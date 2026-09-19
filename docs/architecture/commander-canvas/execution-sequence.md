@@ -18,6 +18,8 @@
 
 **September 20, 2026 — B06 recovery/tray/format source wave.** Structured source adapters, stable tray ownership and the truthful format capability boundary are recorded in [recovery/tray/format wave results](recovery-tray-format-wave-results.md). This closes the B06 source boundary, not the later five-destination route UAT or external converter/codec qualification.
 
+**September 20, 2026 — B07 Commander/overview source wave.** Bounded open-panel pages, the minimized/offscreen recovery rail, persisted-camera restoration and Commander tuck/focus behavior are recorded in [Commander and overview wave results](commander-overview-wave-results.md). Saved appearance preferences, E1.6 motion, live E3 captions/voice and persisted expanded-chat geometry remain their named acceptance joins; no substitute producer is claimed.
+
 ## Global constraints
 
 - Preserve all nine epics, 31 slices and 69 original increments: 66 V1 increments across 30 slices; three V2 increments in E3.4. No disabled or simulated required capability counts as complete V1.

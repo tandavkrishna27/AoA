@@ -61,6 +61,8 @@ export interface UniverseTrayProps {
   onOpenPanel: (key: string) => void;
   /** Commander primary: restore/focus/tuck chat. Never changes voice/blob/captions. */
   onCommanderPrimary: () => void;
+  /** Exposes the primary control for focus restoration after another surface tucks chat. */
+  commanderPrimaryRef?: (node: HTMLButtonElement | null) => void;
   /** Commander options view-mode toggles (independent of the primary action). */
   commanderToggles?: CommanderToggleState;
   onToggleCommander?: (which: keyof CommanderToggleState, value: boolean) => void;
@@ -114,6 +116,7 @@ export function UniverseTray({
   onOpenConversation,
   onOpenPanel,
   onCommanderPrimary,
+  commanderPrimaryRef,
   commanderToggles,
   onToggleCommander,
   conversationTitle,
@@ -235,6 +238,7 @@ export function UniverseTray({
             <>
               <button
                 type="button"
+                ref={commanderPrimaryRef}
                 className="universe-tray-icon universe-tray-commander"
                 aria-label="Commander"
                 onClick={onCommanderPrimary}

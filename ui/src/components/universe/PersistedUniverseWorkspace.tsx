@@ -6,7 +6,7 @@ import {layoutEdit, documentFromState} from "./layout-adapter";
 import {useUniverseState} from "./useUniverseState";
 import type {AuthorizedLayoutSnapshot} from "./panel-state";
 
-type Props = Pick<WorkspaceProps, "content" | "resolveContent" | "onStateObserved" | "motion" | "initialAutoTile"> & {companyId: string; conversationId: string};
+type Props = Pick<WorkspaceProps, "content" | "resolveContent" | "onStateObserved" | "onViewportObserved" | "motion" | "initialAutoTile"> & {companyId: string; conversationId: string};
 /** Persistence boundary for the authorized Universe route. The route supplies
  * already-authorized renderers; this boundary owns layout recovery, not execution. */
 export const PersistedUniverseWorkspace = forwardRef<WorkspaceHandle, Props>(function PersistedUniverseWorkspace(props, forwardedRef) {
@@ -68,6 +68,7 @@ export const PersistedUniverseWorkspace = forwardRef<WorkspaceHandle, Props>(fun
       <UniverseWorkspace key={JSON.stringify([layout.ownerIdentity, props.companyId, props.conversationId])} ref={attach}
         scope={snapshot.scope} initialLayout={snapshot} content={props.content} resolveContent={props.resolveContent} motion={props.motion} initialAutoTile={props.initialAutoTile}
         onStateObserved={props.onStateObserved}
+        onViewportObserved={props.onViewportObserved}
         onInteractionEnd={() => setInteractionEnded(value => value + 1)}
         editsBlocked={!!layout.recoveryError}
         beforeViewportCommit={() => {

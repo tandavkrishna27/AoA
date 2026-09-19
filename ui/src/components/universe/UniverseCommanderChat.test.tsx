@@ -29,3 +29,11 @@ it("places Compact last and restores maximized chat to expanded", () => {
  fireEvent.click(screen.getByRole("button", { name: "Restore Commander" }));
  expect(onPresentationChange).toHaveBeenCalledWith(expect.objectContaining({ chat: "expanded" }));
 });
+it("returns focus to the Commander tray control when tucked", () => {
+ const onPresentationChange = vi.fn();
+ const onTuck = vi.fn();
+ render(<UniverseCommanderChat conversationId={null} onSelectConversation={vi.fn()} onPresentationChange={onPresentationChange} onTuck={onTuck} presentation={{ ...initialPresentation(), chat: "expanded" }} />);
+ fireEvent.click(screen.getByRole("button", { name: "Tuck Commander" }));
+ expect(onPresentationChange).toHaveBeenCalledWith(expect.objectContaining({ chat: "tucked", chatFrontmost: false }));
+ expect(onTuck).toHaveBeenCalledTimes(1);
+});

@@ -48,6 +48,14 @@
   box-shadow: 0 0 50px 8px #b82d4b44, inset 0 0 30px #ffffff30;
 }
 .universe-shell-chat { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+.universe-preview-rail { position: absolute; left: 14px; top: 50%; z-index: 64; transform: translateY(-50%); display: flex; align-items: center; gap: 10px; }
+.universe-preview-rail-items { display: grid; gap: 8px; }
+.universe-preview-rail-items > button { width: 38px; height: 48px; border: 1px solid #42363b; border-radius: 9px; background: #201c1ee8; color: #f2ebed; }
+.universe-preview-card { width: 230px; padding: 10px; border: 1px solid #42363b; border-radius: 12px; background: #201c1ef5; box-shadow: 0 18px 48px #0008; display: grid; gap: 6px; }
+.universe-preview-card-thumb { height: 92px; padding: 18px; border-radius: 8px; background: #121014; display: grid; gap: 8px; }
+.universe-preview-card-thumb i { height: 5px; border-radius: 9px; background: #ffffff19; }
+.universe-preview-card > span { color: var(--dim); font-size: 11px; }
+.universe-preview-card > button { justify-self: end; padding: 5px 9px; border-radius: 7px; background: #ed655e; color: #170b0c; }
 @media (max-width: 640px) {
   .universe-shell-tray { top: 10px; }
   .universe-exit { top: 80px; left: 12px; }

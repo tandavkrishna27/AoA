@@ -9,11 +9,12 @@ interface UniverseCommanderChatProps {
   onSelectConversation: (id: string) => void;
   presentation: Presentation;
   onPresentationChange: (next: Presentation) => void;
+  onTuck?: () => void;
   getUniverseContext?: () => UniverseContext | null;
 }
 
 /** Presentation-only adapter: the canonical panel owns history, drafts and sends. */
-export function UniverseCommanderChat({ conversationId, onSelectConversation, presentation, onPresentationChange, getUniverseContext }: UniverseCommanderChatProps) {
+export function UniverseCommanderChat({ conversationId, onSelectConversation, presentation, onPresentationChange, onTuck, getUniverseContext }: UniverseCommanderChatProps) {
   const { chat } = presentation;
   const showHeader = chat === "expanded" || chat === "maximized";
   const expand = () => onPresentationChange({ ...presentation, chat: "expanded", lastVisible: "expanded", chatFrontmost: true });
@@ -23,7 +24,10 @@ export function UniverseCommanderChat({ conversationId, onSelectConversation, pr
         <header className="universe-commander-header">
           <span>Commander</span>
           <div>
-            <button type="button" aria-label="Tuck Commander" title="Tuck" onClick={() => onPresentationChange({ ...presentation, chat: "tucked", lastVisible: chat, chatFrontmost: false })}><Minus size={16} /></button>
+            <button type="button" aria-label="Tuck Commander" title="Tuck" onClick={() => {
+              onPresentationChange({ ...presentation, chat: "tucked", lastVisible: chat, chatFrontmost: false });
+              onTuck?.();
+            }}><Minus size={16} /></button>
             <button type="button" aria-label={chat === "maximized" ? "Restore Commander" : "Maximize Commander"} title={chat === "maximized" ? "Restore" : "Maximize"} onClick={() => chat === "maximized" ? expand() : onPresentationChange({ ...presentation, chat: "maximized", lastVisible: "maximized", chatFrontmost: true })}>{chat === "maximized" ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
             <button type="button" aria-label="Compact Commander" title="Compact" onClick={() => onPresentationChange(compactChat(presentation))}><ChevronUp size={16} className="rotate-180" /></button>
           </div>

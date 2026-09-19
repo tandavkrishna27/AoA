@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {Link, useNavigate, useSearchParams} from "react-router-dom";
 import {ArrowLeft} from "lucide-react";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
@@ -12,10 +12,11 @@ import {TaskConversationPanel} from "../components/universe/TaskConversationPane
 import {UniverseTray} from "../components/universe/UniverseTray";
 import {CommanderBlob} from "../components/universe/CommanderBlob";
 import {UniverseCommanderChat} from "../components/universe/UniverseCommanderChat";
+import {PanelPreviewRail, isPanelOutOfView} from "../components/universe/PanelPreviewRail";
 import {initialPresentation, toggleTrayChat} from "../components/universe/commander-presentation";
 import {isTransientUniverseReadError} from "../components/universe/transient-read-error";
 import type {WorkspaceHandle} from "../components/universe/UniverseWorkspace";
-import type {State} from "../components/universe/panel-state";
+import type {State, Viewport} from "../components/universe/panel-state";
 import {buildUniverseContext} from "../components/universe/buildUniverseContext";
 import "../components/universe/commander-surface.css";
 import "../components/universe/universe-shell.css";
@@ -40,9 +41,26 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   const [error, setError] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(initialPresentation);
   const [registry, setRegistry] = useState<State | null>(null);
+  const [viewport, setViewport] = useState<Viewport>({x: 0, y: 0, zoom: 1});
+  const [canvasBounds, setCanvasBounds] = useState({width: 1, height: 1});
   const frame = useRef<WorkspaceHandle>(null);
+  const canvas = useRef<HTMLDivElement>(null);
+  const commanderPrimary = useRef<HTMLButtonElement | null>(null);
   const alive = useRef(true);
   useEffect(() => {alive.current = true; return () => {alive.current = false;};}, []);
+  useLayoutEffect(() => {
+    const element = canvas.current;
+    if (!element) return;
+    const measure = () => {
+      const bounds = element.getBoundingClientRect();
+      setCanvasBounds({width: Math.max(1, bounds.width), height: Math.max(1, bounds.height)});
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(element);
+    window.addEventListener("resize", measure);
+    return () => {observer?.disconnect(); window.removeEventListener("resize", measure);};
+  }, []);
   const conversationKey = ["commander-conversations", companyId, "universe-owner", identity];
   const conversations = useQuery({queryKey: conversationKey,
     queryFn: () => commanderConversationsApi.list(companyId), retry: false});
@@ -83,7 +101,16 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   };
   const openPanel = (key: string) => {
     const panel = currentRegistry?.panels[key];
-    if (panel) perform(() => frame.current?.dispatch({type: panel.minimized ? "restore" : "focus", key, generation: panel.generation}));
+    if (panel) perform(() => {
+      frame.current?.dispatch({type: panel.minimized ? "restore" : "focus", key, generation: panel.generation});
+      if (panel.minimized || isPanelOutOfView(panel.rect, viewport, canvasBounds)) {
+        frame.current?.setViewport({
+          x: canvasBounds.width / 2 - (panel.rect.x + panel.rect.width / 2) * viewport.zoom,
+          y: canvasBounds.height / 2 - (panel.rect.y + panel.rect.height / 2) * viewport.zoom,
+          zoom: viewport.zoom,
+        });
+      }
+    });
   };
   const prefix = selectedCompany?.issuePrefix;
   const returnPath = prefix ? `/${prefix}/commander${selected ? `?conversation=${encodeURIComponent(selected)}` : ""}` : "/";
@@ -98,6 +125,7 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
         commanderConversations={[...mine.map(row => ({key: row.id, label: row.title || "Untitled conversation"})),
           {key: "new-conversation", label: creating ? "Creating conversation…" : "New conversation"}]}
         commanderToggles={{chat: presentation.chat !== "tucked", blob: presentation.blob, captions: presentation.captions}}
+        commanderPrimaryRef={node => { commanderPrimary.current = node; }}
         onCommanderPrimary={() => setPresentation(toggleTrayChat)}
         onToggleCommander={(which, value) => setPresentation(previous => which === "chat"
           ? {...previous, chat: value ? previous.lastVisible : "tucked", chatFrontmost: value}
@@ -112,6 +140,11 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
           perform(() => frame.current!.open({ref: {companyId, kind: "task", id}, title: task.title}));
         }}/>
     </div>
+    <PanelPreviewRail panels={currentRegistry?.order.flatMap(key => {
+      const panel = currentRegistry.panels[key];
+      const outside = !panel.minimized && currentRegistry.maximized === null && isPanelOutOfView(panel.rect, viewport, canvasBounds);
+      return panel.minimized || outside ? [{key, title: panel.title, kind: panel.ref.kind === "task" ? "Task" : panel.ref.kind, minimized: panel.minimized}] : [];
+    }) ?? []} onOpen={openPanel}/>
     <div className="universe-shell-notices" aria-live="polite">
       {(error || conversations.isError || tasks.isError) && <p role="alert">{error || (conversations.isError ? "Conversations could not be loaded." : "Tasks could not be loaded.")}</p>}
       {conversations.isError && <button type="button" onClick={() => void conversations.refetch()}>Retry conversations</button>}
@@ -119,9 +152,9 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
       {conversations.isLoading && <p role="status">Loading conversations…</p>}
       {requested && conversations.isSuccess && !selected && <p role="alert">This conversation is unavailable. Choose another in Commander options.</p>}
     </div>
-    <div className="universe-shell-canvas" style={suspended ? {display: "none"} : undefined}>
+    <div ref={canvas} className="universe-shell-canvas" style={suspended ? {display: "none"} : undefined}>
       {selected && <PersistedUniverseWorkspace key={selected} ref={frame} companyId={companyId} conversationId={selected}
-        content={{}} motion onStateObserved={setRegistry} resolveContent={panel => panel.ref.kind === "task" ? {
+        content={{}} motion onStateObserved={setRegistry} onViewportObserved={setViewport} resolveContent={panel => panel.ref.kind === "task" ? {
           ref: panel.ref, title: panel.title, render: () => <TaskConversationPanel companyId={companyId}
             issueId={panel.ref.id} panelKey={panel.key} generation={panel.generation} active/>,
         } : undefined}/>}
@@ -132,7 +165,7 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
     {(conversations.isSuccess || suspended) && (!requested || !!selected) && <div className="universe-shell-chat" style={suspended ? {display: "none"} : undefined}>
       <UniverseCommanderChat conversationId={selected} onSelectConversation={async id => {
         await client.invalidateQueries({queryKey: conversationKey}); if (alive.current) openConversation(id);
-      }} presentation={presentation} onPresentationChange={setPresentation} getUniverseContext={() => {
+      }} presentation={presentation} onPresentationChange={setPresentation} onTuck={() => commanderPrimary.current?.focus()} getUniverseContext={() => {
         if (!selected || !currentRegistry) return null;
         const bounds = document.querySelector(".universe-shell-canvas")?.getBoundingClientRect();
         const viewport = frame.current?.getViewport() ?? {x: 0, y: 0, zoom: 1};

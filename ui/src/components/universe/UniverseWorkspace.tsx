@@ -67,6 +67,8 @@ export type WorkspaceProps = {
   onStateCommit?: (before: State, after: State) => void;
   onInteractionEnd?: () => void;
   onViewportCommit?: (viewport: Viewport) => void;
+  /** Read-only camera projection, including hydration; never a persistence signal. */
+  onViewportObserved?: (viewport: Viewport) => void;
   /** When true, opening a panel re-tiles the auto (non-pinned, non-manual) set.
    * Defaults off so the frame's built-in behaviour stays cascade; the product
    * turns this on via the Universe preference. */
@@ -143,6 +145,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
     const callbacks = useRef(props);
     callbacks.current = props;
     useEffect(() => {callbacks.current.onStateObserved?.(state);}, [state]);
+    useEffect(() => {callbacks.current.onViewportObserved?.(viewport);}, [viewport]);
     const alive = useRef(true);
     const root = useRef<HTMLDivElement>(null);
     const recovery = useRef<HTMLDivElement>(null);

@@ -388,3 +388,20 @@
   margin: 4px 0;
   color: var(--utray-dim);
 }
+.universe-overview-pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--utray-dim);
+  font-size: 12px;
+}
+.universe-overview-pages button {
+  padding: 5px 9px;
+  border: 1px solid var(--utray-border);
+  border-radius: 7px;
+  background: var(--utray-raise);
+  color: var(--utray-text);
+}
+.universe-overview-pages button:disabled { opacity: 0.42; }
