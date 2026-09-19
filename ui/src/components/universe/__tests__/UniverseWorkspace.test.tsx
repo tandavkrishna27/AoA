@@ -72,6 +72,7 @@ function setup() {
   const handle = createRef<WorkspaceHandle>();
   const changed = vi.fn();
   const camera = vi.fn();
+  const committed = vi.fn();
   const result = render(
     <UniverseWorkspace
       ref={handle}
@@ -86,9 +87,10 @@ function setup() {
       }}
       onStateChange={changed}
       onViewportCommit={camera}
+      onStateCommit={committed}
     />
   );
-  return { handle, changed, camera, ...result };
+  return { handle, changed, camera, committed, ...result };
 }
 
 function mouse(target: EventTarget, type: string, x: number, y: number) {
@@ -109,6 +111,35 @@ async function settleCameraEnd() {
 }
 
 describe("controlled workspace", () => {
+  it("commits only the completed drag and never hydration or cancelled samples", async () => {
+    const {handle, committed} = setup();
+    expect(committed).not.toHaveBeenCalled();
+    const header = screen.getByLabelText("Task fixture panel controls");
+    const initial = handle.current!.getState().panels[key].rect;
+    mouse(header, "mousedown", 50, 50);
+    mouse(window, "mousemove", 100, 80);
+    expect(committed).not.toHaveBeenCalled();
+    mouse(window, "mouseup", 100, 80);
+    await act(async () => {await new Promise(resolve => setTimeout(resolve, 0));});
+    expect(committed).toHaveBeenCalledTimes(1);
+    expect(committed.mock.calls[0]![0].panels[key].rect).toEqual(initial);
+    expect(committed.mock.calls[0]![1].panels[key].rect).toEqual(handle.current!.getState().panels[key].rect);
+    committed.mockClear();
+    mouse(header, "mousedown", 100, 80);
+    mouse(window, "mousemove", 140, 90);
+    fireEvent(window, new Event("pointercancel"));
+    mouse(window, "mouseup", 140, 90);
+    await act(async () => {await new Promise(resolve => setTimeout(resolve, 0));});
+    expect(committed).not.toHaveBeenCalled();
+  });
+  it("commits a lifecycle action with before and after state", () => {
+    const {committed} = setup();
+    fireEvent.click(screen.getByRole("button", {name: "Minimize panel"}));
+    expect(committed).toHaveBeenCalledTimes(1);
+    expect(committed.mock.calls[0]![0].panels[key].minimized).toBe(false);
+    expect(committed.mock.calls[0]![1].panels[key].minimized).toBe(true);
+  });
+
   it.each(["close", "minimize"] as const)(
     "returns fallback focus to the recovery group after %s without a launcher",
     (type) => {
@@ -575,4 +606,37 @@ describe("controlled workspace", () => {
     expect(handle.current!.getState().scope).toEqual(other);
     expect(changed).not.toHaveBeenCalled();
   });
+});
+
+it("hydrates authoritative state and camera without issuing save callbacks", () => {
+ const {handle, committed, camera} = setup();
+ const remote = {...layout, revision: 5, viewport: {x: 100, y: 200, zoom: 1}, panels: layout.panels.map(p => ({...p, rect: {...p.rect, x: 70}}))};
+ act(() => handle.current!.hydrate(remote));
+ expect(handle.current!.getState().panels[key].rect.x).toBe(70);
+ expect(handle.current!.getViewport()).toEqual(remote.viewport);
+ expect(committed).not.toHaveBeenCalled();
+ expect(camera).not.toHaveBeenCalled();
+});
+it("reconciles an opening receipt only against its matching generation", () => {
+ const {handle, committed} = setup();
+ const generation = handle.current!.getState().panels[key].generation;
+ const ack = {scope, operationId: "save", revision: 2, nextOpenedOrdinal: 10, opened: [{operationIndex: 0, key, openedOrdinal: 9}]};
+ act(() => handle.current!.reconcile(ack, [{scope, operationId: "save", operationIndex: 0, key, generation}]));
+ expect(handle.current!.getState().panels[key].openedOrdinal).toBe(9);
+ expect(committed).not.toHaveBeenCalled();
+});
+
+it("cancels a live camera interaction when recovery becomes blocked", async () => {
+ const handle = createRef<WorkspaceHandle>(); const camera = vi.fn();
+ const props = {scope, initialLayout: layout, content: {}, onViewportCommit: camera};
+ const {container, rerender} = render(<UniverseWorkspace ref={handle} {...props}/>);
+ mouse(container.querySelector(".react-flow__pane")!, "mousedown", 100, 100);
+ mouse(window, "mousemove", 140, 120);
+ expect(handle.current!.isInteracting()).toBe(true);
+ rerender(<UniverseWorkspace ref={handle} {...props} editsBlocked/>);
+ mouse(window, "mousemove", 180, 160); mouse(window, "mouseup", 180, 160);
+ await settleCameraEnd();
+ expect(handle.current!.isInteracting()).toBe(false);
+ expect(handle.current!.getViewport()).toEqual(layout.viewport);
+ expect(camera).not.toHaveBeenCalled();
 });

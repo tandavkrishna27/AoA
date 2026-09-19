@@ -183,3 +183,12 @@
     opacity: 1;
   }
 }
+
+.universe-persistence { height: 100%; min-height: 0; display: flex; flex-direction: column; color: var(--text, #29292c); background: var(--bg, #f4f4f5); }
+.universe-persistence > .universe-workspace { flex: 1; height: auto; }
+.universe-persistence > [role="status"], .universe-persistence > [role="alert"] { padding: 4px 12px; margin: 0; font-size: 12px; }
+.universe-layout-recovery { flex: 0 1 auto; overflow: auto; max-height: 40%; padding: 8px 12px; background: var(--card-2, #e8e8ea); }
+.universe-layout-recovery button { margin: 4px 8px 4px 0; padding: 6px 10px; color: inherit; background: var(--bg, #f4f4f5); border: 1px solid currentColor; border-radius: 5px; }
+.universe-layout-recovery button:disabled { opacity: .5; }
+.universe-layout-recovery :focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.universe-layout-recovery label { display: block; }

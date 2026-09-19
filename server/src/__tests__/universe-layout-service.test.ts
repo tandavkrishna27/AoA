@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyLayoutOp,
+  applyLayoutWithOpenings,
   applyLayoutOperations,
   hashLayoutOperations,
   type UniverseScope,
@@ -69,7 +70,7 @@ describe("universe layout reducer", () => {
       expect(() => applyLayoutOp(doc, op, scope)).toThrow();
   });
 
-  it("close removes the panel and clears order/selection", () => {
+  it("close removes the panel and selects the last visible survivor", () => {
     let doc = applyLayoutOperations(
       emptyUniverseLayoutDocument(),
       [openOp("k1"), openOp("k2")],
@@ -78,7 +79,7 @@ describe("universe layout reducer", () => {
     doc = applyLayoutOp(doc, { type: "close", key: "k2" }, scope);
     expect(doc.panels.map((p) => p.key)).toEqual(["k1"]);
     expect(doc.order).toEqual(["k1"]);
-    expect(doc.selected).toBeNull();
+    expect(doc.selected).toBe("k1");
   });
 
   it("order must be an exact permutation of the open panels", () => {
@@ -110,4 +111,65 @@ describe("universe layout reducer", () => {
       hashLayoutOperations([openOp("k2")]),
     );
   });
+  it("maximizes and restores without changing normal geometry", () => {
+    const doc = applyLayoutOperations(emptyUniverseLayoutDocument(), [openOp("k1"), { type: "presentation", selected: "k1", maximized: "k1" }], scope);
+    expect(doc.maximized).toBe("k1");
+    expect(() => applyLayoutOperations(doc, [{ type: "geometry", key: "k1", rect }], scope)).toThrow();
+    const restored = applyLayoutOperations(doc, [{ type: "presentation", selected: "k1", maximized: null }], scope);
+    expect(restored.panels[0].rect).toEqual(rect);
+  });
+
+  it("foreground restores and exits the other panel's maximize", () => {
+    const doc = applyLayoutOperations(emptyUniverseLayoutDocument(), [openOp("k1"), openOp("k2"), { type: "minimize", key: "k1", value: true }, { type: "presentation", selected: "k2", maximized: "k2" }], scope);
+    const restored = applyLayoutOperations(doc, [{ type: "minimize", key: "k1", value: false }], scope);
+    expect(restored).toMatchObject({ selected: "k1", maximized: null, order: ["k2", "k1"] });
+  });
+
+  it("validates final presentation after a complete atomic batch", () => {
+    const doc = applyLayoutOperations(emptyUniverseLayoutDocument(), [openOp("k1"), openOp("k2"), { type: "presentation", selected: "k2", maximized: "k2" }], scope);
+    expect(() => applyLayoutOperations(doc, [{ type: "order", keys: ["k2", "k1"] }], scope)).toThrow();
+    expect(applyLayoutOperations(doc, [{ type: "order", keys: ["k2", "k1"] }, { type: "presentation", selected: "k1", maximized: "k1" }], scope).maximized).toBe("k1");
+  });
+
+  it("minimizing transfers selection and protects hidden geometry", () => {
+    const doc = applyLayoutOperations(emptyUniverseLayoutDocument(), [openOp("k1"), openOp("k2"), { type: "minimize", key: "k2", value: true }], scope);
+    expect(doc.selected).toBe("k1");
+    expect(() => applyLayoutOperations(doc, [{ type: "geometry", key: "k2", rect }], scope)).toThrow();
+    expect(applyLayoutOperations(doc, [{ type: "minimize", key: "k1", value: true }], scope).selected).toBeNull();
+  });
+
+  it("does not allocate unsafe ordinals or mutate the input on an invalid batch", () => {
+    const exhausted = { ...emptyUniverseLayoutDocument(), nextOpenedOrdinal: Number.MAX_SAFE_INTEGER };
+    expect(() => applyLayoutOperations(exhausted, [openOp("k1")], scope)).toThrow();
+    const doc = emptyUniverseLayoutDocument();
+    expect(() => applyLayoutOperations(doc, [openOp("k1"), { type: "presentation", selected: "missing", maximized: null }], scope)).toThrow();
+    expect(doc).toEqual(emptyUniverseLayoutDocument());
+  });
+
+  it("opening the already-maximized panel preserves its presentation and identity", () => {
+    const doc = applyLayoutOperations(emptyUniverseLayoutDocument(), [openOp("k1"), { type: "presentation", selected: "k1", maximized: "k1" }], scope);
+    const reopened = applyLayoutOperations(doc, [openOp("k1")], scope);
+    expect(reopened.maximized).toBe("k1");
+    expect(reopened.panels).toEqual(doc.panels);
+    expect(reopened.nextOpenedOrdinal).toBe(doc.nextOpenedOrdinal);
+  });
+
+});
+
+it("receipts preserve every open incarnation even when closed in the same batch", () => {
+  const result = applyLayoutWithOpenings(emptyUniverseLayoutDocument(), [
+    openOp("k1"), openOp("k1"), { type: "close", key: "k1" }, openOp("k1"),
+  ], scope);
+  expect(result.opened).toEqual([
+    { operationIndex: 0, key: "k1", openedOrdinal: 1 },
+    { operationIndex: 1, key: "k1", openedOrdinal: 1 },
+    { operationIndex: 3, key: "k1", openedOrdinal: 2 },
+  ]);
+  expect(result.document.nextOpenedOrdinal).toBe(3);
+});
+
+it.each(["minimize", "close"] as const)("%s selected skips hidden survivors when choosing focus", type => {
+ const doc = applyLayoutOperations(emptyUniverseLayoutDocument(), [openOp("k1"), openOp("k2"), {type: "minimize", key: "k2", value: true}, openOp("k3")], scope);
+ const next = applyLayoutOperations(doc, [type === "close" ? {type, key: "k3"} : {type, key: "k3", value: true}], scope);
+ expect(next.selected).toBe("k1");
 });

@@ -9,6 +9,8 @@ const mockService = vi.hoisted(() => ({
   get: vi.fn(),
   apply: vi.fn(),
   getReceipt: vi.fn(),
+  getCheckpoint: vi.fn(),
+  saveCheckpoint: vi.fn(),
 }));
 
 vi.mock("../services/universe-layout.js", () => ({
@@ -146,5 +148,57 @@ describe("universe layout routes", () => {
     );
     expect(hit.status, JSON.stringify(hit.body)).toBe(200);
     expect(hit.body).toEqual({ operationId: "op-1", revision: 2, schemaVersion: 1 });
+  });
+});
+
+it("decodes checkpoint key once and derives owner from actor", async () => {
+  const key = JSON.stringify([COMPANY_A, "user-1", CONV, "artifact", "id%20literal", "version"]);
+  mockService.getCheckpoint.mockResolvedValue(null);
+  const response = await request(createApp(boardActor())).get(`/api/companies/${COMPANY_A}/universe/conversations/${CONV}/panels/${encodeURIComponent(key)}/checkpoint?sourceVersionId=version`);
+  expect(response.status).toBe(200);
+  expect(mockService.getCheckpoint).toHaveBeenCalledWith(scope, key, "version");
+});
+
+
+describe("checkpoint PATCH boundary", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const version = "22222222-2222-4222-8222-222222222222";
+  const key = JSON.stringify([COMPANY_A, "user-1", CONV, "artifact", "id%20literal", version]);
+  const path = `/api/companies/${COMPANY_A}/universe/conversations/${CONV}/panels/${encodeURIComponent(key)}/checkpoint`;
+  const patch = {sourceVersionId: version, schemaVersion: 1, expectedRevision: 0,
+    data: {inputs: {}, selectedRows: [], filters: {}}};
+
+  it("uses the authenticated owner and decoded key for a valid save", async () => {
+    const ack = {revision: 1, schemaVersion: 1, data: patch.data};
+    mockService.saveCheckpoint.mockResolvedValue(ack);
+    const response = await request(createApp(boardActor())).patch(path).send(patch);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(ack);
+    expect(mockService.saveCheckpoint).toHaveBeenCalledWith(scope, key, patch);
+  });
+
+  it("rejects anonymous, userless, foreign-company, and agent writers before service access", async () => {
+    for (const [actor, status] of [
+      [{type: "none", source: "none"}, 401],
+      [boardActor({userId: undefined}), 401],
+      [boardActor({companyIds: [COMPANY_B]}), 403],
+      [agentActor(COMPANY_A), 403],
+    ] as const) {
+      const response = await request(createApp(actor)).patch(path).send(patch);
+      expect(response.status).toBe(status);
+    }
+    expect(mockService.saveCheckpoint).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsupported schema and executable/unknown fields before service access", async () => {
+    for (const invalid of [
+      {...patch, schemaVersion: 2},
+      {...patch, data: {...patch.data, execute: "code"}},
+      {...patch, userId: "another-user"},
+    ]) {
+      const response = await request(createApp(boardActor())).patch(path).send(invalid);
+      expect(response.status).toBe(400);
+    }
+    expect(mockService.saveCheckpoint).not.toHaveBeenCalled();
   });
 });

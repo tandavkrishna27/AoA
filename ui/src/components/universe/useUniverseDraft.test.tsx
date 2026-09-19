@@ -1,3 +1,4 @@
+vi.mock("../../api/auth", () => ({ authApi: { getSession: async () => ({user: {id: "owner"}, session: {id: "login", userId: "owner"}}) } }));
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -109,4 +110,65 @@ describe("useUniverseDraft", () => {
     const [, , , lastPatch] = mockApi.save.mock.calls[0]!;
     expect(lastPatch.text).toBe("");
   });
+  it("Send freezes the current input before its debounce has saved", async () => {
+    const { result, unmount } = await ready(draft(2, "old"));
+    act(() => { result.current.save("new input", ["a2"]); });
+    expect(result.current.submitSnapshot("s2")).toMatchObject({ text: "new input", attachmentAssetIds: ["a2"] });
+    unmount();
+  });
+
+  it("acknowledgement does not erase input typed after Send", async () => {
+    const { result, unmount } = await ready(draft(2, "sent"));
+    const sent = result.current.submitSnapshot("s2")!;
+    act(() => { result.current.save("unsent new input", []); });
+    await act(async () => { await result.current.acknowledge(sent); });
+    expect(mockApi.save).not.toHaveBeenCalled();
+    expect(result.current.submitSnapshot("s3")?.text).toBe("unsent new input");
+    unmount();
+  });
+
+  it("acknowledgement clears an attachment-only draft", async () => {
+    mockApi.save.mockResolvedValue(draft(3));
+    const { result } = await ready(draft(2, "", ["a1"]));
+    const sent = result.current.submitSnapshot("s2")!;
+    await act(async () => { await result.current.acknowledge(sent); });
+    expect(mockApi.save).toHaveBeenCalledWith("c1", "conv1", dest, expect.objectContaining({ text: "", attachmentAssetIds: [] }), expect.any(AbortSignal));
+  });
+
+  it("a failed in-flight save cannot overwrite a newer queued edit", async () => {
+    let reject!: (reason: Error) => void;
+    mockApi.save.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; }));
+    const { result, unmount } = await ready(draft(0));
+    let saving!: Promise<unknown>;
+    act(() => { saving = result.current.save("older", [], true)!.catch(() => undefined); });
+    act(() => { result.current.save("newer", []); });
+    await act(async () => { reject(new Error("offline")); await saving; });
+    mockApi.save.mockResolvedValue(draft(1, "newer"));
+    await act(async () => { await result.current.flush(); });
+    expect(mockApi.save.mock.calls[1]?.[3].text).toBe("newer");
+    unmount();
+  });
+
+  it("uses a refreshed server draft once the local edit has been saved", async () => {
+    mockApi.save.mockResolvedValue(draft(1, "local"));
+    const { result } = await ready(draft(0));
+    await act(async () => { await result.current.save("local", [], true); });
+    mockApi.get.mockResolvedValue(draft(2, "other tab"));
+    await act(async () => { await result.current.refetch(); });
+    expect(result.current.submitSnapshot("s3")?.text).toBe("other tab");
+  });
+
+});
+
+it("keeps unsaved draft candidates separate when switching destinations", async () => {
+ mockApi.get.mockResolvedValue(draft(0));
+ const h = renderHook(({id}) => useUniverseDraft("c1", "conv1", {kind: "task", id}, {debounceMs: 60000}), {initialProps: {id: "first"}, wrapper: makeWrapper()});
+ await waitFor(() => expect(h.result.current.isLoading).toBe(false));
+ act(() => {h.result.current.save("unsaved first", []);});
+ h.rerender({id: "second"});
+ await waitFor(() => expect(h.result.current.isLoading).toBe(false));
+ expect(h.result.current.submitSnapshot("second")?.text).toBe("");
+ h.rerender({id: "first"});
+ await waitFor(() => expect(h.result.current.submitSnapshot("first")?.text).toBe("unsaved first"));
+ h.unmount();
 });

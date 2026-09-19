@@ -1982,6 +1982,20 @@
       "when": 1789629356955,
       "tag": "0282_past_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 283,
+      "version": "7",
+      "when": 1789818596206,
+      "tag": "0283_stale_absorbing_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 284,
+      "version": "7",
+      "when": 1789818854977,
+      "tag": "0284_icy_the_call",
+      "breakpoints": true
     }
   ]
 }

@@ -620,3 +620,5 @@ export {
   type RuntimeDecisionAnswerInput,
   type RuntimeDecisionDetail,
 } from "./hub.js";
+
+export { checkpointDataSchema, checkpointPatchSchema, type CheckpointData, type CheckpointPatch, type CheckpointSnapshot } from "./universe-layout.js";

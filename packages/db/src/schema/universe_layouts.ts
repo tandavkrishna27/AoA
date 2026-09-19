@@ -90,6 +90,11 @@ export const universeLayoutOperations = pgTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     operationId: text("operation_id").notNull(),
     payloadHash: text("payload_hash").notNull(),
+    // Nullable only for pre-upgrade receipts, whose opening history cannot be reconstructed.
+    acknowledgement: jsonb("acknowledgement").$type<{
+      operationId: string; revision: number; schemaVersion: 1; nextOpenedOrdinal: number;
+      opened: Array<{ operationIndex: number; key: string; openedOrdinal: number }>;
+    }>(),
     acknowledgedRevision: bigint("acknowledged_revision", {
       mode: "number",
     }).notNull(),
@@ -103,3 +108,15 @@ export const universeLayoutOperations = pgTable(
     ).on(table.layoutId, table.operationId),
   }),
 );
+
+export const universePanelCheckpoints = pgTable("universe_panel_checkpoints", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(), conversationId: text("conversation_id").notNull(),
+  panelKey: text("panel_key").notNull(), sourceVersionId: uuid("source_version_id").notNull(),
+  schemaVersion: integer("schema_version").notNull(),
+  revision: bigint("revision", { mode: "number" }).notNull().default(0),
+  data: jsonb("data").$type<{ inputs: Record<string, string | number | boolean>; selectedRows: number[]; filters: Record<string, string> }>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => ({ ownerVersionUq: uniqueIndex("universe_checkpoints_owner_version_uq").on(table.companyId, table.userId, table.conversationId, table.panelKey, table.sourceVersionId) }));

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { LayoutOp, UniverseLayoutDocument } from "@armyofagents/shared";
+import { universeLayoutDocumentSchema, type LayoutOp, type UniverseLayoutDocument } from "@armyofagents/shared";
 import { badRequest } from "../errors.js";
 
 // Pure document reducer — deliberately free of any @armyofagents/db import so it
@@ -27,6 +27,7 @@ function foreground(
     ...doc,
     order: [...doc.order.filter((k) => k !== key), key],
     selected: key,
+    maximized: doc.maximized === key ? key : null,
   };
 }
 
@@ -51,6 +52,7 @@ export function applyLayoutOp(
           },
           op.key,
         );
+      if (doc.nextOpenedOrdinal >= Number.MAX_SAFE_INTEGER) throw badRequest("Opening ordinal exhausted");
       return foreground(
         {
           ...doc,
@@ -77,9 +79,11 @@ export function applyLayoutOp(
     case "minimize": {
       if (!doc.panels.some((p) => p.key === op.key))
         throw badRequest(`Unknown panel for ${op.type}`);
+      if (op.type === "geometry" && (doc.maximized === op.key || doc.panels.find((p) => p.key === op.key)?.minimized))
+        throw badRequest("Cannot change geometry of a minimized or maximized panel");
       const panels = doc.panels.map((p) => {
         if (p.key !== op.key) return p;
-        if (op.type === "geometry") return { ...p, rect: op.rect };
+        if (op.type === "geometry") return { ...p, rect: op.rect, ...(op.placement ? {placement: op.placement} : {}) };
         if (op.type === "pin") return { ...p, pinned: op.value };
         return { ...p, minimized: op.value };
       });
@@ -87,10 +91,10 @@ export function applyLayoutOp(
         return {
           ...doc,
           panels,
-          selected: doc.selected === op.key ? null : doc.selected,
+          selected: doc.selected === op.key ? [...doc.order].reverse().find(key => key !== op.key && panels.some(p => p.key === key && !p.minimized)) ?? null : doc.selected,
           maximized: doc.maximized === op.key ? null : doc.maximized,
         };
-      return { ...doc, panels };
+      return op.type === "minimize" ? foreground({ ...doc, panels, maximized: null }, op.key) : { ...doc, panels };
     }
     case "close": {
       if (!doc.panels.some((p) => p.key === op.key))
@@ -99,7 +103,7 @@ export function applyLayoutOp(
         ...doc,
         panels: doc.panels.filter((p) => p.key !== op.key),
         order: doc.order.filter((k) => k !== op.key),
-        selected: doc.selected === op.key ? null : doc.selected,
+        selected: doc.selected === op.key ? [...doc.order].reverse().find(key => key !== op.key && doc.panels.some(p => p.key === key && !p.minimized)) ?? null : doc.selected,
         maximized: doc.maximized === op.key ? null : doc.maximized,
       };
     }
@@ -113,6 +117,8 @@ export function applyLayoutOp(
         throw badRequest("Order must be a permutation of the open panels");
       return { ...doc, order: [...op.keys] };
     }
+    case "presentation":
+      return { ...doc, selected: op.selected, maximized: op.maximized };
     case "viewport":
       return { ...doc, viewport: { x: op.x, y: op.y, zoom: op.zoom } };
   }
@@ -124,5 +130,24 @@ export function applyLayoutOperations(
   operations: LayoutOp[],
   scope: UniverseScope,
 ): UniverseLayoutDocument {
-  return operations.reduce((acc, op) => applyLayoutOp(acc, op, scope), doc);
+  const result = universeLayoutDocumentSchema.safeParse(
+    operations.reduce((acc, op) => applyLayoutOp(acc, op, scope), doc),
+  );
+  if (!result.success) throw badRequest("Invalid final layout presentation");
+  return result.data;
+}
+
+/** Capture allocations at each operation, not from the final document (which may
+ * have closed and reopened the same key). */
+export function applyLayoutWithOpenings(doc: UniverseLayoutDocument, operations: LayoutOp[], scope: UniverseScope) {
+  const opened: Array<{ operationIndex: number; key: string; openedOrdinal: number }> = [];
+  let document = doc;
+  operations.forEach((op, operationIndex) => {
+    document = applyLayoutOp(document, op, scope);
+    if (op.type === "open") opened.push({ operationIndex, key: op.key,
+      openedOrdinal: document.panels.find(panel => panel.key === op.key)!.openedOrdinal });
+  });
+  const valid = universeLayoutDocumentSchema.safeParse(document);
+  if (!valid.success) throw badRequest("Invalid final layout presentation");
+  return { document: valid.data, opened };
 }

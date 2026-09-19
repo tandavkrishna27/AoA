@@ -20,12 +20,14 @@ export const universeDraftApi = {
     companyId: string,
     conversationId: string,
     destination: UniverseDraftDestination,
-  ) => api.get<UniverseDraft>(base(companyId, conversationId, destination)),
+    signal?: AbortSignal,
+  ) => api.get<UniverseDraft>(base(companyId, conversationId, destination), {signal}),
   save: (
     companyId: string,
     conversationId: string,
     destination: UniverseDraftDestination,
     patch: UniverseDraftPatch,
+    signal?: AbortSignal,
   ) =>
-    api.patch<UniverseDraft>(base(companyId, conversationId, destination), patch),
+    api.patch<UniverseDraft>(base(companyId, conversationId, destination), patch, {signal}),
 };

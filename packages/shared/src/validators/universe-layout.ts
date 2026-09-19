@@ -55,10 +55,11 @@ export const layoutOpSchema = z.discriminatedUnion("type", [
       title: z.string().max(1024),
     })
     .strict(),
-  z.object({ type: z.literal("geometry"), key, rect: rectSchema }).strict(),
+  z.object({ type: z.literal("geometry"), key, rect: rectSchema, placement: z.enum(["auto", "manual"]).optional() }).strict(),
   z.object({ type: z.literal("pin"), key, value: z.boolean() }).strict(),
   z.object({ type: z.literal("minimize"), key, value: z.boolean() }).strict(),
   z.object({ type: z.literal("close"), key }).strict(),
+  z.object({ type: z.literal("presentation"), selected: key.nullable(), maximized: key.nullable() }).strict(),
   z
     .object({
       type: z.literal("order"),
@@ -77,16 +78,18 @@ export const layoutPatchSchema = z
   .object({
     schemaVersion: z.literal(UNIVERSE_LAYOUT_SCHEMA_VERSION),
     operationId: z.string().min(1).max(256),
-    expectedRevision: z.number().int().gte(0),
+    expectedRevision: z.number().int().safe().gte(0),
     operations: z
       .array(layoutOpSchema)
       .min(1)
       .max(UNIVERSE_LAYOUT_MAX_OPERATIONS),
   })
-  .strict();
+  .strict().refine(v => new TextEncoder().encode(JSON.stringify(v)).length <= 65536, "Layout patch exceeds 64 KiB");
 export type LayoutPatch = z.infer<typeof layoutPatchSchema>;
 
 export type LayoutAck = {
+  nextOpenedOrdinal: number;
+  opened: Array<{ operationIndex: number; key: string; openedOrdinal: number }>;
   operationId: string;
   revision: number;
   schemaVersion: typeof UNIVERSE_LAYOUT_SCHEMA_VERSION;
@@ -107,7 +110,7 @@ const documentPanelSchema = z
       .strict(),
     title: z.string().max(1024),
     rect: rectSchema,
-    openedOrdinal: z.number().int().gte(1),
+    openedOrdinal: z.number().int().safe().gte(1),
     minimized: z.boolean(),
     pinned: z.boolean(),
     placement: z.enum(["auto", "manual"]).optional(),
@@ -119,12 +122,30 @@ export const universeLayoutDocumentSchema = z
   .object({
     panels: z.array(documentPanelSchema).max(UNIVERSE_LAYOUT_MAX_PANELS),
     order: z.array(key).max(UNIVERSE_LAYOUT_MAX_PANELS),
-    selected: z.string().nullable(),
-    maximized: z.string().nullable(),
+    selected: key.nullable(),
+    maximized: key.nullable(),
     viewport: viewportSchema,
-    nextOpenedOrdinal: z.number().int().gte(1),
+    nextOpenedOrdinal: z.number().int().safe().gte(1),
   })
-  .strict();
+  .strict()
+  .superRefine((doc, ctx) => {
+    const keys = new Set(doc.panels.map((panel) => panel.key));
+    const ordinals = new Set(doc.panels.map((panel) => panel.openedOrdinal));
+    const invalid = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    if (keys.size !== doc.panels.length || doc.order.length !== keys.size ||
+        new Set(doc.order).size !== keys.size || doc.order.some((item) => !keys.has(item))) {
+      invalid("Order must contain every panel exactly once");
+    }
+    if (ordinals.size !== doc.panels.length || doc.panels.some((panel) => panel.openedOrdinal >= doc.nextOpenedOrdinal)) {
+      invalid("Opening ordinals must be unique and precede the next ordinal");
+    }
+    if (doc.selected !== null && !doc.panels.some((panel) => panel.key === doc.selected && !panel.minimized)) {
+      invalid("Selected panel must exist and be visible");
+    }
+    if (doc.maximized !== null && (doc.maximized !== doc.selected || doc.order.at(-1) !== doc.maximized)) {
+      invalid("Maximized panel must be selected and foreground");
+    }
+  }).refine(v => new TextEncoder().encode(JSON.stringify(v)).length <= 262144, "Layout snapshot exceeds 256 KiB");
 export type UniverseLayoutDocument = z.infer<
   typeof universeLayoutDocumentSchema
 >;
@@ -138,3 +159,19 @@ export const emptyUniverseLayoutDocument = (): UniverseLayoutDocument => ({
   viewport: { x: 0, y: 0, zoom: 1 },
   nextOpenedOrdinal: 1,
 });
+
+/** Registered inert reviewed-block state, version 1. Custom executable tools do
+ * not register their own validator through request data. */
+export const checkpointDataSchema = z.object({
+  inputs: z.record(z.string().max(200), z.union([z.string().max(32768), z.number().finite(), z.boolean()]))
+    .refine(v => Object.keys(v).length <= 100),
+  selectedRows: z.array(z.number().int().safe().nonnegative()).max(100),
+  filters: z.record(z.string().max(200), z.string().max(200)).refine(v => Object.keys(v).length <= 20),
+}).strict().refine(v => new TextEncoder().encode(JSON.stringify(v)).length <= 32768, "Checkpoint exceeds 32 KiB");
+export const checkpointPatchSchema = z.object({
+  sourceVersionId: z.string().uuid(), schemaVersion: z.literal(1),
+  expectedRevision: z.number().int().safe().nonnegative(), data: checkpointDataSchema,
+}).strict();
+export type CheckpointData = z.infer<typeof checkpointDataSchema>;
+export type CheckpointPatch = z.infer<typeof checkpointPatchSchema>;
+export type CheckpointSnapshot = { revision: number; schemaVersion: 1; data: CheckpointData };

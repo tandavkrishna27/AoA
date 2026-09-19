@@ -1,4 +1,5 @@
-CREATE TABLE "universe_drafts" (
+-- C14: idempotency guards added to Drizzle-generated DDL; schema unchanged.
+CREATE TABLE IF NOT EXISTS "universe_drafts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"company_id" uuid NOT NULL,
 	"user_id" text NOT NULL,
@@ -12,6 +13,9 @@ CREATE TABLE "universe_drafts" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "universe_drafts" ADD CONSTRAINT "universe_drafts_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "universe_drafts_company_user_idx" ON "universe_drafts" USING btree ("company_id","user_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "universe_drafts_owner_destination_uq" ON "universe_drafts" USING btree ("user_id","company_id","conversation_id","destination_kind","destination_id");
+DO $$ BEGIN
+ ALTER TABLE "universe_drafts" ADD CONSTRAINT "universe_drafts_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "universe_drafts_company_user_idx" ON "universe_drafts" USING btree ("company_id","user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "universe_drafts_owner_destination_uq" ON "universe_drafts" USING btree ("user_id","company_id","conversation_id","destination_kind","destination_id");

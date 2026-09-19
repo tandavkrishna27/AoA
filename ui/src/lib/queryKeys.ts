@@ -168,16 +168,18 @@ export const queryKeys = {
   },
   sidebarPreferences: (companyId: string) => ["sidebar-preferences", companyId] as const,
   homeBoardLayout: (companyId: string) => ["home-board-layout", companyId] as const,
-  universeLayout: (companyId: string, conversationId: string) =>
-    ["universe-layout", companyId, conversationId] as const,
+  universeLayout: (companyId: string, conversationId: string, ownerSession: string) =>
+    ["universe-layout", ownerSession, companyId, conversationId] as const,
   universeDraft: (
     companyId: string,
     conversationId: string,
     destinationKind: string,
     destinationId: string,
+    ownerSession: string,
   ) =>
     [
       "universe-draft",
+      ownerSession,
       companyId,
       conversationId,
       destinationKind,

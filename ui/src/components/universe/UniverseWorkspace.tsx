@@ -1,6 +1,7 @@
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -14,6 +15,9 @@ import {
   displayRect,
   equalRect,
   hydrateLayout,
+  reconcileOpeningAck,
+  type OpeningAck,
+  type PendingOpen,
   initialState,
   openingRect,
   panelKey,
@@ -52,6 +56,12 @@ export type WorkspaceProps = {
   initialLayout: AuthorizedLayoutSnapshot;
   content: Record<string, ContentEntry>;
   onStateChange?: (state: State) => void;
+  /** Accepted edits only: drag samples and cancelled gestures are not saves. */
+  editsBlocked?: boolean;
+  beforeViewportCommit?: (next: Viewport) => boolean;
+  beforeStateCommit?: (before: State, after: State) => boolean;
+  onStateCommit?: (before: State, after: State) => void;
+  onInteractionEnd?: () => void;
   onViewportCommit?: (viewport: Viewport) => void;
   /** When true, opening a panel re-tiles the auto (non-pinned, non-manual) set.
    * Defaults off so the frame's built-in behaviour stays cascade; the product
@@ -69,6 +79,10 @@ export type WorkspaceHandle = {
     policy?: SizePolicy
   ) => void;
   getState: () => State;
+  isInteracting: () => boolean;
+  hydrate: (snapshot: AuthorizedLayoutSnapshot) => void;
+  refresh: (snapshot: AuthorizedLayoutSnapshot) => void;
+  reconcile: (ack: OpeningAck, pending: PendingOpen[]) => void;
   getViewport: () => Viewport;
   setViewport: (viewport: Viewport) => void;
   undo: () => void;
@@ -132,6 +146,8 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
     );
     const history = useRef(initialHistory(state.scope));
     const gesture = useRef<GestureEntry | null>(null);
+    const cameraActive = useRef(false);
+    const cameraStart = useRef<Viewport | null>(null);
     const serial = useRef(0);
     const [shielded, setShielded] = useState(false);
     const [autoTile, setAutoTileState] = useState(
@@ -152,6 +168,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       if (!alive.current) return;
       setShielded(false);
       if (!entry) return;
+      callbacks.current.onInteractionEnd?.();
       const panel = current.current.panels[entry.key];
       if (panel?.generation !== entry.generation) return;
       if (cancelled) {
@@ -173,15 +190,41 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       }
       // A synchronous observer may have superseded the last accepted sample.
       // Only a still-owned result can become human history or clear prior redo.
-      if (equalRect(panel.rect, entry.after))
-        history.current = commitGesture(history.current, entry);
+      if (equalRect(panel.rect, entry.after)) {
+        if (!equalRect(entry.before, entry.after)) {
+          const after = current.current;
+          const before = {...after, panels: {...after.panels, [entry.key]: {...panel, rect: {...entry.before}}}};
+          if (callbacks.current.beforeStateCommit?.(structuredClone(before), structuredClone(after)) === false) {
+            current.current = before;
+            setState(before);
+            callbacks.current.onStateChange?.(structuredClone(before));
+            return;
+          }
+          history.current = commitGesture(history.current, entry);
+          callbacks.current.onStateCommit?.(structuredClone(before), structuredClone(after));
+        }
+      }
     }, []);
+    useEffect(() => {
+      if (!props.editsBlocked) return;
+      finishGesture(true);
+      if (cameraActive.current) {
+        if (cameraStart.current) {
+          camera.current = {...cameraStart.current};
+          setCamera({...camera.current});
+        }
+        cameraActive.current = false;
+        cameraStart.current = null;
+        callbacks.current.onInteractionEnd?.();
+      }
+    }, [props.editsBlocked, finishGesture]);
     const applyAction = useCallback(
       (action: Action, owner?: GestureEntry) => {
         if (!alive.current) return;
         const before = current.current;
         const next = panelReducer(before, action);
         if (next === before) return;
+        if (!owner && callbacks.current.beforeStateCommit?.(structuredClone(before), structuredClone(next)) === false) return;
         if (action.type === "open") {
           const element = document.activeElement;
           if (
@@ -219,6 +262,8 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
           (trigger?.isConnected ? trigger : recovery.current)?.focus();
           if (action.type === "close") triggers.current.delete(action.key);
         }
+        if (!owner && JSON.stringify(before) !== JSON.stringify(current.current))
+          callbacks.current.onStateCommit?.(structuredClone(before), structuredClone(current.current));
         // A defensive snapshot prevents observers from mutating the sole registry.
         callbacks.current.onStateChange?.(structuredClone(current.current));
         // Auto-tile reflows the remaining panels when the visible set changes, so
@@ -346,8 +391,14 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       return true;
     }, []);
     const updateViewport = (next: Viewport, commit = false) => {
-      if (!alive.current || current.current.maximized || !validViewport(next))
+      if (!alive.current || current.current.maximized || !validViewport(next)) return;
+      if (callbacks.current.editsBlocked || (commit && callbacks.current.beforeViewportCommit?.({...next}) === false)) {
+        if (commit && cameraStart.current) {
+          camera.current = {...cameraStart.current};
+          setCamera({...camera.current});
+        }
         return;
+      }
       camera.current = { ...next };
       setCamera({ ...next });
       if (commit) callbacks.current.onViewportCommit?.({ ...next });
@@ -436,6 +487,42 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
         if (autoTile) retile("auto");
       },
       getState: () => structuredClone(current.current),
+      isInteracting: () => !!gesture.current || cameraActive.current,
+      hydrate: snapshot => {
+        if (!alive.current) return;
+        const next = hydrateLayout(current.current, snapshot);
+        gesture.current = null;
+        cameraActive.current = false;
+        setShielded(false);
+        history.current = initialHistory(next.scope);
+        pendingFocus.current = null;
+        current.current = next;
+        setState(next);
+        camera.current = viewportFromLayout(snapshot);
+        setCamera({...camera.current});
+      },
+      refresh: snapshot => {
+        if (!alive.current || gesture.current || cameraActive.current) return;
+        const previous = current.current;
+        const next = hydrateLayout(previous, snapshot);
+        // A canonical refresh is not a new opening. Keep renderer identity and
+        // guarded Undo entries for surviving incarnations; a close/reopen gets
+        // a new generation even when its canonical key is unchanged.
+        for (const panel of Object.values(next.panels)) {
+          const existing = previous.panels[panel.key];
+          if (existing && existing.openedOrdinal === panel.openedOrdinal)
+            panel.generation = existing.generation;
+        }
+        current.current = next;
+        setState(next);
+        camera.current = viewportFromLayout(snapshot);
+        setCamera({...camera.current});
+      },
+      reconcile: (ack, pending) => {
+        if (!alive.current) return;
+        const next = reconcileOpeningAck(current.current, ack, pending);
+        if (next !== current.current) {current.current = next; setState(next);}
+      },
       getViewport: () => ({ ...camera.current }),
       setViewport: (next) => updateViewport(next, true),
       undo: () => replay("undo"),
@@ -582,17 +669,22 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
               nodeTypes={nodeTypes}
               viewport={viewport}
               onViewportChange={(next) => updateViewport(next)}
+              onMoveStart={event => {if (event instanceof Event) {cameraActive.current = true; cameraStart.current = {...camera.current};}}}
               onMoveEnd={(event, next) => {
                 // Controlled viewport synchronization also emits a truthy { sync: true }
                 // end event. A delayed native end can also predate a newer pan.
                 // Completion commits only the live camera; it never replays old samples.
                 if (
-                  event instanceof Event &&
+                  event instanceof Event && cameraActive.current &&
                   next.x === camera.current.x &&
                   next.y === camera.current.y &&
                   next.zoom === camera.current.zoom
-                )
+                ) {
                   updateViewport(next, true);
+                  cameraActive.current = false;
+                  cameraStart.current = null;
+                  callbacks.current.onInteractionEnd?.();
+                }
               }}
               minZoom={0.25}
               maxZoom={2}
@@ -615,10 +707,10 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
               selectionKeyCode={null}
               multiSelectionKeyCode={null}
               deleteKeyCode={null}
-              panOnDrag={!maximized}
-              panOnScroll={!maximized}
-              zoomOnScroll={!maximized}
-              zoomOnPinch={!maximized}
+              panOnDrag={!maximized && !props.editsBlocked}
+              panOnScroll={!maximized && !props.editsBlocked}
+              zoomOnScroll={!maximized && !props.editsBlocked}
+              zoomOnPinch={!maximized && !props.editsBlocked}
               zoomOnDoubleClick={false}
               autoPanOnNodeDrag={!maximized}
               autoPanOnNodeFocus={false}
