@@ -16,6 +16,7 @@ import {initialPresentation, toggleTrayChat} from "../components/universe/comman
 import {isTransientUniverseReadError} from "../components/universe/transient-read-error";
 import type {WorkspaceHandle} from "../components/universe/UniverseWorkspace";
 import type {State} from "../components/universe/panel-state";
+import {buildUniverseContext} from "../components/universe/buildUniverseContext";
 import "../components/universe/commander-surface.css";
 import "../components/universe/universe-shell.css";
 
@@ -130,7 +131,24 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
     {(conversations.isSuccess || suspended) && (!requested || !!selected) && <div className="universe-shell-chat" style={suspended ? {display: "none"} : undefined}>
       <UniverseCommanderChat conversationId={selected} onSelectConversation={async id => {
         await client.invalidateQueries({queryKey: conversationKey}); if (alive.current) openConversation(id);
-      }} presentation={presentation} onPresentationChange={setPresentation}/>
+      }} presentation={presentation} onPresentationChange={setPresentation} getUniverseContext={() => {
+        if (!selected || !currentRegistry) return null;
+        const bounds = document.querySelector(".universe-shell-canvas")?.getBoundingClientRect();
+        const viewport = frame.current?.getViewport() ?? {x: 0, y: 0, zoom: 1};
+        const referenceFor = (key: string) => {
+          const panel = currentRegistry.panels[key];
+          if (!panel || panel.minimized || panel.ref.kind === "browser") return null;
+          return panel.ref.kind === "artifact"
+            ? {kind: "artifact" as const, id: panel.ref.id, ...(panel.ref.version ? {versionId: panel.ref.version} : {})}
+            : {kind: "task" as const, id: panel.ref.id};
+        };
+        return buildUniverseContext({
+          conversationId: selected,
+          selected: currentRegistry.selected ? referenceFor(currentRegistry.selected) : null,
+          visible: currentRegistry.order.flatMap(key => {const ref = referenceFor(key); return ref ? [ref] : [];}),
+          viewport: {width: Math.max(1, bounds?.width ?? window.innerWidth), height: Math.max(1, bounds?.height ?? window.innerHeight), ...viewport},
+        });
+      }}/>
     </div>}
   </main>;
 }

@@ -7,6 +7,7 @@ import { useUniverseDraft } from "./useUniverseDraft";
 import { universeDraftApi } from "../../api/universe-draft";
 import { ApiError } from "../../api/client";
 import { commanderConversationsApi } from "../../api/internal-agent";
+import { issuesApi } from "../../api/issues";
 
 vi.mock("../../api/universe-draft", () => ({
   universeDraftApi: { get: vi.fn(), save: vi.fn() },
@@ -14,8 +15,10 @@ vi.mock("../../api/universe-draft", () => ({
 vi.mock("../../api/internal-agent", () => ({
   commanderConversationsApi: { getSubmissionOutcome: vi.fn() },
 }));
+vi.mock("../../api/issues", () => ({ issuesApi: { getCommentSubmissionOutcome: vi.fn() } }));
 const mockApi = vi.mocked(universeDraftApi);
 const mockCommanderApi = vi.mocked(commanderConversationsApi);
+const mockIssuesApi = vi.mocked(issuesApi);
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -165,6 +168,16 @@ describe("useUniverseDraft", () => {
     await act(async () => { await result.current.recoverCommanderSubmission(sent); });
     expect(mockApi.save).not.toHaveBeenCalled();
     expect(result.current.submitSnapshot("next")?.text).toBe("keep");
+  });
+
+  it("recovers a lost task-comment acknowledgement through the task receipt", async () => {
+    mockIssuesApi.getCommentSubmissionOutcome.mockResolvedValue({ state: "completed", commentId: "comment-1" });
+    mockApi.save.mockResolvedValue(draft(3));
+    const { result } = await ready(draft(2, "sent task reply"));
+    const sent = result.current.submitSnapshot("task-submission")!;
+    await act(async () => { await result.current.recoverSubmission(sent); });
+    expect(mockIssuesApi.getCommentSubmissionOutcome).toHaveBeenCalledWith("t1", "task-submission");
+    expect(mockApi.save).toHaveBeenCalledWith("c1", "conv1", dest, expect.objectContaining({ text: "" }), expect.any(AbortSignal));
   });
 
   it("a failed in-flight save cannot overwrite a newer queued edit", async () => {

@@ -549,6 +549,8 @@ interface AgentPanelContentProps {
    */
   sessionsCollapsed?: boolean;
   onSetSessionsCollapsed?: (value: boolean) => void;
+  /** Captured at Send time and retained on Retry; only the dedicated Universe route supplies it. */
+  getUniverseContext?: () => import("@armyofagents/shared").UniverseContext | null;
 }
 
 /**
@@ -568,9 +570,10 @@ interface CommanderSendAttempt {
   refsForTurn: CommanderInputRef[];
   revision: number;
   clientSubmissionId: string;
+  universeContext?: import("@armyofagents/shared").UniverseContext;
 }
 
-export function AgentPanelContent({ conversationId, onSelectConversation, onOpenSessions, enableViewerPanel, cardChrome = false, sessionsCollapsed, onSetSessionsCollapsed, universeView }: AgentPanelContentProps = {}) {
+export function AgentPanelContent({ conversationId, onSelectConversation, onOpenSessions, enableViewerPanel, cardChrome = false, sessionsCollapsed, onSetSessionsCollapsed, universeView, getUniverseContext }: AgentPanelContentProps = {}) {
   const { selectedCompanyId } = useCompany();
   const { currentUser } = useTeamAccess(selectedCompanyId);
   const { breadcrumbs } = useBreadcrumbs();
@@ -1030,12 +1033,12 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
 
   const pageContext = breadcrumbs.length > 0 ? breadcrumbs.map((b) => b.label).join(" > ") : null;
   const contextScope = useMemo(
-    () => providedContextScope ?? buildCommanderContextScopeFromPath(location.pathname),
-    [providedContextScope, location.pathname],
+    () => universeView ? { surface: "universe" as const, route: location.pathname } : providedContextScope ?? buildCommanderContextScopeFromPath(location.pathname),
+    [providedContextScope, location.pathname, universeView],
   );
 
   const sendText = useCallback(
-    async (text: string, attachmentAssetIds?: string[], clientSubmissionId?: string): Promise<boolean> => {
+    async (text: string, attachmentAssetIds?: string[], clientSubmissionId?: string, universeContext?: import("@armyofagents/shared").UniverseContext): Promise<boolean> => {
       if (!text || !companyId || streaming) return false;
 
       // New user turn: allow exactly one auto-opened viewer tab for the refs
@@ -1080,7 +1083,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       let sawError = false;
 
       try {
-        const stream = streamAgentChat(companyId, text, pageContext, controller.signal, conversationId, contextScope, attachmentAssetIds, clientSubmissionId);
+        const stream = streamAgentChat(companyId, text, pageContext, controller.signal, conversationId, contextScope, attachmentAssetIds, clientSubmissionId, universeContext);
 
         for await (const event of stream) {
           if (event.event === "error") sawError = true;
@@ -1124,7 +1127,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
    *  banner's Retry replays the stored one (same clientSubmissionId). */
   const performCommanderSend = useCallback(
     async (attempt: CommanderSendAttempt) => {
-      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId);
+      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId, attempt.universeContext);
       if (accepted) {
         setSendFailed(false);
         lastAttemptRef.current = null;
@@ -1162,6 +1165,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       if ((!trimmed && refsForTurn.length === 0) || uploadingFiles.length > 0 || isOffline) return;
       setSendFailed(false);
       const baseText = trimmed || "Use the referenced context.";
+      const universeContext = getUniverseContext?.() ?? null;
       // Minted ONCE per submission and snapshotted BEFORE the await so the
       // banner's Retry re-sends the exact same attempt (same clientSubmissionId
       // → the server replays if the first request actually landed).
@@ -1172,11 +1176,12 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         refsForTurn,
         revision: composerRevisionRef.current,
         clientSubmissionId: createComposerSubmissionId(),
+        ...(universeContext ? { universeContext } : {}),
       };
       lastAttemptRef.current = attempt;
       await performCommanderSend(attempt);
     },
-    [performCommanderSend, uploadingFiles.length, isOffline],
+    [performCommanderSend, uploadingFiles.length, isOffline, getUniverseContext],
   );
 
   /** Banner Retry: re-send the IDENTICAL stored attempt (same clientSubmissionId). */

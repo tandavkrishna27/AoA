@@ -8,6 +8,7 @@ import {
 import { ApiError } from "../../api/client";
 import { universeDraftApi } from "../../api/universe-draft";
 import { commanderConversationsApi } from "../../api/internal-agent";
+import { issuesApi } from "../../api/issues";
 import { queryKeys } from "../../lib/queryKeys";
 import { useUniverseOwner } from "./useUniverseOwner";
 import { afterAcknowledgement, type SentSnapshot } from "./draft-state";
@@ -213,6 +214,16 @@ export function useUniverseDraft(
     return outcome;
   }, [acknowledge, companyId, conversationId, destination.kind, scope]);
 
+  const recoverSubmission = useCallback(async (sent: SentSnapshot) => {
+    assertScope();
+    if (destination.kind === "commander") return recoverCommanderSubmission(sent);
+    if (destination.kind !== "task") throw new Error("This destination does not yet expose a canonical submission receipt");
+    const outcome = await issuesApi.getCommentSubmissionOutcome(destination.id, sent.clientSubmissionId);
+    assertScope();
+    if (outcome.state === "completed") await acknowledge(sent);
+    return outcome;
+  }, [acknowledge, destination, recoverCommanderSubmission, scope]);
+
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -230,6 +241,7 @@ export function useUniverseDraft(
     submitSnapshot,
     acknowledge,
     recoverCommanderSubmission,
+    recoverSubmission,
     refetch: query.refetch,
   };
 }
