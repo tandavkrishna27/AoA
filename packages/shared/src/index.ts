@@ -1519,6 +1519,13 @@ export {
   type UniverseAttentionResponse,
 } from "./validators/universe-attention.js";
 export {
+  universeSnapshotReferenceSchema,
+  universeSnapshotTaskSchema,
+  universeSnapshotOutputSchema,
+  universeReconciliationSnapshotSchema,
+  type UniverseReconciliationSnapshot,
+} from "./validators/universe-reconciliation.js";
+export {
   universeIntakeDestinationSchema,
   beginUniverseIntakeSchema,
   universeIntakeSnapshotSchema,

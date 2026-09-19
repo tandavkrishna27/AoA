@@ -18,6 +18,7 @@ import {isTransientUniverseReadError} from "../components/universe/transient-rea
 import type {WorkspaceHandle} from "../components/universe/UniverseWorkspace";
 import type {State, Viewport} from "../components/universe/panel-state";
 import {buildUniverseContext} from "../components/universe/buildUniverseContext";
+import {useUniverseReconciliation} from "../components/universe/useUniverseReconciliation";
 import "../components/universe/commander-surface.css";
 import "../components/universe/universe-shell.css";
 
@@ -38,6 +39,7 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   const [params, setParams] = useSearchParams();
   const {selectedCompany} = useCompany();
   const [creating, setCreating] = useState(false);
+  const [implicitConversation, setImplicitConversation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(initialPresentation);
   const [registry, setRegistry] = useState<State | null>(null);
@@ -68,10 +70,14 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   const authorized = conversations.isSuccess || suspended ? conversations.data?.conversations.filter(row => row.userId === userId) ?? [] : [];
   const mine = conversations.isSuccess ? authorized : [];
   const requested = params.get("conversation");
-  const selected = requested ? authorized.find(row => row.id === requested)?.id ?? null : authorized[0]?.id ?? null;
+  const selected = requested
+    ? authorized.find(row => row.id === requested)?.id ?? null
+    : authorized.find(row => row.id === implicitConversation)?.id ?? authorized[0]?.id ?? null;
+  const reconciliation = useUniverseReconciliation({companyId,conversationId:selected,ownerSession:identity});
   // Pin the initial selection in the route; a later list reorder is not navigation.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!conversations.isSuccess || requested || !selected) return;
+    setImplicitConversation(previous => previous ?? selected);
     setParams(previous => {
       if (previous.get("conversation")) return previous;
       const next = new URLSearchParams(previous); next.set("conversation", selected); return next;
@@ -146,6 +152,8 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
       return panel.minimized || outside ? [{key, title: panel.title, kind: panel.ref.kind === "task" ? "Task" : panel.ref.kind, minimized: panel.minimized}] : [];
     }) ?? []} onOpen={openPanel}/>
     <div className="universe-shell-notices" aria-live="polite">
+      {selected && reconciliation.state.status !== "current" && <p role="status">Workspace updates are {reconciliation.state.status}. Showing the last confirmed view.</p>}
+      {reconciliation.query.data?.partialReasons.length ? <p role="status">Some workspace updates are still being reconciled.</p> : null}
       {(error || conversations.isError || tasks.isError) && <p role="alert">{error || (conversations.isError ? "Conversations could not be loaded." : "Tasks could not be loaded.")}</p>}
       {conversations.isError && <button type="button" onClick={() => void conversations.refetch()}>Retry conversations</button>}
       {tasks.isError && <button type="button" onClick={() => void tasks.refetch()}>Retry tasks</button>}

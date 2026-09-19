@@ -79,6 +79,7 @@ import { homeBoardLayoutRoutes } from "./routes/home-board-layout.js";
 import { universeLayoutRoutes } from "./routes/universe-layout.js";
 import { universeDraftsRoutes } from "./routes/universe-drafts.js";
 import { universeAttentionRoutes } from "./routes/universe-attention.js";
+import { universeCatchupRoutes } from "./routes/universe-catchup.js";
 import { universeIntakeRoutes } from "./routes/universe-intake.js";
 import { viewerPreferencesRoutes } from "./routes/viewer-preferences.js";
 import { inboxDismissalRoutes } from "./routes/inbox-dismissals.js";
@@ -638,6 +639,7 @@ export async function createApp(
   api.use(universeLayoutRoutes(db));
   api.use(universeDraftsRoutes(db));
   api.use(universeAttentionRoutes(db));
+  api.use(universeCatchupRoutes(db));
   api.use(universeIntakeRoutes(db, opts.storageService));
   api.use(viewerPreferencesRoutes(db));
   api.use(inboxDismissalRoutes(db));

@@ -170,6 +170,8 @@ export const queryKeys = {
   homeBoardLayout: (companyId: string) => ["home-board-layout", companyId] as const,
   universeLayout: (companyId: string, conversationId: string, ownerSession: string) =>
     ["universe-layout", ownerSession, companyId, conversationId] as const,
+  universeSnapshot: (companyId: string, conversationId: string, ownerSession: string) =>
+    ["universe-snapshot", ownerSession, companyId, conversationId] as const,
   universeDraft: (
     companyId: string,
     conversationId: string,

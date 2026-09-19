@@ -638,6 +638,13 @@ export {
   type UniverseAttentionResponse,
 } from "./universe-attention.js";
 export {
+  universeSnapshotReferenceSchema,
+  universeSnapshotTaskSchema,
+  universeSnapshotOutputSchema,
+  universeReconciliationSnapshotSchema,
+  type UniverseReconciliationSnapshot,
+} from "./universe-reconciliation.js";
+export {
   universeIntakeDestinationSchema,
   beginUniverseIntakeSchema,
   universeIntakeSnapshotSchema,
