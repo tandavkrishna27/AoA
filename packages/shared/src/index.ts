@@ -1503,3 +1503,5 @@ export * from "./mcp-connector-catalog.js";
 export * from "./provider-connections.js";
 
 export { checkpointDataSchema, checkpointPatchSchema, type CheckpointData, type CheckpointPatch, type CheckpointSnapshot } from "./validators/universe-layout.js";
+export * from "./types/universe-context.js";
+export { universeReferenceSchema, universeViewportSchema, universeContextSchema, type UniverseContextInput } from "./validators/universe-context.js";

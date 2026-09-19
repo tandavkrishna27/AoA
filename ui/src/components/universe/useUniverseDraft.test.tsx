@@ -6,11 +6,16 @@ import type { ReactNode } from "react";
 import { useUniverseDraft } from "./useUniverseDraft";
 import { universeDraftApi } from "../../api/universe-draft";
 import { ApiError } from "../../api/client";
+import { commanderConversationsApi } from "../../api/internal-agent";
 
 vi.mock("../../api/universe-draft", () => ({
   universeDraftApi: { get: vi.fn(), save: vi.fn() },
 }));
+vi.mock("../../api/internal-agent", () => ({
+  commanderConversationsApi: { getSubmissionOutcome: vi.fn() },
+}));
 const mockApi = vi.mocked(universeDraftApi);
+const mockCommanderApi = vi.mocked(commanderConversationsApi);
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -33,6 +38,12 @@ async function ready(initial = draft(0)) {
   const hook = renderHook(() => useUniverseDraft("c1", "conv1", dest), {
     wrapper: makeWrapper(),
   });
+  await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+  return hook;
+}
+async function readyCommander(initial = draft(0)) {
+  mockApi.get.mockResolvedValue(initial);
+  const hook = renderHook(() => useUniverseDraft("c1", "conv1", { kind: "commander", id: "conv1" }), { wrapper: makeWrapper() });
   await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
   return hook;
 }
@@ -133,6 +144,27 @@ describe("useUniverseDraft", () => {
     const sent = result.current.submitSnapshot("s2")!;
     await act(async () => { await result.current.acknowledge(sent); });
     expect(mockApi.save).toHaveBeenCalledWith("c1", "conv1", dest, expect.objectContaining({ text: "", attachmentAssetIds: [] }), expect.any(AbortSignal));
+  });
+
+  it("recovers a lost Commander acknowledgement by observing without resending", async () => {
+    mockCommanderApi.getSubmissionOutcome.mockResolvedValue({ state: "completed", userMessageId: "u1", assistantMessageId: "a1" });
+    mockApi.save.mockResolvedValue(draft(3));
+    const { result } = await readyCommander(draft(2, "sent"));
+    const sent = result.current.submitSnapshot("submission-2")!;
+    let outcome: Awaited<ReturnType<typeof result.current.recoverCommanderSubmission>>;
+    await act(async () => { outcome = await result.current.recoverCommanderSubmission(sent); });
+    expect(mockCommanderApi.getSubmissionOutcome).toHaveBeenCalledWith("c1", "conv1", "submission-2");
+    expect(outcome!.state).toBe("completed");
+    expect(mockApi.save).toHaveBeenCalledWith("c1", "conv1", { kind: "commander", id: "conv1" }, expect.objectContaining({ text: "" }), expect.any(AbortSignal));
+  });
+
+  it("retains the draft when canonical observation has no submission", async () => {
+    mockCommanderApi.getSubmissionOutcome.mockResolvedValue({ state: "not_found" });
+    const { result } = await readyCommander(draft(2, "keep"));
+    const sent = result.current.submitSnapshot("missing")!;
+    await act(async () => { await result.current.recoverCommanderSubmission(sent); });
+    expect(mockApi.save).not.toHaveBeenCalled();
+    expect(result.current.submitSnapshot("next")?.text).toBe("keep");
   });
 
   it("a failed in-flight save cannot overwrite a newer queued edit", async () => {

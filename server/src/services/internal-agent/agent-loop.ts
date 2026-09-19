@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import { internalAgentConfig, agents } from "@armyofagents/db";
-import type { CommanderContextScope, ShowRef } from "@armyofagents/shared";
+import type { CommanderContextScope, ShowRef, UniverseContext } from "@armyofagents/shared";
 import type { ToolResult } from "./types.js";
 import { conversationService, COMMANDER_TURN_HEARTBEAT_MS } from "./conversation.js";
 import { cliModeService } from "./cli-mode.js";
@@ -31,6 +31,7 @@ import {
   createRuntimeAttachmentDeps,
 } from "./runtime-attachments.js";
 import type { Readable } from "node:stream";
+import { resolveUniverseContext } from "./universe-context.js";
 
 /** Minimal storage surface needed to read attachment bytes for runtime delivery. */
 export interface RuntimeAttachmentStorage {
@@ -93,6 +94,7 @@ export interface ChatInput {
   departmentContext?: string;
   conversationId?: string;
   contextScope?: CommanderContextScope | NormalizedCommanderContextScope | null;
+  universeContext?: UniverseContext;
   /**
    * The internal_agent_runs row id for this turn (created by the chat route).
    * Threaded to the MCP bridge as AOA_RUN_ID so emitted output refs carry
@@ -481,6 +483,7 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
               content: item.content,
               layer: item.layer,
             })),
+            ...(params.universeContext ? { resolvedUniverseContext: await resolveUniverseContext(db, { companyId: params.companyId, userId: params.userId, conversationId: conversation.id, context: params.universeContext }) } : {}),
           });
 
           // Split assembled context from the user message (C-systemsplit).

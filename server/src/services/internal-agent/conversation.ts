@@ -6,6 +6,7 @@ import {
 } from "@armyofagents/db";
 import { showRefSchema } from "@armyofagents/shared";
 import { mergeOutputRefs } from "./output-refs.js";
+import { classifyCommanderSubmissionOutcome } from "./submission-outcome.js";
 
 export interface MessageInput {
   role: string;
@@ -144,6 +145,13 @@ export function conversationService(db: Db) {
           ),
         )
         .then((rows: any[]) => rows[0] ?? null);
+    },
+
+    /** Read-only observation for lost-ack recovery. This never claims or runs a turn. */
+    async getSubmissionOutcome(conversationId: string, clientSubmissionId: string) {
+      const userMessage = await this.getMessageByClientSubmissionId(conversationId, clientSubmissionId);
+      const assistantMessage = userMessage ? await this.getAssistantReplyForUserMessage(conversationId, userMessage.id) : null;
+      return classifyCommanderSubmissionOutcome(userMessage, assistantMessage);
     },
 
     /**

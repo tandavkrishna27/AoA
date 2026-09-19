@@ -7,6 +7,7 @@ import {
 } from "@armyofagents/shared";
 import { ApiError } from "../../api/client";
 import { universeDraftApi } from "../../api/universe-draft";
+import { commanderConversationsApi } from "../../api/internal-agent";
 import { queryKeys } from "../../lib/queryKeys";
 import { useUniverseOwner } from "./useUniverseOwner";
 import { afterAcknowledgement, type SentSnapshot } from "./draft-state";
@@ -198,6 +199,20 @@ export function useUniverseDraft(
     [qc, key, save, scope],
   );
 
+  const recoverCommanderSubmission = useCallback(async (sent: SentSnapshot) => {
+    assertScope();
+    if (destination.kind !== "commander") throw new Error("Commander recovery requires a Commander destination");
+    if (!companyId || !conversationId) return { state: "not_found" } as const;
+    const outcome = await commanderConversationsApi.getSubmissionOutcome(
+      companyId,
+      conversationId,
+      sent.clientSubmissionId,
+    );
+    assertScope();
+    if (outcome.state !== "not_found") await acknowledge(sent);
+    return outcome;
+  }, [acknowledge, companyId, conversationId, destination.kind, scope]);
+
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -214,6 +229,7 @@ export function useUniverseDraft(
     flush,
     submitSnapshot,
     acknowledge,
+    recoverCommanderSubmission,
     refetch: query.refetch,
   };
 }
