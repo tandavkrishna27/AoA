@@ -7,6 +7,7 @@ import { universeAttentionProjectionService } from "../services/universe-attenti
 import { assertBoard, assertCompanyAccess } from "./authz.js";
 
 function boardUser(req: Request): string {
+  // rbac: paired-via-helper
   assertBoard(req);
   if (req.actor.type !== "board" || !req.actor.userId) throw unauthorized("Board authentication required");
   return req.actor.userId;

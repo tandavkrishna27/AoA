@@ -8,6 +8,7 @@ import { universeIntakeService } from "../services/universe-intake.js";
 import { assertBoard, assertCompanyAccess } from "./authz.js";
 
 function scope(req: Request) {
+  // rbac: paired-via-helper
   assertBoard(req);
   if (req.actor.type !== "board" || !req.actor.userId) throw unauthorized("Board authentication required");
   return { companyId: req.params.companyId as string, actorKey: req.actor.userId };
