@@ -1,6 +1,6 @@
 # E1.2 combined-base proposal
 
-Status: checks completed with a full-suite fixture failure; **not adopted**.
+Status: user approved fixture repair, qualification and conditional adoption; **not adopted yet**.
 
 ## Exact composition
 
@@ -64,3 +64,16 @@ is unidentified. No assertion or shared helper was changed. The unchanged full
 security manifest suite subsequently passed **19/19** (79.07s). This is not an
 all-green full run. Build, typecheck, 28 focused tests and migration proofs passed.
 Base adoption and production-entry/UAT acceptance remain outstanding.
+
+## Approved continuation
+
+On 2026-09-19 the user approved repairing the isolated fixture, qualifying it,
+and adopting exact replatform `75350f1` only if required checks pass.
+The pending decision is resolved; qualification remains a gate.
+
+The fixture recognizes confirmed partial IPv4 bind collisions before migration,
+stops that ephemeral cluster and retries at most three times. Migration and
+assertion failures remain failures. Unit regression RED/GREEN and a real
+occupied-socket test prove this behavior; read-only review found no blocker.
+The final full qualification is running. Active source is preserved in checkpoint
+`dd60d42b7`; the ongoing replatform branch remains untouched.
