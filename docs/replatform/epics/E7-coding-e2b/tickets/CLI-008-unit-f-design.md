@@ -57,6 +57,21 @@ stands) · Measured in `C:/uf` at `611a78bfb` (base `c48259358`), 2026-09-04, **
 > it broken while looking like a fix), **E7-F028** (MEDIUM — the probe's codex verdict states a cause
 > its own stderr contradicts) and **E7-F029** (LOW — the pack's self-test emits a second, synthetic
 > report). ★ **This amendment ships NO product change**, and it is not permission to make one.
+>
+> ★★★ **AMENDED AGAIN 2026-09-18 (post-E7-1) — STOP-CONDITION CLAUSE 1 IS NOW DISCHARGED FOR
+> `claude_local`; THE "LITERALS ARE UNCHANGED AT THIS TIP" PHRASING IS STALE.** The two-clause stop
+> condition above (repeated at `:1100-1101` and `:1201`) was written 2026-09-04, before the posture
+> landed. **E7-F021 is RESOLVED (2026-09-11, founder-authorized):** the posture PR added
+> `--dangerously-skip-permissions` to BOTH claude literals in
+> `server/src/services/task-run-sandbox-invocation.ts` (guarded RED-when-removed by
+> `server/src/__tests__/task-run-batch-workload.test.ts`). So **clause 1 — "no mechanism before the
+> posture is in the product (a reviewed, merged diff)" — is DISCHARGED for `claude_local`**: a
+> sandboxed claude now writes. **Clause 2 STILL STANDS:** codex is unchanged (**E7-F027 open** —
+> refused by its own trusted-directory gate), so any near-term mechanism must be **`claude_local`-only**,
+> not adapter-agnostic. ★ **This does NOT reopen the measure-first ruling or license a mechanism.** The
+> supply mechanism remains the 3×-refuted terrain of §4 and the measure-first position of §12/§13;
+> clause 1 clearing means only that its *precondition* is met, not that a fourth mechanism is approved.
+> **NO product change ships with this amendment.**
 
 **Governing decision:** [`DECISION-byte-egress-and-provider-topology.md`](../../../DECISION-byte-egress-and-provider-topology.md)
 — Option D, "the provider reads the file from inside its sandbox and PUTs it directly to object
@@ -848,6 +863,8 @@ post-execute capture is skipped on every failing run.
 **Unit F's dependency statement is therefore:** blocked on `E7-F014` **and** on a supply mechanism
 that survives §6. The second does not exist.
 
+> ★ **AMENDED 2026-09-19 (records-lag reconciliation).** `E7-F014` **has landed.** `findings.md:838-840` records it **resolved** by the carrier fix (PR #351, 2026-09-04), and `packages/sandbox-e2b-provider/src/real-transport.ts:183-210` now catches the SDK throw and returns the `crashed` shape `MockE2bTransport` already returns (the `crashed: exitCode !== 0` branch this section called *measured dead today* is live). So Unit F is **no longer blocked on `E7-F014`**; its dependency reduces to *a supply mechanism that survives §6* — still open (§9.1, §13). This note corrects a status; it builds nothing and takes no §13 decision.
+
 ---
 
 ## 6. Constraints any future supply mechanism must satisfy
@@ -1080,6 +1097,15 @@ adapter-agnostic is making a claim about codex that no run supports.
 **And what NOTHING here revives: the lettered slice plan.** §4.3 refuted round 3 **at the predicate
 itself**, which is a scope conclusion and not a premise question. Probe (a) does not touch it, and
 the deleted A–G plan, its positive-control table and its acceptance criteria stay deleted.
+
+#### 12.0.2 ★ AMENDED 2026-09-19 — the two owed preconditions have BOTH landed (records-lag reconciliation)
+
+This section, and the stop condition at §12.3, turn in places on *"the literals are unchanged at this tip"* and *"until that diff lands"*. **Both premises are stale at HEAD** and are corrected here rather than rewritten in place, per §10's discipline (the original reasoning is kept, not erased):
+
+- **The permission-posture diff MERGED, founder-authorized 2026-09-11.** `task-run-sandbox-invocation.ts` now emits `--dangerously-skip-permissions` on the claude arm (`:186-187`, E7-F021) and `--dangerously-bypass-approvals-and-sandbox --skip-git-repo-check` on the codex arm (`:211-212`, E7-F027). The A2 rewrite the probe performed *inside itself* is now the **shipped literal**. Per §12.3 clause **(i)** — *"a mechanism proposed before the permission posture is IN THE PRODUCT … will be refuted"* — the *"merged posture diff quoted by commit"* third input named there now exists, so **clause (i) is SATISFIED for `claude_local`**.
+- **`E7-F014` resolved** (PR #351, 2026-09-04 — see the §5 note).
+
+★ **What this does NOT do, stated because a lifted precondition reads as permission (§12.3, §13.3):** it does **not** satisfy clause **(ii)** — `codex_local`'s write capability remains **unmeasured** (probe (a)'s codex arms were refused upstream — E7-F027/E7-F028 — and no run since has measured a codex write), so an *adapter-agnostic* mechanism is still refutable; it does **not** discharge §9.1's census (owed for any candidate predicate) or §9.2's unrun `files.read`-after-redirect probe; and it does **not** touch §13 — deleting or retiring clause-6 arm 2 remains **the founder's call**, deliberately open. The only thing that changed: the measure-first stop condition's **first clause is now met**, so the decision this section defers is **ripe**, not made. No mechanism is proposed here, the A–G plan stays deleted, and the bar is untouched.
 
 ### 12.1 The status, stated so it cannot be misread in either direction
 

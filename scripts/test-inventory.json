@@ -2,7 +2,7 @@
   "trees": {
     "cli": {
       "mode": "pinned",
-      "count": 13
+      "count": 14
     },
     "docker": {
       "mode": "pinned",
@@ -58,7 +58,7 @@
     },
     "packages/worker-daemon": {
       "mode": "pinned",
-      "count": 161
+      "count": 163
     },
     "packages/worker-keystore": {
       "mode": "pinned",

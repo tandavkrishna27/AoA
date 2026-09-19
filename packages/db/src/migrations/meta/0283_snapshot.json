@@ -1,6 +1,6 @@
 {
-  "id": "bb2732a0-81ee-4d70-835c-7d25efafd4cd",
-  "prevId": "644d492d-4647-42c3-be66-17d192ba1d04",
+  "id": "d55c9254-7185-40a9-b1f9-8deebc9033b7",
+  "prevId": "abb87e9d-d210-4c39-bffb-0767c3c5f5c7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -17637,6 +17637,24 @@
         "log_ref": {
           "name": "log_ref",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "execution_owner": {
+          "name": "execution_owner",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distributed_job_id": {
+          "name": "distributed_job_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "distributed_attempt_id": {
+          "name": "distributed_attempt_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -37145,12 +37163,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "acknowledgement": {
-          "name": "acknowledgement",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
         },
         "acknowledged_revision": {
           "name": "acknowledged_revision",

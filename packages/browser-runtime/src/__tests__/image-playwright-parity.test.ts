@@ -38,7 +38,10 @@ describe("BRW-003b — image Playwright pin vs resolved Playwright", () => {
 
   it("that pin equals the version this repo actually resolves", () => {
     const require_ = createRequire(import.meta.url);
-    const resolved = (require_("playwright-core/package.json") as { version: string }).version;
+    // Resolve the core used by our declared Playwright dependency. pnpm does
+    // not expose that transitive dependency at this package's root.
+    const fromPlaywright = createRequire(require_.resolve("playwright/package.json"));
+    const resolved = (fromPlaywright("playwright-core/package.json") as { version: string }).version;
     expect(imagePin()).toBe(resolved);
   });
 

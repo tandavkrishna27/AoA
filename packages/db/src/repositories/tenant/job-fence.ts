@@ -147,10 +147,38 @@ export class OrphanQuarantineRejection extends Error {
 // `attempt_terminal` and are decided earlier by the guard).
 // -----------------------------------------------------------------------------
 
-/** The CLOSED set of legacy value stores a handle's `ref_kind` may dispatch to. A
- * fifth store would need a new resolver branch AND a new entry here. */
-export const SECRET_REF_KINDS = ["company_secret", "connector_oauth", "provider_key", "device_local"] as const;
+/** The CLOSED set of value stores a handle's `ref_kind` may dispatch to. The first
+ * four are legacy value stores; `run_jwt` (DAT-007 / CLI-008) is the mint-at-resolve
+ * agent bearer — no value is stored, the broker MINTS it server-side at resolve. A
+ * sixth would need a new resolver branch AND a new entry here. */
+export const SECRET_REF_KINDS = ["company_secret", "connector_oauth", "provider_key", "device_local", "run_jwt"] as const;
 export type SecretRefKind = (typeof SECRET_REF_KINDS)[number];
+
+/**
+ * The owner principal kinds that CAN hold a `company_memberships` row — i.e. the kinds
+ * for which the rule-6 membership re-check is a REAL control. This is exactly
+ * `packages/shared` `PRINCIPAL_TYPES`: the table's `principal_type` is only ever `user`
+ * or `agent` (no CHECK enforces it, but every writer stamps one of these two).
+ *
+ * The distributed-execution SUBSTRATE kinds are deliberately ABSENT. Decision #121's
+ * frozen executor authority stamps a task_run/crew_run/one_shot executor as
+ * `worker`/`sandbox` (and system jobs `system`); `agent` is only ever a *requester* kind,
+ * never an executor. `execution-secret-handle-mint-runner` owner-binds a handle to that
+ * executor, so a distributed run's owner-bound handle carries a `worker`/`sandbox` owner
+ * that can NEVER have a membership row. Re-checking membership for those kinds denied
+ * EVERY agent-executed run with `owner_membership_lost` even though the owner==executor
+ * routing held and `guardActiveFence` had already proven the principal's live lease
+ * authority — the substrate's liveness IS the fence, not a company membership.
+ *
+ * Exempting ONLY these substrate kinds (rather than "everything but user") keeps the
+ * membership re-check intact for a membership-capable `agent` owner, so the relaxation
+ * changes behaviour ONLY for principals that could never have satisfied the check.
+ *
+ * Hardcoded, not imported: this is the dependency-minimal fence surface and the
+ * policy-lane mirror (`scripts/check-secret-resolve-vectors.mjs`) re-derives the decision
+ * WITHOUT importing it. A test pins this set equal to `PRINCIPAL_TYPES` so they cannot drift.
+ */
+export const MEMBERSHIP_CAPABLE_OWNER_KINDS = ["user", "agent"] as const;
 
 /**
  * `ref_id` for a `device_local` handle: the `provider_credentials` uuid PK, lowercase
@@ -163,7 +191,7 @@ const DEVICE_CREDENTIAL_REF_RE =
 export interface SecretResolveHandleFacts {
   /** `active` | `revoked`. */
   status: string;
-  /** company_secret | connector_oauth | provider_key | device_local (or unknown → deny). */
+  /** company_secret | connector_oauth | provider_key | device_local | run_jwt (or unknown → deny). */
   refKind: string | null;
   /** The non-secret pointer into the chosen broker (never a value). A ref_kind with no
    * pointer is unresolvable → deny (fail-closed against a half-minted handle). */
@@ -292,7 +320,7 @@ export function authorizeSecretResolve(input: SecretResolveAuthzInput): SecretRe
   //    without rebuilding the dispatched envelope).
   if (h.status !== "active") return "handle_revoked";
 
-  // 2. ref_kind must be one of the four legacy stores.
+  // 2. ref_kind must be a KNOWN store: a legacy value store or the run_jwt bearer.
   if (!h.refKind || !(SECRET_REF_KINDS as readonly string[]).includes(h.refKind)) return "unknown_ref_kind";
 
   // 2b. The broker pointer must be present — a ref_kind with no ref_id is a
@@ -323,6 +351,14 @@ export function authorizeSecretResolve(input: SecretResolveAuthzInput): SecretRe
     return "ref_kind_policy_conflict";
   }
   if (h.refKind === "device_local" && u === "remote_server_fenced") {
+    return "ref_kind_policy_conflict";
+  }
+  // A `run_jwt` is a fresh, agent-authenticating bearer MINTED at resolve for the
+  // sandbox env ONLY (`AOA_API_KEY`). It has no egress form, so it resolves ONLY as
+  // `sandbox_local_only` + `env` — never a network seam. Same defense-in-depth as the
+  // two above: a corrupt or hand-built envelope cannot route a run JWT to a
+  // remote-server / proxy destination.
+  if (h.refKind === "run_jwt" && (u !== "sandbox_local_only" || m !== "env")) {
     return "ref_kind_policy_conflict";
   }
 
@@ -372,7 +408,8 @@ export function authorizeSecretResolve(input: SecretResolveAuthzInput): SecretRe
 
   // 6. Owner binding + membership re-check. device_local is ALWAYS owner-bound; any
   //    handle that denormalizes an owner is re-validated against the LOCKED job's
-  //    executor + a live, active company membership.
+  //    executor (routing, for every owner) + — for a MEMBERSHIP-CAPABLE owner only — a
+  //    live, active company membership.
   const ownerBound = !!(h.ownerPrincipalKind && h.ownerPrincipalId);
   if (h.refKind === "device_local" && !ownerBound) return "owner_binding_incomplete";
   if (ownerBound) {
@@ -380,7 +417,22 @@ export function authorizeSecretResolve(input: SecretResolveAuthzInput): SecretRe
       || h.ownerPrincipalId !== input.jobOwner.executorPrincipalId) {
       return "owner_binding_incomplete";
     }
-    if (input.ownerMembershipActive !== true) return "owner_membership_lost";
+    // The company-membership re-check (invariant #5) applies ONLY to a MEMBERSHIP-CAPABLE
+    // owner (user/agent): such a principal removed from the company must lose access on the
+    // next resolve. The execution SUBSTRATE (worker/sandbox/system) is never a company
+    // member, so requiring a membership row for it denies EVERY agent-executed distributed
+    // run with `owner_membership_lost` — even though the owner==executor routing above
+    // (DE-29) already holds and `guardActiveFence` has already proven the principal's LIVE
+    // lease authority. A substrate owner's liveness is the fence, not a membership. See
+    // MEMBERSHIP_CAPABLE_OWNER_KINDS above.
+    //
+    // The routing check above proved `h.ownerPrincipalKind === executorPrincipalKind`, and
+    // the latter is a guaranteed non-null string, so it IS the owner's kind (used here to
+    // stay type-safe without asserting away `ownerPrincipalKind`'s nullable type).
+    if ((MEMBERSHIP_CAPABLE_OWNER_KINDS as readonly string[]).includes(input.jobOwner.executorPrincipalKind)
+      && input.ownerMembershipActive !== true) {
+      return "owner_membership_lost";
+    }
   }
 
   // 7. device_local CREDENTIAL BINDING (D12/3 + D12/4). The facts come from the same

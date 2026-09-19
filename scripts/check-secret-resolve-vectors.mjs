@@ -36,8 +36,10 @@ export const FIXTURE_SEGMENTS = ["tests", "fixtures", "secret-resolve", "v1", "v
 /** Thrown by the reference validation for any fixture problem. */
 export class SecretResolveVectorError extends Error {}
 
-/** The CLOSED set of legacy value stores a handle's ref_kind may dispatch to. */
-export const SECRET_REF_KINDS = ["company_secret", "connector_oauth", "provider_key", "device_local"];
+/** The CLOSED set of value stores a handle's ref_kind may dispatch to. The first four
+ * are legacy value stores; `run_jwt` (DAT-007 / CLI-008) is the mint-at-resolve agent
+ * bearer (no stored value). Mirrors SECRET_REF_KINDS in job-fence.ts. */
+export const SECRET_REF_KINDS = ["company_secret", "connector_oauth", "provider_key", "device_local", "run_jwt"];
 
 /**
  * The CLOSED rejection vocabulary, mirrored from `SECRET_RESOLVE_REJECTION_REASONS`
@@ -51,6 +53,15 @@ export const SECRET_REF_KINDS = ["company_secret", "connector_oauth", "provider_
 /** device_local ref_id is the provider_credentials uuid PK. Anchored. */
 const DEVICE_CREDENTIAL_REF_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The owner principal kinds that CAN hold a `company_memberships` row (user/agent —
+ * `packages/shared` PRINCIPAL_TYPES). Mirrors `MEMBERSHIP_CAPABLE_OWNER_KINDS` in
+ * job-fence.ts WITHOUT importing it (this lane is an independent re-derivation). The
+ * execution substrate (worker/sandbox/system) is deliberately absent: it is never a
+ * company member, so the rule-6 membership re-check does not apply to it.
+ */
+const MEMBERSHIP_CAPABLE_OWNER_KINDS = ["user", "agent"];
 
 export const SECRET_RESOLVE_REJECTION_REASONS = [
   "handle_revoked",
@@ -107,6 +118,11 @@ export function decideResolve(input) {
   if (h.refKind === "device_local" && u === "remote_server_fenced") {
     return "ref_kind_policy_conflict";
   }
+  //     run_jwt (a mint-at-resolve agent bearer) => sandbox_local_only + env ONLY, never
+  //     a network seam. Mirrors the run_jwt lock in authorizeSecretResolve.
+  if (h.refKind === "run_jwt" && (u !== "sandbox_local_only" || m !== "env")) {
+    return "ref_kind_policy_conflict";
+  }
 
   // 4. sandbox_local_only can NEVER carry a network destination (no egress path).
   if (u === "sandbox_local_only" && h.destination !== null && h.destination !== undefined && h.destination !== "") {
@@ -144,7 +160,13 @@ export function decideResolve(input) {
       || h.ownerPrincipalId !== input.jobOwner.executorPrincipalId) {
       return "owner_binding_incomplete";
     }
-    if (input.ownerMembershipActive !== true) return "owner_membership_lost";
+    // The company-membership re-check applies ONLY to a membership-capable owner
+    // (user/agent). The execution substrate (worker/sandbox/system) is never a company
+    // member, so it is exempt — its liveness is the fence (owner==executor above + the
+    // proven lease authority), not a company_membership. Mirrors job-fence.ts rule 6.
+    if (MEMBERSHIP_CAPABLE_OWNER_KINDS.includes(h.ownerPrincipalKind) && input.ownerMembershipActive !== true) {
+      return "owner_membership_lost";
+    }
   }
 
   // 7. device_local CREDENTIAL BINDING (D12/3 + D12/4). Facts read in the same fenced

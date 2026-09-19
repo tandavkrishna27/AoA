@@ -38,10 +38,11 @@
 //   * TWO of the nine `recordProof` refusal sites stay DOUBLY NULL and are
 //     deliberately NOT wired: `worker-enrollment.ts:315`
 //     (`authoritativeOrganizationId` is `string | null`) and
-//     `middleware/worker-session-auth.ts:151`, whose `:183-185` branch passes an
+//     `middleware/worker-session-auth.ts` `verifyCurrent`'s `if (!recorded) fail()`,
+//     whose platform branch (`claims.organizationId === null`) passes an
 //     explicit `null` for a platform-scope worker. A row with neither axis is a
 //     different decision from a row with one, and this unit does not take it.
-//   * ONE MORE of the nine — `job-leasing.ts:816` (lease ack) — HOLDS an
+//   * ONE MORE of the nine — `job-leasing.ts:1023` (lease ack) — HOLDS an
 //     organization and is still NOT wired, so this module serves SIX of DE-03's
 //     seven organization-attested sites, not all seven. Its refusal throws out of
 //     `runInTenant`, and the FROZEN JOB-003 ack-flow contract
@@ -50,7 +51,10 @@
 //     the ack method body and whose expression unwraps to the `runInTenant` call,
 //     and its `unwrap` strips only `await`, parens, `as` and `!`. Wiring it needs
 //     an AMENDMENT to that contract. The proving file PINS the site as recording
-//     nothing rather than dropping it from the count.
+//     nothing rather than dropping it from the count. ★ 2026-09-14: that
+//     amendment is RULED ADOPTED in hardened form (Option B,
+//     docs/replatform/DECISION-REQUEST-job003-ack-drain.md); the site stays
+//     unwired until the build unit lands.
 //   * `resolveWorkerDeviceContext`'s AUTHORITY throws (missing authority,
 //     inactive target, profile drift) are NOT wired. Only its `recordProof`
 //     refusal is, because that is the site DE-03 enumerates. Its siblings are
@@ -85,6 +89,10 @@ import { recordSecurityDenial } from "./security-denial-audit.js";
 export const WORKER_FENCE_DENIAL_SURFACE = "worker_fence_resolution";
 /** The reserved `surface` slug → `security.denied.worker_proof_replay`. */
 export const WORKER_PROOF_DENIAL_SURFACE = "worker_proof_replay";
+/** The reserved `surface` slug → `security.denied.worker_poll_authority` —
+ * the POLL/ACK admission-authority refusals (DE-18's admission arm), distinct
+ * from the fence-resolution surface because a poll presents no fence. */
+export const WORKER_POLL_AUTHORITY_DENIAL_SURFACE = "worker_poll_authority";
 
 /**
  * The reason vocabulary. Each code corresponds to exactly ONE branch in a
@@ -108,6 +116,22 @@ export const WORKER_PROOF_DENIAL_SURFACE = "worker_proof_replay";
  *                           (`target_authority_key`, `provider_constraint_hash`,
  *                           or one of the defence-in-depth re-checks). This is
  *                           the ONE reason here that carries a company.
+ *
+ * `poll_generation_superseded` and `poll_authority_stale` are the TWO
+ * classifications of the ONE poll admission-authority reject branch in
+ * `job-leasing.ts:poll` — distinct from the fence-resolution siblings above (a
+ * poll presents no fence), split by the classifier
+ * (`pollAuthorityCurrencyIntent`, job-leasing.ts) on the ACTUAL failed
+ * conjunct(s) of the 19-conjunct `authorityCurrent` composite, never the
+ * composite boolean. An AUTHORITATIVE worker/target generation cutoff is
+ * DE-18's "generation changes … at worker admission" → `poll_generation_superseded`,
+ * DE-18. Every other authority-currency failure (stale heartbeat, membership
+ * loss, status/credential drift, disabled target, request-identity mismatch) →
+ * `poll_authority_stale`, filed under DE-04's worker-authority-currency arm
+ * (register amendment 2026-09-13). The two post-authority data-integrity
+ * refusals stay unrecorded — not an authority-currency failure, no clause to
+ * serve. `details.failed` names the conjuncts that fired; the wire answer stays
+ * the coarse `target_revoked`.
  */
 export const WORKER_DENIAL_REASONS = [
   "proof_replayed",
@@ -117,6 +141,16 @@ export const WORKER_DENIAL_REASONS = [
   "profile_drift",
   "lease_unresolved",
   "fence_tuple_mismatch",
+  "poll_generation_superseded",
+  "poll_authority_stale",
+  // The ACK admission-authority split, the same shape as the poll pair above and on the same
+  // surface — a control-ACK's `ackAuthorityCurrent` recheck refuses `target_revoked` when the
+  // worker's authority has drifted, classified per failed conjunct: an authoritative
+  // worker/target generation cutoff is DE-18's `ack_generation_superseded`, every other
+  // authority-currency failure is DE-04's `ack_authority_stale`. `details.operation`
+  // (`control_command_ack`) distinguishes it from the poll rows on the shared surface.
+  "ack_generation_superseded",
+  "ack_authority_stale",
 ] as const;
 
 export type WorkerDenialReason = (typeof WORKER_DENIAL_REASONS)[number];
@@ -134,6 +168,10 @@ export const WORKER_DENIAL_SURFACE_BY_REASON: Record<WorkerDenialReason, string>
   profile_drift: WORKER_FENCE_DENIAL_SURFACE,
   lease_unresolved: WORKER_FENCE_DENIAL_SURFACE,
   fence_tuple_mismatch: WORKER_FENCE_DENIAL_SURFACE,
+  poll_generation_superseded: WORKER_POLL_AUTHORITY_DENIAL_SURFACE,
+  poll_authority_stale: WORKER_POLL_AUTHORITY_DENIAL_SURFACE,
+  ack_generation_superseded: WORKER_POLL_AUTHORITY_DENIAL_SURFACE,
+  ack_authority_stale: WORKER_POLL_AUTHORITY_DENIAL_SURFACE,
 };
 
 /**
@@ -194,6 +232,83 @@ export function createWorkerDenialSink(): WorkerDenialSink {
  * across operations. `entity_id` carries no FK, so an id that matches no live row
  * is safe to record.
  */
+/**
+ * The POLL admission-arm intent for `job-leasing.ts:poll`'s authority-currency
+ * `target_revoked` refusal. Built by the caller's classifier
+ * `pollAuthorityCurrencyIntent`, which derives reason + crossing from the failed
+ * conjunct(s): authoritative generation cutoff ⇒ `poll_generation_superseded`
+ * (DE-18), any other authority-currency failure ⇒ `poll_authority_stale`
+ * (DE-04's worker-authority-currency arm) (Codex P2 x4 on PR #448; DE-04 arm
+ * 2026-09-13). `companyId` is null: no lease has resolved at a poll, and
+ * `workers`/`execution_targets` carry `organization_id` only.
+ */
+export function pollAuthorityDenialIntent(
+  reason: "poll_generation_superseded" | "poll_authority_stale",
+  crossing: string,
+  auth: {
+    organizationId: string;
+    workerId: string;
+    targetId: string;
+    targetGeneration: number;
+    deviceThumbprint: string;
+  },
+  failed?: string[],
+): WorkerDenialIntent {
+  return {
+    reason,
+    companyId: null,
+    organizationId: auth.organizationId,
+    crossings: [crossing],
+    entityType: "execution_target",
+    entityId: auth.targetId,
+    details: {
+      workerId: auth.workerId,
+      targetId: auth.targetId,
+      targetGeneration: auth.targetGeneration,
+      deviceThumbprint: auth.deviceThumbprint,
+      ...(failed && failed.length > 0 ? { failed } : {}),
+    },
+  };
+}
+
+/**
+ * The ACK admission-arm intent for `job-control-ack.ts`'s `ackAuthorityCurrent` reject — the ack
+ * analogue of {@link pollAuthorityDenialIntent}, and identical in shape (org-only attribution, the
+ * superseded target as the resource, `details.failed` naming the conjuncts). Built by the caller's
+ * classifier `ackAuthorityCurrencyIntent`: an authoritative generation cutoff ⇒
+ * `ack_generation_superseded` (DE-18), any other authority-currency failure ⇒ `ack_authority_stale`
+ * (DE-04's worker-authority-currency arm). `companyId` is null: the reject fires BEFORE the lease
+ * ack-context is resolved, and `workers`/`execution_targets` carry `organization_id` only.
+ */
+export function ackAuthorityDenialIntent(
+  reason: "ack_generation_superseded" | "ack_authority_stale",
+  crossing: string,
+  auth: {
+    organizationId: string;
+    workerId: string;
+    targetId: string;
+    targetGeneration: number;
+    deviceThumbprint: string;
+  },
+  failed?: string[],
+): WorkerDenialIntent {
+  return {
+    reason,
+    companyId: null,
+    organizationId: auth.organizationId,
+    crossings: [crossing],
+    entityType: "execution_target",
+    entityId: auth.targetId,
+    details: {
+      workerId: auth.workerId,
+      targetId: auth.targetId,
+      targetGeneration: auth.targetGeneration,
+      deviceThumbprint: auth.deviceThumbprint,
+      ...(failed && failed.length > 0 ? { failed } : {}),
+    },
+  };
+}
+
 export function workerProofReplayIntent(auth: {
   organizationId: string;
   workerId: string;

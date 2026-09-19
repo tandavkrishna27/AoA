@@ -466,6 +466,7 @@ export async function createApp(
       deploymentExposure: opts.deploymentExposure,
       authReady: opts.authReady,
       companyDeletionEnabled: opts.companyDeletionEnabled,
+      distributedExecutionEnabled: opts.distributedExecutionEnabled,
     })
   );
   api.use(

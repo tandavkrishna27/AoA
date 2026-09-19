@@ -58,8 +58,11 @@ import {
 import type { VerifiedWorkerOperation } from "../middleware/worker-operation-proof.js";
 import {
   createWorkerDenialSink,
+  pollAuthorityDenialIntent,
+  ackAuthorityDenialIntent,
   drainWorkerDenial,
   workerProofReplayIntent,
+  type WorkerDenialIntent,
 } from "./worker-denial-audit.js";
 
 export type { VerifiedWorkerOperation } from "../middleware/worker-operation-proof.js";
@@ -280,6 +283,84 @@ function authorityCurrent(input: {
     && input.databaseNow.getTime() - oldestHeartbeat <= input.maxHeartbeatAgeMs;
 }
 
+/**
+ * Classify WHY a poll's `authorityCurrent` returned false and build the deny-path
+ * intent, deriving the CROSSING from the actual failed conjunct(s) (Codex P2 x4 on
+ * PR #448; DE-04 arm added 2026-09-13). `authorityCurrent` is a 19-conjunct
+ * composite; DE-18's audit clause is narrowly "placement decisions and generation
+ * changes are audited", and an AUTHORITATIVE worker/target `device_generation`
+ * cutoff at worker admission is exactly that ⇒ `poll_generation_superseded`,
+ * DE-18. Every OTHER authority-currency failure — stale heartbeat,
+ * owner-membership loss, worker status/credential drift, target disabled,
+ * request/payload identity mismatch — is NOT a generation change; it files under
+ * DE-04's worker-authority-currency arm (register amendment 2026-09-13, the
+ * follow-on PR #448 documented) ⇒ `poll_authority_stale`, DE-04. Only the
+ * AUTHORITATIVE DB-row generations count for DE-18: `request_generation_drift` is
+ * the caller's own payload claim (a current worker could forge it), so it never
+ * triggers DE-18 — it rides the DE-04 row's `details.failed` instead. The two
+ * POST-authority data-integrity refusals (unreadable current target / unparseable
+ * stored hello) stay outside this classifier and remain unrecorded — they are not
+ * an authority-currency failure and serve no crossing's audit clause.
+ *
+ * PURE (no IO, no repository selection, no mutation) and mirrors the predicate in
+ * `authorityCurrent` exactly — registered in `job-leasing-contract.test.ts`'s
+ * reviewed-protected-call allowlist for that reason, alongside `authorityCurrent`.
+ * Always computed, only USED on the reject branch; a `null` return drains no row.
+ */
+export function pollAuthorityCurrencyIntent(
+  auth: VerifiedWorkerOperation,
+  authority: LeaseWorkerAuthority,
+  request: PollRequestV1,
+  databaseNow: Date,
+  maxHeartbeatAgeMs: number,
+  platformPhysicalHeartbeatAt?: Date | null,
+): WorkerDenialIntent | null {
+  const worker = authority.worker;
+  const target = authority.target;
+  const oldestHeartbeat = target.scope === "platform"
+    ? platformPhysicalHeartbeatAt?.getTime() ?? null
+    : !worker.lastSeenAt || !target.lastSeenAt
+      ? null
+      : Math.min(worker.lastSeenAt.getTime(), target.lastSeenAt.getTime());
+  const failed: string[] = [];
+  if (worker.id !== auth.workerId) failed.push("worker_id_mismatch");
+  if (worker.executionTargetId !== auth.targetId) failed.push("worker_target_mismatch");
+  if (worker.organizationId !== auth.organizationId) failed.push("worker_org_mismatch");
+  if (worker.scope === "platform") failed.push("worker_scope_platform");
+  if (worker.deviceGeneration !== auth.targetGeneration) failed.push("worker_generation_drift");
+  if (worker.deviceThumbprint !== auth.deviceThumbprint) failed.push("worker_thumbprint_mismatch");
+  if (worker.devicePublicKey !== auth.publicKey) failed.push("worker_pubkey_mismatch");
+  if (worker.profileHash !== auth.profileHash) failed.push("worker_profile_mismatch");
+  if (worker.revokedAt !== null) failed.push("worker_revoked");
+  if (!(worker.status === "enrolled" || worker.status === "active")) failed.push("worker_status_invalid");
+  if (!authority.ownerMembershipActive) failed.push("owner_membership_lost");
+  if (target.id !== auth.targetId) failed.push("target_id_mismatch");
+  if (target.status !== "active") failed.push("target_inactive");
+  if (target.deviceGeneration !== auth.targetGeneration) failed.push("target_generation_drift");
+  if (request.workerId !== auth.workerId) failed.push("request_worker_mismatch");
+  if (request.targetId !== auth.targetId) failed.push("request_target_mismatch");
+  if (request.deviceGeneration !== auth.targetGeneration) failed.push("request_generation_drift");
+  if (oldestHeartbeat === null || databaseNow.getTime() - oldestHeartbeat > maxHeartbeatAgeMs) {
+    failed.push("heartbeat_stale");
+  }
+  // Nothing failed ⇒ nothing to classify ⇒ no row (the classifier is always
+  // computed; only the reject branch drains it).
+  if (failed.length === 0) return null;
+  // Only the AUTHORITATIVE DB-row generations are DE-18's cutoff —
+  // `request_generation_drift` is the caller's own forgeable payload claim and
+  // never mints a DE-18 event.
+  const GENERATION_CONJUNCTS = new Set([
+    "worker_generation_drift", "target_generation_drift",
+  ]);
+  const generation = failed.some((f) => GENERATION_CONJUNCTS.has(f));
+  if (generation) return pollAuthorityDenialIntent("poll_generation_superseded", "DE-18", auth, failed);
+  // ★ Every NON-generation authority-currency failure (stale heartbeat, owner
+  // membership loss, worker status/credential drift, disabled target,
+  // request-identity mismatch) now files under DE-04's worker-authority-currency
+  // arm (register amendment 2026-09-13 — the follow-on PR #448 documented).
+  return pollAuthorityDenialIntent("poll_authority_stale", "DE-04", auth, failed);
+}
+
 export function ackAuthorityCurrent(input: {
   auth: VerifiedWorkerOperation;
   authority: LeaseWorkerAuthority;
@@ -313,6 +394,61 @@ export function ackAuthorityCurrent(input: {
     && target.deviceGeneration === auth.targetGeneration
     && oldestHeartbeat !== null
     && input.databaseNow.getTime() - oldestHeartbeat <= input.maxHeartbeatAgeMs;
+}
+
+/**
+ * The audit classifier for `ackAuthorityCurrent`'s reject — the ACK analogue of
+ * {@link pollAuthorityCurrencyIntent}. It mirrors `ackAuthorityCurrent`'s predicate EXACTLY,
+ * collecting the failed conjunct(s) into `details.failed` and deriving the audit crossing from
+ * them rather than from the composite boolean: an AUTHORITATIVE worker/target generation cutoff is
+ * DE-18's "generation changes … at worker admission" (`ack_generation_superseded`), and every other
+ * authority-currency failure (stale heartbeat, owner-membership loss, worker status/credential
+ * drift, disabled target, request-identity mismatch) is DE-04's worker-authority-currency arm
+ * (`ack_authority_stale`). PURE (no IO, no repository selection, no mutation); always computed,
+ * only USED on the reject branch — a `null` return drains no row. Kept beside `ackAuthorityCurrent`
+ * so a future edit to that predicate is visibly next to the classifier that must track it.
+ */
+export function ackAuthorityCurrencyIntent(input: {
+  auth: VerifiedWorkerOperation;
+  authority: LeaseWorkerAuthority;
+  workerId: string;
+  databaseNow: Date;
+  maxHeartbeatAgeMs: number;
+  platformPhysicalHeartbeatAt?: Date | null;
+}): WorkerDenialIntent | null {
+  const { auth, authority } = input;
+  const worker = authority.worker;
+  const target = authority.target;
+  const oldestHeartbeat = target.scope === "platform"
+    ? input.platformPhysicalHeartbeatAt?.getTime() ?? null
+    : !worker.lastSeenAt || !target.lastSeenAt
+      ? null
+      : Math.min(worker.lastSeenAt.getTime(), target.lastSeenAt.getTime());
+  const failed: string[] = [];
+  if (input.workerId !== auth.workerId) failed.push("request_worker_mismatch");
+  if (worker.id !== auth.workerId) failed.push("worker_id_mismatch");
+  if (worker.executionTargetId !== auth.targetId) failed.push("worker_target_mismatch");
+  if (worker.organizationId !== auth.organizationId) failed.push("worker_org_mismatch");
+  if (worker.scope === "platform") failed.push("worker_scope_platform");
+  if (worker.deviceGeneration !== auth.targetGeneration) failed.push("worker_generation_drift");
+  if (worker.deviceThumbprint !== auth.deviceThumbprint) failed.push("worker_thumbprint_mismatch");
+  if (worker.devicePublicKey !== auth.publicKey) failed.push("worker_pubkey_mismatch");
+  if (worker.profileHash !== auth.profileHash) failed.push("worker_profile_mismatch");
+  if (worker.revokedAt !== null) failed.push("worker_revoked");
+  if (!(worker.status === "enrolled" || worker.status === "active")) failed.push("worker_status_invalid");
+  if (!authority.ownerMembershipActive) failed.push("owner_membership_lost");
+  if (target.id !== auth.targetId) failed.push("target_id_mismatch");
+  if (target.status !== "active") failed.push("target_inactive");
+  if (target.deviceGeneration !== auth.targetGeneration) failed.push("target_generation_drift");
+  if (oldestHeartbeat === null || input.databaseNow.getTime() - oldestHeartbeat > input.maxHeartbeatAgeMs) {
+    failed.push("heartbeat_stale");
+  }
+  if (failed.length === 0) return null;
+  // Only the AUTHORITATIVE DB-row generations are DE-18's cutoff (matching the poll classifier).
+  const GENERATION_CONJUNCTS = new Set(["worker_generation_drift", "target_generation_drift"]);
+  const generation = failed.some((f) => GENERATION_CONJUNCTS.has(f));
+  if (generation) return ackAuthorityDenialIntent("ack_generation_superseded", "DE-18", auth, failed);
+  return ackAuthorityDenialIntent("ack_authority_stale", "DE-04", auth, failed);
 }
 
 function ackPlacementCurrent(
@@ -436,6 +572,19 @@ export function createJobLeasingService(input: {
   class HeadRestartConflict extends Error {}
   const isHeadRestartConflict = (error: unknown): error is HeadRestartConflict =>
     error instanceof HeadRestartConflict;
+  // ★ DE-18, NOT WIRED HERE AND WHY: this helper's two `target_revoked` throws
+  // (platform-scope mismatch, platform physical-authority recheck) are shared by
+  // the poll AND ack paths, and the frozen JOB-003 contract pins its exact call
+  // expression at both call sites (`job-leasing-contract.test.ts` — the guard-call
+  // shape checks and the ack-flow `exactAckReturnDominance`), so neither a sink
+  // parameter nor a wrapping capture is admissible without a contract amendment.
+  // ★ 2026-09-14 Option-B ruling (docs/replatform/DECISION-REQUEST-job003-ack-drain.md):
+  // these two throws are NOT blocked by the ack drain — their blocker is the
+  // pinned helper/call shape, and they are attributed to
+  // DEFERRED-DECISION: guardPlatformAuthority denial sink (a named, owner-visible
+  // future decision, not accepted-as-gap). The
+  // organization-scope arms in the poll BODY are wired; these platform arms are
+  // named rather than silently skipped.
   const guardPlatformAuthority = async (
     guardRepos: TenantRepositories,
     guardAuth: VerifiedWorkerOperation,
@@ -552,6 +701,14 @@ export function createJobLeasingService(input: {
       // consumer of the authority chain appears inside the transaction without
       // review. An earlier revision of this change tripped it and CI caught it.
       const replayDenialIntent = workerProofReplayIntent(pollInput.auth);
+      // ★ Poll admission-arm: every authorityCurrent refusal is audited, with the
+      // crossing derived per-conjunct by `pollAuthorityCurrencyIntent` below —
+      // authoritative generation cutoff ⇒ DE-18; any other authority-currency
+      // failure ⇒ DE-04's worker-authority-currency arm (register amendment
+      // 2026-09-13). The two POST-AUTHORITY data-integrity refusals (unreadable
+      // current target / unparseable stored hello) are still NOT recorded: not an
+      // authority-currency failure, no crossing's audit clause to serve (Codex
+      // P2 x4 on PR #448). They throw the coarse `target_revoked` with no row.
       for (let restartAttempt = 0; restartAttempt < 3; restartAttempt += 1) {
         // A retry iteration (restartAttempt > 0) means the previous head claim rolled back; count it
         // here so the head-conflict catch below stays the exact classifier/exhaustion/continue triple.
@@ -583,6 +740,29 @@ export function createJobLeasingService(input: {
                   guardedAuthority.physicalAuthorityWorker.lastSeenAt.getTime(),
                 ))
               : null;
+            // ★ Classify the authority-currency failure BEFORE the frozen
+            // `const currentAuthority = authorityCurrent(...)` binding, so the
+            // reject `if` remains the single-throw statement the JOB-003 contract
+            // (`builder:trusted-common-authority-current`) pins as the NEXT
+            // statement after that binding — a statement between them reds it.
+            // `pollAuthorityCurrencyIntent` is a PURE classifier (registered in the
+            // contract's reviewed-call allowlist beside `authorityCurrent`); it
+            // derives the reason + crossing from the ACTUAL failed conjunct so a
+            // stale-heartbeat / membership / credential failure is NOT filed under
+            // DE-18's generation-replacement crossing (Codex P2 on PR #448). Its
+            // result is bound to a non-protected local, so assigning it in the
+            // throw's comma expression carries no protected symbol on the RHS
+            // (`binding:protected-value-escape`). It runs on every poll (cheap,
+            // pure) and is only USED on the failure branch.
+            // ★ Pass `platformPhysicalHeartbeatAt` too (Codex P2 on PR #448): for a
+            // shared-platform target the classifier must age liveness against the
+            // SAME physical heartbeat `authorityCurrent` uses, or it would compute a
+            // null heartbeat and spuriously add `heartbeat_stale` to a platform
+            // target rejected for another reason.
+            const pollAuthorityFailureIntent = pollAuthorityCurrencyIntent(
+              pollInput.auth, lockedAuthority, parsedRequest, databaseNow, maxHeartbeatAgeMs,
+              platformPhysicalHeartbeatAt,
+            );
             const currentAuthority = authorityCurrent({
               auth: pollInput.auth,
               authority: lockedAuthority,
@@ -591,7 +771,9 @@ export function createJobLeasingService(input: {
               maxHeartbeatAgeMs,
               platformPhysicalHeartbeatAt,
             });
-            if (!currentAuthority) throw new JobLeasingError("target_revoked");
+            if (!currentAuthority) {
+              throw (proofDenial.intent = pollAuthorityFailureIntent, new JobLeasingError("target_revoked"));
+            }
             // Touch liveness only AFTER the target lock + authority revalidation (F033). A poll that
             // loses the target row to an overlapping revoke throws above and never reaches here, so
             // the worker's last_seen_at stays untouched; only a poll that keeps authority advances
@@ -600,6 +782,8 @@ export function createJobLeasingService(input: {
             const normalizedCurrentTarget = await normalizePlacementRegistryTarget(
               guardedAuthority.currentTarget,
             );
+            // Not recorded: a post-authority data-integrity refusal serves no
+            // crossing's audit clause (see the poll-arm note above).
             if (!normalizedCurrentTarget) throw new JobLeasingError("target_revoked");
             const parsedStoredHello = workerHelloV1Schema.safeParse(
               lockedAuthority.worker.profileSnapshot,
@@ -884,6 +1068,10 @@ export function createJobLeasingService(input: {
       // `runInTenant` CALLBACK's body, so a protected ack effect placed inside the
       // `.finally` callback leaves the contract fully GREEN. A safe amendment must
       // also sweep the drain callback. Do not take the one-line version.
+      // ★ 2026-09-14 — RULED, Option B (docs/replatform/DECISION-REQUEST-job003-ack-drain.md):
+      // the hardened amendment is ADOPTED and this drain point is UNBLOCKED; the
+      // build (contract widening + wiring) has not shipped yet, so this site still
+      // records nothing until that unit lands.
       return runInTenant(input.appDb, ackInput.auth.organizationId, async (repos) => {
         const databaseNow = await repos.jobControl.currentDatabaseTime();
         await repos.workerEnrollment.cleanupExpiredProofs(databaseNow, 100);

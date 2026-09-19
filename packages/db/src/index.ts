@@ -4,6 +4,8 @@ export {
   createTenantAppDbConnection,
   createOperatorDbConnection,
   assertNonOwnerConnection,
+  assertPrimaryDbBypassesRls,
+  rlsBypassRefusal,
   type NonOwnerDbConnection,
   type NonOwnerDbConnectionOptions,
   loadRequiredMigrationIdentity,
@@ -34,10 +36,12 @@ export {
 } from "./migration-snapshot-gate.js";
 export {
   runDatabaseBackup,
+  runDatabaseRestore,
   formatDatabaseBackupResult,
   pruneOldBackups,
   type RunDatabaseBackupOptions,
   type RunDatabaseBackupResult,
+  type RunDatabaseRestoreOptions,
 } from "./backup-lib.js";
 export * from "./schema/index.js";
 // TEN-003: the tenant repository factory is the only sanctioned reader/writer of
@@ -110,6 +114,7 @@ export {
   SecretResolveRejection,
   authorizeSecretResolve,
   SECRET_REF_KINDS,
+  MEMBERSHIP_CAPABLE_OWNER_KINDS,
   SECRET_RESOLVE_REJECTION_REASONS,
   GUARDED_JOB_MUTATORS,
   TERMINAL_ATTEMPT_STATUSES,

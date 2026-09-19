@@ -9,6 +9,7 @@ import type { Request as ExpressRequest, RequestHandler } from "express";
 import { and, asc, eq, exists, gt, ne, sql } from "drizzle-orm";
 import {
   createDb,
+  assertPrimaryDbBypassesRls,
   loadRequiredMigrationIdentity,
   ensurePostgresDatabase,
   inspectMigrations,
@@ -28,6 +29,7 @@ import { createApp } from "./app.js";
 import { buildReadinessProbe } from "./routes/readiness.js";
 import { loadSchemaCompatibility } from "./services/schema-compatibility.js";
 import { setDistributedRolloutPort } from "./services/distributed-rollout-port.js";
+import { setProviderCredentialBrokerDb } from "./services/provider-resolution-deps.js";
 import {
   OPERATOR_ROLE,
   TENANT_APP_ROLE,
@@ -82,6 +84,7 @@ import { scheduleWarmSandboxReaper } from "./services/warm-sandbox-reaper.js";
 import { scheduleCleanupRetrySweeper } from "./services/workspace-cleanup-retry-sweeper.js";
 import { scheduleClaudeConfigDirSweeper } from "./services/claude-config-dir-sweeper.js";
 import { registerHeartbeatWatchdogSweeper } from "./services/heartbeat-watchdog.js";
+import { createCrewAttemptTerminalProjection } from "./services/internal-agent/aoa-agents/crew-terminal-projection.js";
 import { startEmbeddingWorker } from "./services/embeddings-worker.js";
 import { startMentionOutboxWorker } from "./services/mention-outbox-worker.js";
 import { startCommentWakeupOutboxWorker } from "./services/comment-wakeup-outbox-worker.js";
@@ -618,6 +621,10 @@ const distributedExecutionDatabases = config.distributedExecutionEnabled
   : null;
 if (distributedExecutionDatabases) {
   logger.info("Verified aoa_app and aoa_operator bounded database pools");
+  // E7-1: register the operator pool for the provider-credential broker (migration 0281). The
+  // multi_tenant credential resolution routes through the SECURITY DEFINER functions over this
+  // pool; read lazily in buildResolveDeps so registration order is irrelevant.
+  setProviderCredentialBrokerDb(distributedExecutionDatabases.operatorDb);
 }
 
 let jobControlRuntime: { stop(): Promise<void> } | null = null;
@@ -659,6 +666,11 @@ const listAdmittedOrganizationIds = distributedExecutionDatabases
   : undefined;
 
 if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
+  // DAT-007 item #1 precondition: the /mcp run-JWT currency resolver reads FORCE-RLS'd
+  // leases/job_attempts on this primary owner pool. Refuse to arm distributed execution unless
+  // the primary role bypasses RLS, or the resolver would read zero rows and deny every
+  // distributed run (fail-closed). Loud boot failure beats a silent, oracle-less 403 storm.
+  await assertPrimaryDbBypassesRls(db);
   const { createJobReadyScheduler } = await import("./services/job-ready-scheduler.js");
   const { createJobOutboxWorker } = await import("./services/job-outbox-worker.js");
   const { createPinoJobControlMetrics } = await import("./services/job-control-metrics.js");
@@ -919,40 +931,54 @@ const readinessProbe = buildReadinessProbe({
 // secret resolver; a deployment that never canaries should not pay for that at
 // startup. Inert until a run actually carries the `execution_owner` marker.
 let canaryProjectionHeartbeat: ReturnType<typeof heartbeatService> | undefined;
+// MIG-006 slice 2 — the crew analogue, composed alongside the heartbeat projection. Each no-ops
+// (its findRunForAttempt returns null) for any attempt the OTHER owns — heartbeat_runs and
+// internal_agent_runs are disjoint per attempt — so both run safely on every terminal.
+let crewProjection: ReturnType<typeof createCrewAttemptTerminalProjection> | undefined;
 const onAttemptTerminal =
   config.distributedExecutionEnabled && distributedExecutionDatabases
     ? async (signal: import("./services/job-events.js").AttemptTerminalSignal) => {
         const tenantAppDb = distributedExecutionDatabases.appDb;
-        canaryProjectionHeartbeat ??= heartbeatService(db as any);
         const { runInTenant } = await import("./db/tenant-context.js");
         const { jobEvents } = await import("@armyofagents/db");
         const { and: andOp, eq: eqOp } = await import("drizzle-orm");
-        await canaryProjectionHeartbeat.projectDistributedAttemptTerminal({
-          signal,
-          // The ONE thing the heartbeat service cannot do for itself: `job_events`
-          // is tenant-scoped behind RLS and reachable only through `runInTenant`
-          // over the `aoa_app` pool.
-          listAttemptEvents: async ({ organizationId, companyId, jobId, attemptId }) =>
-            runInTenant(tenantAppDb, organizationId, async (_repos, tx: typeof tenantAppDb) =>
-              tx
-                .select({
-                  eventId: jobEvents.eventId,
-                  sequence: jobEvents.sequence,
-                  eventType: jobEvents.eventType,
-                  event: jobEvents.event,
-                  occurredAt: jobEvents.occurredAt,
-                })
-                .from(jobEvents)
-                .where(
-                  andOp(
-                    eqOp(jobEvents.organizationId, organizationId),
-                    eqOp(jobEvents.companyId, companyId),
-                    eqOp(jobEvents.jobId, jobId),
-                    eqOp(jobEvents.attemptId, attemptId),
-                  ),
+        // The ONE thing the projection services cannot do for themselves: `job_events` is
+        // tenant-scoped behind RLS and reachable only through `runInTenant` over the `aoa_app`
+        // pool. Defined ONCE and shared by both projections so they can never read different rows.
+        const listAttemptEvents = async ({
+          organizationId,
+          companyId,
+          jobId,
+          attemptId,
+        }: {
+          organizationId: string;
+          companyId: string;
+          jobId: string;
+          attemptId: string;
+        }) =>
+          runInTenant(tenantAppDb, organizationId, async (_repos, tx: typeof tenantAppDb) =>
+            tx
+              .select({
+                eventId: jobEvents.eventId,
+                sequence: jobEvents.sequence,
+                eventType: jobEvents.eventType,
+                event: jobEvents.event,
+                occurredAt: jobEvents.occurredAt,
+              })
+              .from(jobEvents)
+              .where(
+                andOp(
+                  eqOp(jobEvents.organizationId, organizationId),
+                  eqOp(jobEvents.companyId, companyId),
+                  eqOp(jobEvents.jobId, jobId),
+                  eqOp(jobEvents.attemptId, attemptId),
                 ),
-            ),
-        });
+              ),
+          );
+        canaryProjectionHeartbeat ??= heartbeatService(db as any);
+        await canaryProjectionHeartbeat.projectDistributedAttemptTerminal({ signal, listAttemptEvents });
+        crewProjection ??= createCrewAttemptTerminalProjection(db as any);
+        await crewProjection.projectCrewAttemptTerminal({ signal, listAttemptEvents });
       }
     : undefined;
 
@@ -1456,10 +1482,10 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   // open. Unconditional registration would be a throw, not a safety net.
   //
   // ★ WHAT THIS TICK ACTUALLY DOES TODAY, stated so nobody reads a running timer as a
-  // running service. `listReconcilableServices` scans `services`, which has ONE insert in
-  // the tree and ZERO production callers — there is no route by which a human or an agent
-  // can create a service (SVC-007 owns that). So on every real deployment this tick reads an
-  // empty window and converges nothing. What it does deliver is that the moment a `services`
+  // running service. `listReconcilableServices` scans `services`, whose create path shipped with
+  // SVC-007 — the org-admin-gated `POST .../companies/:company/services` -> `createService`
+  // (routes/job-control.ts) is now a production caller that inserts a row. So a deployment where
+  // an org-admin has created services converges them; one with none converges nothing. The moment a `services`
   // row exists with `desired_state='running'` and a `service_generations` definition, exactly
   // one instance and one job appear for it, and never two.
   const { createServiceReconciler } = await import("./services/service-reconciler.js");
