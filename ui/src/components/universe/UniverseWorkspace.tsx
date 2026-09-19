@@ -55,7 +55,11 @@ export type WorkspaceProps = {
   scope: Scope;
   initialLayout: AuthorizedLayoutSnapshot;
   content: Record<string, ContentEntry>;
+  /** Resolve restored references through an authorization-enforcing content boundary. */
+  resolveContent?: (panel: Panel) => ContentEntry | undefined;
   onStateChange?: (state: State) => void;
+  /** Read-only projection, including hydration; never a persistence signal. */
+  onStateObserved?: (state: State) => void;
   /** Accepted edits only: drag samples and cancelled gestures are not saves. */
   editsBlocked?: boolean;
   beforeViewportCommit?: (next: Viewport) => boolean;
@@ -137,6 +141,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
     const camera = useRef(viewport);
     const callbacks = useRef(props);
     callbacks.current = props;
+    useEffect(() => {callbacks.current.onStateObserved?.(state);}, [state]);
     const alive = useRef(true);
     const root = useRef<HTMLDivElement>(null);
     const recovery = useRef<HTMLDivElement>(null);
@@ -560,7 +565,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
             const rect = displayRect(panel, state, viewport, usable);
             const entry = Object.hasOwn(props.content, key)
               ? props.content[key]
-              : undefined;
+              : props.resolveContent?.(panel);
             const matchingEntry =
               entry &&
               validRef(entry.ref, state.scope) &&

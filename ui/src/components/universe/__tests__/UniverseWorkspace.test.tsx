@@ -68,6 +68,37 @@ const layout: AuthorizedLayoutSnapshot = {
   maximized: null,
 };
 
+it("resolves restored references without a preloaded library and preserves mounted content on minimize", async () => {
+  const handle = createRef<WorkspaceHandle>();
+  render(<UniverseWorkspace ref={handle} scope={scope} initialLayout={layout} content={{}}
+    resolveContent={panel => ({ref: panel.ref, title: panel.title,
+      render: () => <textarea aria-label="Restored draft" defaultValue="original"/>})}/>);
+  const input = await screen.findByRole("textbox", {name: "Restored draft"});
+  fireEvent.change(input, {target: {value: "unsent"}});
+  const generation = handle.current!.getState().panels[key].generation;
+  act(() => handle.current!.dispatch({type: "minimize", key, generation}));
+  act(() => handle.current!.dispatch({type: "restore", key, generation}));
+  expect(screen.getByRole("textbox", {name: "Restored draft"})).toBe(input);
+  expect(input).toHaveValue("unsent");
+});
+
+it("rejects a resolved renderer for another reference", async () => {
+  const renderPrivate = vi.fn(() => <p>Wrong task</p>);
+  render(<UniverseWorkspace scope={scope} initialLayout={layout} content={{}}
+    resolveContent={() => ({ref: {...ref, id: "other"}, title: "Other", render: renderPrivate})}/>);
+  expect(await screen.findByText("Content is unavailable or still loading.")).toBeInTheDocument();
+  expect(renderPrivate).not.toHaveBeenCalled();
+});
+
+it("publishes the hydrated registry without treating it as an edit", async () => {
+  const observed = vi.fn(); const committed = vi.fn();
+  render(<UniverseWorkspace scope={scope} initialLayout={layout} content={{}}
+    onStateObserved={observed} onStateCommit={committed}/>);
+  await waitFor(() => expect(observed).toHaveBeenCalled());
+  expect(observed.mock.calls.at(-1)?.[0].panels[key].ref).toEqual(ref);
+  expect(committed).not.toHaveBeenCalled();
+});
+
 function setup() {
   const handle = createRef<WorkspaceHandle>();
   const changed = vi.fn();

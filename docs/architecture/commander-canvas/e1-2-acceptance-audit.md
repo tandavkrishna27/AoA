@@ -1,4 +1,4 @@
-# E1.2 acceptance audit â€” 2026-09-19
+# E1.2 acceptance audit - 2026-09-19
 
 Status: incomplete. This audit preserves the full slice scope; it does not convert
 fixture evidence or deferred consuming joins into acceptance.
@@ -8,7 +8,7 @@ fixture evidence or deferred consuming joins into acceptance.
 - `slice-plans/e1-2.md`: both increments, connected acceptance, UAT and recovery.
 - `coding-plans/e1-2.md`: transaction, checkpoint, ordinal and client requirements.
 - `execution-sequence.md`: B03/B04 producers and B10/B15/B16/B20 consuming joins.
-- Active Universe HEAD `a996d507bb54fa9d4623ffd6ca9a9c95d321d550` plus current working changes.
+- Qualified/adopted base at `7bcf81596`; production-entry work continues from `749bd82be`.
 - Isolated combined candidate and exact source hashes: `evidence/reconciliation-2026-09-19/combined-candidate-checks.json`.
 
 ## Requirement-to-evidence map
@@ -29,38 +29,36 @@ that every requirement is covered by a single test or that the production UI exi
 | Generated migration and final source compatibility | Candidate fresh and upstream-0282 upgrade proofs, repeat no-op, Drizzle no drift | Qualified generated lineage adopted at 7bcf81596; base gate cleared |
 | Layout/receipt/checkpoint deletion cascade | Extended real PostgreSQL company removal test seeds a checkpoint, proves it exists, removes through companyService, then proves all three stores empty; 18/18 suite passed | Included in final passing combined qualification |
 | Write-ahead bounded tab journal and safe overflow | `layout-journal.test.ts`, `useUniverseState.test.tsx`, connected workspace storage-failure tests | Actual-entry reload/storage-failure experience |
-| Receipt-first uncertainty reconciliation, no speculative replay | Hook receipt/snapshot/recheck tests; lost-ack browser fixture | Real HTTP/DB browser journey |
-| Independent property rebase; explicit same-property conflict | `layout-rebase.test.ts`, hook tests, two-tab browser fixture | Production two-tab acceptance |
-| Owner switch/logout cancellation and recovery clearing | `universe-owner-isolation.test.tsx`, scoped hook tests | Production authentication transition |
+| Receipt-first uncertainty reconciliation, no speculative replay | Hook tests and fixture; real PATCH response dropped after commit, reload recovered without revision increase | Remaining renderer-specific uncertainty paths |
+| Independent property rebase; explicit same-property conflict | Reducer/hook fixtures and real two-tab different-panel pin edits; same-property conflict retained until explicit saved choice | Wider real-entry geometry/camera and UAT matrix |
+| Owner switch/logout cancellation and recovery clearing | Isolation/hook tests; real sign-out returned 401 for layout and unmounted the workspace after reload | Live account-switch and source-revocation UI matrix |
 | Hydrate without PATCH, preserve in-progress gesture, content and Undo | `PersistedUniverseWorkspace.test.tsx`, browser fixture saved-drag journey | Actual page entry |
 | Smaller-screen/reduced-motion/keyboard behavior | Browser fixture narrow-screen journey | UAT in target host |
-| Production mounting | Server `app.ts` mounts `universeLayoutRoutes`; source search finds `PersistedUniverseWorkspace` consumed only by `ui/src/dev/UniversePersistenceHarness.tsx` | E1.0/E2.4 authorized UI integration is absent, not merely untested |
-| Full repository verification | Adopted candidate build/typecheck pass; final full run 24,847 pass/0 fail/76 skip | Full qualification passed after reviewed fixture repair; actual-entry acceptance remains separate |
+| Production mounting | Company-scoped `/universe` route mounts `PersistedUniverseWorkspace`; task content reuses `WorkspaceTimeline` through an owner/company authorization boundary | Bounded consuming entry exists; complete E1.0 shell rollout and other E2.4 launch paths remain separate |
+| Full repository verification | Adopted candidate: 24,847 pass/0 fail/76 skip with typecheck/build. Current entry: 24,865 pass/0 fail/76 skip with recursive typecheck and build pass; see production-entry work record for the retained port-collision diagnostic | Base qualification does not substitute for verification of the entry increment |
 | Product acceptance and rollback | Formal UAT register remains authoritative; feature rollback preserves data by contract | Tester acceptance and actual consuming disable/recovery proof remain required |
 
 ## Decision and next work
 
-The user approved conditional upstream adoption for exact revision `75350f1`:
-repair the isolated fixture, qualify, then adopt only if required checks pass.
-Adoption is authorized only after the required checks pass. No live replatform work is changed.
+The user approved conditional upstream adoption for exact revision `75350f1`.
+Qualification passed and adoption completed at `7bcf81596`. No live replatform
+work was changed. The earlier conditional decision and failed runs remain in the
+takeover record; they are not current blockers.
 
-Continue producer gaps on the existing base where independent. Do not add an
-ad-hoc production route to bypass the approved E1.0/E2.4 ownership. Whole E1.2
-remains open until its connected acceptance and UAT joins are proved.
+Continue the mapped E1.0 consuming entry and E2.4 shared-content boundary as
+recorded in `e1-2-production-entry-work.md`. This is not a separate task backend
+or a substitute for the full planned shell. Whole E1.2 remains open until its
+connected acceptance and UAT joins are proved.
 
 ## Connected-entry dependency revalidation
 
-A current filesystem check confirms all three planned E2.4 outputs are absent:
-`ui/src/components/universe/TaskConversationPanel.tsx`,
-`ui/src/components/task-detail/TaskConversationContent.tsx`, and
-`tests/e2e/universe-task-routes.spec.ts`.
-Thus production acceptance cannot be obtained by simply rerunning the current
-fixture. It requires the owning task-content/entry work and then the actual-host
-acceptance join. Do not silently mark that dependency complete or substitute a
-new mock entry. No qualification process remains running; the unrelated backend
-container is the only running container and was left untouched.
+`TaskConversationPanel.tsx` and `TaskConversationContent.tsx` now exist and the
+company route consumes them. The real-entry browser test is isolated under
+`tests/universe-production/` instead of the generic fixture-only canvas suite.
+It uses real Better Auth sessions, canonical APIs and disposable PostgreSQL;
+it does not qualify Google OAuth, provider execution, all task launch paths,
+or product acceptance. See the production-entry work record for current runs.
 
-The goal remains incomplete. The exact-base decision is now approved conditionally. Fixture repair and final
-qualification are running in the preserved candidate; base adoption has not occurred.
-
-Latest base disposition: qualified and adopted at `7bcf81596`; the earlier conditional adoption and fixture-failure notes are historical. Production task-entry outputs and actual-host/UAT joins remain outstanding.
+Remaining joins include renderer-specific checkpoint consumers, the complete
+real-entry recovery/accessibility matrix and the formal UAT register. The
+existing harness remains sample-content evidence, not the production route.

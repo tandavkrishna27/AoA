@@ -24,7 +24,7 @@ import { CommentThread } from "./CommentThread";
 import { IssueDocumentsSection } from "./IssueDocumentsSection";
 import { IssueProperties } from "./IssueProperties";
 import { LiveRunWidget } from "./LiveRunWidget";
-import { WorkspaceTimeline } from "./workspace/WorkspaceTimeline";
+import { TaskConversationContent } from "./task-detail/TaskConversationContent";
 import { IssueWorkspaceCard } from "./IssueWorkspaceCard";
 import { ImageGalleryModal } from "./ImageGalleryModal";
 import {
@@ -1089,9 +1089,9 @@ export function TaskDetail({
             </div>
 
             {/* Shared workspace timeline + input */}
-            <WorkspaceTimeline
+            <TaskConversationContent
               issueId={issueId!}
-              compact
+              active={active}
               anchorId={workspaceAnchorId}
               className="flex-1 min-h-0"
             />

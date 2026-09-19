@@ -43,6 +43,7 @@ export function shouldUseFullBleedMain(pathname: string, companyPrefix?: string)
     section === "skills" ||
     (section === "team" && !detailId) ||
     section === "commander" ||
+    section === "universe" ||
     // Threads continuum (§13) is an edge-to-edge resizable surface, like Workspace.
     section === "discussions" ||
     section === "threads" ||

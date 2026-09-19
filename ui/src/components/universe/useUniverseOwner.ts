@@ -37,5 +37,5 @@ export function useUniverseOwner() {
   const assertCurrent = () => {
     if (!isCurrent()) throw new Error("Universe owner session changed");
   };
-  return {identity, isCurrent, isSameIdentity, assertCurrent, isLoading: auth.isLoading, isVerified: auth.isSuccess};
+  return {identity, userId: auth.data?.user.id ?? null, isCurrent, isSameIdentity, assertCurrent, isLoading: auth.isLoading, isVerified: auth.isSuccess};
 }
