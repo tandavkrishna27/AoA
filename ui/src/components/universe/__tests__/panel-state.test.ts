@@ -84,6 +84,18 @@ describe("panel lifecycle", () => {
       200
     );
   });
+  it("fits restored dimensions without changing preferred geometry or subsequent camera transforms", () => {
+    const s = opened();
+    const savedView = {x: 0, y: 0, zoom: 1};
+    const narrow = {left: 0, top: 0, width: 390, height: 700};
+    const projected = displayRect(s.panels[key], s, savedView, narrow, savedView);
+    expect(projected).toEqual({...rect, x: 0, width: 390});
+    expect(s.panels[key].rect).toEqual(rect);
+    expect(displayRect(s.panels[key], s, {x: -100, y: 40, zoom: 2}, narrow, savedView)).toEqual(projected);
+    expect(displayRect(s.panels[key], s, savedView, {...narrow, width: 1280}, savedView)).toEqual(rect);
+    expect(displayRect(s.panels[key], s, savedView, narrow)).toEqual(rect);
+    expect(displayRect(s.panels[key], s, savedView, narrow, {x: 20, y: 0, zoom: 0.5})).toEqual(rect);
+  });
   it("max/min/restore preserves normal rect and never leaves orphan selection", () => {
     let s = opened();
     for (let n = 0; n < 100; n++) {

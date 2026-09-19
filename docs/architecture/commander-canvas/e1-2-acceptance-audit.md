@@ -62,3 +62,12 @@ or product acceptance. See the production-entry work record for current runs.
 Remaining joins include renderer-specific checkpoint consumers, the complete
 real-entry recovery/accessibility matrix and the formal UAT register. The
 existing harness remains sample-content evidence, not the production route.
+
+## 2026-09-20 actual-entry extension
+
+The dedicated shell was accepted at the overall-layout level. Further actual-entry
+checks and the restored-panel narrow-screen correction are recorded in
+[e1-2-actual-entry-acceptance.md](e1-2-actual-entry-acceptance.md). That record
+supersedes the older fixture-only status only for the scenarios it explicitly
+verifies. Whole E1.2 remains open: renderer checkpoint consumers, remaining host
+matrix/rollback evidence and formal interactive UAT are not implied by these runs.

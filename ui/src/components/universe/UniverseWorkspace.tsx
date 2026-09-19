@@ -139,6 +139,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       viewportFromLayout(props.initialLayout)
     );
     const camera = useRef(viewport);
+    const restoredLayout = useRef(props.initialLayout);
     const callbacks = useRef(props);
     callbacks.current = props;
     useEffect(() => {callbacks.current.onStateObserved?.(state);}, [state]);
@@ -495,6 +496,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       isInteracting: () => !!gesture.current || cameraActive.current,
       hydrate: snapshot => {
         if (!alive.current) return;
+        restoredLayout.current = snapshot;
         const next = hydrateLayout(current.current, snapshot);
         gesture.current = null;
         cameraActive.current = false;
@@ -562,7 +564,13 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       usable.width && usable.height
         ? renderOrder.map((key) => {
             const panel = state.panels[key];
-            const rect = displayRect(panel, state, viewport, usable);
+            const restored = restoredLayout.current.panels.find(p =>
+              p.openedOrdinal === panel.openedOrdinal && panelKey(state.scope, p.ref) === key);
+            // Explicit resizing replaces preferred dimensions; viewport fitting
+            // alone never changes registry geometry or emits a persistence edit.
+            const fitted = restored && restored.rect.width === panel.rect.width && restored.rect.height === panel.rect.height;
+            const rect = displayRect(panel, state, viewport, usable,
+              fitted ? viewportFromLayout(restoredLayout.current) : undefined);
             const entry = Object.hasOwn(props.content, key)
               ? props.content[key]
               : props.resolveContent?.(panel);

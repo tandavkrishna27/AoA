@@ -273,10 +273,21 @@ export function displayRect(
   panel: Panel,
   state: State,
   view: Viewport,
-  usable: Bounds
+  usable: Bounds,
+  restoredView?: Viewport
 ): Rect {
   validateView(view, usable);
-  if (state.maximized !== panel.key) return panel.rect;
+  if (state.maximized !== panel.key) {
+    if (!restoredView) return panel.rect;
+    validateView(restoredView, usable);
+    // Fit only restored preferred dimensions, in the saved camera's scale.
+    // Subsequent camera zoom/pan must still transform the fitted panel normally.
+    const width = Math.min(panel.rect.width, usable.width / restoredView.zoom);
+    const height = Math.min(panel.rect.height, usable.height / restoredView.zoom);
+    return {...panel.rect, width, height,
+      x: width < panel.rect.width ? (usable.left - restoredView.x) / restoredView.zoom : panel.rect.x,
+      y: height < panel.rect.height ? (usable.top - restoredView.y) / restoredView.zoom : panel.rect.y};
+  }
   return {
     x: (usable.left - view.x) / view.zoom,
     y: (usable.top - view.y) / view.zoom,
