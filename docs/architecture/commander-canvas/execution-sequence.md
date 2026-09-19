@@ -12,7 +12,7 @@
 
 **September 13, 2026 — author-reviewed sequencing packet.** BASE is adopted and qualified. TK subsequently approved the first Canvas batch. Its exact package scope and current qualification are recorded in [first-batch results](first-canvas-batch-results.md); this does not authorize the remaining packages. This plan review is Codex's review, not a new Claude or independent-agent review.
 
-**September 20, 2026 — draft/context/recovery source wave.** The ready E1.3/E2.1/E2.2 source producers and Commander/Task recovery adapters are recorded in [draft/context/recovery wave results](draft-context-recovery-wave-results.md). Focused tests, recursive typecheck and build pass; Linux migrated-DB qualification and the remaining B05 producers stay open. This is not closure of every B04/B05 package.
+**September 20, 2026 — draft/context/recovery source wave.** The ready E1.3/E2.1/E2.2 source producers and Commander/Task recovery adapters are recorded in [draft/context/recovery wave results](draft-context-recovery-wave-results.md). Focused tests, recursive typecheck, build and the exact-source Linux migrated-DB qualification pass; the remaining B05 producers stay open. This is not closure of every B04/B05 package.
 
 ## Global constraints
 
