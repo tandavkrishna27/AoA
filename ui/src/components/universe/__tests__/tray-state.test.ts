@@ -66,4 +66,12 @@ describe("trayReducer", () => {
       manualCollapse: false,
     });
   });
+
+  it("auto-hide waits for a real pointer leave after manual collapse", () => {
+    const collapsed = trayReducer(initialTrayState(), { type: "logo" });
+    expect(trayReducer(collapsed, { type: "pointerEnter" })).toEqual(collapsed);
+    const left = trayReducer(collapsed, { type: "pointerLeave" });
+    expect(left).toEqual({ expanded: false, menu: null, manualCollapse: false });
+    expect(trayReducer(left, { type: "pointerEnter" }).expanded).toBe(true);
+  });
 });

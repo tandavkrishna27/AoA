@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UniverseTray, type UniverseTrayProps } from "../UniverseTray";
 import type { OpenPanelTile } from "../OpenPanelsOverview";
@@ -130,5 +130,26 @@ describe("UniverseTray", () => {
     expect(screen.getByRole("button", { name: "Work" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Universe menu" }));
     expect(screen.queryByRole("button", { name: "Work" })).toBeNull();
+  });
+
+  it("dismisses an open menu when its authorization scope changes", async () => {
+    const user = userEvent.setup();
+    const view = renderTray({ scopeKey: "company-a:conversation-a" });
+    await user.click(screen.getByRole("button", { name: "Work" }));
+    expect(screen.getByRole("dialog", { name: "Work" })).toBeInTheDocument();
+    view.rerender(<UniverseTray {...({
+      openPanels: [], onOpenReference: vi.fn(), onOpenPanel: vi.fn(), onCommanderPrimary: vi.fn(),
+      scopeKey: "company-a:conversation-b",
+    } satisfies UniverseTrayProps)} />);
+    expect(screen.queryByRole("dialog", { name: "Work" })).toBeNull();
+  });
+
+  it("auto-hides after pointer leave and reveals on the next entry", () => {
+    renderTray({ dockHiding: "auto" });
+    const tray = screen.getByRole("navigation", { name: "Universe" });
+    fireEvent.pointerLeave(tray);
+    expect(screen.queryByRole("button", { name: "Work" })).toBeNull();
+    fireEvent.pointerEnter(tray);
+    expect(screen.getByRole("button", { name: "Work" })).toBeInTheDocument();
   });
 });

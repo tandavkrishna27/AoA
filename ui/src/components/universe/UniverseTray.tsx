@@ -43,6 +43,8 @@ export interface CommanderToggleState {
 }
 
 export interface UniverseTrayProps {
+  /** Authorization scope identity. A change dismisses any menu holding old-scope data. */
+  scopeKey?: string;
   /** Authorized reference lists per library menu. Absent menu → empty. */
   menuItems?: Partial<Record<LibraryMenu, TrayReferenceItem[]>>;
   /** Recent/new conversations exposed under the Commander options menu. */
@@ -103,6 +105,7 @@ function Badge({ count }: { count: number | undefined }) {
 }
 
 export function UniverseTray({
+  scopeKey,
   menuItems,
   commanderConversations = [],
   openPanels,
@@ -126,6 +129,10 @@ export function UniverseTray({
   const triggerRefs = useRef(new Map<TrayMenu, HTMLButtonElement | null>());
   const [search, setSearch] = useState("");
   const popupId = useId();
+
+  useEffect(() => {
+    dispatch({ type: "dismiss" });
+  }, [scopeKey]);
 
   // Reset the per-menu search whenever the open menu changes.
   useEffect(() => setSearch(""), [state.menu]);
@@ -212,6 +219,12 @@ export function UniverseTray({
       aria-label="Universe"
       data-expanded={state.expanded}
       data-dock-hiding={dockHiding}
+      onPointerLeave={() => {
+        if (dockHiding === "auto") dispatch({ type: "pointerLeave" });
+      }}
+      onPointerEnter={() => {
+        if (dockHiding === "auto") dispatch({ type: "pointerEnter" });
+      }}
     >
       {state.expanded && conversationTitle && (
         <div className="universe-tray-conversation">{conversationTitle}</div>

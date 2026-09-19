@@ -22,7 +22,9 @@ export type TrayAction =
   | { type: "logo" }
   | { type: "menu"; menu: TrayMenu }
   | { type: "dismiss" }
-  | { type: "reenter" };
+  | { type: "reenter" }
+  | { type: "pointerEnter" }
+  | { type: "pointerLeave" };
 
 export const initialTrayState = (expanded = true): TrayState => ({
   expanded,
@@ -40,6 +42,8 @@ export function trayReducer(s: TrayState, a: TrayAction): TrayState {
       manualCollapse: false,
     };
   if (a.type === "dismiss") return { ...s, menu: null };
+  if (a.type === "pointerEnter") return s.manualCollapse ? s : { ...s, expanded: true };
+  if (a.type === "pointerLeave") return { expanded: false, menu: null, manualCollapse: false };
   // reenter: a genuine pointer exit/re-entry clears the manual-collapse latch.
   return { ...s, manualCollapse: false };
 }

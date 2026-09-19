@@ -90,7 +90,8 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   return <main className="universe-shell" aria-label="Universe canvas">
     <Link className="universe-exit" to={returnPath} aria-label="Back to Commander" title="Back to Commander"><ArrowLeft size={18}/></Link>
     <div className="universe-shell-tray">
-      <UniverseTray conversationTitle={mine.find(row => row.id === selected)?.title || undefined}
+      <UniverseTray scopeKey={`${identity}:${companyId}:${selected ?? "none"}`}
+        conversationTitle={mine.find(row => row.id === selected)?.title || undefined}
         openPanels={suspended ? [] : currentRegistry?.order.map(key => ({...currentRegistry.panels[key], kind: "Task"})) ?? []}
         menuItems={{work: available.map(task => ({key: task.id, label: task.title})),
           settings: [{key: "company-settings", label: "Company settings"}, {key: "lobby", label: "Return to lobby"}]}}

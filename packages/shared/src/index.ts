@@ -1526,5 +1526,13 @@ export {
   type BeginUniverseIntake,
   type UniverseIntakeSnapshot,
 } from "./validators/universe-intake.js";
+export {
+  FORMAT_DISPOSITIONS,
+  FORMAT_FAILURES,
+  formatCapabilitySchema,
+  type FormatDisposition,
+  type FormatCapability,
+  type FormatFailure,
+} from "./validators/universe-formats.js";
 export * from "./types/universe-context.js";
 export { universeReferenceSchema, universeViewportSchema, universeContextSchema, type UniverseContextInput } from "./validators/universe-context.js";

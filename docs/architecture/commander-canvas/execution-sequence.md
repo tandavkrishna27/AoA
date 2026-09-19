@@ -16,6 +16,8 @@
 
 **September 20, 2026 — attention/original-intake source wave.** The authorized attention projection is committed, and the durable human-original boundary is recorded in [original intake wave results](original-intake-wave-results.md). Its focused tests, recursive typechecks and exact-source Linux real-PostgreSQL integration pass. E4.1/2 processing/index status, derivative lineage and supported S3/MinIO recovery qualification remain explicit later gates.
 
+**September 20, 2026 — B06 recovery/tray/format source wave.** Structured source adapters, stable tray ownership and the truthful format capability boundary are recorded in [recovery/tray/format wave results](recovery-tray-format-wave-results.md). This closes the B06 source boundary, not the later five-destination route UAT or external converter/codec qualification.
+
 ## Global constraints
 
 - Preserve all nine epics, 31 slices and 69 original increments: 66 V1 increments across 30 slices; three V2 increments in E3.4. No disabled or simulated required capability counts as complete V1.

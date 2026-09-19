@@ -645,3 +645,11 @@ export {
   type BeginUniverseIntake,
   type UniverseIntakeSnapshot,
 } from "./universe-intake.js";
+export {
+  FORMAT_DISPOSITIONS,
+  FORMAT_FAILURES,
+  formatCapabilitySchema,
+  type FormatDisposition,
+  type FormatCapability,
+  type FormatFailure,
+} from "./universe-formats.js";
