@@ -40,9 +40,9 @@ that every requirement is covered by a single test or that the production UI exi
 
 ## Decision and next work
 
-The upstream adoption decision has been requested for exact revision `75350f1`:
+The user approved conditional upstream adoption for exact revision `75350f1`:
 repair the isolated fixture, qualify, then adopt only if required checks pass.
-No adoption is authorized merely by this audit. No live replatform work is changed.
+Adoption is authorized only after the required checks pass. No live replatform work is changed.
 
 Continue producer gaps on the existing base where independent. Do not add an
 ad-hoc production route to bypass the approved E1.0/E2.4 ownership. Whole E1.2
@@ -60,7 +60,5 @@ acceptance join. Do not silently mark that dependency complete or substitute a
 new mock entry. No qualification process remains running; the unrelated backend
 container is the only running container and was left untouched.
 
-The goal remains incomplete. The exact-base decision requested in this task is
-pending; repeated prerequisite audits have reached the same boundary. Resume
-from that decision, preserving the existing candidate and evidence rather than
-repeating the same broad tests on unchanged source.
+The goal remains incomplete. The exact-base decision is now approved conditionally. Fixture repair and final
+qualification are running in the preserved candidate; base adoption has not occurred.
