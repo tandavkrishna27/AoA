@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import type { Db } from "@armyofagents/db";
-import { draftDestinationSchema, draftPatchSchema } from "@armyofagents/shared";
+import { draftDestinationSchema, universeDraftPatchSchema } from "@armyofagents/shared";
 import { validate } from "../middleware/validate.js";
 import { universeDraftsService } from "../services/universe-drafts.js";
 import { assertBoard, assertCompanyAccess } from "./authz.js";
@@ -45,12 +45,14 @@ export function universeDraftsRoutes(db: Db) {
   router.get(base, async (req, res) => {
     await assertCompanyAccess(db, req, req.params.companyId as string);
     const { scope, destination } = parse(req);
+    await svc.assertDestinationAccess(scope, destination);
     res.json(await svc.get(scope, destination));
   });
 
-  router.patch(base, validate(draftPatchSchema), async (req, res) => {
+  router.patch(base, validate(universeDraftPatchSchema), async (req, res) => {
     await assertCompanyAccess(db, req, req.params.companyId as string);
     const { scope, destination } = parse(req);
+    await svc.assertDestinationAccess(scope, destination);
     res.json(await svc.patch(scope, destination, req.body));
   });
 

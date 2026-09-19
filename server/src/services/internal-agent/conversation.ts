@@ -20,6 +20,7 @@ export interface MessageInput {
   outputRefs?: unknown;
   reasoning?: string | null;
   clientSubmissionId?: string | null;
+  submissionPayloadHash?: string | null;
   replyToUserMessageId?: string | null;
 }
 
@@ -102,6 +103,7 @@ export function conversationService(db: Db) {
           outputRefs,
           reasoning: message.reasoning ?? null,
           clientSubmissionId: message.clientSubmissionId ?? null,
+          submissionPayloadHash: message.submissionPayloadHash ?? null,
           replyToUserMessageId: message.replyToUserMessageId ?? null,
         })
         // Concurrency backstop for the replay check in agent-loop.chat(): a
@@ -209,6 +211,20 @@ export function conversationService(db: Db) {
         : ((result as { rows?: unknown[] })?.rows ?? []);
       const token = (rows[0] as { turnClaimToken?: string } | undefined)?.turnClaimToken;
       return token ?? null;
+    },
+
+    /** Bind the admitted run only while this caller still owns the turn claim. */
+    async bindRunToClaim(userMessageId: string, token: string, runId: string): Promise<boolean> {
+      const [updated] = await db
+        .update(internalAgentMessages)
+        .set({ runId })
+        .where(and(
+          eq(internalAgentMessages.id, userMessageId),
+          eq(internalAgentMessages.turnStatus, "running"),
+          eq(internalAgentMessages.turnClaimToken, token),
+        ))
+        .returning({ id: internalAgentMessages.id });
+      return !!updated;
     },
 
     /**

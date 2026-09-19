@@ -1854,6 +1854,7 @@ export function issueRoutes(db: Db, storage: StorageService) {
     await assertCompanyAccess(db, req, issue.companyId);
     if (!clientSubmissionId || clientSubmissionId.length > 200) { res.status(400).json({ error: "Invalid client submission id" }); return; }
     const comment = await svc.getCommentByClientSubmissionId(issue.companyId, id, clientSubmissionId);
+    res.setHeader("Cache-Control", "no-store");
     res.json(comment ? { state: "completed", commentId: comment.id } : { state: "not_found" });
   });
 

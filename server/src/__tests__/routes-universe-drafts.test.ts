@@ -6,6 +6,7 @@ import { universeDraftsRoutes } from "../routes/universe-drafts.js";
 import { conflict } from "../errors.js";
 
 const mockService = vi.hoisted(() => ({
+  assertDestinationAccess: vi.fn(),
   get: vi.fn(),
   patch: vi.fn(),
 }));
@@ -16,8 +17,10 @@ vi.mock("../services/universe-drafts.js", () => ({
 
 const COMPANY_A = "11111111-1111-1111-1111-111111111111";
 const COMPANY_B = "55555555-5555-5555-5555-555555555555";
-const CONV = "conv-1";
-const draftPath = (kind = "task", id = "t1", company = COMPANY_A) =>
+const CONV = "22222222-2222-4222-8222-222222222222";
+const TASK = "33333333-3333-4333-8333-333333333333";
+const QUESTION = "44444444-4444-4444-8444-444444444444";
+const draftPath = (kind = "task", id = TASK, company = COMPANY_A) =>
   `/api/companies/${company}/universe/conversations/${CONV}/drafts/${kind}/${id}`;
 const validPatch = {
   schemaVersion: 1,
@@ -26,7 +29,7 @@ const validPatch = {
   attachmentAssetIds: [],
 };
 const scope = { companyId: COMPANY_A, conversationId: CONV, userId: "user-1" };
-const taskDest = { kind: "task", id: "t1" };
+const taskDest = { kind: "task", id: TASK };
 
 function createApp(actor: unknown) {
   const app = express();
@@ -67,6 +70,7 @@ describe("universe draft routes", () => {
     const res = await request(createApp(boardActor())).get(draftPath());
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body).toEqual(draft);
+    expect(mockService.assertDestinationAccess).toHaveBeenCalledWith(scope, taskDest);
     expect(mockService.get).toHaveBeenCalledWith(scope, taskDest);
   });
 
@@ -90,6 +94,14 @@ describe("universe draft routes", () => {
       .send(validPatch);
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(mockService.patch).toHaveBeenCalledWith(scope, taskDest, validPatch);
+  });
+
+  it("PATCH accepts a structured draft for its matching destination", async () => {
+    const body = { schemaVersion: 1, expectedRevision: 0, payload: { kind: "question", expectedVersion: 1, text: "", selectedValues: ["yes"] }, pendingAttempt: null };
+    mockService.patch.mockResolvedValue({ revision: 1, text: "", attachmentAssetIds: [], payload: body.payload, pendingAttempt: null });
+    const res = await request(createApp(boardActor())).patch(draftPath("question", QUESTION)).send(body);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(mockService.patch).toHaveBeenCalledWith(scope, { kind: "question", id: QUESTION }, body);
   });
 
   it("PATCH rejects an unknown destination kind with 400", async () => {

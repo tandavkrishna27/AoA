@@ -264,6 +264,9 @@ export const internalAgentMessages = pgTable(
     // the original turn instead of persisting a duplicate user message or
     // starting a second CLI run. Nullable: assistant/system/tool rows carry none.
     clientSubmissionId: text("client_submission_id"),
+    // Stable identity of the admitted payload. A repeated client submission id
+    // may replay only when this hash still matches the frozen intent.
+    submissionPayloadHash: text("submission_payload_hash"),
 
     // Explicit link from an assistant reply to the user message that triggered
     // it (PR #291 review). Replay must return THIS turn's reply, not simply the

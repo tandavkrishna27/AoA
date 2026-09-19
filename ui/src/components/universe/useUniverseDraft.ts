@@ -210,7 +210,7 @@ export function useUniverseDraft(
       sent.clientSubmissionId,
     );
     assertScope();
-    if (outcome.state !== "not_found") await acknowledge(sent);
+    if (outcome.state === "accepted" || outcome.state === "completed") await acknowledge(sent);
     return outcome;
   }, [acknowledge, companyId, conversationId, destination.kind, scope]);
 

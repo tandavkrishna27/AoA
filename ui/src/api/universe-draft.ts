@@ -1,7 +1,7 @@
 import type {
   UniverseDraft,
   UniverseDraftDestination,
-  UniverseDraftPatch,
+  UniverseDraftPatchInput,
 } from "@armyofagents/shared";
 import { api } from "./client";
 
@@ -26,7 +26,7 @@ export const universeDraftApi = {
     companyId: string,
     conversationId: string,
     destination: UniverseDraftDestination,
-    patch: UniverseDraftPatch,
+    patch: UniverseDraftPatchInput,
     signal?: AbortSignal,
   ) =>
     api.patch<UniverseDraft>(base(companyId, conversationId, destination), patch, {signal}),

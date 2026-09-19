@@ -442,7 +442,8 @@ export const commanderConversationsApi = {
 
   getSubmissionOutcome: (companyId: string, convId: string, clientSubmissionId: string) =>
     api.get<
-      | { state: "not_found" }
+        | { state: "not_found" }
+        | { state: "unknown"; userMessageId: string; reason: "legacy_identity" }
       | { state: "accepted"; userMessageId: string }
       | { state: "completed"; userMessageId: string; assistantMessageId: string }
       | { state: "failed"; userMessageId: string }

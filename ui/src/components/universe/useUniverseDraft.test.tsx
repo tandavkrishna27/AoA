@@ -69,7 +69,7 @@ describe("useUniverseDraft", () => {
     expect(mockApi.save).toHaveBeenCalledTimes(1);
     const [, , , patch] = mockApi.save.mock.calls[0]!;
     expect(patch.expectedRevision).toBe(2);
-    expect(patch.text).toBe("typed");
+    expect("text" in patch && patch.text).toBe("typed");
     expect(result.current.status).toBe("saved");
     expect(result.current.draft).toEqual(draft(3, "typed"));
   });
@@ -122,7 +122,7 @@ describe("useUniverseDraft", () => {
       await result.current.acknowledge(sent!);
     });
     const [, , , lastPatch] = mockApi.save.mock.calls[0]!;
-    expect(lastPatch.text).toBe("");
+    expect("text" in lastPatch && lastPatch.text).toBe("");
   });
   it("Send freezes the current input before its debounce has saved", async () => {
     const { result, unmount } = await ready(draft(2, "old"));
@@ -190,7 +190,8 @@ describe("useUniverseDraft", () => {
     await act(async () => { reject(new Error("offline")); await saving; });
     mockApi.save.mockResolvedValue(draft(1, "newer"));
     await act(async () => { await result.current.flush(); });
-    expect(mockApi.save.mock.calls[1]?.[3].text).toBe("newer");
+    const retryPatch = mockApi.save.mock.calls[1]?.[3];
+    expect(retryPatch && "text" in retryPatch && retryPatch.text).toBe("newer");
     unmount();
   });
 

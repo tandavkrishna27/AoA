@@ -1125,10 +1125,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
 
   /** Shared send path: submitCommanderInput mints a fresh attempt, the failed-send
    *  banner's Retry replays the stored one (same clientSubmissionId). */
-  const performCommanderSend = useCallback(
-    async (attempt: CommanderSendAttempt) => {
-      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId, attempt.universeContext);
-      if (accepted) {
+  const settleAcceptedCommanderSend = useCallback((attempt: CommanderSendAttempt) => {
         setSendFailed(false);
         lastAttemptRef.current = null;
         // Retry-success safety: only clear when the draft still matches the
@@ -1144,6 +1141,13 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
           setInputRefs(remaining);
           setAttachmentError(null);
         }
+  }, []);
+
+  const performCommanderSend = useCallback(
+    async (attempt: CommanderSendAttempt) => {
+      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId, attempt.universeContext);
+      if (accepted) {
+        settleAcceptedCommanderSend(attempt);
       } else {
         // Failure never eats your work (mock §5): the draft + attached refs are
         // all kept — the shared banner offers Retry / Edit / Discard.
@@ -1155,7 +1159,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         setSendFailed(composerRevisionRef.current === attempt.revision);
       }
     },
-    [sendText],
+    [sendText, settleAcceptedCommanderSend],
   );
 
   const submitCommanderInput = useCallback(
@@ -1184,12 +1188,33 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     [performCommanderSend, uploadingFiles.length, isOffline, getUniverseContext],
   );
 
-  /** Banner Retry: re-send the IDENTICAL stored attempt (same clientSubmissionId). */
-  const handleRetryFailedSend = useCallback(() => {
+  /** Banner Retry first observes the canonical receipt. It re-sends the exact
+   * attempt only when the server proves the submission was never accepted. */
+  const handleRetryFailedSend = useCallback(async () => {
     const attempt = lastAttemptRef.current;
     if (!attempt || streamingRef.current || isOffline) return;
-    void performCommanderSend(attempt);
-  }, [performCommanderSend, isOffline]);
+    if (!companyId || !conversationId) {
+      await performCommanderSend(attempt);
+      return;
+    }
+    try {
+      const outcome = await commanderConversationsApi.getSubmissionOutcome(
+        companyId,
+        conversationId,
+        attempt.clientSubmissionId,
+      );
+      if (outcome.state === "accepted" || outcome.state === "completed") {
+        settleAcceptedCommanderSend(attempt);
+        await queryClient.invalidateQueries({ queryKey: queryKeys.agentConversation(companyId) });
+        return;
+      }
+      if (outcome.state === "not_found") await performCommanderSend(attempt);
+      // A canonical failed receipt or an observation failure is deliberately
+      // not resubmitted. The preserved draft remains available to edit/discard.
+    } catch {
+      setSendFailed(true);
+    }
+  }, [companyId, conversationId, isOffline, performCommanderSend, queryClient, settleAcceptedCommanderSend]);
 
   const handleEditFailedSend = useCallback(() => {
     setSendFailed(false);

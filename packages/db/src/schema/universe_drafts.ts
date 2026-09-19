@@ -31,6 +31,8 @@ export const universeDrafts = pgTable(
     attachmentAssetIds: jsonb("attachment_asset_ids")
       .$type<string[]>()
       .notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    pendingAttempt: jsonb("pending_attempt").$type<Record<string, unknown> | null>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

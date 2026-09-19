@@ -1368,6 +1368,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
       await assertCompanyAccess(db, req, companyId);
       await loadOwnedConversation(db, req, companyId, convId);
       if (!clientSubmissionId || clientSubmissionId.length > 200) throw badRequest("Invalid client submission id");
+      res.setHeader("Cache-Control", "no-store");
       res.json(await conversationService(db).getSubmissionOutcome(convId, clientSubmissionId));
     },
   );

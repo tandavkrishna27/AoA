@@ -519,10 +519,17 @@ export {
   UNIVERSE_DRAFT_MAX_ATTACHMENTS,
   draftDestinationSchema,
   draftPatchSchema,
+  universeDraftPayloadSchema,
+  pendingDraftAttemptSchema,
+  structuredDraftPatchSchema,
+  universeDraftPatchSchema,
   type UniverseDraftDestinationKind,
   type UniverseDraftDestination,
   type UniverseDraftPatch,
   type UniverseDraft,
+  type UniverseDraftPayload,
+  type PendingDraftAttempt,
+  type UniverseDraftPatchInput,
 } from "./universe-draft.js";
 
 export {

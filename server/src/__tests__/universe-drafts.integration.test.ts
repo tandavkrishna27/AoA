@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import {
   applyPendingMigrations,
+  assets,
   companies,
   createDb,
   universeDrafts,
@@ -110,14 +111,34 @@ describe.skipIf(process.platform === "win32")(
 
     it("patch creates then updates, bumping the revision, and clears on empty", async () => {
       const s = scope();
-      const first = await svc.patch(s, taskDest("t1"), patch(0, "hello", ["a1"]));
-      expect(first).toEqual({ revision: 1, text: "hello", attachmentAssetIds: ["a1"] });
+      const assetId = randomUUID();
+      await db.insert(assets).values({id: assetId, companyId: companyA, provider: "local", objectKey: `draft/${assetId}`, contentType: "text/plain", byteSize: 5, sha256: "0".repeat(64), composerValidated: true});
+      const first = await svc.patch(s, taskDest("t1"), patch(0, "hello", [assetId]));
+      expect(first).toEqual({ revision: 1, text: "hello", attachmentAssetIds: [assetId], payload: {kind: "task", text: "hello", attachmentAssetIds: [assetId]}, pendingAttempt: null });
       const second = await svc.patch(s, taskDest("t1"), patch(1, "hello world"));
-      expect(second).toEqual({ revision: 2, text: "hello world", attachmentAssetIds: [] });
+      expect(second).toEqual({ revision: 2, text: "hello world", attachmentAssetIds: [], payload: {kind: "task", text: "hello world", attachmentAssetIds: []}, pendingAttempt: null });
       expect(await svc.get(s, taskDest("t1"))).toEqual(second);
       // Clear (post-send) is just a patch to empty at the current revision.
       const cleared = await svc.patch(s, taskDest("t1"), patch(2, ""));
-      expect(cleared).toEqual({ revision: 3, text: "", attachmentAssetIds: [] });
+      expect(cleared).toEqual({ revision: 3, text: "", attachmentAssetIds: [], payload: {kind: "task", text: "", attachmentAssetIds: []}, pendingAttempt: null });
+    });
+
+    it("persists a structured answer and rejects a payload for another destination", async () => {
+      const s = scope();
+      const question = {kind: "question" as const, id: randomUUID()};
+      const first = await svc.patch(s, question, {
+        schemaVersion: 1,
+        expectedRevision: 0,
+        payload: {kind: "question", expectedVersion: 2, text: "Because", selectedValues: ["yes"]},
+        pendingAttempt: {attemptId: "attempt-1", draftRevision: 0, payloadHash: "hash-1", idempotencyKey: "idem-1", state: "pending"},
+      });
+      expect(first.payload).toMatchObject({kind: "question", expectedVersion: 2});
+      expect(first.pendingAttempt).toMatchObject({attemptId: "attempt-1", state: "pending"});
+      await expect(svc.patch(s, question, {
+        schemaVersion: 1,
+        expectedRevision: 1,
+        payload: {kind: "approval", observedUpdatedAt: new Date().toISOString(), decision: null, decisionNote: ""},
+      })).rejects.toMatchObject({status: 400});
     });
 
     it("a stale expectedRevision is a 409 and does not change the draft", async () => {
