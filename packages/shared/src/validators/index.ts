@@ -637,3 +637,11 @@ export {
   type UniverseAttentionEntry,
   type UniverseAttentionResponse,
 } from "./universe-attention.js";
+export {
+  universeIntakeDestinationSchema,
+  beginUniverseIntakeSchema,
+  universeIntakeSnapshotSchema,
+  type UniverseIntakeDestination,
+  type BeginUniverseIntake,
+  type UniverseIntakeSnapshot,
+} from "./universe-intake.js";

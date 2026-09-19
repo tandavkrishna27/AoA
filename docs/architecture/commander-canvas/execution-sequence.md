@@ -14,6 +14,8 @@
 
 **September 20, 2026 — draft/context/recovery source wave.** The ready E1.3/E2.1/E2.2 source producers and Commander/Task recovery adapters are recorded in [draft/context/recovery wave results](draft-context-recovery-wave-results.md). Focused tests, recursive typecheck, build and the exact-source Linux migrated-DB qualification pass; the remaining B05 producers stay open. This is not closure of every B04/B05 package.
 
+**September 20, 2026 — attention/original-intake source wave.** The authorized attention projection is committed, and the durable human-original boundary is recorded in [original intake wave results](original-intake-wave-results.md). Its focused tests, recursive typechecks and exact-source Linux real-PostgreSQL integration pass. E4.1/2 processing/index status, derivative lineage and supported S3/MinIO recovery qualification remain explicit later gates.
+
 ## Global constraints
 
 - Preserve all nine epics, 31 slices and 69 original increments: 66 V1 increments across 30 slices; three V2 increments in E3.4. No disabled or simulated required capability counts as complete V1.

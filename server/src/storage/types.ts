@@ -90,9 +90,19 @@ export interface PutFileResult {
   originalFilename: string | null;
 }
 
+export interface PutReservedObjectInput {
+  organizationId: string | null;
+  companyId: string;
+  objectKey: string;
+  body: Buffer;
+  contentType: string;
+  sha256: string;
+}
+
 export interface StorageService {
   provider: StorageProviderId;
   putFile(input: PutFileInput): Promise<PutFileResult>;
+  putReservedObject(input: PutReservedObjectInput): Promise<void>;
   // Backward-compatible overloads: legacy `(companyId, objectKey)` callers keep working;
   // asset-serving routes pass the request-resolved `(organizationId, companyId, objectKey)`
   // for cross-tenant defense-in-depth.

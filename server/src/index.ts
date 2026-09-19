@@ -96,6 +96,7 @@ import { buildCommanderLoginService } from "./services/commander-login-runtime.j
 import { initThreadEventListener } from "./services/thread-events.js";
 import { onBudgetExhausted } from "./services/budget-hooks.js";
 import { createStorageServiceFromConfig } from "./storage/index.js";
+import { universeIntakeService } from "./services/universe-intake.js";
 import { printStartupBanner } from "./startup-banner.js";
 import { getBoardClaimWarningUrl, initializeBoardClaimChallenge } from "./board-claim.js";
 import { tryRecoverOrphanPostgres } from "./postgres/embedded-orphan-recovery.js";
@@ -872,6 +873,13 @@ if (config.devLocalIdentity) {
 
 const uiMode = config.uiDevMiddleware ? "vite-dev" : config.serveUi ? "static" : "none";
 const storageService = createStorageServiceFromConfig(config);
+const intakeReconciler = universeIntakeService(db, storageService);
+const reconcileUniverseIntakes = () => void intakeReconciler.reconcileExpired()
+  .then((count) => { if (count > 0) logger.info({ count }, "expired Universe intakes reconciled"); })
+  .catch((err: unknown) => logger.warn({ err }, "Universe intake reconciliation failed"));
+reconcileUniverseIntakes();
+const universeIntakeReconcileTimer = setInterval(reconcileUniverseIntakes, 15 * 60 * 1000);
+universeIntakeReconcileTimer.unref();
 const workQuestionSnapshotBackfill = await backfillWorkQuestionSnapshots(db as any);
 if (workQuestionSnapshotBackfill.updated > 0) {
   logger.info(workQuestionSnapshotBackfill, "work-question identity snapshot backfill complete");

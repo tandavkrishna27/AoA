@@ -300,3 +300,4 @@ export { marketplacePendingUpdates } from "./marketplace_pending_updates.js";
 export { pluginVersionSnapshots } from "./plugin_version_snapshots.js";
 
 export { universePanelCheckpoints } from "./universe_layouts.js";
+export { universeIntakes, universeIntakeParts } from "./universe_intakes.js";
