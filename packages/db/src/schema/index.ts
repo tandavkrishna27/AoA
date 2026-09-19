@@ -301,3 +301,4 @@ export { pluginVersionSnapshots } from "./plugin_version_snapshots.js";
 
 export { universePanelCheckpoints } from "./universe_layouts.js";
 export { universeIntakes, universeIntakeParts } from "./universe_intakes.js";
+export { universePreferences } from "./universe_preferences.js";

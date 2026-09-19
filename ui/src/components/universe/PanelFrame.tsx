@@ -35,6 +35,7 @@ export type PanelFrameProps = {
   children: ReactNode;
   onHeaderKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   shielded: boolean;
+  referenceHighlighted?: boolean;
   onHeaderReady?: (header: HTMLElement) => boolean;
 };
 export function PanelFrame({
@@ -45,6 +46,7 @@ export function PanelFrame({
   children,
   onHeaderKeyDown,
   shielded,
+  referenceHighlighted,
   onHeaderReady,
 }: PanelFrameProps) {
   const header = useRef<HTMLElement>(null);
@@ -74,6 +76,7 @@ export function PanelFrame({
       data-selected={selected}
       data-panel-key={panel.key}
       data-generation={panel.generation}
+      data-reference-highlight={referenceHighlighted || undefined}
       aria-label={panel.title}
       inert={panel.minimized}
       onPointerDownCapture={(event) => {

@@ -43,6 +43,8 @@ import {
   type GestureEntry,
 } from "./panel-history";
 import { resizeLimits } from "./panel-gestures";
+import { readableCamera, targetIsEditable, type NavigationIntent } from "./viewport-controller";
+import { resolveMotionTokens, type MotionMode } from "./motion-tokens";
 import "@xyflow/react/dist/style.css";
 import "./universe-panels.css";
 
@@ -76,6 +78,7 @@ export type WorkspaceProps = {
   /** Enables the opt-in motion layer (glide on geometry change, fade on open).
    * Off by default; the product enables it, still respecting reduced motion. */
   motion?: boolean;
+  motionMode?: MotionMode;
 };
 /** Commands require caller authorization. The reducer's source field is not an authorization grant. */
 export type WorkspaceHandle = {
@@ -99,6 +102,7 @@ export type WorkspaceHandle = {
   fit: () => void;
   /** Toggle auto-tile-on-open; enabling it re-tiles immediately. */
   setAutoTile: (on: boolean) => void;
+  requestNavigation: (intent: NavigationIntent) => "moved" | "deferred" | "ignored" | "stale";
 };
 const nodeTypes = { "universe-panel": PanelNode };
 // Tiles never grow past the preferred size, so a lone panel opens at a normal
@@ -159,6 +163,12 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
     const cameraStart = useRef<Viewport | null>(null);
     const serial = useRef(0);
     const [shielded, setShielded] = useState(false);
+    const [referenceHighlight, setReferenceHighlight] = useState<string | null>(null);
+    const [minimizeProxy, setMinimizeProxy] = useState<{title:string;x:number;y:number;width:number;height:number}|null>(null);
+    const pendingNavigation = useRef<NavigationIntent | null>(null);
+    const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cameraAnimation = useRef<number | null>(null);
+    const flushNavigationRef = useRef<(() => void) | null>(null);
     const [autoTile, setAutoTileState] = useState(
       props.initialAutoTile ?? false
     );
@@ -213,6 +223,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
           callbacks.current.onStateCommit?.(structuredClone(before), structuredClone(after));
         }
       }
+      queueMicrotask(() => flushNavigationRef.current?.());
     }, []);
     useEffect(() => {
       if (!props.editsBlocked) return;
@@ -231,6 +242,13 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       (action: Action, owner?: GestureEntry) => {
         if (!alive.current) return;
         const before = current.current;
+        if (action.type === "minimize" && props.motion && props.motionMode !== "reduced") {
+          const panel = before.panels[action.key];
+          if (panel && panel.generation === action.generation) {
+            setMinimizeProxy({title:panel.title,x:panel.rect.x*camera.current.zoom+camera.current.x,y:panel.rect.y*camera.current.zoom+camera.current.y,width:panel.rect.width*camera.current.zoom,height:panel.rect.height*camera.current.zoom});
+            setTimeout(() => { if (alive.current) setMinimizeProxy(null); }, 240);
+          }
+        }
         const next = panelReducer(before, action);
         if (next === before) return;
         if (!owner && callbacks.current.beforeStateCommit?.(structuredClone(before), structuredClone(next)) === false) return;
@@ -367,6 +385,8 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
         alive.current = false;
         gesture.current = null;
         observer.disconnect();
+        if (highlightTimer.current) clearTimeout(highlightTimer.current);
+        if (cameraAnimation.current !== null) cancelAnimationFrame(cameraAnimation.current);
         window.removeEventListener("pointerup", release);
         window.removeEventListener("mouseup", release);
         window.removeEventListener("pointercancel", cancel);
@@ -411,6 +431,51 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
       camera.current = { ...next };
       setCamera({ ...next });
       if (commit) callbacks.current.onViewportCommit?.({ ...next });
+    };
+    const performNavigation = (intent: NavigationIntent) => {
+      if (intent.cause === "background") return "ignored" as const;
+      const panel = current.current.panels[intent.panelKey];
+      if (!panel || panel.generation !== intent.generation || panel.minimized) return "stale" as const;
+      if (gesture.current || cameraActive.current || targetIsEditable(document.activeElement)) {
+        pendingNavigation.current = intent;
+        return "deferred" as const;
+      }
+      const next = readableCamera(usable, panel.rect);
+      if (!next) return "deferred" as const;
+      pendingNavigation.current = null;
+      dispatch({ type: "focus", key: panel.key, generation: panel.generation });
+      if (cameraAnimation.current !== null) cancelAnimationFrame(cameraAnimation.current);
+      const reducedMotionQuery = typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-reduced-motion: reduce)")
+        : undefined;
+      const osReduced = reducedMotionQuery?.matches === true;
+      const tokens = resolveMotionTokens(props.motionMode ?? (props.motion ? "subtle" : "reduced"), osReduced);
+      const finish = () => {
+        cameraAnimation.current = null;
+        updateViewport(next, true);
+        const actual = current.current.panels[intent.panelKey];
+        if (!intent.highlight || actual?.generation !== intent.generation) return;
+        setReferenceHighlight(panel.key);
+        if (highlightTimer.current) clearTimeout(highlightTimer.current);
+        highlightTimer.current = setTimeout(() => setReferenceHighlight(current => current === panel.key ? null : current), tokens.glow);
+      };
+      if (!tokens.camera) finish();
+      else {
+        const from = { ...camera.current };
+        const started = performance.now();
+        const tick = (now: number) => {
+          const progress = Math.min(1, (now - started) / tokens.camera);
+          const eased = 1 - (1 - progress) ** 3;
+          updateViewport({x:from.x+(next.x-from.x)*eased,y:from.y+(next.y-from.y)*eased,zoom:from.zoom+(next.zoom-from.zoom)*eased});
+          if (progress < 1) cameraAnimation.current = requestAnimationFrame(tick); else finish();
+        };
+        cameraAnimation.current = requestAnimationFrame(tick);
+      }
+      return "moved" as const;
+    };
+    flushNavigationRef.current = () => {
+      const pending = pendingNavigation.current;
+      if (pending) performNavigation(pending);
     };
     const retileRef = useRef<((mode: "auto" | "all") => void) | null>(null);
     const retile = (mode: "auto" | "all") => {
@@ -543,6 +608,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
         setAutoTileState(on);
         if (on) retile("all");
       },
+      requestNavigation: performNavigation,
     }));
     function replay(direction: "undo" | "redo") {
       if (!alive.current || gesture.current) return;
@@ -610,6 +676,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
                 headerReady,
                 gestureDispatch,
                 shielded,
+                referenceHighlighted: referenceHighlight === key,
                 beginGesture,
                 endGesture: () => finishGesture(),
                 content: (
@@ -645,6 +712,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
     const maximized = state.maximized !== null;
     return (
       <div className="universe-workspace">
+        {minimizeProxy && <div aria-hidden className="universe-minimize-proxy" style={{left:minimizeProxy.x,top:minimizeProxy.y,width:minimizeProxy.width,height:minimizeProxy.height}}><span>{minimizeProxy.title}</span></div>}
         <div
           className="universe-recovery"
           ref={recovery}
@@ -677,6 +745,8 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
           }`}
           ref={root}
           data-testid="universe-canvas"
+          data-motion={props.motionMode ?? (props.motion ? "subtle" : "reduced")}
+          onBlur={() => queueMicrotask(() => flushNavigationRef.current?.())}
         >
           {usable.width > 0 && usable.height > 0 && (
             <ReactFlow<PanelFlowNode>
@@ -685,7 +755,7 @@ const ScopedWorkspace = forwardRef<WorkspaceHandle, WorkspaceProps>(
               nodeTypes={nodeTypes}
               viewport={viewport}
               onViewportChange={(next) => updateViewport(next)}
-              onMoveStart={event => {if (event instanceof Event) {cameraActive.current = true; cameraStart.current = {...camera.current};}}}
+              onMoveStart={event => {if (event instanceof Event) {pendingNavigation.current = null; if (cameraAnimation.current !== null) {cancelAnimationFrame(cameraAnimation.current); cameraAnimation.current=null;} setReferenceHighlight(null); cameraActive.current = true; cameraStart.current = {...camera.current};}}}
               onMoveEnd={(event, next) => {
                 // Controlled viewport synchronization also emits a truthy { sync: true }
                 // end event. A delayed native end can also predate a newer pan.

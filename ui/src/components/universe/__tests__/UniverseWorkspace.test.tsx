@@ -671,3 +671,32 @@ it("cancels a live camera interaction when recovery becomes blocked", async () =
  expect(handle.current!.getViewport()).toEqual(layout.viewport);
  expect(camera).not.toHaveBeenCalled();
 });
+
+it("reveals and highlights a deliberate offscreen reference but defers while typing", async () => {
+  const { handle } = setup();
+  const generation = handle.current!.getState().panels[key].generation;
+  const input = screen.getByRole("textbox", { name: "Draft" });
+  input.focus();
+  expect(handle.current!.requestNavigation({
+    id: "nav-1", panelKey: key, generation, cause: "commander-reference", highlight: true,
+  })).toBe("deferred");
+  expect(handle.current!.getViewport()).toEqual(layout.viewport);
+  act(() => { input.blur(); screen.getByLabelText("Workspace controls").focus(); });
+  await waitFor(() => expect(handle.current!.getViewport()).not.toEqual(layout.viewport));
+  expect(screen.getByLabelText("Task fixture")).toHaveAttribute("data-reference-highlight", "true");
+  expect(handle.current!.requestNavigation({
+    id: "background", panelKey: key, generation, cause: "background", highlight: true,
+  })).toBe("ignored");
+});
+
+it("commits minimize immediately while using only a noninteractive motion proxy", () => {
+  const handle=createRef<WorkspaceHandle>();
+  const {container}=render(<UniverseWorkspace ref={handle} scope={scope} initialLayout={layout} content={{}} motion motionMode="full"/>);
+  const generation=handle.current!.getState().panels[key].generation;
+  act(()=>handle.current!.dispatch({type:"minimize",key,generation}));
+  expect(handle.current!.getState().panels[key].minimized).toBe(true);
+  const proxy=container.querySelector(".universe-minimize-proxy");
+  expect(proxy).toBeInTheDocument();
+  expect(proxy).toHaveAttribute("aria-hidden","true");
+  expect(proxy?.querySelector("button,input,textarea")).toBeNull();
+});

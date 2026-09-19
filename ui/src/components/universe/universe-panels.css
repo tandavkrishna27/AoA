@@ -7,6 +7,14 @@
   background: var(--bg, #f4f4f5);
   font: 13px system-ui, sans-serif;
 }
+.universe-minimize-proxy {
+  position: absolute; z-index: 500; pointer-events: none; overflow: hidden;
+  border: 1px solid var(--universe-accent, #c33f47); border-radius: 8px;
+  background: color-mix(in srgb, var(--card, #17191f) 82%, transparent);
+  transform-origin: top center; animation: universe-minimize-proxy 220ms ease-in forwards;
+}
+.universe-minimize-proxy span { display: block; padding: 10px 14px; white-space: nowrap; }
+@keyframes universe-minimize-proxy { to { opacity: 0; transform: translate(calc(50vw - 50%), -80px) scale(.08); } }
 .universe-recovery {
   display: flex;
   align-items: center;
@@ -58,6 +66,16 @@
 }
 .universe-panel:not([data-selected="true"]) .universe-panel-title {
   color: var(--dim, #65656c);
+}
+.universe-panel[data-reference-highlight="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  z-index: -1;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: 0 0 0 2px var(--universe-accent, #c43d46), 0 0 28px color-mix(in srgb, var(--universe-accent, #c43d46) 58%, transparent);
+  animation: universe-reference-glow 1.8s ease-out both;
 }
 .universe-panel-title {
   flex: 1;
@@ -174,6 +192,17 @@
   .universe-motion .universe-panel {
     animation: universe-panel-in 180ms ease both;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .universe-panel[data-reference-highlight="true"]::after { animation: none; }
+}
+.universe-canvas[data-motion="reduced"] .react-flow__node { transition: none !important; }
+.universe-canvas[data-motion="reduced"] .universe-panel { animation: none !important; }
+.universe-canvas[data-motion="reduced"] .universe-panel[data-reference-highlight="true"]::after { animation: none; }
+@keyframes universe-reference-glow {
+  0% { opacity: 0; transform: scale(.985); }
+  18%, 58% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.01); }
 }
 @keyframes universe-panel-in {
   from {

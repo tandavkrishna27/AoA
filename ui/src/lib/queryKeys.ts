@@ -348,6 +348,7 @@ export const queryKeys = {
   },
   cockpit: (companyId: string) => ["cockpit", companyId] as const,
   cockpitCounts: (companyId: string) => ["cockpit", companyId, "counts"] as const,
+  universePreferences: (companyId: string) => ["universe-preferences", companyId] as const,
   plugins: {
     all: ["plugins"] as const,
     list: ["plugins", "list"] as const,

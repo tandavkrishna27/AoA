@@ -81,6 +81,7 @@ import { universeDraftsRoutes } from "./routes/universe-drafts.js";
 import { universeAttentionRoutes } from "./routes/universe-attention.js";
 import { universeCatchupRoutes } from "./routes/universe-catchup.js";
 import { universeIntakeRoutes } from "./routes/universe-intake.js";
+import { universePreferenceRoutes } from "./routes/universe-preferences.js";
 import { viewerPreferencesRoutes } from "./routes/viewer-preferences.js";
 import { inboxDismissalRoutes } from "./routes/inbox-dismissals.js";
 import { userEntityPinRoutes } from "./routes/user-entity-pins.js";
@@ -641,6 +642,7 @@ export async function createApp(
   api.use(universeAttentionRoutes(db));
   api.use(universeCatchupRoutes(db));
   api.use(universeIntakeRoutes(db, opts.storageService));
+  api.use(universePreferenceRoutes(db));
   api.use(viewerPreferencesRoutes(db));
   api.use(inboxDismissalRoutes(db));
   api.use(userEntityPinRoutes(db));

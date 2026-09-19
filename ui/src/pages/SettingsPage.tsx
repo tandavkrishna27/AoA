@@ -24,13 +24,14 @@ import { ProvidersSection } from "@/components/settings/sections/ProvidersSectio
 import { InboxSection } from "@/components/settings/sections/InboxSection";
 import { OperationsSection } from "@/components/settings/sections/OperationsSection";
 import { DevicesSection } from "@/components/settings/sections/DevicesSection";
+import { UniverseSection } from "@/components/settings/sections/UniverseSection";
 
 // Accepted ?tab= input values. "llm" is retained as a legacy alias so old
 // bookmarks (?tab=llm) survive and normalize to "memory" rather than silently
 // falling back to General (Rev 3, finding #10).
 export const VALID_SECTIONS: readonly SettingsSectionAlias[] = [
   "general", "health", "commander", "memory", "llm", "providers", "budget", "mcp", "connectors", "github", "plugins", "marketplace", "archive",
-  "activity", "environments", "secrets", "inbox", "operations", "devices",
+  "activity", "environments", "secrets", "inbox", "operations", "devices", "universe",
 ];
 
 function isValidSection(s: string | null): s is SettingsSectionAlias {
@@ -50,6 +51,8 @@ function renderActiveSection(id: SettingsSectionId) {
       return <HealthSection />;
     case "commander":
       return <CommanderSection />;
+    case "universe":
+      return <UniverseSection />;
     case "memory":
       return <MemorySettingsSection />;
     case "providers":

@@ -14,6 +14,7 @@ export type PanelNodeData = Record<string, unknown> & {
   gestureDispatch: Dispatch<Action>;
   content: ReactNode;
   shielded: boolean;
+  referenceHighlighted: boolean;
   beginGesture: (panel: Panel) => void;
   endGesture: () => void;
 };
@@ -66,6 +67,7 @@ export function PanelNode({ data }: NodeProps<PanelFlowNode>) {
         maximized={data.maximized}
         dispatch={dispatch}
         shielded={data.shielded}
+        referenceHighlighted={data.referenceHighlighted}
         onHeaderReady={(header) => data.headerReady(panel, header)}
         onHeaderKeyDown={(event) => {
           if (

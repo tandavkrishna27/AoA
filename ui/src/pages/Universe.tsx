@@ -1,4 +1,4 @@
-import {useEffect, useLayoutEffect, useRef, useState} from "react";
+import {useEffect, useLayoutEffect, useRef, useState, type CSSProperties} from "react";
 import {Link, useNavigate, useSearchParams} from "react-router-dom";
 import {ArrowLeft} from "lucide-react";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
@@ -19,6 +19,8 @@ import type {WorkspaceHandle} from "../components/universe/UniverseWorkspace";
 import type {State, Viewport} from "../components/universe/panel-state";
 import {buildUniverseContext} from "../components/universe/buildUniverseContext";
 import {useUniverseReconciliation} from "../components/universe/useUniverseReconciliation";
+import {useUniversePreferences} from "../hooks/useUniversePreferences";
+import {UNIVERSE_ACCENTS} from "../components/universe/appearance-tokens";
 import "../components/universe/commander-surface.css";
 import "../components/universe/universe-shell.css";
 
@@ -42,6 +44,8 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   const [implicitConversation, setImplicitConversation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(initialPresentation);
+  const preferences = useUniversePreferences(companyId);
+  const appliedPreferences = useRef(-1);
   const [registry, setRegistry] = useState<State | null>(null);
   const [viewport, setViewport] = useState<Viewport>({x: 0, y: 0, zoom: 1});
   const [canvasBounds, setCanvasBounds] = useState({width: 1, height: 1});
@@ -74,6 +78,20 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
     ? authorized.find(row => row.id === requested)?.id ?? null
     : authorized.find(row => row.id === implicitConversation)?.id ?? authorized[0]?.id ?? null;
   const reconciliation = useUniverseReconciliation({companyId,conversationId:selected,ownerSession:identity});
+  const effectivePreferences = preferences.snapshot?.effective;
+  useEffect(() => {
+    if (!preferences.snapshot || appliedPreferences.current === preferences.snapshot.revision) return;
+    appliedPreferences.current = preferences.snapshot.revision;
+    const value = preferences.snapshot.effective;
+    setPresentation(previous => ({
+      ...previous,
+      chat: value.chatVisibility === "tucked" ? "tucked" : value.conversationPresentation,
+      lastVisible: value.conversationPresentation,
+      chatFrontmost: value.chatVisibility === "shown",
+      blob: value.blobVisibility === "shown",
+      captions: value.captions === "visible",
+    }));
+  }, [preferences.snapshot]);
   // Pin the initial selection in the route; a later list reorder is not navigation.
   useLayoutEffect(() => {
     if (!conversations.isSuccess || requested || !selected) return;
@@ -110,21 +128,22 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
     if (panel) perform(() => {
       frame.current?.dispatch({type: panel.minimized ? "restore" : "focus", key, generation: panel.generation});
       if (panel.minimized || isPanelOutOfView(panel.rect, viewport, canvasBounds)) {
-        frame.current?.setViewport({
-          x: canvasBounds.width / 2 - (panel.rect.x + panel.rect.width / 2) * viewport.zoom,
-          y: canvasBounds.height / 2 - (panel.rect.y + panel.rect.height / 2) * viewport.zoom,
-          zoom: viewport.zoom,
-        });
+        frame.current?.requestNavigation({id: crypto.randomUUID(), panelKey:key, generation:panel.generation, cause:"user-reference", highlight:false});
       }
     });
   };
   const prefix = selectedCompany?.issuePrefix;
   const returnPath = prefix ? `/${prefix}/commander${selected ? `?conversation=${encodeURIComponent(selected)}` : ""}` : "/";
-  return <main className="universe-shell" aria-label="Universe canvas">
+  const accent = UNIVERSE_ACCENTS[effectivePreferences?.accent ?? "brand_red"];
+  return <main className="universe-shell" aria-label="Universe canvas"
+    data-theme={effectivePreferences?.theme ?? "inherit"} data-density={effectivePreferences?.density ?? "comfortable"}
+    data-grid={effectivePreferences?.grid ?? "dots"} data-blob-style={effectivePreferences?.blobStyle ?? "fluid"}
+    style={{"--universe-accent":accent,"--universe-grid-opacity":effectivePreferences?.gridIntensity ?? .15} as CSSProperties}>
     <Link className="universe-exit" to={returnPath} aria-label="Back to Commander" title="Back to Commander"><ArrowLeft size={18}/></Link>
     <div className="universe-shell-tray">
       <UniverseTray scopeKey={`${identity}:${companyId}:${selected ?? "none"}`}
         conversationTitle={mine.find(row => row.id === selected)?.title || undefined}
+        dockHiding={effectivePreferences?.dockHiding === "auto_hide" ? "auto" : "always"}
         openPanels={suspended ? [] : currentRegistry?.order.map(key => ({...currentRegistry.panels[key], kind: "Task"})) ?? []}
         menuItems={{work: available.map(task => ({key: task.id, label: task.title})),
           settings: [{key: "company-settings", label: "Company settings"}, {key: "lobby", label: "Return to lobby"}]}}
@@ -139,18 +158,18 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
         onOpenConversation={id => {if (id === "new-conversation") void create(); else openConversation(id);}}
         onOpenPanel={openPanel}
         onOpenReference={(menu, id) => {
-          if (menu === "settings") { navigate(id === "lobby" ? "/" : `/${prefix}/settings`); return; }
+          if (menu === "settings") { navigate(id === "lobby" ? "/" : `/${prefix}/settings?tab=universe`); return; }
           const task = available.find(row => row.id === id);
           if (menu !== "work" || !task) return;
           if (!selected || !currentRegistry || !frame.current) {setError("Choose or create a conversation in Commander options before opening a task."); return;}
           perform(() => frame.current!.open({ref: {companyId, kind: "task", id}, title: task.title}));
         }}/>
     </div>
-    <PanelPreviewRail panels={currentRegistry?.order.flatMap(key => {
+    {effectivePreferences?.openPanelPreviews !== "hidden" && <PanelPreviewRail panels={currentRegistry?.order.flatMap(key => {
       const panel = currentRegistry.panels[key];
       const outside = !panel.minimized && currentRegistry.maximized === null && isPanelOutOfView(panel.rect, viewport, canvasBounds);
       return panel.minimized || outside ? [{key, title: panel.title, kind: panel.ref.kind === "task" ? "Task" : panel.ref.kind, minimized: panel.minimized}] : [];
-    }) ?? []} onOpen={openPanel}/>
+    }) ?? []} onOpen={openPanel}/>}
     <div className="universe-shell-notices" aria-live="polite">
       {selected && reconciliation.state.status !== "current" && <p role="status">Workspace updates are {reconciliation.state.status}. Showing the last confirmed view.</p>}
       {reconciliation.query.data?.partialReasons.length ? <p role="status">Some workspace updates are still being reconciled.</p> : null}
@@ -162,12 +181,14 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
     </div>
     <div ref={canvas} className="universe-shell-canvas" style={suspended ? {display: "none"} : undefined}>
       {selected && <PersistedUniverseWorkspace key={selected} ref={frame} companyId={companyId} conversationId={selected}
-        content={{}} motion onStateObserved={setRegistry} onViewportObserved={setViewport} resolveContent={panel => panel.ref.kind === "task" ? {
+        content={{}} motion motionMode={effectivePreferences?.motion ?? "subtle"} initialAutoTile={effectivePreferences?.arrangement === "assisted"}
+        onStateObserved={setRegistry} onViewportObserved={setViewport} resolveContent={panel => panel.ref.kind === "task" ? {
           ref: panel.ref, title: panel.title, render: () => <TaskConversationPanel companyId={companyId}
             issueId={panel.ref.id} panelKey={panel.key} generation={panel.generation} active/>,
         } : undefined}/>}
     </div>
-    {presentation.blob && presentation.chat !== "maximized" && <div className="universe-shell-blob" data-occupied={!!currentRegistry?.order.some(key => !currentRegistry.panels[key].minimized)}>
+    {presentation.blob && presentation.chat !== "maximized" && <div className="universe-shell-blob" data-occupied={!!currentRegistry?.order.some(key => !currentRegistry.panels[key].minimized)} data-style={effectivePreferences?.blobStyle ?? "fluid"} data-color={effectivePreferences?.blobColor ?? "match_accent"}
+      style={{"--blob-accent":effectivePreferences?.blobColor && effectivePreferences.blobColor !== "match_accent" ? UNIVERSE_ACCENTS[effectivePreferences.blobColor] : accent} as CSSProperties}>
       <CommanderBlob onPrimary={() => setPresentation(toggleTrayChat)} onHide={() => setPresentation(previous => ({...previous, blob: false}))}/>
     </div>}
     {(conversations.isSuccess || suspended) && (!requested || !!selected) && <div className="universe-shell-chat" style={suspended ? {display: "none"} : undefined}>
