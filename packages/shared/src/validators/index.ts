@@ -633,9 +633,13 @@ export {
   universeAttentionSourceRefSchema,
   universeAttentionEntrySchema,
   universeAttentionResponseSchema,
+  universeAttentionCheckpointInputSchema,
+  universeAttentionCheckpointSchema,
   type UniverseAttentionSourceRef,
   type UniverseAttentionEntry,
   type UniverseAttentionResponse,
+  type UniverseAttentionCheckpointInput,
+  type UniverseAttentionCheckpoint,
 } from "./universe-attention.js";
 export {
   universeSnapshotReferenceSchema,

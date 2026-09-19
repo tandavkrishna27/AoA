@@ -5,16 +5,17 @@ import {beforeEach, expect, it, vi} from "vitest";
 import {Universe} from "./Universe";
 import {queryKeys} from "../lib/queryKeys";
 import {ApiError} from "../api/client";
-const h=vi.hoisted(()=>({company:"c",verified:true,list:vi.fn(),tasks:vi.fn(),create:vi.fn()}));
+const h=vi.hoisted(()=>({company:"c",verified:true,list:vi.fn(),tasks:vi.fn(),getTask:vi.fn(),attention:vi.fn(),create:vi.fn()}));
 vi.mock("../context/CompanyContext",()=>({useCompany:()=>({selectedCompanyId:h.company,selectedCompany:{issuePrefix:"ACM"}})}));
 vi.mock("../components/universe/useUniverseOwner",()=>({useUniverseOwner:()=>({identity:"owner:session",userId:"owner",isVerified:h.verified,isCurrent:()=>h.verified})}));
 vi.mock("../api/internal-agent",()=>({commanderConversationsApi:{list:h.list,create:h.create}}));
-vi.mock("../api/issues",()=>({issuesApi:{list:h.tasks}}));
+vi.mock("../api/issues",()=>({issuesApi:{list:h.tasks,get:h.getTask}}));
+vi.mock("../api/universe-attention",()=>({universeAttentionApi:{get:h.attention}}));
 vi.mock("../components/universe/UniverseCommanderChat",()=>({UniverseCommanderChat:()=> <div>Canonical Commander composer</div>}));
 vi.mock("../components/universe/PersistedUniverseWorkspace",()=>({PersistedUniverseWorkspace:({companyId,conversationId}:{companyId:string;conversationId:string})=><div>Workspace {companyId} {conversationId}</div>}));
 function setup(url="/ACM/universe"){const client=new QueryClient({defaultOptions:{queries:{retry:false}}});return {...render(<MemoryRouter initialEntries={[url]}><QueryClientProvider client={client}><Universe/></QueryClientProvider></MemoryRouter>),client};}
 const mine={id:"mine",userId:"owner",title:"Mine"};
-beforeEach(()=>{h.company="c";h.verified=true;h.list.mockReset();h.tasks.mockReset();h.create.mockReset();h.tasks.mockResolvedValue([]);});
+beforeEach(()=>{h.company="c";h.verified=true;h.list.mockReset();h.tasks.mockReset();h.getTask.mockReset();h.attention.mockReset();h.create.mockReset();h.tasks.mockResolvedValue([]);h.attention.mockResolvedValue({asOf:new Date().toISOString(),needsYou:[],ready:[],comingUp:[],nextCursor:null});});
 it("only offers the authenticated owner's conversations even when the founder list includes others",async()=>{
  h.list.mockResolvedValue({conversations:[mine,{id:"foreign",userId:"other",title:"Private"}]});setup();
  expect(await screen.findByText("Workspace c mine")).toBeInTheDocument();

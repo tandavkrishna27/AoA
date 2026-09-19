@@ -95,11 +95,41 @@ describe("Universe attention projection", () => {
       req.actor = { type: "board", userId: "local-board", source: "local_implicit", isInstanceAdmin: true };
       next();
     });
-    app.use(universeAttentionRoutes({} as Db, { projection: { get } }));
+    const checkpoints = {
+      get: vi.fn(async () => ({ revision: 0, lastAcknowledgedAt: null })),
+      issueToken: vi.fn(() => "signed-token"),
+      acknowledge: vi.fn(),
+    };
+    app.use(universeAttentionRoutes({} as Db, { projection: { get }, checkpoints }));
 
     const response = await request(app).get("/companies/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/universe/attention");
     expect(response.status).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(get).toHaveBeenCalledWith(expect.objectContaining({ role: "founder", actorUserId: "local-board" }));
+    expect(response.body).toMatchObject({ checkpoint: { revision: 0 }, checkpointToken: "signed-token" });
+  });
+
+  it("advances read history only through the explicit checkpoint route", async () => {
+    const projection = { get: vi.fn() };
+    const checkpoints = {
+      get: vi.fn(), issueToken: vi.fn(),
+      acknowledge: vi.fn(async () => ({ revision: 3, lastAcknowledgedAt: now.toISOString() })),
+    };
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.actor = { type: "board", userId: "local-board", source: "local_implicit", isInstanceAdmin: true };
+      next();
+    });
+    app.use(universeAttentionRoutes({} as Db, { projection, checkpoints }));
+    const response = await request(app)
+      .post("/companies/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/universe/attention/checkpoint")
+      .send({ baseRevision: 2, through: "signed-token" });
+    expect(response.status).toBe(200);
+    expect(checkpoints.acknowledge).toHaveBeenCalledWith(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "local-board",
+      { baseRevision: 2, through: "signed-token" },
+    );
+    expect(projection.get).not.toHaveBeenCalled();
   });
 });

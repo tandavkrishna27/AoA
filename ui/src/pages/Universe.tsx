@@ -21,6 +21,11 @@ import {buildUniverseContext} from "../components/universe/buildUniverseContext"
 import {useUniverseReconciliation} from "../components/universe/useUniverseReconciliation";
 import {useUniversePreferences} from "../hooks/useUniversePreferences";
 import {UNIVERSE_ACCENTS} from "../components/universe/appearance-tokens";
+import {universeAttentionApi} from "../api/universe-attention";
+import {AttentionRail} from "../components/universe/AttentionRail";
+import {AttentionQuestion} from "../components/universe/AttentionQuestion";
+import {openTaskReference} from "../components/universe/open-task-reference";
+import type {UniverseAttentionEntry} from "@armyofagents/shared";
 import "../components/universe/commander-surface.css";
 import "../components/universe/universe-shell.css";
 
@@ -43,6 +48,7 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   const [creating, setCreating] = useState(false);
   const [implicitConversation, setImplicitConversation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attentionEntry, setAttentionEntry] = useState<UniverseAttentionEntry | null>(null);
   const [presentation, setPresentation] = useState(initialPresentation);
   const preferences = useUniversePreferences(companyId);
   const appliedPreferences = useRef(-1);
@@ -104,6 +110,23 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
   const currentRegistry = registry?.scope.conversationId === selected ? registry : null;
   const tasks = useQuery({queryKey: [...queryKeys.issues.list(companyId), "universe-owner", identity],
     queryFn: () => issuesApi.list(companyId), retry: false});
+  const attention = useQuery({queryKey:["universe-attention",companyId,identity],
+    queryFn:()=>universeAttentionApi.get(companyId), retry:false, refetchInterval:30_000});
+  const [finishingAttention,setFinishingAttention]=useState(false);
+  const finishAttention=async()=>{
+    const snapshot=attention.data;
+    if(!snapshot?.checkpoint||!snapshot.checkpointToken||finishingAttention)return;
+    setFinishingAttention(true);
+    try{await universeAttentionApi.finish(companyId,snapshot.checkpoint.revision,snapshot.checkpointToken);
+      setAttentionEntry(null);await attention.refetch();setError(null);
+    }catch(cause){setError(cause instanceof Error?cause.message:"Could not finish attention review.");}
+    finally{if(alive.current)setFinishingAttention(false);}
+  };
+  useEffect(()=>{
+    if(!attentionEntry||!attention.data)return;
+    const visible=[...attention.data.needsYou,...attention.data.ready,...attention.data.comingUp].some(item=>item.id===attentionEntry.id);
+    if(!visible)setAttentionEntry(null);
+  },[attention.data,attentionEntry]);
   const available = tasks.isSuccess ? tasks.data.filter(task => task.companyId === companyId) : [];
   const openConversation = (id: string) => {
     setParams(previous => {const next = new URLSearchParams(previous); next.set("conversation", id); return next;});
@@ -132,6 +155,21 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
       }
     });
   };
+  const openTask = async (issueId: string, route: Parameters<typeof openTaskReference>[0]["route"], anchorId?: string | null) => {
+    if (!selected || !currentRegistry || !frame.current) {
+      setError("Choose or create a conversation in Commander options before opening a task."); return;
+    }
+    try {
+      await openTaskReference({issueId,anchorId,route},{companyId,state:currentRegistry,workspace:frame.current,resolveIssue:issuesApi.get});
+      setError(null);
+    } catch(cause) { setError(cause instanceof Error ? cause.message : "Could not open task."); }
+  };
+  const directTask = params.get("task");
+  const consumedDirectTask = useRef<string | null>(null);
+  useEffect(()=>{
+    if (!directTask || directTask === consumedDirectTask.current || !currentRegistry || !selected) return;
+    consumedDirectTask.current=directTask; void openTask(directTask,"direct-reference",params.get("anchor"));
+  },[directTask,currentRegistry,selected]);
   const prefix = selectedCompany?.issuePrefix;
   const returnPath = prefix ? `/${prefix}/commander${selected ? `?conversation=${encodeURIComponent(selected)}` : ""}` : "/";
   const accent = UNIVERSE_ACCENTS[effectivePreferences?.accent ?? "brand_red"];
@@ -144,6 +182,7 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
       <UniverseTray scopeKey={`${identity}:${companyId}:${selected ?? "none"}`}
         conversationTitle={mine.find(row => row.id === selected)?.title || undefined}
         dockHiding={effectivePreferences?.dockHiding === "auto_hide" ? "auto" : "always"}
+        counts={{inbox:attention.data?.needsYou.length}}
         openPanels={suspended ? [] : currentRegistry?.order.map(key => ({...currentRegistry.panels[key], kind: "Task"})) ?? []}
         menuItems={{work: available.map(task => ({key: task.id, label: task.title})),
           settings: [{key: "company-settings", label: "Company settings"}, {key: "lobby", label: "Return to lobby"}]}}
@@ -156,13 +195,16 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
           ? {...previous, chat: value ? previous.lastVisible : "tucked", chatFrontmost: value}
           : {...previous, [which]: value})}
         onOpenConversation={id => {if (id === "new-conversation") void create(); else openConversation(id);}}
-        onOpenPanel={openPanel}
+        onOpenPanel={key=>{
+          const panel=currentRegistry?.panels[key];
+          if(panel?.ref.kind==="task")void openTask(panel.ref.id,"open-panels"); else openPanel(key);
+        }}
         onOpenReference={(menu, id) => {
           if (menu === "settings") { navigate(id === "lobby" ? "/" : `/${prefix}/settings?tab=universe`); return; }
           const task = available.find(row => row.id === id);
           if (menu !== "work" || !task) return;
           if (!selected || !currentRegistry || !frame.current) {setError("Choose or create a conversation in Commander options before opening a task."); return;}
-          perform(() => frame.current!.open({ref: {companyId, kind: "task", id}, title: task.title}));
+          void openTask(task.id,"work");
         }}/>
     </div>
     {effectivePreferences?.openPanelPreviews !== "hidden" && <PanelPreviewRail panels={currentRegistry?.order.flatMap(key => {
@@ -170,10 +212,17 @@ function OwnedUniverse({companyId, userId, identity}: {companyId: string; userId
       const outside = !panel.minimized && currentRegistry.maximized === null && isPanelOutOfView(panel.rect, viewport, canvasBounds);
       return panel.minimized || outside ? [{key, title: panel.title, kind: panel.ref.kind === "task" ? "Task" : panel.ref.kind, minimized: panel.minimized}] : [];
     }) ?? []} onOpen={openPanel}/>}
+    {effectivePreferences?.attentionPreviews !== "hidden" && attention.data &&
+      (effectivePreferences?.attentionPreviews === "always" || attention.data.needsYou.length+attention.data.ready.length+attention.data.comingUp.length>0) &&
+      <AttentionRail attention={attention.data} selectedId={attentionEntry?.id} onSelect={setAttentionEntry}
+        onViewAll={()=>navigate(`/${prefix}/inbox`)} onFinish={()=>void finishAttention()} finishing={finishingAttention}/>}
+    {attentionEntry && <AttentionQuestion companyId={companyId} entry={attentionEntry}
+      onOpenTask={id=>void openTask(id,"needs-you")} onClose={()=>setAttentionEntry(null)}/>}
     <div className="universe-shell-notices" aria-live="polite">
       {selected && reconciliation.state.status !== "current" && <p role="status">Workspace updates are {reconciliation.state.status}. Showing the last confirmed view.</p>}
       {reconciliation.query.data?.partialReasons.length ? <p role="status">Some workspace updates are still being reconciled.</p> : null}
       {(error || conversations.isError || tasks.isError) && <p role="alert">{error || (conversations.isError ? "Conversations could not be loaded." : "Tasks could not be loaded.")}</p>}
+      {attention.isError && <p role="alert">Attention items could not be loaded. Inbox remains available.</p>}
       {conversations.isError && <button type="button" onClick={() => void conversations.refetch()}>Retry conversations</button>}
       {tasks.isError && <button type="button" onClick={() => void tasks.refetch()}>Retry tasks</button>}
       {conversations.isLoading && <p role="status">Loading conversations…</p>}

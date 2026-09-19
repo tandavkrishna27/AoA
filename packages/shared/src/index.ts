@@ -1508,15 +1508,20 @@ export {
 export * from "./providers/provider-catalog.js";
 export * from "./mcp-connector-catalog.js";
 export * from "./provider-connections.js";
+export * from "./notification-delivery.js";
 
 export { checkpointDataSchema, checkpointPatchSchema, type CheckpointData, type CheckpointPatch, type CheckpointSnapshot } from "./validators/universe-layout.js";
 export {
   universeAttentionSourceRefSchema,
   universeAttentionEntrySchema,
   universeAttentionResponseSchema,
+  universeAttentionCheckpointInputSchema,
+  universeAttentionCheckpointSchema,
   type UniverseAttentionSourceRef,
   type UniverseAttentionEntry,
   type UniverseAttentionResponse,
+  type UniverseAttentionCheckpointInput,
+  type UniverseAttentionCheckpoint,
 } from "./validators/universe-attention.js";
 export {
   universeSnapshotReferenceSchema,

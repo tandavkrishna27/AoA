@@ -22,8 +22,25 @@ export const universeAttentionResponseSchema = z.object({
   ready: z.array(universeAttentionEntrySchema).max(50),
   comingUp: z.array(universeAttentionEntrySchema).max(50),
   nextCursor: z.string().max(8_000).nullable(),
+  checkpoint: z.object({
+    revision: z.number().int().nonnegative(),
+    lastAcknowledgedAt: z.string().datetime().nullable(),
+  }).strict().optional(),
+  checkpointToken: z.string().min(1).max(2_000).optional(),
+}).strict();
+
+export const universeAttentionCheckpointInputSchema = z.object({
+  baseRevision: z.number().int().nonnegative(),
+  through: z.string().min(1).max(2_000),
+}).strict();
+
+export const universeAttentionCheckpointSchema = z.object({
+  revision: z.number().int().nonnegative(),
+  lastAcknowledgedAt: z.string().datetime().nullable(),
 }).strict();
 
 export type UniverseAttentionSourceRef = z.infer<typeof universeAttentionSourceRefSchema>;
 export type UniverseAttentionEntry = z.infer<typeof universeAttentionEntrySchema>;
 export type UniverseAttentionResponse = z.infer<typeof universeAttentionResponseSchema>;
+export type UniverseAttentionCheckpointInput = z.infer<typeof universeAttentionCheckpointInputSchema>;
+export type UniverseAttentionCheckpoint = z.infer<typeof universeAttentionCheckpointSchema>;
