@@ -78,6 +78,7 @@ import { sidebarPreferencesRoutes } from "./routes/sidebar-preferences.js";
 import { homeBoardLayoutRoutes } from "./routes/home-board-layout.js";
 import { universeLayoutRoutes } from "./routes/universe-layout.js";
 import { universeDraftsRoutes } from "./routes/universe-drafts.js";
+import { universeAttentionRoutes } from "./routes/universe-attention.js";
 import { viewerPreferencesRoutes } from "./routes/viewer-preferences.js";
 import { inboxDismissalRoutes } from "./routes/inbox-dismissals.js";
 import { userEntityPinRoutes } from "./routes/user-entity-pins.js";
@@ -635,6 +636,7 @@ export async function createApp(
   api.use(homeBoardLayoutRoutes(db));
   api.use(universeLayoutRoutes(db));
   api.use(universeDraftsRoutes(db));
+  api.use(universeAttentionRoutes(db));
   api.use(viewerPreferencesRoutes(db));
   api.use(inboxDismissalRoutes(db));
   api.use(userEntityPinRoutes(db));

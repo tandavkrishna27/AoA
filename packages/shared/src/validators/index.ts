@@ -629,3 +629,11 @@ export {
 } from "./hub.js";
 
 export { checkpointDataSchema, checkpointPatchSchema, type CheckpointData, type CheckpointPatch, type CheckpointSnapshot } from "./universe-layout.js";
+export {
+  universeAttentionSourceRefSchema,
+  universeAttentionEntrySchema,
+  universeAttentionResponseSchema,
+  type UniverseAttentionSourceRef,
+  type UniverseAttentionEntry,
+  type UniverseAttentionResponse,
+} from "./universe-attention.js";
