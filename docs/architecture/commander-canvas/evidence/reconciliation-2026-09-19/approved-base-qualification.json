@@ -1,5 +1,5 @@
 {
-  "status": "qualification passed; adoption authorized",
+  "status": "qualified and adopted locally; E1.2 connected acceptance remains open",
   "scope": "isolated combined candidate only",
   "unitBefore": {
     "failed": 2,
@@ -43,6 +43,18 @@
     ".tmp/e12-approved-build.log": {
       "sha256": "f211d148a950f877a673125aef3d4f96d7482614fd2a22167e1d218aa6e793dc",
       "bytes": 37515
+    },
+    ".tmp/e12-adopted-install.log": {
+      "sha256": "d52fd2edbdb588af645ecdc5503185a8ff00166c6d1da3dc1afb999208676542",
+      "bytes": 1530
+    },
+    ".tmp/e12-adopted-browser.log": {
+      "sha256": "fd8b36658b34c25259e7e5766e33174389d1dbff2a1826266c79b0a029dbb6c8",
+      "bytes": 1107
+    },
+    ".tmp/e12-adopted-source-comparison.json": {
+      "sha256": "9a6e2becf08200253d8dd5bab3cb0f9cebbf4ede43aca528a88048d3536fee1e",
+      "bytes": 72
     }
   },
   "fullTests": {
@@ -56,5 +68,17 @@
   "typecheck": "passed",
   "upstreamObservedLater": "77f4bf98b0136b018c3c7579cf3de80fa6bac007",
   "adoptionPin": "75350f1f634aec9b679d715aeefeb45287aa36e7",
-  "build": "passed"
+  "build": "passed",
+  "adoptedMerge": "7bcf81596ebf59c30dbb417aca411e84b6925de2",
+  "adoptedSourceComparison": {
+    "checked": 6759,
+    "differences": [],
+    "extraSourceFiles": []
+  },
+  "frozenInstall": "passed",
+  "browserFixtures": {
+    "passed": 5,
+    "failed": 0,
+    "productionEntryProof": false
+  }
 }

@@ -26,8 +26,8 @@ that every requirement is covered by a single test or that the production UI exi
 | Full viewport/order/selected/maximized snapshot, preserved restore rectangles | PostgreSQL coupled-presentation case; reducer/adapter and browser fixture tests | Production maximize/reload/restore journey |
 | Owner/version checkpoint CAS and retention on panel close | Real PostgreSQL first-write race, version isolation, foreign reference and close-retention cases | Registered renderer consumers in E5.1/E5.2 |
 | Checkpoint payload schema, exact 32KiB and failed audit rollback | Real PostgreSQL boundary/validation/first-write and update rollback; PATCH route tests | Renderer-specific restore/revocation and lost-ack consumer behavior |
-| Generated migration and final source compatibility | Candidate fresh and upstream-0282 upgrade proofs, repeat no-op, Drizzle no drift | Adopt reviewed lineage only after upstream decision; active migration numbering still conflicts with newer upstream |
-| Layout/receipt/checkpoint deletion cascade | Extended real PostgreSQL company removal test seeds a checkpoint, proves it exists, removes through companyService, then proves all three stores empty; 18/18 suite passed | Added test is on active base; candidate source fingerprint remains unchanged |
+| Generated migration and final source compatibility | Candidate fresh and upstream-0282 upgrade proofs, repeat no-op, Drizzle no drift | Qualified generated lineage adopted at 7bcf81596; base gate cleared |
+| Layout/receipt/checkpoint deletion cascade | Extended real PostgreSQL company removal test seeds a checkpoint, proves it exists, removes through companyService, then proves all three stores empty; 18/18 suite passed | Included in final passing combined qualification |
 | Write-ahead bounded tab journal and safe overflow | `layout-journal.test.ts`, `useUniverseState.test.tsx`, connected workspace storage-failure tests | Actual-entry reload/storage-failure experience |
 | Receipt-first uncertainty reconciliation, no speculative replay | Hook receipt/snapshot/recheck tests; lost-ack browser fixture | Real HTTP/DB browser journey |
 | Independent property rebase; explicit same-property conflict | `layout-rebase.test.ts`, hook tests, two-tab browser fixture | Production two-tab acceptance |
@@ -35,7 +35,7 @@ that every requirement is covered by a single test or that the production UI exi
 | Hydrate without PATCH, preserve in-progress gesture, content and Undo | `PersistedUniverseWorkspace.test.tsx`, browser fixture saved-drag journey | Actual page entry |
 | Smaller-screen/reduced-motion/keyboard behavior | Browser fixture narrow-screen journey | UAT in target host |
 | Production mounting | Server `app.ts` mounts `universeLayoutRoutes`; source search finds `PersistedUniverseWorkspace` consumed only by `ui/src/dev/UniversePersistenceHarness.tsx` | E1.0/E2.4 authorized UI integration is absent, not merely untested |
-| Full repository verification | Candidate build/typecheck pass; full run 24,842 pass/1 fail/76 skip; affected security suite 19/19 unchanged afterward | A single required all-green full run remains unproven; PostgreSQL fixture port race recorded separately |
+| Full repository verification | Adopted candidate build/typecheck pass; final full run 24,847 pass/0 fail/76 skip | Full qualification passed after reviewed fixture repair; actual-entry acceptance remains separate |
 | Product acceptance and rollback | Formal UAT register remains authoritative; feature rollback preserves data by contract | Tester acceptance and actual consuming disable/recovery proof remain required |
 
 ## Decision and next work
@@ -62,3 +62,5 @@ container is the only running container and was left untouched.
 
 The goal remains incomplete. The exact-base decision is now approved conditionally. Fixture repair and final
 qualification are running in the preserved candidate; base adoption has not occurred.
+
+Latest base disposition: qualified and adopted at `7bcf81596`; the earlier conditional adoption and fixture-failure notes are historical. Production task-entry outputs and actual-host/UAT joins remain outstanding.

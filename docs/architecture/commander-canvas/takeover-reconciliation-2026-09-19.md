@@ -546,3 +546,27 @@ is unidentified. No assertion or shared helper was changed. The unchanged full
 security manifest suite subsequently passed **19/19** (79.07s). This is not an
 all-green full run. Build, typecheck, 28 focused tests and migration proofs passed.
 Base adoption and production-entry/UAT acceptance remain outstanding.
+
+## Adopted qualified base — latest result
+
+The user-approved replatform revision `75350f1f634aec9b679d715aeefeb45287aa36e7`
+is now adopted locally by merge `7bcf81596ebf59c30dbb417aca411e84b6925de2`.
+The prior Universe work is preserved in checkpoint `dd60d42b7` and its history.
+The active source matches all 6,759 normalized candidate application/configuration
+files, with no extra source files. The migration conflicts were exactly the three
+rehearsed metadata conflicts; generated Universe 0283/0284 follow upstream 0281/0282.
+
+Final combined qualification: **24,847 passed, zero failed, 76 skipped**, 2,643
+passing test files and ten skipped files, 700.05 seconds. Recursive typecheck and
+full build passed. Frozen dependency installation on the adopted Windows checkout
+passed. All **five persistence browser fixture journeys passed again** there.
+Earlier failed runs above remain historical evidence, not the current result.
+Fresh/upgrade/repeated migration proofs remain applicable: migration bytes did not
+change after those proofs. A real occupied-port regression and bounded unit tests
+verify the fixture repair; the source review found no blocker.
+
+This clears the base qualification/adoption gate, not whole E1.2 acceptance.
+Production-entry integration and user acceptance remain outstanding; controlled
+browser transport is not a substitute. The remote replatform branch advanced to
+`77f4bf9` during qualification; it was deliberately not adopted or modified.
+These commits are local; no deployment or remote push occurred in this step.
