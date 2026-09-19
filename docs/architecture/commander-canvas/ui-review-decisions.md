@@ -6,6 +6,8 @@ This replaces chronological UI notes, preserved in [history](history/ui-review-b
 
 ## U01 — Identity, composition and arrival
 
+**Entry clarification, September 19:** Commander and a Universe icon on each lobby company card open the same dedicated company-scoped Universe route. Universe has no board or lobby sidebar. The authenticated company boundary remains in force. The old real-data screenshot inside the board layout was an implementation error, not an approved alternative composition. See [correction and evidence](universe-shell-correction.md).
+
 - Army of Agents is the product; **Universe** is the feature/navigation label, not “Open Universe.” Commander is the assistant.
 - Use the actual AoA brand asset, including its red dot, from the existing product. Red supersedes the orange-looking mock. Contrast-safe theme tokens must preserve brand identity.
 - JARVIS and the Atlas film interfaces inform floating work, restrained chrome, spatial depth and a separate luminous Commander presence. They do not imply decorative telemetry, illegible content or a permanently dark product.

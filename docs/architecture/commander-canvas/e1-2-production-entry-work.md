@@ -1,5 +1,7 @@
 # E1.2 production-entry acceptance work
 
+> The initial board-layout screenshot below was rejected as a visual implementation. The [standalone-shell correction](universe-shell-correction.md) supersedes its surrounding UI; the persistence evidence remains technical evidence only.
+
 Continuation of the approved E1.2/E2.4 integration plan after qualified base adoption.
 This work supplies the consuming entry needed to prove persistence. It does not
 mark all E2.4 routes, artifact renderers or V1 accepted.

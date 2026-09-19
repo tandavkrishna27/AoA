@@ -1,0 +1,79 @@
+/* Dedicated Universe viewport. No board sidebar or engineering selector rows. */
+.universe-shell {
+  --bg: #090b11;
+  --text: #e9eaf0;
+  --card: #17191f;
+  --card-2: #20232b;
+  --dim: #a1a5b1;
+  position: relative;
+  width: 100%; height: 100dvh; min-height: 0;
+  overflow: hidden; isolation: isolate;
+  color: var(--text);
+  background: radial-gradient(ellipse at 50% 25%, #161a25 0%, #090b11 65%);
+}
+.universe-shell-canvas { position: absolute; inset: 88px 0 0; }
+.universe-shell-canvas .universe-persistence, .universe-shell-canvas .universe-workspace { background: transparent; }
+.universe-shell-canvas .universe-recovery {
+  position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%);
+}
+.universe-shell-canvas .universe-recovery:focus-within {
+  z-index: 80; top: 8px; left: 16px; width: auto; height: auto; padding: 8px;
+  clip-path: none; background: var(--card); border-radius: 10px;
+}
+.universe-shell-canvas [aria-label="Layout save status"] {
+  position: absolute; bottom: 12px; right: 16px; z-index: 5;
+  color: var(--dim); font-size: 11px;
+}
+.universe-shell-canvas .universe-layout-recovery {
+  position: absolute; bottom: 48px; right: 16px; z-index: 65;
+  width: min(440px, calc(100% - 32px)); border: 1px solid #ffffff20; border-radius: 12px;
+  box-shadow: 0 16px 50px #0006;
+}
+.universe-shell-tray { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 70; }
+.universe-exit {
+  position: absolute; top: 26px; left: 18px; z-index: 75; display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 50%; color: #aaaebb; background: #141720;
+}
+.universe-exit:hover { color: white; background: #222631; }
+.universe-exit:focus-visible { outline: 2px solid #d74646; outline-offset: 3px; }
+.universe-shell-notices { position: absolute; top: 100px; right: 20px; z-index: 72; max-width: min(380px, calc(100% - 40px)); }
+.universe-shell-notices:empty { display: none; }
+.universe-shell-notices p { padding: 10px 14px; border-radius: 10px; background: #1c202a; font-size: 13px; }
+.universe-shell-notices button { margin: 4px; padding: 6px 10px; border-radius: 6px; background: #303442; }
+.universe-shell-blob { position: absolute; inset: 88px 0 140px; display: grid; place-items: center; pointer-events: none; z-index: 1; }
+.universe-shell-blob[data-occupied="true"] { inset: auto auto 24px 28px; }
+.universe-shell-blob[data-occupied="true"] .universe-commander-blob-wrap { --blob-size: 64px !important; }
+.universe-shell-blob .universe-commander-blob {
+  background: radial-gradient(circle at 36% 30%, #f9c7d3 0%, #d85370 30%, #bc304b 61%, #591527 100%);
+  box-shadow: 0 0 50px 8px #b82d4b44, inset 0 0 30px #ffffff30;
+}
+.universe-shell-chat { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
+@media (max-width: 640px) {
+  .universe-shell-tray { top: 10px; }
+  .universe-exit { top: 80px; left: 12px; }
+  .universe-shell-canvas { inset: 120px 0 0; }
+  .universe-shell-blob[data-occupied="true"] { bottom: 104px; left: 14px; }
+}
+/* Match the reviewed clean-panels reference rather than the generic harness orb. */
+.universe-shell {
+  --bg: #0d0b0c; --text: #f2ebed; --card: #201c1e; --card-2: #292326; --dim: #b4a7ac;
+  background: radial-gradient(ellipse at 78% 30%, #27131455, transparent 50%), var(--bg);
+}
+.universe-shell .universe-tray { --utray-bg: #201c1ee8; --utray-red: #ed655e; --utray-border: #42363b; }
+.universe-shell-blob .universe-commander-blob {
+  background: radial-gradient(circle at 30% 20%, #ffe5e1, #ed655e 24%, #773947 62%, #23121b 90%);
+  border: 1px solid #ed655e; border-radius: 50%;
+  box-shadow: inset 0 0 18px #ed655e, 0 0 40px #ed655e40;
+  animation: universe-reviewed-breathe 5s ease-in-out infinite;
+}
+.universe-shell-blob .universe-commander-blob-core {
+  inset: 24%; background: transparent; border: 2px solid #ffe5e199;
+  border-radius: 60% 40% 46% 54%; transform: rotate(34deg);
+  box-shadow: 0 0 20px #ed655e, inset 0 0 12px #ed655e;
+}
+.universe-shell-blob .universe-commander-blob::after {
+  content: ""; pointer-events: none; position: absolute; inset: -12%; border: 1px solid #ed655e73;
+  border-radius: 50%; transform: rotate(-30deg) scaleX(.85); box-shadow: 0 0 16px #ed655e4d;
+}
+@keyframes universe-reviewed-breathe { 50% { border-radius: 55% 45% 43% 57%; filter: brightness(1.12); } }
+@media (prefers-reduced-motion: reduce) { .universe-shell-blob .universe-commander-blob { animation: none; } }

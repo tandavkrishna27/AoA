@@ -24,7 +24,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { VisionMission } from "./pages/VisionMission";
 import { Objectives } from "./pages/Objectives";
 import { Commander } from "./pages/Commander";
-import { Universe } from "./pages/Universe";
+import { UniverseRoute } from "./pages/UniverseRoute";
 import { TeamPage } from "./pages/TeamPage";
 import { TeamDetail } from "./pages/TeamDetail";
 import { HumanDetail } from "./pages/HumanDetail";
@@ -127,7 +127,6 @@ function boardRoutes() {
       <Route path="vision" element={<VisionMission />} />
       <Route path="objectives" element={<Objectives />} />
       <Route path="commander" element={<Commander />} />
-      <Route path="universe" element={<Universe />} />
       <Route path="settings" element={<SettingsPage />} />
       <Route path="secrets" element={<Navigate to="../settings?tab=secrets" replace />} />
       <Route path="settings/commander" element={<Navigate to="../settings?tab=commander" replace />} />
@@ -423,6 +422,7 @@ export function App() {
             <Route path="projects/:projectId/settings" element={<UnprefixedBoardRedirect />} />
             <Route path="skills/*" element={<UnprefixedBoardRedirect />} />
             <Route path="workspaces" element={<UnprefixedBoardRedirect />} />
+            <Route path=":companyPrefix/universe" element={<UniverseRoute />} />
             <Route path=":companyPrefix" element={<Layout />}>
               {boardRoutes()}
             </Route>

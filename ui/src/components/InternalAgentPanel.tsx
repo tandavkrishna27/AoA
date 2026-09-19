@@ -519,6 +519,8 @@ export function settleRunningToolCalls(messages: LocalMessage[], messageId: stri
 /* ------------------------------------------------------------------ */
 
 interface AgentPanelContentProps {
+  /** Universe changes chrome only; one canonical composer remains mounted. */
+  universeView?: "compact" | "expanded" | "maximized" | "tucked";
   conversationId?: string | null;
   onSelectConversation?: (id: string) => void;
   /**
@@ -568,7 +570,7 @@ interface CommanderSendAttempt {
   clientSubmissionId: string;
 }
 
-export function AgentPanelContent({ conversationId, onSelectConversation, onOpenSessions, enableViewerPanel, cardChrome = false, sessionsCollapsed, onSetSessionsCollapsed }: AgentPanelContentProps = {}) {
+export function AgentPanelContent({ conversationId, onSelectConversation, onOpenSessions, enableViewerPanel, cardChrome = false, sessionsCollapsed, onSetSessionsCollapsed, universeView }: AgentPanelContentProps = {}) {
   const { selectedCompanyId } = useCompany();
   const { currentUser } = useTeamAccess(selectedCompanyId);
   const { breadcrumbs } = useBreadcrumbs();
@@ -1734,7 +1736,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
           selected (the default conversation shows messages with conversationId still
           null). In docked mode it shows only with an active conversation and never the
           toggle (no viewer there). */}
-      {(conversationId || enableViewerPanel) && (
+      {!universeView && (conversationId || enableViewerPanel) && (
         <ChatPaneCaption
           title={activeConv?.title ?? "New chat"}
           messageCount={activeConv?.messageCount ?? messages.length}
@@ -1752,7 +1754,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       {/* Mobile/tablet Sessions trigger — shown only when there is NO active
           conversation (the caption's Sessions button covers the active case).
           `lg:hidden` keeps the desktop layout completely unchanged. */}
-      {!conversationId && !enableViewerPanel && onOpenSessions && (
+      {!universeView && !conversationId && !enableViewerPanel && onOpenSessions && (
         <div className="lg:hidden shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background">
           <button
             type="button"
@@ -1768,15 +1770,15 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         </div>
       )}
 
-      <MemoryContextStrip
+      {!universeView && <MemoryContextStrip
         strictness="balanced"
         layers={["identity", "domain", "active_context", "working"]}
         surface={contextScope.surface ?? "commander"}
         hasWorkingContext={Boolean(contextScope.taskId || contextScope.goalId || contextScope.projectId || conversationId)}
-      />
+      />}
 
       {/* Mobile close button (absolute overlay, not in flow) */}
-      <Button
+      {!universeView && <Button
         variant="ghost"
         size="icon-sm"
         onClick={closePanel}
@@ -1784,10 +1786,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         className="md:hidden absolute top-2 right-2 z-10"
       >
         <X className="h-4 w-4" />
-      </Button>
+      </Button>}
 
       {/* Messages (fix #11: aria-live for streaming accessibility) */}
       <div
+        data-commander-history
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto px-3 py-3 min-h-0"
         aria-live="polite"
@@ -2132,7 +2135,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       </div>
 
       {/* Input bar */}
-      <div ref={inputBarRef} className="shrink-0 border-t border-border p-3 relative">
+      <div data-commander-composer ref={inputBarRef} className="shrink-0 border-t border-border p-3 relative">
         {/* Task 9: skill picker — anchored above the input card */}
         <SkillPicker
           open={pickerOpen}
@@ -2262,7 +2265,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
           {/* Rich input — renders skill selections as colored atomic tokens */}
           <CommanderInput
             ref={inputRef}
-            placeholder="Ask the agent..."
+            placeholder={universeView ? "Ask Commander…" : "Ask the agent..."}
             disabled={streaming}
             onSubmit={(text) => void submitCommanderInput(text)}
             onReferenceDrop={({ ref, prompt }) => addInputRef(ref, prompt)}
@@ -2288,7 +2291,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
           />
           {/* Controls row — approved mock §1/§2 order: attach + mention first,
               surface extras (+ skills, voice) after them. */}
-          <div className="flex items-center gap-1.5 px-2 pb-2">
+          <div data-commander-controls className="flex items-center gap-1.5 px-2 pb-2">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -2404,7 +2407,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
 
   // No viewer panel (docked usage) — unchanged single column.
   if (!enableViewerPanel || !companyId) {
-    return <div className="flex h-full min-h-0 flex-row overflow-hidden">{chatColumn}</div>;
+    return <div className={cn("flex h-full min-h-0 flex-row", !universeView && "overflow-hidden")}>{chatColumn}</div>;
   }
 
   // Mobile — unchanged: chat + floating pill/Sheet (no Group).
