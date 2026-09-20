@@ -178,3 +178,5 @@ export type { PluginToolDispatcher } from "./plugin-tool-dispatcher.js";
 
 export { fileImportService, processFileImportQueue, resetStuckJobs, WORKER_INTERVAL_MS } from "./file-import.js";
 export { jobSubmissionService, type AuthenticatedJobPrincipal } from "./job-submission.js";
+export { budgetCapacityService, lockBudgetAuthority } from "./budget-capacity.js";
+export { voiceMediaCredentialService } from "./voice-media-credentials.js";

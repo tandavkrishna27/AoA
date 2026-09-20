@@ -59,6 +59,7 @@ import { issueService } from "./issues.js";
 import { executePinnedRequest, validateAndResolveFetchUrl } from "./outbound-url-guard.js";
 import { projectService } from "./projects.js";
 import { routineService } from "./routines.js";
+import { lockBudgetAuthority } from "./budget-capacity.js";
 
 const DEFAULT_INCLUDE: CompanyPortabilityInclude = {
   company: true,
@@ -3199,10 +3200,14 @@ export function companyPortabilityService(db: Db) {
         const batch = pendingInserts.slice(i, i + COST_EVENT_INSERT_BATCH_SIZE);
         const batchSlugs = pendingSlugs.slice(i, i + COST_EVENT_INSERT_BATCH_SIZE);
         if (batch.length === 0) continue;
-        const returned = (await db
-          .insert(costEvents)
-          .values(batch as never)
-          .returning({ id: costEvents.id })) as { id: string }[];
+        const returned = await db.transaction(async (tx) => {
+          const txDb = tx as unknown as Db;
+          await lockBudgetAuthority(txDb, targetCompany.id);
+          return (await txDb
+            .insert(costEvents)
+            .values(batch as never)
+            .returning({ id: costEvents.id })) as { id: string }[];
+        });
         for (let j = 0; j < returned.length && j < batchSlugs.length; j++) {
           const slug = batchSlugs[j];
           const newId = returned[j]?.id;

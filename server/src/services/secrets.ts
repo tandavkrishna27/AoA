@@ -6,6 +6,7 @@ import {
   companySecretProviderConfigs,
   companySecrets,
   companySecretVersions,
+  providerConnections,
   runtimeProviderKeys,
   secretAccessEvents,
 } from "@armyofagents/db";
@@ -40,6 +41,10 @@ import {
   resolveProviderKeyTarget,
   type ProviderKeyTarget,
 } from "./providers/provider-key.js";
+import {
+  authorizeVoiceMediaCredential,
+  type VoiceMediaCapability,
+} from "./voice-media-credential-policy.js";
 
 const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const SENSITIVE_ENV_KEY_RE =
@@ -62,6 +67,8 @@ export type SecretConsumerContext = {
   pluginId?: string | null;
   /** Internal capability for the OAuth broker/loader; never accepted from API input. */
   mcpOAuthOwner?: McpOAuthSecretOwner;
+  /** Server-derived capability context. Generic API input must never populate it. */
+  voiceMedia?: { connectionId: string; capability: VoiceMediaCapability };
 };
 
 type Actor = { userId?: string | null; agentId?: string | null };
@@ -469,6 +476,56 @@ export function secretService(db: Db) {
     }
   }
 
+  async function assertVoiceMediaBinding(
+    secret: typeof companySecrets.$inferSelect,
+    context: SecretConsumerContext,
+  ) {
+    if (secret.resolutionScope !== "voice_media") return;
+    if (context.consumerType !== "provider_connection" || !context.voiceMedia) {
+      throw new SecretCandidateUnavailableError(
+        "restricted_credential_denied",
+        "Restricted voice/media credential is unavailable (restricted_consumer)",
+      );
+    }
+    const connectionId = context.voiceMedia.connectionId;
+    const [connection] = await db
+      .select()
+      .from(providerConnections)
+      .where(
+        and(
+          eq(providerConnections.id, connectionId),
+          eq(providerConnections.companyId, secret.companyId),
+        ),
+      );
+    const binding = context.configPath
+      ? await db
+          .select()
+          .from(companySecretBindings)
+          .where(
+            and(
+              eq(companySecretBindings.companyId, secret.companyId),
+              eq(companySecretBindings.secretId, secret.id),
+              eq(companySecretBindings.targetType, "provider_connection"),
+              eq(companySecretBindings.targetId, connectionId),
+              eq(companySecretBindings.configPath, context.configPath),
+            ),
+          )
+          .then((rows) => rows[0] ?? null)
+      : null;
+    const decision = authorizeVoiceMediaCredential({
+      secret,
+      connection: connection ?? null,
+      binding,
+      context,
+    });
+    if (!decision.allowed) {
+      throw new SecretCandidateUnavailableError(
+        "restricted_credential_denied",
+        `Restricted voice/media credential is unavailable (${decision.reason})`,
+      );
+    }
+  }
+
   async function resolveSecretValue(
     companyId: string,
     secretId: string,
@@ -486,6 +543,7 @@ export function secretService(db: Db) {
       if (secret.status !== "active") {
         throw new SecretCandidateUnavailableError("secret_inactive", "Secret is not active");
       }
+      await assertVoiceMediaBinding(secret, context);
       // Broker-owned-secret guard (remediation R3): generic resolution paths must not
       // resolve/mutate an mcp:* OAuth bundle outside the broker's own consumer context.
       assertMcpOAuthResolutionAllowed(secret, context);
