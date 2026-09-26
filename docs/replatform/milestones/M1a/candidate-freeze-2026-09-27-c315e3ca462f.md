@@ -114,6 +114,16 @@ observed sandbox must then be bound fail-closed to that exact template/build usi
 identity stops the lane. Actual values are runtime observations and must not be
 invented in this document.
 
+This closes EVID-01's immutable-template arm: `buildID` is the immutable template
+build identifier, and the sandbox event binds each observed sandbox to it.
+`envdVersion`, when the provider supplies it, is retained as a provider-returned
+template-runtime identifier. It is not represented as a global E2B service release,
+because the current API exposes no such identifier to this lane. EVID-01 still
+requires the gate owner either to rule that retained `envdVersion` is the acceptable
+equivalent service-side identifier, or to record that no global service version is
+obtainable and that the immutable template build binding satisfies the condition
+alone. This inventory does not take that ruling.
+
 Keyless shipped boot comes first. One keyed run may occur only under the existing
 named F8 authorization after preflight confirms no equivalent run is active or
 complete. Failure authorizes no retry or additional paid run.
@@ -131,17 +141,38 @@ complete. Failure authorizes no retry or additional paid run.
 Preparing this inventory is not taking the freeze decision. The future freeze
 reviewer must explicitly verify these separations rather than relying on this record.
 
-## Required rulings and pre-campaign gates
+## Attributed planning ruling: PR #624 repair disposition
 
-1. Planning must decide whether PR #624's post-DEP-027 evidence-harness repair
-   requires a new named repair ticket/result with independent approval. No such
-   result exists at this candidate. The alternative is an explicit F2 ruling that
-   the candidate-level repair requires no additional ticket. This inventory takes
-   neither decision, and DEP-027 must not be rewritten to absorb the work.
-2. Planning must take and record the freeze decision for this exact candidate.
-3. A separate eligible reviewer must approve the freeze inventory and authorship
+The following is the planning session's F2 ruling, recorded here with attribution;
+it is not a decision by this inventory preparer:
+
+> PR #624 is a candidate-level campaign-evidence repair, not an additional M1a
+> required milestone ticket. No new ticket/result is required for this bounded
+> harness-only correction: its exact reviewed implementation
+> `f3362eea5b37f8986a7ed5de5d1723545f2646f4`, merged candidate
+> `c315e3ca462f8d8b77cb1777c53c76ef49dd873f`, distinct independent CLEAR review,
+> and all 16 CI checks passing are the repair disposition. This grants no campaign,
+> audit, epic or milestone pass and does not rewrite frozen DEP-027; all thirteen
+> required results remain unchanged, and fresh candidate-bound campaigns are still
+> required. Adding a ticket would duplicate the already independently reviewed
+> repair without changing acceptance or ownership. If this ruling is wrong, reopen
+> it and add a separately approved repair result before any closure.
+
+Evidence pins for that ruling are PR #624 head
+`f3362eea5b37f8986a7ed5de5d1723545f2646f4`, merge
+`c315e3ca462f8d8b77cb1777c53c76ef49dd873f`, and GitHub Actions run
+`36264689552`, which completed successfully with all 16 checks. The independent
+review was performed by the candidate inventory/campaign-QA session named above,
+distinct from implementation and planning, and reported CLEAR on the exact head.
+
+## Remaining pre-campaign gates
+
+1. Planning must take and record the freeze decision for this exact candidate.
+2. A separate eligible reviewer must approve the freeze inventory and authorship
    boundaries, re-resolve the candidate ref, verify ancestry and every blob pin,
    and run declaration, finding, citation, ticket-graph, and immutable-history guards.
+3. Before a keyed campaign, the gate owner must record the EVID-01 service-identity
+   disposition described above; no unavailable global service version may be invented.
 4. The free exact-candidate D1 campaign must run after the approved freeze and
    retain all three jobs, artifact-only grading, suppressed-injection controls,
    full exclusion ledger, source topology manifest, and digests.
