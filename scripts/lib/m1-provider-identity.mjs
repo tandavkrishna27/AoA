@@ -15,12 +15,15 @@ export function selectE2bTemplateIdentity(requestedTemplate, templates) {
   if (typeof row.templateID !== "string" || row.templateID.length === 0) throw new Error("E2B template identity: missing template ID");
   if (!BUILD_ID_RE.test(String(row.buildID ?? ""))) throw new Error("E2B template identity: missing or malformed immutable build ID");
   if (row.buildStatus !== "ready") throw new Error(`E2B template identity: current build is not ready (${JSON.stringify(row.buildStatus)})`);
+  if (typeof row.envdVersion !== "string" || row.envdVersion.trim().length === 0) {
+    throw new Error("E2B template identity: missing provider runtime version");
+  }
   return {
     requestedTemplate: requested,
     templateId: row.templateID,
     buildId: row.buildID,
     buildStatus: row.buildStatus,
-    envdVersion: typeof row.envdVersion === "string" ? row.envdVersion : null,
+    envdVersion: row.envdVersion,
   };
 }
 
