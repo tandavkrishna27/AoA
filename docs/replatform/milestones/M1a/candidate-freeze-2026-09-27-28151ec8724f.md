@@ -66,6 +66,26 @@ Git blob hashes identify bytes in the candidate tree.
 | Root versions | package.json | `e61d0536511b578bf4ff0739cbb3d5fd45bb0ad4` |
 | Dependency resolution | pnpm-lock.yaml | `d9e4fee2660f9612c4d734f0243de907f6b836d9` |
 
+## Candidate entry-review pins
+
+These additive records discharge the source-review portion of the M1a entry criteria at the named
+candidate. They preserve the older `b71f0dd539fe...` delta review and `7be35ae6b771...` ledgers as
+historical records and do not carry their campaign evidence forward.
+
+| Review boundary | Repository path | Git blob SHA |
+|---|---|---|
+| E0-E2 dependency/delta review | docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-28151ec8724f.md | `eb8c763aa6dc497e2139728e98b1791e3d299273` |
+| E3-E6 review index and method | docs/replatform/milestones/M1a/reachability/28151ec8724f/README.md | `54dd32c00574e068f47376ba6d7dd5fd74d15b8a` |
+| E3 job-control ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E3-job-control.md | `16b4ea37d0543a9a2739377cfe0b3e8c908dd2a2` |
+| E4 worker-daemon ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E4-worker-daemon.md | `8c7b2dfd609950954a8899947b1a81e9e60b5bb2` |
+| E5 workspaces/secrets ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E5-workspaces-secrets.md | `c290d5c89bbc2afb575f3b9212e265405b00661d` |
+| E6 deployment/harness ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E6-deployment-test-harness.md | `641c85fb03598be367bed4ea3684de0dd204b035` |
+
+The entry review measured the candidate's production-reachability deltas, current caller census,
+test/control wiring, frozen campaign allocations, and campaign limits. Its author is the inventory/QA
+session, distinct from implementation and planning. It is not the independent freeze review and
+does not approve dispatch, certify a campaign, or change milestone status.
+
 ## Topology and exclusion manifest
 
 D1 is the committed Linux topology with two control-plane replicas, separately
@@ -201,14 +221,16 @@ guards, and the authorship separation from planning, implementation, inventory/Q
 authorship, and later audit certification.
 
 That CLEAR applied to the superseded `c315e3ca...` inventory before the enforcement
-repair. A fresh eligible reviewer must verify this new candidate, all regenerated
-pins, source bindings, and role separation. Planning has not approved this replacement
-freeze. No dispatch is authorized.
+repair and before the candidate-current entry reviews were added. A fresh eligible reviewer must
+verify this new candidate, all 40 pins, the six candidate-current entry-review artifacts, source
+bindings, campaign allocations/limits, and role separation. Planning has not approved this
+replacement freeze. No dispatch is authorized.
 
 ## Remaining pre-campaign gates
 
-1. Obtain a fresh independent freeze review of this exact candidate, ref, all 34
-   pins, source bindings, guards, and authorship boundaries; then planning must take
+1. Obtain a fresh independent freeze review of this exact candidate, ref, all 40
+   pins, candidate-current E0-E2 delta review, E3-E6 reachability ledgers, source bindings,
+   guards, campaign limits, and authorship boundaries; then planning must take
    the freeze decision for this candidate only.
 2. Immediately before any later dispatch, re-resolve that candidate ref and confirm
    no equivalent campaign is active or complete.
