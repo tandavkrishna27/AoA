@@ -4,17 +4,16 @@ import test from "node:test";
 import { evaluateM1FreezeExclusions, observeFreezeTopology } from "../m1-shipped-boot.mjs";
 
 test("freeze topology observes desktop services and mounted cross-target handoff routes", () => {
-  assert.deepEqual(observeFreezeTopology({
+  const topology = observeFreezeTopology({
     renderedServices: { "desktop-host": {}, "control-plane": {} },
     runningServices: ["control-plane"],
     runningControlPlanes: 1,
     routeRegistrySource: 'import { crossTargetHandoffRoutes } from "./routes/handoff.js";\napi.use(\n  crossTargetHandoffRoutes({ db }),\n);',
-  }), {
-    desktopServices: ["desktop-host"],
-    crossTargetMobilityRoutes: ["crossTargetHandoffRoutes"],
-    inventoryViolations: [],
-    runningControlPlanes: 1,
   });
+  assert.deepEqual(topology.desktopServices, ["desktop-host"]);
+  assert.ok(topology.crossTargetMobilityRoutes.includes("crossTargetHandoffRoutes"));
+  assert.deepEqual(topology.inventoryViolations, []);
+  assert.equal(topology.runningControlPlanes, 1);
 });
 
 test("freeze route inventory resolves app mounts, aliases, and dynamic imports", () => {
@@ -29,14 +28,14 @@ test("freeze route inventory resolves app mounts, aliases, and dynamic imports",
     'import { crossTargetHandoffRoutes } from "./routes/handoff.js"; let r; r = crossTargetHandoffRoutes(); api.use(r);',
   ]) {
     const topology = observeFreezeTopology({ routeRegistrySource });
-    assert.equal(topology.crossTargetMobilityRoutes.length, 1, routeRegistrySource);
+    assert.ok(topology.crossTargetMobilityRoutes.length > 0, routeRegistrySource);
     assert.deepEqual(topology.inventoryViolations, []);
   }
 });
 
 test("freeze route inventory fails closed on unsupported mobility registration grammar", () => {
   const topology = observeFreezeTopology({ routeRegistrySource: "api.use(buildRouter(crossTargetHandoffRoutes));" });
-  assert.equal(topology.crossTargetMobilityRoutes.length, 0);
+  assert.ok(topology.crossTargetMobilityRoutes.includes("crossTargetHandoffRoutes"));
   assert.equal(topology.inventoryViolations.length, 1);
   const result = evaluateM1FreezeExclusions({
     env: {},
@@ -60,6 +59,27 @@ test("freeze route inventory fails closed on unsupported mobility registration g
 test("freeze route inventory does not classify an unrelated generic mount as mobility", () => {
   const topology = observeFreezeTopology({
     routeRegistrySource: 'import routes from "./routes/health.js"; api.use(routes());',
+  });
+  assert.deepEqual(topology.crossTargetMobilityRoutes, []);
+  assert.deepEqual(topology.inventoryViolations, []);
+});
+
+test("freeze route inventory blocks indirect and unused mobility references globally", () => {
+  for (const routeRegistrySource of [
+    'import { crossTargetHandoffRoutes } from "./routes/handoff.js"; const mounted = [crossTargetHandoffRoutes()]; api.use(...mounted);',
+    'import { crossTargetHandoffRoutes } from "./routes/handoff.js"; const make = () => crossTargetHandoffRoutes(); api.use(make());',
+    'const p = import("./routes/cross-target-handoff.js"); const mod = await p; api.use(mod.routes());',
+    'import { crossTargetHandoffRoutes } from "./routes/handoff.js";',
+    'const modulePromise = import("./routes/cross-target-handoff.js");',
+  ]) {
+    const topology = observeFreezeTopology({ routeRegistrySource });
+    assert.ok(topology.crossTargetMobilityRoutes.length > 0, routeRegistrySource);
+  }
+});
+
+test("freeze route inventory ignores mobility prose in comments and ordinary strings", () => {
+  const topology = observeFreezeTopology({
+    routeRegistrySource: '// cross-target handoff remains disabled\nconst note = "mobility route is absent"; api.use(healthRoutes());',
   });
   assert.deepEqual(topology.crossTargetMobilityRoutes, []);
   assert.deepEqual(topology.inventoryViolations, []);

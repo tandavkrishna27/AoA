@@ -188,6 +188,10 @@ export function observeFreezeTopology({ renderedServices = {}, runningServices =
   const source = ts.createSourceFile("route-registry.ts", String(routeRegistrySource), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const inventoryViolations = source.parseDiagnostics.map((d) => `unparseable route registry at ${d.start ?? "unknown"}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
   const mobilityName = (name) => /(?:crossTarget|mobility|handoff)/i.test(String(name));
+  // M1a certifies absence, so source-level mobility evidence is intentionally
+  // conservative: an unused import can false-positive, but an indirect mount
+  // must never disappear merely because its dataflow shape is unfamiliar.
+  const mobilityReferences = new Set();
   const factories = new Map();
   const namespaces = new Map();
   const aliases = new Map();
@@ -209,9 +213,13 @@ export function observeFreezeTopology({ renderedServices = {}, runningServices =
     return null;
   };
   const visitBindings = (node) => {
+    if (ts.isIdentifier(node) && mobilityName(node.text)) mobilityReferences.add(node.text);
+    const dynamicReference = importSpecifier(node);
+    if (dynamicReference && mobilityName(dynamicReference)) mobilityReferences.add(dynamicReference);
     if (ts.isImportDeclaration(node) && node.importClause) {
       const clause = node.importClause;
       const moduleName = ts.isStringLiteral(node.moduleSpecifier) ? node.moduleSpecifier.text : "";
+      if (mobilityName(moduleName)) mobilityReferences.add(moduleName);
       if (clause.name && (mobilityName(clause.name.text) || mobilityName(moduleName))) factories.set(clause.name.text, mobilityName(clause.name.text) ? clause.name.text : moduleName);
       if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
         for (const element of clause.namedBindings.elements) {
@@ -265,7 +273,10 @@ export function observeFreezeTopology({ renderedServices = {}, runningServices =
   visitMounts(source);
   return {
     desktopServices: names.filter((name) => /desktop/i.test(name)),
-    crossTargetMobilityRoutes: [...new Set(mountedRoutes.filter((name) => /(?:crossTarget|mobility|handoff)/i.test(name)))].sort(),
+    crossTargetMobilityRoutes: [...new Set([
+      ...mobilityReferences,
+      ...mountedRoutes.filter((name) => mobilityName(name)),
+    ])].sort(),
     inventoryViolations,
     runningControlPlanes,
   };
