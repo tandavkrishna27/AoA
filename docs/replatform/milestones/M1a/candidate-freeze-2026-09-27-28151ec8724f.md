@@ -4,8 +4,8 @@
 **Candidate:** `28151ec8724fc94d3774845d9d23cac5411a489a`
 **Candidate ref:** `refs/heads/codex/m1a-candidate-28151ec8724f`
 **Integration branch:** `docs/replatform-program`
-**Status:** source repair merged; fresh independent freeze review and planning approval pending
-**Purpose:** replacement candidate inventory after PRs #624 and #626; not a QA verdict, campaign authorization, or handoff
+**Status:** approved for the named candidate, subject to final pre-dispatch verification
+**Purpose:** replacement candidate freeze after PRs #624 and #626; not a QA verdict, gate pass, epic-status grant, campaign result, or handoff
 
 The candidate is the verified merge commit of PR #626, containing PR #624. The dedicated candidate ref
 resolved to the exact candidate when this inventory was prepared and must never move.
@@ -13,8 +13,10 @@ PR #623 and its `6d74d7e4e592...` freeze proposal, plus this PR's earlier unmerg
 `c315e3ca...` proposal, are superseded and must not be used for dispatch. Earlier
 automatic runs remain diagnostic only. No earlier-candidate campaign result is carried forward.
 
-This record inventories existing evidence and attributed planning rulings. It is not
-an approved freeze, campaign evidence, a QA or audit verdict, or a milestone handoff.
+This record inventories existing evidence and attributed planning rulings. Its
+candidate freeze is approved only for the exact candidate named above. It is not
+campaign evidence, a QA or audit verdict, a gate pass, an epic-status grant, or a
+milestone handoff.
 
 ## Ticket-result pins
 
@@ -151,7 +153,7 @@ complete. Failure authorizes no retry or additional paid run.
 | Planning, freeze decision, partial-gate/rollback ownership, dispatch, handoff decision | calling M1 planning session under founder F2 delegation |
 | DEP-027 implementer | `01a0dd9c-ec6d-7b12-a26a-f3e9783d4506` |
 | Candidate inventory preparer; later campaign QA and E5 audit author | `01a0dd9b-ba6d-79a2-8d96-9651bf242b4e` |
-| Freeze reviewer | pending fresh review; Herschel `01a0df3b-e8f1-7751-a156-9a7a78b0bf1e` reviewed the superseded proposal and must independently reconfirm this candidate if retained |
+| Freeze reviewer | Herschel `01a0df3b-e8f1-7751-a156-9a7a78b0bf1e`; independently reported `CLEAR` for PR #625 head `8898ad1f4fee6c115b957fdbb53d930323b008c1`, the exact candidate/ref, all 40 pins, and the matrix/ledger sets |
 | Reserved E5 audit certifier | `01a0de6b-915c-7fb0-b3d7-59e7bac3dc95`; excluded from implementation, dispatch, relied-on decisions, campaign QA/audit authorship, and handoff preparation |
 
 Preparing this inventory was not taking the freeze decision. The attributed planning
@@ -221,20 +223,37 @@ guards, and the authorship separation from planning, implementation, inventory/Q
 authorship, and later audit certification.
 
 That CLEAR applied to the superseded `c315e3ca...` inventory before the enforcement
-repair and before the candidate-current entry reviews were added. A fresh eligible reviewer must
-verify this new candidate, all 40 pins, the six candidate-current entry-review artifacts, source
-bindings, campaign allocations/limits, and role separation. Planning has not approved this
-replacement freeze. No dispatch is authorized.
+repair and before the candidate-current entry reviews were added. Herschel subsequently
+performed the required fresh review and explicitly reported **CLEAR** for PR #625 exact head
+`8898ad1f4fee6c115b957fdbb53d930323b008c1`. The fresh review verified candidate
+`28151ec8724fc94d3774845d9d23cac5411a489a`, its dedicated ref, all 40 pins, and the
+fault-matrix/reachability-ledger sets. This is the independent review relied on by the
+replacement freeze.
+
+GitHub Actions run `36275028541` passed on that exact inventory head, including `policy`,
+worker-protocol contract-byte checks on Ubuntu and Windows, `brand-check`, and
+`ci-required`. No review comment remained that altered the reviewed pins, configuration,
+results, campaign limits, or authorship boundaries.
+
+## Attributed planning approval
+
+The calling M1 planning session `01a0d96c-ae64-7920-a1cb-af28a360c21c`, acting under
+founder F2 delegation, approved the freeze for candidate
+`28151ec8724fc94d3774845d9d23cac5411a489a` after the exact-head independent CLEAR and
+green CI above. The approval is conditioned only on committing this attribution and, before
+dispatch, completing the final CI, comment, and candidate-ref verification against the resulting
+documentation head. It grants no gate pass, epic status, campaign result, audit verdict, or
+handoff, and authorizes no candidate, pin, configuration, or result substitution.
+
+No workflow dispatch or paid provider action is authorized by this documentation commit itself.
 
 ## Remaining pre-campaign gates
 
-1. Obtain a fresh independent freeze review of this exact candidate, ref, all 40
-   pins, candidate-current E0-E2 delta review, E3-E6 reachability ledgers, source bindings,
-   guards, campaign limits, and authorship boundaries; then planning must take
-   the freeze decision for this candidate only.
-2. Immediately before any later dispatch, re-resolve that candidate ref and confirm
-   no equivalent campaign is active or complete.
-3. The free exact-candidate D1 campaign must run after an approved replacement freeze and
+1. After this attributed-approval commit is pushed, require its final CI to pass, verify that no
+   PR comment changes the disposition, and re-resolve the dedicated candidate ref to the exact
+   candidate. Repeat the ref and equivalent-run checks immediately before any later dispatch.
+2. Confirm no equivalent campaign is active or complete.
+3. The free exact-candidate D1 campaign may run only after those checks and must
    retain all three jobs, artifact-only grading, suppressed-injection controls,
    full exclusion ledger, source topology manifest, and digests.
 4. The keyless shipped-boot preflight must pass. Runtime provider identity must be
