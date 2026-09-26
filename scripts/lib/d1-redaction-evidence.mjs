@@ -4,6 +4,15 @@ export const D1_REDACTION_REQUIRED_ATTEMPT_STATUS = "succeeded";
 const RUN_OUTPUT_PROBE_TAG = "AOA-RUN-OUTPUT-PROBE";
 const REDACTION_MARKER = "«redacted»";
 
+export function buildD1RedactionArmInputs({ plant, nonce, canary, controlCanary, capabilitySecret }) {
+  return {
+    workloadArgs: plant
+      ? [`--aoa-fake-probe-nonce=${nonce}`, "--aoa-fake-echo-env=ANTHROPIC_API_KEY"]
+      : [`--aoa-fake-probe-nonce=${nonce}`, `--aoa-fake-control-canary=${controlCanary}`],
+    secretValue: plant ? canary : capabilitySecret,
+  };
+}
+
 function scopedLines(text, nonce) {
   const token = ` arm=${nonce} `;
   return String(text ?? "")

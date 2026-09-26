@@ -30,6 +30,16 @@ test("DEP-027 exports the nonce-scoped D1 redaction evidence judge", () => {
   assert.equal(typeof moduleUnderTest.evaluateD1RedactionEvidence, "function");
 });
 
+test("DEP-027 rendered arm inputs keep the withheld capability secret distinct and its control canary unhandled", () => {
+  const graded = moduleUnderTest.buildD1RedactionArmInputs({ plant: true, nonce: "g", canary: "graded-secret", controlCanary: undefined, capabilitySecret: undefined });
+  const withheld = moduleUnderTest.buildD1RedactionArmInputs({ plant: false, nonce: "w", canary: "graded-secret", controlCanary: "inert-control", capabilitySecret: "withheld-capability" });
+  assert.equal(graded.secretValue, "graded-secret");
+  assert.equal(withheld.secretValue, "withheld-capability");
+  assert.notEqual(withheld.secretValue, graded.secretValue);
+  assert.deepEqual(withheld.workloadArgs, ["--aoa-fake-probe-nonce=w", "--aoa-fake-control-canary=inert-control"]);
+  assert.equal(JSON.stringify(withheld).includes("control=inert-control"), false);
+});
+
 test("DEP-027 stale nonce lines cannot satisfy either arm", () => {
   const evaluate = moduleUnderTest.evaluateD1RedactionEvidence;
   assert.equal(typeof evaluate, "function");

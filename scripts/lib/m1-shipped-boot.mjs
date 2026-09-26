@@ -18,6 +18,9 @@
 // -----------------------------------------------------------------------------
 
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 /** The per-org slug every canary Organization's `dedicated_worker` target must carry (E11-F008). */
 export const CANARY_EXECUTION_TARGET_SLUG = "aoa-canary-e2b";
@@ -127,6 +130,156 @@ export function evaluateMustBeOffFlags(env) {
     }
   }
   return { violations: v };
+}
+
+const EXCLUDED_BOOLEAN_FLAGS = Object.freeze([
+  "AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED",
+  "AOA_DISTRIBUTED_PUBLIC_SERVICE_INGRESS_ENABLED",
+  "AOA_DISTRIBUTED_CLOUD_PLUGIN_EXECUTION_ENABLED",
+  "AOA_ALLOW_UNSANDBOXED_MULTITENANT",
+  "AOA_0188_CUTOVER_OPT_IN",
+]);
+
+/** M1 plan section 6's conceptual exclusions, mapped to mechanisms that actually exist. */
+export function evaluateM1FreezeExclusions({ env = {}, rolloutValue, expectedTenants, topology = {} }) {
+  const violations = [];
+  const flagValues = {};
+  for (const name of EXCLUDED_BOOLEAN_FLAGS) {
+    const raw = env[name] ?? null;
+    flagValues[name] = raw;
+    try {
+      if (parseRolloutBoolean(name, raw)) violations.push(`${name} is ON`);
+    } catch {
+      violations.push(`${name} is unparseable (${JSON.stringify(raw)})`);
+    }
+  }
+  let toolArmed = false;
+  const toolRaw = env.AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED ?? null;
+  if (toolRaw !== null && String(toolRaw).trim() !== "" && ["0", "false", "no", "off"].includes(String(toolRaw).trim().toLowerCase()) === false) {
+    toolArmed = true;
+    violations.push(`AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED is armed or invalid (${JSON.stringify(toolRaw)})`);
+  }
+  const rollout = evaluateTenantRollout(rolloutValue, expectedTenants);
+  violations.push(...rollout.violations.map((v) => `rollout: ${v}`));
+  const desktopServices = Array.isArray(topology.desktopServices) ? topology.desktopServices : [];
+  const mobilityRoutes = Array.isArray(topology.crossTargetMobilityRoutes) ? topology.crossTargetMobilityRoutes : [];
+  const inventoryViolations = Array.isArray(topology.inventoryViolations) ? topology.inventoryViolations : [];
+  violations.push(...inventoryViolations.map((v) => `route inventory: ${v}`));
+  if (desktopServices.length) violations.push(`desktop services are present: ${desktopServices.join(", ")}`);
+  if (mobilityRoutes.length) violations.push(`cross-target mobility routes are present: ${mobilityRoutes.join(", ")}`);
+  if (env.AOA_DEPLOYMENT_MODE === "cloud_auth") violations.push("AOA_DEPLOYMENT_MODE=cloud_auth exposes the hosted beta surface");
+  const categories = {
+    workload: { mechanism: "rollout_allowlist", state: rollout.violations.length === 0 ? "batch/task_run only" : "violation" },
+    desktop: { mechanism: "service_absence", state: desktopServices.length === 0 ? "absent" : "present", services: desktopServices },
+    mobility: { mechanism: "route_absence", state: mobilityRoutes.length === 0 ? "absent" : "present", routes: mobilityRoutes },
+    cutover: { mechanism: "canary_rollout_and_real_opt_in", state: flagValues.AOA_0188_CUTOVER_OPT_IN === null ? "off" : String(flagValues.AOA_0188_CUTOVER_OPT_IN) },
+    ha: { mechanism: "topology_observation", state: "not_claimed", runningControlPlanes: topology.runningControlPlanes ?? null },
+    beta: { mechanism: "deployment_mode", state: env.AOA_DEPLOYMENT_MODE ?? null },
+    crew: { mechanism: "AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED", state: flagValues.AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED ?? null },
+    tool: { mechanism: "AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED", state: toolArmed ? "armed" : "off", raw: toolRaw },
+  };
+  return { violations, categories, actualFlags: { ...flagValues, AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED: toolRaw } };
+}
+
+/** Derive excluded structural surfaces from the rendered and running Compose service sets. */
+export function observeFreezeTopology({ renderedServices = {}, runningServices = [], runningControlPlanes = null, routeRegistrySource = "" } = {}) {
+  const ts = require("typescript");
+  const names = [...new Set([...Object.keys(renderedServices ?? {}), ...(runningServices ?? [])])].sort();
+  const source = ts.createSourceFile("route-registry.ts", String(routeRegistrySource), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const inventoryViolations = source.parseDiagnostics.map((d) => `unparseable route registry at ${d.start ?? "unknown"}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
+  const mobilityName = (name) => /(?:crossTarget|mobility|handoff)/i.test(String(name));
+  // M1a certifies absence, so source-level mobility evidence is intentionally
+  // conservative: an unused import can false-positive, but an indirect mount
+  // must never disappear merely because its dataflow shape is unfamiliar.
+  const mobilityReferences = new Set();
+  const factories = new Map();
+  const namespaces = new Map();
+  const aliases = new Map();
+  const mountedRoutes = [];
+  const importSpecifier = (node) => {
+    const call = ts.isAwaitExpression(node) ? node.expression : node;
+    return ts.isCallExpression(call) && call.expression.kind === ts.SyntaxKind.ImportKeyword && call.arguments.length === 1 && ts.isStringLiteral(call.arguments[0])
+      ? call.arguments[0].text
+      : null;
+  };
+  const calledMobilityRoute = (node) => {
+    if (!ts.isCallExpression(node)) return null;
+    if (ts.isIdentifier(node.expression)) return factories.get(node.expression.text) ?? null;
+    if (ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.expression)) {
+      const namespace = namespaces.get(node.expression.expression.text);
+      if (namespace) return mobilityName(node.expression.name.text) ? node.expression.name.text : `${namespace}#${node.expression.name.text}`;
+      if (mobilityName(node.expression.name.text)) return node.expression.name.text;
+    }
+    return null;
+  };
+  const visitBindings = (node) => {
+    if (ts.isIdentifier(node) && mobilityName(node.text)) mobilityReferences.add(node.text);
+    const dynamicReference = importSpecifier(node);
+    if (dynamicReference && mobilityName(dynamicReference)) mobilityReferences.add(dynamicReference);
+    if (ts.isImportDeclaration(node) && node.importClause) {
+      const clause = node.importClause;
+      const moduleName = ts.isStringLiteral(node.moduleSpecifier) ? node.moduleSpecifier.text : "";
+      if (mobilityName(moduleName)) mobilityReferences.add(moduleName);
+      if (clause.name && (mobilityName(clause.name.text) || mobilityName(moduleName))) factories.set(clause.name.text, mobilityName(clause.name.text) ? clause.name.text : moduleName);
+      if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        for (const element of clause.namedBindings.elements) {
+          const importedName = element.propertyName?.text ?? element.name.text;
+          if (mobilityName(importedName) || mobilityName(moduleName)) factories.set(element.name.text, mobilityName(importedName) ? importedName : `${moduleName}#${importedName}`);
+        }
+      }
+      if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings) && mobilityName(moduleName)) namespaces.set(clause.namedBindings.name.text, moduleName);
+    }
+    if (ts.isVariableDeclaration(node)) {
+      const dynamicModule = node.initializer ? importSpecifier(node.initializer) : null;
+      if (ts.isObjectBindingPattern(node.name) && dynamicModule) {
+        for (const element of node.name.elements) {
+          if (ts.isIdentifier(element.name)) {
+            const importedName = element.propertyName?.getText(source) ?? element.name.text;
+            if (mobilityName(importedName) || mobilityName(dynamicModule)) factories.set(element.name.text, mobilityName(importedName) ? importedName : `${dynamicModule}#${importedName}`);
+          }
+        }
+      }
+      if (ts.isIdentifier(node.name) && node.initializer) {
+        const init = ts.isAwaitExpression(node.initializer) ? node.initializer.expression : node.initializer;
+        if (dynamicModule && mobilityName(dynamicModule)) namespaces.set(node.name.text, dynamicModule);
+        else if (calledMobilityRoute(init)) aliases.set(node.name.text, calledMobilityRoute(init));
+        else if (ts.isIdentifier(init) && (factories.has(init.text) || aliases.has(init.text))) aliases.set(node.name.text, aliases.get(init.text) ?? factories.get(init.text));
+      }
+    }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isIdentifier(node.left)) {
+      const route = calledMobilityRoute(node.right);
+      if (route) aliases.set(node.left.text, route);
+      else if (ts.isIdentifier(node.right) && (factories.has(node.right.text) || aliases.has(node.right.text))) aliases.set(node.left.text, aliases.get(node.right.text) ?? factories.get(node.right.text));
+    }
+    ts.forEachChild(node, visitBindings);
+  };
+  visitBindings(source);
+  const referencesMobilityBinding = (node) => {
+    if (ts.isIdentifier(node) && (factories.has(node.text) || namespaces.has(node.text) || aliases.has(node.text))) return true;
+    return node.getChildren(source).some(referencesMobilityBinding);
+  };
+  const visitMounts = (node) => {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "use") {
+      for (const arg of node.arguments) {
+        let route = null;
+        if (ts.isCallExpression(arg)) route = calledMobilityRoute(arg);
+        else if (ts.isIdentifier(arg) && aliases.has(arg.text)) route = aliases.get(arg.text);
+        if (route) mountedRoutes.push(route);
+        else if (mobilityName(arg.getText(source)) || referencesMobilityBinding(arg)) inventoryViolations.push(`unsupported mobility route mount grammar: ${arg.getText(source)}`);
+      }
+    }
+    ts.forEachChild(node, visitMounts);
+  };
+  visitMounts(source);
+  return {
+    desktopServices: names.filter((name) => /desktop/i.test(name)),
+    crossTargetMobilityRoutes: [...new Set([
+      ...mobilityReferences,
+      ...mountedRoutes.filter((name) => mobilityName(name)),
+    ])].sort(),
+    inventoryViolations,
+    runningControlPlanes,
+  };
 }
 
 /** `KEY=value` lines (as `docker inspect … .Config.Env` prints them) → a map. */

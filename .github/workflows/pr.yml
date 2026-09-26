@@ -671,7 +671,7 @@ jobs:
           node --test scripts/lib/__tests__/e6f-harness-binding.test.mjs
           node --test scripts/lib/__tests__/d2m-cross-tenant-coverage.test.mjs
           node --test scripts/check-cross-tenant-suppression.test.mjs
-          node --test scripts/lib/__tests__/m1a-redaction-probe.test.mjs
+          node --test scripts/lib/__tests__/m1a-redaction-probe.test.mjs scripts/lib/__tests__/m1-provider-identity.test.mjs
           node --test scripts/lib/__tests__/dep-024-worker-driven-seed.test.mjs
 
       - name: CI lane routing invariants (DEP-004)
@@ -1143,6 +1143,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: M1 mobility route AST inventory
+        if: matrix.shard == 1
+        run: node --test scripts/lib/__tests__/m1-route-inventory.test.mjs
 
       # worker-protocol + sandbox-fake-provider are dist-only leaves (package.json
       # exports resolve to ./dist), and Typecheck/Run tests run BEFORE Build — so
