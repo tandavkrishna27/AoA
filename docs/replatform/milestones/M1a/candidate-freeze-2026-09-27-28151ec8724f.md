@@ -75,10 +75,10 @@ historical records and do not carry their campaign evidence forward.
 | Review boundary | Repository path | Git blob SHA |
 |---|---|---|
 | E0-E2 dependency/delta review | docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-28151ec8724f.md | `eb8c763aa6dc497e2139728e98b1791e3d299273` |
-| E3-E6 review index and method | docs/replatform/milestones/M1a/reachability/28151ec8724f/README.md | `54dd32c00574e068f47376ba6d7dd5fd74d15b8a` |
-| E3 job-control ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E3-job-control.md | `16b4ea37d0543a9a2739377cfe0b3e8c908dd2a2` |
-| E4 worker-daemon ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E4-worker-daemon.md | `8c7b2dfd609950954a8899947b1a81e9e60b5bb2` |
-| E5 workspaces/secrets ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E5-workspaces-secrets.md | `c290d5c89bbc2afb575f3b9212e265405b00661d` |
+| E3-E6 review index and method | docs/replatform/milestones/M1a/reachability/28151ec8724f/README.md | `25ec7731875fb025b4256684f4264d004474ad2a` |
+| E3 job-control ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E3-job-control.md | `3e6b6553d520d55bde94398b18d8515245d6d6f4` |
+| E4 worker-daemon ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E4-worker-daemon.md | `61e637387178d70262c5fdf402883d31339889e4` |
+| E5 workspaces/secrets ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E5-workspaces-secrets.md | `07df571e4730baf10d8715319df976cbdba895eb` |
 | E6 deployment/harness ledger | docs/replatform/milestones/M1a/reachability/28151ec8724f/E6-deployment-test-harness.md | `641c85fb03598be367bed4ea3684de0dd204b035` |
 
 The entry review measured the candidate's production-reachability deltas, current caller census,

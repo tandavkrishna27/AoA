@@ -5,9 +5,9 @@
 
 | Mechanism group | Candidate source reachability | Fresh evidence allocation |
 |---|---|---|
-| Staged inputs and grants | `stageJobInputFiles` retains two production callers; `createStagedInputResolver` and `recordObjectAccessGrant` retain one each. | Tenant-scoped staging and hostile access: both according to the frozen matrix. |
-| Run secrets and environment absence | `synthesiseRunSecrets` retains one production caller. Candidate redaction and output probes do not replace the planted env-absence controls. | Secret/env absence plus positive controls: both; exact candidate observations required. |
-| Artifact/output export | Worker and provider export paths are reachable and now enforce output-root and secret-scan refusal boundaries. | Seven-clause E5 matrix and export refusal cases: `M1a-D2-MECHANISM`; cross-tenant visibility as allocated to `M1-D1-SPINE`. |
+| Staged inputs and grants | `stageJobInputFiles` retains two production callers; `createStagedInputResolver` and `recordObjectAccessGrant` retain one each. | Hostile staged-input access is required separately as `d1.tenant.cross.staged_inputs` and `d2m.tenant.cross.staged_inputs`. |
+| Run secrets and environment absence | `synthesiseRunSecrets` retains one production caller. Candidate redaction and output probes do not replace the planted env-absence controls. | Each profile owes its own exact-candidate secret/env observations and positive controls. Cross-tenant secret denial is separately required as `d1.tenant.cross.secrets` and `d2m.tenant.cross.secrets`. |
+| Artifact/output export | Worker and provider export paths are reachable and now enforce output-root and secret-scan refusal boundaries. | The mechanism campaign owes the E5 export/refusal observations. Cross-tenant output visibility is independently required as `d1.tenant.cross.outputs` and `d2m.tenant.cross.outputs`; neither profile's result may be substituted for the other. |
 | Audit, cost, and tool surface | Audit/cost projectors remain reachable. The tool surface remains disarmed for M1a and is not promoted by this review. | Fresh attribution/cardinality evidence required. Deferred tool-call case needs the existing reviewed disposition, not an unauthorized runner. |
 | Object cleanup | Object-store cleanup/reclamation mechanisms remain present. | Orphan/object cleanup injections: `M1-D1-SPINE` only where named by the matrix. |
 

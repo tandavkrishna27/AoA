@@ -15,6 +15,10 @@ and inspected the frozen workflows, topology, fault matrix, provider-identity re
 verdict code. The current wiring guard reports **28 wired clauses, 6 declared dormant, and 2
 intentionally deferred clauses**. The caller census is retained by the freeze review logs.
 
+The profiles have distinct provider topology. `M1-D1-SPINE` runs the worker-driven reference
+journey against the gated fake provider on port `8082`; `M1a-D2-MECHANISM` runs its worker-driven
+journey against real E2B. A row applies to both profiles only when it names both frozen case IDs.
+
 | Ledger | Candidate conclusion |
 |---|---|
 | [E3](./E3-job-control.md) | Production routes remain reachable; campaign-only tenant/cancellation claims remain campaign obligations. |
@@ -22,9 +26,10 @@ intentionally deferred clauses**. The caller census is retained by the freeze re
 | [E5](./E5-workspaces-secrets.md) | Staging/secrets/output mechanisms are source-reachable where declared; all seven audit clauses still require fresh candidate evidence. |
 | [E6](./E6-deployment-test-harness.md) | The candidate harness includes material post-`7be` repairs and must be exercised fresh; old runs are not transferable. |
 
-`Certified only by M1-D1-SPINE` below means the clause is allocated only to that fresh candidate
-campaign. It does not mean the clause has passed. `Both` means both fresh campaign records owe it.
-`M1a-D2-MECHANISM` means only that fresh mechanism campaign owes it.
+`M1-D1-SPINE only` below means the clause is allocated only to that fresh candidate campaign. It
+does not mean the clause has passed. `M1a-D2-MECHANISM only` has the corresponding meaning. Where
+both profiles owe analogous evidence, the ledger names the `d1.*` and `d2m.*` case IDs separately;
+the shorthand `both` is not an allocation authority.
 
 **Entry disposition:** the E3-E6 candidate-ledger entry bullet is covered for this candidate's
 source and allocation review. Freeze approval, dispatch, campaign pass, audit certification, and
