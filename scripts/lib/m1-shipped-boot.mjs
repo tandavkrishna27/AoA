@@ -177,11 +177,13 @@ export function evaluateM1FreezeExclusions({ env = {}, rolloutValue, expectedTen
 }
 
 /** Derive excluded structural surfaces from the rendered and running Compose service sets. */
-export function observeFreezeTopology({ renderedServices = {}, runningServices = [], runningControlPlanes = null } = {}) {
+export function observeFreezeTopology({ renderedServices = {}, runningServices = [], runningControlPlanes = null, routeRegistrySource = "" } = {}) {
   const names = [...new Set([...Object.keys(renderedServices ?? {}), ...(runningServices ?? [])])].sort();
+  const mountedRoutes = [...String(routeRegistrySource).matchAll(/\bapi\.use\([\s\S]{0,240}?\b([A-Za-z_$][\w$]*(?:Routes|Router))\s*\(/g)]
+    .map((match) => match[1]);
   return {
     desktopServices: names.filter((name) => /desktop/i.test(name)),
-    crossTargetMobilityRoutes: names.filter((name) => /(?:cross[-_]?target|mobility|handoff)/i.test(name)),
+    crossTargetMobilityRoutes: [...new Set(mountedRoutes.filter((name) => /(?:crossTarget|mobility|handoff)/i.test(name)))].sort(),
     runningControlPlanes,
   };
 }

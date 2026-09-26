@@ -44,7 +44,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
@@ -246,6 +246,7 @@ test("m1-spine: every control-plane replica carries the F10 tenant set, and the 
     renderedServices: rendered.services,
     runningServices,
     runningControlPlanes: M1_SPINE_CONTROL_PLANE_REPLICAS.filter((name) => runningServices.includes(name)).length,
+    routeRegistrySource: readFileSync(path.resolve("server/src/app.ts"), "utf8"),
   });
   for (const replica of M1_SPINE_CONTROL_PLANE_REPLICAS) {
     const probe = step(probeReplicaRollout({ replica, organizationIds, workloadType: M1_SPINE_WORKLOAD }), `${replica} rollout probe`);

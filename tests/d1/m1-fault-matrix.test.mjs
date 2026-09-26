@@ -135,7 +135,7 @@ import { readFindingSources } from "../../scripts/lib/finding-sources.mjs";
 import {
   REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS,
 } from "../../scripts/lib/m1a-redaction-probe.mjs";
-import { evaluateD1RedactionEvidence, serializeD1FaultMatrixRow } from "../../scripts/lib/d1-redaction-evidence.mjs";
+import { buildD1RedactionArmInputs, evaluateD1RedactionEvidence, serializeD1FaultMatrixRow } from "../../scripts/lib/d1-redaction-evidence.mjs";
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -1259,21 +1259,20 @@ test("fault-matrix: a planted credential canary is SCRUBBED from both streams, a
   const runArm = ({ label, plant }) => {
     const nonce = `${label}-${randomBytes(12).toString("hex")}`;
     const controlCanary = plant ? undefined : `unseeded-${randomBytes(16).toString("hex")}`;
+    const capabilitySecret = plant ? undefined : `m1fmcap${randomBytes(20).toString("hex")}`;
     const ids = { jobId: randomUUID(), attemptId: randomUUID(), issueId: randomUUID(), runId: randomUUID(), handleId: randomUUID() };
-    const workloadArgs = [`--aoa-fake-probe-nonce=${nonce}`];
-    if (plant) workloadArgs.push("--aoa-fake-echo-env=ANTHROPIC_API_KEY");
-    else workloadArgs.push(`--aoa-fake-control-canary=${controlCanary}`);
+    const armInputs = buildD1RedactionArmInputs({ plant, nonce, canary, controlCanary, capabilitySecret });
     const seeded = step(seedSpineWorkerDrivenJob({
       tenant: A,
       ...ids,
       target: deployed.target,
-      workloadArgs,
+      workloadArgs: armInputs.workloadArgs,
       // Both arms need a resolved handle because the run capability rides the resolve reply.
       // Suppression changes only what the workload prints: the inert control canary below is
       // deliberately not registered as secret material and must survive verbatim.
       seedSecret: true,
       secretName: `provider:m1fm-canary-${randomBytes(6).toString("hex")}`,
-      secretValue: canary,
+      secretValue: armInputs.secretValue,
     }), `${label} worker-driven seed`);
     assert.equal(seeded.ok, true, `${label} job seed: ${truncate(seeded)}`);
     const observation = step(awaitSpineWorkerDrivenTerminal({ jobId: ids.jobId }), `${label} run terminal`);

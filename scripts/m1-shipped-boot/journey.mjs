@@ -593,7 +593,12 @@ function assertTenants(state) {
   const violations = [];
   const runningControlPlanes = CP_REPLICAS.filter((replica) => compose(state, ["ps", "-q", replica]).stdout.trim()).length;
   const runningServices = compose(state, ["ps", "--services", "--status", "running"]).stdout.split(/\r?\n/).filter(Boolean);
-  const topology = observeFreezeTopology({ renderedServices: rendered.services, runningServices, runningControlPlanes });
+  const topology = observeFreezeTopology({
+    renderedServices: rendered.services,
+    runningServices,
+    runningControlPlanes,
+    routeRegistrySource: readFileSync(path.join(repoRoot, "server/src/app.ts"), "utf8"),
+  });
   for (const replica of CP_REPLICAS) {
     // (a) the render
     const renderedEnv = rendered.services?.[replica]?.environment ?? {};

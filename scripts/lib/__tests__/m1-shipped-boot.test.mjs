@@ -185,15 +185,16 @@ test("the M1 freeze exclusion ledger refuses real excluded switches and structur
   assert.notDeepEqual(evaluateM1FreezeExclusions({ ...base, topology: { ...base.topology, crossTargetMobilityRoutes: ["handoff"] } }).violations, []);
 });
 
-test("freeze topology observations come from rendered and running service names", async () => {
+test("freeze topology observes desktop services and mounted cross-target handoff routes", async () => {
   const { observeFreezeTopology } = await import("../m1-shipped-boot.mjs");
   assert.deepEqual(observeFreezeTopology({
-    renderedServices: { "desktop-host": {}, "cross-target-handoff": {}, "control-plane": {} },
-    runningServices: ["mobility-router", "control-plane"],
+    renderedServices: { "desktop-host": {}, "control-plane": {} },
+    runningServices: ["control-plane"],
     runningControlPlanes: 1,
+    routeRegistrySource: "api.use(\n  crossTargetHandoffRoutes({ db }),\n);",
   }), {
     desktopServices: ["desktop-host"],
-    crossTargetMobilityRoutes: ["cross-target-handoff", "mobility-router"],
+    crossTargetMobilityRoutes: ["crossTargetHandoffRoutes"],
     runningControlPlanes: 1,
   });
 });
