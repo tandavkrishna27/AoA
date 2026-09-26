@@ -320,6 +320,11 @@
       "workflow": "pr.yml",
       "step": "Invisible control characters (a shell must not write a regex escape)"
     },
+    "scripts/lib/__tests__/m1-route-inventory.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1 mobility route AST inventory"
+    },
     "scripts/lib/__tests__/m1-shipped-boot.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",

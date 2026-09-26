@@ -185,55 +185,6 @@ test("the M1 freeze exclusion ledger refuses real excluded switches and structur
   assert.notDeepEqual(evaluateM1FreezeExclusions({ ...base, topology: { ...base.topology, crossTargetMobilityRoutes: ["handoff"] } }).violations, []);
 });
 
-test("freeze topology observes desktop services and mounted cross-target handoff routes", async () => {
-  const { observeFreezeTopology } = await import("../m1-shipped-boot.mjs");
-  assert.deepEqual(observeFreezeTopology({
-    renderedServices: { "desktop-host": {}, "control-plane": {} },
-    runningServices: ["control-plane"],
-    runningControlPlanes: 1,
-    routeRegistrySource: 'import { crossTargetHandoffRoutes } from "./routes/handoff.js";\napi.use(\n  crossTargetHandoffRoutes({ db }),\n);',
-  }), {
-    desktopServices: ["desktop-host"],
-    crossTargetMobilityRoutes: ["crossTargetHandoffRoutes"],
-    inventoryViolations: [],
-    runningControlPlanes: 1,
-  });
-});
-
-test("freeze route inventory resolves app mounts, aliases, and dynamic imports", async () => {
-  const { observeFreezeTopology } = await import("../m1-shipped-boot.mjs");
-  for (const routeRegistrySource of [
-    'import { crossTargetHandoffRoutes } from "./routes/handoff.js"; app.use(crossTargetHandoffRoutes());',
-    'import { crossTargetHandoffRoutes as routes } from "./routes/handoff.js"; app.use(routes());',
-    'import { crossTargetHandoffRoutes } from "./routes/handoff.js"; const mobilityRouter = crossTargetHandoffRoutes(); api.use(mobilityRouter);',
-    'const { crossTargetHandoffRoutes } = await import("./routes/handoff.js"); api.use(crossTargetHandoffRoutes());',
-    'const { crossTargetHandoffRoutes: routes } = await import("./routes/handoff.js"); api.use(routes());',
-  ]) {
-    const topology = observeFreezeTopology({ routeRegistrySource });
-    assert.deepEqual(topology.crossTargetMobilityRoutes, ["crossTargetHandoffRoutes"]);
-    assert.deepEqual(topology.inventoryViolations, []);
-  }
-});
-
-test("freeze route inventory fails closed on unsupported mobility registration grammar", async () => {
-  const { observeFreezeTopology, evaluateM1FreezeExclusions } = await import("../m1-shipped-boot.mjs");
-  const topology = observeFreezeTopology({ routeRegistrySource: "api.use(buildRouter(crossTargetHandoffRoutes));" });
-  assert.equal(topology.crossTargetMobilityRoutes.length, 0);
-  assert.equal(topology.inventoryViolations.length, 1);
-  const result = evaluateM1FreezeExclusions({
-    env: {},
-    rolloutValue: JSON.stringify({ organizations: {} }),
-    expectedTenants: { enabled: [], control: null },
-    topology,
-  });
-  assert.ok(result.violations.some((v) => v.includes("unsupported mobility route mount grammar")));
-
-  const aliased = observeFreezeTopology({
-    routeRegistrySource: 'import { crossTargetHandoffRoutes as routes } from "./routes/handoff.js"; api.use(buildRouter(routes));',
-  });
-  assert.equal(aliased.inventoryViolations.length, 1);
-});
-
 test("envLinesToMap reads `docker inspect` Env lines, keeping '=' inside values", () => {
   const map = envLinesToMap(`A=1\nAOA_DISTRIBUTED_EXECUTION_ROLLOUT={"organizations":{"x":{"mode":"canary"}}}\nB=x=y\n`);
   assert.equal(map.A, "1");
