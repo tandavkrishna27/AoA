@@ -38,7 +38,13 @@ test("template resolution follows provider pagination before selecting an alias"
         ok: true,
         status: 200,
         headers: { get: (name) => name === "X-Next-Token" && !second ? "page-2" : null },
-        json: async () => second ? [{ templateID: "tpl", buildID: BUILD, aliases: ["aoa-base"], buildStatus: "ready" }] : [],
+        json: async () => second ? [{
+          templateID: "tpl",
+          buildID: BUILD,
+          aliases: ["aoa-base"],
+          buildStatus: "ready",
+          envdVersion: "0.2.0",
+        }] : [],
       };
     },
   });
@@ -46,6 +52,34 @@ test("template resolution follows provider pagination before selecting an alias"
   assert.equal(new URL(urls[0]).pathname, "/templates");
   assert.equal(new URL(urls[1]).pathname, "/templates");
   assert.match(urls[1], /nextToken=page-2/);
+});
+
+test("template selection fails closed when the provider runtime version is absent or blank", () => {
+  const row = {
+    templateID: "tpl",
+    buildID: BUILD,
+    aliases: ["aoa-base"],
+    names: [],
+    buildStatus: "ready",
+  };
+  for (const envdVersion of [undefined, null, "", "   "]) {
+    assert.throws(
+      () => selectE2bTemplateIdentity("aoa-base", [{ ...row, envdVersion }]),
+      /runtime version/i,
+    );
+  }
+});
+
+test("template selection retains the exact meaningful provider runtime version", () => {
+  const envdVersion = " 0.2.0 ";
+  const identity = selectE2bTemplateIdentity("aoa-base", [{
+    templateID: "tpl",
+    buildID: BUILD,
+    aliases: ["aoa-base"],
+    buildStatus: "ready",
+    envdVersion,
+  }]);
+  assert.equal(identity.envdVersion, envdVersion);
 });
 
 test("template selection fails closed on no match, ambiguity, non-ready or missing build identity", () => {
