@@ -4,7 +4,7 @@
 **Candidate:** `c315e3ca462f8d8b77cb1777c53c76ef49dd873f`
 **Candidate ref:** `refs/heads/codex/m1a-candidate-c315e3ca462f`
 **Integration branch:** `docs/replatform-program`
-**Status:** inventory prepared; planning freeze decision and independent freeze review pending
+**Status:** HOLD; EVID-01 runtime-version enforcement missing; freeze not approved
 **Purpose:** replacement candidate inventory after PR #624; not a QA verdict, campaign authorization, or handoff
 
 The candidate is the verified merge commit of PR #624. The dedicated candidate ref
@@ -13,9 +13,8 @@ PR #623 and its `6d74d7e4e592...` freeze proposal are superseded and must not be
 used for dispatch. Earlier automatic runs remain diagnostic only. No earlier-candidate
 campaign result is carried forward.
 
-This record inventories existing evidence for a planning decision. The planning session
-must take the freeze decision, and a separate eligible reviewer must verify this record,
-its authorship boundaries, ancestry, pins, and current remote ref before any campaign.
+This record inventories existing evidence and attributed planning rulings. It is not
+an approved freeze, campaign evidence, a QA or audit verdict, or a milestone handoff.
 
 ## Ticket-result pins
 
@@ -118,11 +117,8 @@ This closes EVID-01's immutable-template arm: `buildID` is the immutable templat
 build identifier, and the sandbox event binds each observed sandbox to it.
 `envdVersion`, when the provider supplies it, is retained as a provider-returned
 template-runtime identifier. It is not represented as a global E2B service release,
-because the current API exposes no such identifier to this lane. EVID-01 still
-requires the gate owner either to rule that retained `envdVersion` is the acceptable
-equivalent service-side identifier, or to record that no global service version is
-obtainable and that the immutable template build binding satisfies the condition
-alone. This inventory does not take that ruling.
+because the current API exposes no such identifier to this lane. The attributed
+planning/gate-owner ruling below accepts that bounded identity set for this mechanism.
 
 Keyless shipped boot comes first. One keyed run may occur only under the existing
 named F8 authorization after preflight confirms no equivalent run is active or
@@ -135,11 +131,11 @@ complete. Failure authorizes no retry or additional paid run.
 | Planning, freeze decision, partial-gate/rollback ownership, dispatch, handoff decision | calling M1 planning session under founder F2 delegation |
 | DEP-027 implementer | `01a0dd9c-ec6d-7b12-a26a-f3e9783d4506` |
 | Candidate inventory preparer; later campaign QA and E5 audit author | `01a0dd9b-ba6d-79a2-8d96-9651bf242b4e` |
-| Freeze reviewer | pending; must be eligible and distinct from planning, implementation, and this inventory preparer |
+| Freeze reviewer | Herschel `01a0df3b-e8f1-7751-a156-9a7a78b0bf1e`; review reopened for the EVID-01 enforcement mismatch |
 | Reserved E5 audit certifier | `01a0de6b-915c-7fb0-b3d7-59e7bac3dc95`; excluded from implementation, dispatch, relied-on decisions, campaign QA/audit authorship, and handoff preparation |
 
-Preparing this inventory is not taking the freeze decision. The future freeze
-reviewer must explicitly verify these separations rather than relying on this record.
+Preparing this inventory was not taking the freeze decision. The attributed planning
+decision and independent review below retain their separate ownership.
 
 ## Attributed planning ruling: PR #624 repair disposition
 
@@ -165,15 +161,52 @@ Evidence pins for that ruling are PR #624 head
 review was performed by the candidate inventory/campaign-QA session named above,
 distinct from implementation and planning, and reported CLEAR on the exact head.
 
+## Attributed planning/gate-owner ruling: EVID-01 service identity, pending enforcement
+
+The following is the planning session's F2 and EVID-01 gate-owner ruling, recorded
+with attribution and not taken by this inventory preparer:
+
+> For the named M1a partial mechanism campaign only, provider-returned
+> `envdVersion` is accepted as the equivalent service-side runtime identifier when
+> retained with immutable `templateID`/`buildID` and per-sandbox event build binding.
+> This does not claim that a global E2B service release is identified or that the
+> remote service deployment is immutable. Missing `envdVersion`, template/build
+> identity, sandbox identity, or event binding remains fail-closed under the
+> resolver. This ruling does not certify full D1/D2, H-06, E5/E7 completion, or
+> beta. The actual provider API exposes the runtime version and build binding
+> pertinent to this mechanism; no invented or unverified global release identifier
+> is substituted. If this ruling is wrong, reopen the identity disposition before
+> any passing QA and rerun only after separate authorization where required.
+
+The ruling is not enforceable by candidate `c315e3ca462f8d8b77cb1777c53c76ef49dd873f`.
+At this candidate, `selectE2bTemplateIdentity` returns `envdVersion: null` when the
+provider omits or empties the field; it does not refuse before keyed prepare/spend.
+Therefore this ruling is pending source enforcement and cannot approve this freeze.
+
+## Independent freeze review status
+
+Herschel `01a0df3b-e8f1-7751-a156-9a7a78b0bf1e` independently reviewed inventory
+head `0096a95e4cdd6e64054a62ca2b215bb766d73734` and initially reported **CLEAR**. The review
+verified all 34 blob pins, the exact candidate ref, 114 focused checks, the required
+guards, and the authorship separation from planning, implementation, inventory/QA
+authorship, and later audit certification.
+
+Planning subsequently placed freeze approval on **HOLD** after verifying the missing
+runtime-version refusal. The independent review is reopened on that issue. There is
+no approved freeze and no dispatch is authorized for candidate `c315e3ca...` under
+the pending EVID-01 ruling.
+
 ## Remaining pre-campaign gates
 
-1. Planning must take and record the freeze decision for this exact candidate.
-2. A separate eligible reviewer must approve the freeze inventory and authorship
-   boundaries, re-resolve the candidate ref, verify ancestry and every blob pin,
-   and run declaration, finding, citation, ticket-graph, and immutable-history guards.
-3. Before a keyed campaign, the gate owner must record the EVID-01 service-identity
-   disposition described above; no unavailable global service version may be invented.
-4. The free exact-candidate D1 campaign must run after the approved freeze and
+1. Implement the minimal source repair: keyed template resolution must require a
+   non-empty provider `envdVersion` before prepare/spend, with RED controls for null,
+   empty, and missing values.
+2. Merge the independently reviewed repair, create a new exact candidate and
+   immutable candidate ref, regenerate every affected pin, and obtain a fresh
+   independent freeze review plus planning freeze decision.
+3. Immediately before any later dispatch, re-resolve that candidate ref and confirm
+   no equivalent campaign is active or complete.
+4. The free exact-candidate D1 campaign must run after an approved replacement freeze and
    retain all three jobs, artifact-only grading, suppressed-injection controls,
    full exclusion ledger, source topology manifest, and digests.
 5. The keyless shipped-boot preflight must pass. Runtime provider identity must be
