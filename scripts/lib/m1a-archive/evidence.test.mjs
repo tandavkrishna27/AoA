@@ -203,6 +203,51 @@ test('large_valid_member_does_not_overflow_base64_validation', async () => {
   const f = fixture([{ path: 'job.txt', bytes: Buffer.alloc(2 * 1024 * 1024, 0x61), format: 'utf8' }]);
   const p = await validate(f); assert.equal(JSON.parse(p.bytes).members[0].size, 2 * 1024 * 1024);
 });
+test('round1_actual_64mib_member_validates_in_bounded_child', async () => {
+  // Isolate the maximum fixture and its serialization copies from the test runner.
+  const script = `import assert from 'node:assert/strict';
+    import { createHash } from 'node:crypto';
+    import { validateArchiveBytes } from ${JSON.stringify(new URL('./evidence.mjs', import.meta.url).href)};
+    const hash = ${hash.toString()}; const sort = ${sort.toString()};
+    const descriptor = ${descriptor.toString()}; const inventory = ${inventory.toString()};
+    ${fixture.toString()} ${canonical.toString()} ${bundle.toString()}
+    try {
+      const size = 64 * 1024 * 1024;
+      let f = fixture([{ path: 'job.txt', bytes: Buffer.alloc(size, 0x61), format: 'utf8' }]);
+      const args = bundle(f); f = null; global.gc();
+      const prepared = await validateArchiveBytes(args);
+      assert.equal(prepared.size, args.bytes.length);
+      assert.equal(prepared.sha256, args.expected.sha256);
+      assert.equal(prepared.contractSha256, args.expected.contractSha256);
+      assert.ok(prepared.bytes.equals(args.bytes));
+      process.stdout.write('validated-64mib');
+    } catch (e) { process.stderr.write(e.code ?? 'CHILD_FAILURE'); process.exitCode = 1; }`;
+  const allowed = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP']);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => allowed.has(k.toUpperCase())));
+  let result;
+  try {
+    result = { code: 0, ...await promisify(execFile)(process.execPath,
+      ['--max-old-space-size=1024', '--expose-gc', '--input-type=module', '-e', script],
+      { env, shell: false, windowsHide: true, timeout: 60_000, maxBuffer: 1024 }) };
+  } catch (e) { result = { code: e.code, stdout: e.stdout, stderr: e.stderr }; }
+  assert.equal(result.code, 0, `Valid 64 MiB member refused: ${result.stderr}`);
+  assert.equal(result.stdout, 'validated-64mib'); assert.equal(result.stderr, '');
+});
+test('round1_base64_padding_whitespace_and_url_alphabet_are_refused', async () => {
+  const f = fixture([{ path: 'job.txt', bytes: Buffer.from('a'), format: 'utf8' }]);
+  for (const base64 of ['Y===', '=Q==', 'Y=Q=', 'YR==', 'YQ= ', 'YQ=\n', 'YQ-=', 'YQ_=', 'YQ', 'YQ==AA', 'Y!==']) {
+    await refuses(f, args => {
+      const archive = JSON.parse(args.bytes); archive.members[0].base64 = base64;
+      args.bytes = Buffer.from(JSON.stringify(archive));
+      args.expected.sha256 = hash(args.bytes); args.expected.size = args.bytes.length;
+    });
+  }
+  for (const value of ['a', 'ab', 'abc']) await validate(fixture([{ path: 'job.txt', bytes: Buffer.from(value), format: 'utf8' }]));
+});
+test('round1_oversize_declared_member_refused_before_base64_allocation', async () => {
+  const f = fixture(); f.contract.members[0].size = 64 * 1024 * 1024 + 1; repin(f);
+  await assert.rejects(() => validate(f), { code: 'M1A_SIZE_BOUND' });
+});
 test('aggregate_inflation_is_bounded_across_zip_members', async () => {
   const entries = ['a.zip', 'b.zip'].map(path => ({ path, bytes: zip([{ name: 'log.txt', method: 8,
     bytes: Buffer.alloc(33 * 1024 * 1024, 0x61) }]), format: 'zip' }));

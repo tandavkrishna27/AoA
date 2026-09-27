@@ -181,7 +181,8 @@ async function inspectMembers(contract, members, supplied) {
     closed(raw, ['path', 'sha256', 'size', 'base64']);
     if (raw.path !== declared.path || raw.sha256 !== declared.sha256 || raw.size !== declared.size ||
       typeof raw.base64 !== 'string' || raw.base64.length !== 4 * Math.ceil(declared.size / 3) ||
-      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(raw.base64)) fail('M1A_INVENTORY_MISMATCH');
+      /[^A-Za-z0-9+/=]/.test(raw.base64)) fail('M1A_INVENTORY_MISMATCH');
+    // Linear character check above; canonical re-encoding checks padding/pad bits.
     const bytes = Buffer.from(raw.base64, 'base64');
     if (bytes.length !== declared.size || bytes.toString('base64') !== raw.base64 || digest(bytes) !== declared.sha256) fail('M1A_MEMBER_MISMATCH');
     if (declared.format === 'zip') {
