@@ -4,15 +4,15 @@
 **Candidate:** `d479709ed8940fe69ef28539daadb90b9b29310b`
 **Candidate ref:** `refs/heads/codex/m1a-candidate-d479709ed894`
 **Integration branch:** `docs/replatform-program`
-**Status:** proposed; conditional planning approval is not effective until PR #627 lands and a fresh exact-head review and CI/comment check clear
+**Status:** approved replacement freeze; planning approval is effective for this freeze only
 **Purpose:** replacement freeze after the D1 host-harness repair in PR #628; not campaign evidence, a QA verdict, gate pass, epic-status grant, or handoff
 
 The candidate is the verified merge commit of PR #628. The dedicated candidate ref resolved to the
 exact commit when this inventory was prepared and must never move. The historical freeze merged by
 PR #625 and `refs/heads/codex/m1a-candidate-28151ec8724f` remain preserved for their named candidate;
-they are not edited, moved, or reused. D1 attempts 19, 20, and 21 are retained on PR #627 but are not yet
-present on this branch's integration base. PR #627 must land first so those records become committed
-history. After that prerequisite, the next D1 result/correction is attempt 22 or higher. The separate
+they are not edited, moved, or reused. PR #627 landed as merge commit
+`9800ad7184894fbc6afe68068fee462283830936`, preserving D1 attempts 19, 20, and 21 as committed
+history. That prerequisite is satisfied, so the next D1 result/correction is attempt 22 or higher. The separate
 `M1a-D2-MECHANISM` chain already ends at attempt 25, so its next result remains attempt 26.
 
 No earlier-candidate campaign result, runtime identifier, image digest, provider identity, or QA
@@ -126,7 +126,7 @@ mismatched identity fails closed. No runtime value is invented in this freeze.
 | Planning, freeze decision, dispatch, rollback, and handoff | M1 planning session `01a0d96c-ae64-7920-a1cb-af28a360c21c` under founder F2 delegation |
 | PR #628 implementation | branch `codex/d1-typescript-runtime`, exact reviewed head `ee07f09d5830455607263b1b4319a6d2c13c5fde` |
 | Candidate inventory and entry-review author | this session; distinct from implementation, planning, and independent freeze review |
-| Independent freeze reviewer | pending; must review the exact freeze PR head and all 40 pins |
+| Independent freeze reviewer | Herschel; **CLEAR** on exact PR #629 head `e4b25142116e54049cda8e5f22da654c925f3fee` |
 | Reserved E5 audit certifier | remains excluded from implementation, dispatch, relied-on freeze decisions, campaign QA/audit authorship, and handoff preparation |
 
 The implementation CLEAR for PR #628 does not substitute for independent review of this freeze.
@@ -147,6 +147,15 @@ index still pointed at older reviews. This revision fixes those findings, change
 index blob accordingly, and requires a fresh independent exact-head review. The earlier CLEAR remains
 historical review evidence for its exact head; it is not asserted as CLEAR for this revised head.
 
+Herschel subsequently reviewed the corrected freeze at exact PR #629 head
+`e4b25142116e54049cda8e5f22da654c925f3fee` and explicitly reported **CLEAR**. That review verified
+all 40 pins, the fixed candidate ref, the attempt-21 correction, next D1 attempt 22 or higher, next
+mechanism attempt 26, and the HOLD/no-dispatch boundary. Exact-head GitHub Actions run
+`36282643449` passed all required checks, and all review threads were resolved. PR #627 was then
+merged from reviewed head `d87d53979d75f9b2fb8de48f584d6c92bd914548` as merge commit
+`9800ad7184894fbc6afe68068fee462283830936`, satisfying the prerequisite without changing the
+candidate ref or any immutable QA record.
+
 ## Attributed planning approval
 
 The M1 planning session `01a0d96c-ae64-7920-a1cb-af28a360c21c`, acting under founder F2
@@ -155,25 +164,24 @@ certification, **APPROVES** this replacement freeze for candidate
 `d479709ed8940fe69ef28539daadb90b9b29310b` on immutable ref
 `refs/heads/codex/m1a-candidate-d479709ed894`.
 
-Approval was conditioned on final CI passing and PR comments remaining clear on the exact
-post-attribution head before planning merges with an exact-head guard. Those conditions were not met
-after new review findings appeared, so approval is not effective. It may become effective only after
-PR #627 lands and a fresh independent review plus exact-head CI/comments clear this revision. It is
-freeze approval only:
+Approval was conditioned on PR #627 landing and a fresh independent review plus exact-head
+CI/comments clearing the corrected freeze. Those conditions are now satisfied by the verified PR #627
+merge, Herschel's **CLEAR** on `e4b25142116e54049cda8e5f22da654c925f3fee`, GitHub Actions run
+`36282643449`, and resolved review threads. Planning therefore makes this replacement-freeze approval
+effective. It is freeze approval only:
 it is not a gate pass, campaign result, E5 closure, epic-status grant, milestone handoff, retry
 authorization, paid-run authorization, or dispatch instruction.
 
 ## Required next steps
 
-1. Land PR #627 first after its own required independent review, preserving D1 attempts 19, 20, and 21.
-2. Obtain fresh independent review of this exact freeze head and require final PR checks and comments
-   clear without rewriting any immutable record.
-3. Planning may then land only with an exact-head guard.
-4. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
+1. Land this approval-only update only after fresh independent review and final PR checks/comments
+   clear on its exact head, using an exact-head guard.
+2. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
    dispatch and prove no equivalent run is active or complete.
-5. Run fresh free D1 evidence first; its new QA starts at attempt 22 or higher. The separate mechanism
+3. Run fresh free D1 evidence first; its new QA starts at attempt 22 or higher. The separate mechanism
    chain starts at attempt 26. Then follow the approved keyless/keyed sequence and paid-run limits.
    Failure grants no retry.
 
-No workflow, approval, paid provider action, campaign result, or merge is authorized by this
-inventory. The integration branch name is never a candidate identity.
+No workflow execution, dispatch, paid provider action, campaign result, gate pass, or milestone
+handoff is authorized by this freeze approval. The integration branch name is never a candidate
+identity.
