@@ -40,6 +40,30 @@ const metadata = { VersionId: 'version-1', ChecksumSHA256: checksum, ContentLeng
 const privateWindowsFacts = () => ({ sid: 'S-1-5-21-123', owner: 'S-1-5-21-123', protected: true,
   rules: [{ sid: 'S-1-5-21-123', allow: true, rights: 2032127, inheritanceFlags: 3, propagationFlags: 0 }], syncRoots: [] });
 
+test('pr631_posix_distinct_case_configured_and_registered_roots_allow_scratch', { skip: process.platform === 'win32' }, async t => {
+  const f = await fixture(t);
+  const root = join(f.root, 'Evidence'), sync = join(f.root, 'evidence');
+  await mkdir(root, { mode: 0o700 }); await mkdir(sync, { mode: 0o700 });
+  const { lstat } = await import('node:fs/promises');
+  assert.notEqual((await lstat(root)).ino, (await lstat(sync)).ino);
+  const previous = process.env.GOOGLE_DRIVE;
+  try {
+    for (const registered of [false, true]) {
+      if (registered) delete process.env.GOOGLE_DRIVE; else process.env.GOOGLE_DRIVE = sync;
+      const store = createS3ArchiveStore({ mode: 'upload', privateScratch: root, runAws: f.runAws,
+        inspectWindowsPrivacy: async () => ({ ...privateWindowsFacts(), syncRoots: registered ? [sync] : [] }) });
+      assert.deepEqual(await store.put({ key, bytes, checksumSha256: checksum }), { versionId: ref.versionId, checksumSha256: checksum });
+      assert.deepEqual((await store.get(ref)).bytes, bytes);
+      assert.deepEqual(await readdir(root), []);
+      const refused = createS3ArchiveStore({ mode: 'upload', privateScratch: sync, runAws: f.runAws,
+        inspectWindowsPrivacy: async () => ({ ...privateWindowsFacts(), syncRoots: registered ? [sync] : [] }) });
+      const before = f.calls.length;
+      await assert.rejects(refused.put({ key, bytes, checksumSha256: checksum }), { code: 'UNSAFE_SCRATCH' });
+      assert.equal(f.calls.length, before); assert.deepEqual(await readdir(sync), []);
+    }
+  } finally { if (previous === undefined) delete process.env.GOOGLE_DRIVE; else process.env.GOOGLE_DRIVE = previous; }
+});
+
 test('pr631_configured_sync_roots_refuse_before_raw_or_cloud_io', async t => {
   const f = await fixture(t);
   const leaf = join(f.root, 'private'); await mkdir(leaf, { mode: 0o700 });

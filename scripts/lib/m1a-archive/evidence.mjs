@@ -275,7 +275,8 @@ async function windowsPrivacy(path) {
     facts.syncRoots.some(r => contained(path, r))) fail('M1A_SOURCE_NOT_PRIVATE');
 }
 function contained(path, root) {
-  const p = resolve(path).toLowerCase(), r = resolve(root).toLowerCase();
+  const p = process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path);
+  const r = process.platform === 'win32' ? resolve(root).toLowerCase() : resolve(root);
   return p === r || p.startsWith(r.endsWith(sep) ? r : r + sep);
 }
 async function privateStat(path, directory) {

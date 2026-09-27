@@ -107,12 +107,15 @@ async function readWindowsPrivacy(path) {
   } catch { fail('SCRATCH_PRIVACY_UNAVAILABLE'); }
 }
 
+function contained(path, root) {
+  const p = process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path);
+  const r = process.platform === 'win32' ? resolve(root).toLowerCase() : resolve(root);
+  return p === r || p.startsWith(r.endsWith(sep) ? r : r + sep);
+}
+
 function validateWindowsPrivacy(path, acl, kind) {
   if (!acl || !Array.isArray(acl.syncRoots) || acl.syncRoots.some(root => typeof root !== 'string' || !isAbsolute(root))) fail('SCRATCH_PRIVACY_UNAVAILABLE');
-  if (acl.syncRoots.some(root => {
-    const sync = resolve(root).toLowerCase();
-    return path.toLowerCase() === sync || path.toLowerCase().startsWith(sync.endsWith(sep) ? sync : sync + sep);
-  })) fail('UNSAFE_SCRATCH');
+  if (acl.syncRoots.some(root => contained(path, root))) fail('UNSAFE_SCRATCH');
   if ((kind === 'directory' && acl.protected !== true) || typeof acl.sid !== 'string' || !/^S-1-[0-9-]+$/.test(acl.sid) || acl.owner !== acl.sid || !Array.isArray(acl.rules) || !acl.rules.length ||
     acl.rules.some(r => !r || typeof r.sid !== 'string' || typeof r.allow !== 'boolean' || !Number.isSafeInteger(r.rights) ||
       !Number.isInteger(r.inheritanceFlags) || r.inheritanceFlags < 0 || r.inheritanceFlags > 3 ||
@@ -165,10 +168,7 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
       if (/onedrive|dropbox|googledrive|google_drive|icloud|box_sync/i.test(k) && value) {
         if (!isAbsolute(value)) fail('UNSAFE_SCRATCH');
         const roots = [resolve(value), await realpath(value)];
-        if (roots.some(root => {
-          const sync = root.toLowerCase(), candidate = canonical.toLowerCase();
-          return candidate === sync || candidate.startsWith(sync.endsWith(sep) ? sync : sync + sep);
-        })) fail('UNSAFE_SCRATCH');
+        if (roots.some(root => contained(canonical, root))) fail('UNSAFE_SCRATCH');
       }
     }
     let child;

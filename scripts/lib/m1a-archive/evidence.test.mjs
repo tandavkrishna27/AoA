@@ -12,6 +12,99 @@ import { promisify } from 'node:util';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const sort = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
+for (const boundary of ['input', 'output', 'registered']) test(`pr631_host_containment_${boundary}_preserves_posix_case_and_folds_windows_case`, async () => {
+  // Model OS facts only in a child; exercise the unchanged public privacy boundaries.
+  const script = `import assert from 'node:assert/strict';
+    import path from 'node:path'; import fs from 'node:fs/promises';
+    import cp from 'node:child_process'; import {syncBuiltinESMExports} from 'node:module';
+    const platform = process.argv[1];
+    process.getuid = () => 1000;
+    const paths = platform === 'win32' ? path.win32 : path.posix;
+    const base = platform === 'win32' ? 'C:\\\\private' : '/private';
+    const source = paths.join(base,'Evidence'), sync = paths.join(base,'evidence');
+    let registered = [], canonicalSync = sync, missing = false;
+    fs.realpath = async p => {
+      if (p === sync) { if(missing) throw Object.assign(Error(),{code:'ENOENT'}); return canonicalSync; }
+      return p;
+    };
+    fs.lstat = async p => {
+      if(paths.parse(p).base === '.git') throw Object.assign(Error(),{code:'ENOENT'});
+      return {isDirectory:()=>true,isSymbolicLink:()=>false,mode:0o40700,uid:1000};
+    };
+    fs.access = async p => { await fs.lstat(p); };
+    let opens = 0;
+    fs.open = async () => { opens++; throw Error('stop before writing synthetic scratch'); };
+    cp.execFile = () => {throw Error('external execution forbidden');};
+    cp.execFile[Symbol.for('nodejs.util.promisify.custom')] = async () => ({stdout:JSON.stringify({
+      sid:'S-1-5-21-123',owner:'S-1-5-21-123',protected:true,reparse:false,syncRoots:registered,
+      rules:[{sid:'S-1-5-21-123',allow:true,rights:2032127,inheritanceFlags:3,propagationFlags:0}]}),stderr:''});
+    syncBuiltinESMExports();
+    const input = await import(${JSON.stringify(new URL('./evidence.mjs', import.meta.url).href)});
+    const output = await import(${JSON.stringify(new URL('./s3-store.mjs', import.meta.url).href)});
+    Object.defineProperty(process, 'platform', {value:platform});
+    for (const name of ['resolve','dirname','join','isAbsolute','sep','parse']) path[name] = paths[name];
+    syncBuiltinESMExports();
+    const boundary = process.argv[2];
+    const check = boundary === 'input' ? input.assertPrivateArchiveInputRoot : boundary === 'output' ?
+      output.assertPrivateArchiveOutputRoot : async p => {
+        const before = opens;
+        const store = output.createS3ArchiveStore({mode:'verify',privateScratch:p,
+          runAws:async()=>{throw Error('AWS forbidden');},inspectWindowsPrivacy:async()=>({
+            sid:'S-1-5-21-123',owner:'S-1-5-21-123',protected:true,syncRoots:registered,
+            rules:[{sid:'S-1-5-21-123',allow:true,rights:2032127,inheritanceFlags:3,propagationFlags:0}]})});
+        try { await store.get({key:'replatform/m1a/e3/123-r1/a1/'+'a'.repeat(64)+'.json',versionId:'v1'}); }
+        catch(e) { if(e.code !== 'SCRATCH_IO_FAILED') throw e; }
+        assert.equal(opens,before+1); return p;
+      };
+    const code = boundary === 'input' ? 'M1A_SOURCE_NOT_PRIVATE' : 'UNSAFE_SCRATCH';
+    {
+      if(boundary === 'registered') registered = [sync]; else process.env.GOOGLE_DRIVE = sync;
+      if(platform === 'win32') await assert.rejects(check(source),{code});
+      else assert.equal(await check(source),source);
+      await assert.rejects(check(sync),{code});
+      await assert.rejects(check(paths.join(sync,'child')),{code});
+      assert.equal(await check(sync+'-sibling'),sync+'-sibling');
+      if(boundary !== 'registered') {
+        canonicalSync = source;
+        await assert.rejects(check(source),{code}); canonicalSync = sync;
+        missing = true; await assert.rejects(check(source),{code}); missing = false;
+      }
+      delete process.env.GOOGLE_DRIVE;
+      registered = [];
+      if(platform === 'win32') {
+        registered = [sync]; await assert.rejects(check(source),{code}); registered = [];
+      }
+    }
+    process.stdout.write('host-containment-verified');`;
+  const allowed = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP']);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => allowed.has(k.toUpperCase())));
+  for (const platform of ['linux', 'win32']) {
+    const result = await promisify(execFile)(process.execPath, ['--input-type=module', '-e', script, platform, boundary],
+      { env, shell: false, windowsHide: true, timeout: 60_000 });
+    assert.equal(result.stdout, 'host-containment-verified'); assert.equal(result.stderr, '');
+  }
+});
+
+test('pr631_posix_distinct_case_sync_root_allows_real_source_preparation', { skip: process.platform === 'win32' }, async t => {
+  const parent = await mkdtemp(join(tmpdir(), 'm1a-source-case-'));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, 'Evidence'), sync = join(parent, 'evidence');
+  await mkdir(root, { mode: 0o700 }); await mkdir(sync, { mode: 0o700 });
+  assert.notEqual((await lstat(root)).ino, (await lstat(sync)).ino);
+  const f = fixture(); await writeFile(join(root, 'job.txt'), f.entries[0].bytes, { mode: 0o600 });
+  const previous = process.env.GOOGLE_DRIVE;
+  try {
+    process.env.GOOGLE_DRIVE = sync;
+    const m = await api();
+    assert.equal(await m.assertPrivateArchiveInputRoot(root), root);
+    await m.assertPrivateArchiveInputFile(join(root, 'job.txt'));
+    const prepared = await m.prepareArchive({ contract: f.contract, expectedContractSha256: bundle(f).expected.contractSha256,
+      expectedJobs: ['build'], requiredCategories: ['logs'], root });
+    assert.deepEqual(Buffer.from(JSON.parse(prepared.bytes).members[0].base64, 'base64'), f.entries[0].bytes);
+    await assert.rejects(m.assertPrivateArchiveInputRoot(sync), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+  } finally { if (previous === undefined) delete process.env.GOOGLE_DRIVE; else process.env.GOOGLE_DRIVE = previous; }
+});
+
 test('pr631_source_sync_aliases_and_unavailable_roots_refuse_before_preparation', async t => {
   const parent = await mkdtemp(join(tmpdir(), 'm1a-source-alias-'));
   t.after(() => rm(parent, { recursive: true, force: true }));
