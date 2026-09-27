@@ -281,7 +281,7 @@ function contained(path, root) {
 async function privateStat(path, directory) {
   await privateRoot(dirname(path));
   const stat = await lstat(path);
-  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) ||
+  if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1) ||
     (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid()))) fail('M1A_SOURCE_NOT_PRIVATE');
   if (process.platform === 'win32') await windowsPrivacy(path);
   return stat;

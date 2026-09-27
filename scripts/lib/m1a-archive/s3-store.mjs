@@ -161,6 +161,16 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
     const path = resolve(input);
     const canonical = await realpath(path);
     if (process.platform === 'win32' ? canonical.toLowerCase() !== path.toLowerCase() : canonical !== path) fail('UNSAFE_SCRATCH');
+    for (const [k, value] of Object.entries(process.env)) {
+      if (/onedrive|dropbox|googledrive|google_drive|icloud|box_sync/i.test(k) && value) {
+        if (!isAbsolute(value)) fail('UNSAFE_SCRATCH');
+        const roots = [resolve(value), await realpath(value)];
+        if (roots.some(root => {
+          const sync = root.toLowerCase(), candidate = canonical.toLowerCase();
+          return candidate === sync || candidate.startsWith(sync.endsWith(sep) ? sync : sync + sep);
+        })) fail('UNSAFE_SCRATCH');
+      }
+    }
     let child;
     for (let p = path;; p = dirname(p)) {
       const stat = await lstat(p);
@@ -175,12 +185,6 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
       try { await access(join(p, '.git')); fail('UNSAFE_SCRATCH'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
       child = stat;
       if (p === parse(p).root) break;
-    }
-    for (const [k, value] of Object.entries(process.env)) {
-      if (/onedrive|dropbox/i.test(k) && value) {
-        const sync = resolve(value).toLowerCase();
-        if (path.toLowerCase() === sync || path.toLowerCase().startsWith(sync + (process.platform === 'win32' ? '\\' : '/'))) fail('UNSAFE_SCRATCH');
-      }
     }
     const stat = await lstat(path);
     if (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid())) fail('SCRATCH_NOT_PRIVATE');

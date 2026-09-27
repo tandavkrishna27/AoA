@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, writeFile, readFile, rm, symlink, mkdir, chmod } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm, symlink, mkdir, chmod, link, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
@@ -11,6 +11,59 @@ import { promisify } from 'node:util';
 // Independent fixtures spell out the externally pinned serialization.
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const sort = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+
+test('pr631_hermetic_hardlink_privacy_refuses_without_preparing_bytes', async t => {
+  const parent = await mkdtemp(join(tmpdir(), 'm1a-link-facts-'));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, 'private'); await mkdir(root, { mode: 0o700 });
+  const f = fixture([{ path: 'nested/job.txt', bytes: Buffer.from('clean original bytes'), format: 'utf8' }]);
+  await mkdir(join(root, 'nested'), { mode: 0o700 });
+  const source = join(root, 'nested/job.txt'), alias = join(parent, 'outside.txt');
+  await writeFile(source, f.entries[0].bytes, { mode: 0o600 }); await link(source, alias);
+  const args = { contract: f.contract, expectedContractSha256: bundle(f).expected.contractSha256,
+    expectedJobs: ['build'], requiredCategories: ['logs'], root };
+  const script = `import assert from 'node:assert/strict';
+    import cp from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module';
+    import { readFile, rm, lstat } from 'node:fs/promises';
+    cp.execFile = () => { throw Error('unexpected execution'); };
+    cp.execFile[Symbol.for('nodejs.util.promisify.custom')] = async () => ({stdout:JSON.stringify({
+      sid:'S-1-5-21-123',owner:'S-1-5-21-123',reparse:false,syncRoots:[],
+      rules:[{sid:'S-1-5-21-123',allow:true,rights:2032127}]}),stderr:''});
+    syncBuiltinESMExports();
+    const {prepareArchive,assertPrivateArchiveInputFile} = await import(${JSON.stringify(new URL('./evidence.mjs', import.meta.url).href)});
+    const args = JSON.parse(process.argv[1]), source = process.argv[2], alias = process.argv[3];
+    const original = await readFile(source); assert.equal((await lstat(source)).nlink,2);
+    await assert.rejects(assertPrivateArchiveInputFile(source),{code:'M1A_SOURCE_NOT_PRIVATE'});
+    await assert.rejects(prepareArchive(args),{code:'M1A_SOURCE_NOT_PRIVATE'});
+    assert.deepEqual(await readFile(source),original); assert.deepEqual(await readFile(alias),original);
+    await rm(alias); const prepared = await prepareArchive(args);
+    assert.deepEqual(Buffer.from(JSON.parse(prepared.bytes).members[0].base64,'base64'),original);
+    process.stdout.write('hardlink-refused-original-preserved');`;
+  const allowed = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP']);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => allowed.has(k.toUpperCase())));
+  const result = await promisify(execFile)(process.execPath,
+    ['--input-type=module', '-e', script, JSON.stringify(args), source, alias],
+    { env, shell: false, windowsHide: true, timeout: 60_000 });
+  assert.equal(result.stdout, 'hardlink-refused-original-preserved'); assert.equal(result.stderr, '');
+});
+
+test('pr631_posix_source_hardlink_refused_before_preparation', { skip: process.platform === 'win32' }, async t => {
+  const parent = await mkdtemp(join(tmpdir(), 'm1a-hardlink-'));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, 'private'); await mkdir(root, { mode: 0o700 });
+  const f = fixture(); const source = join(root, 'job.txt'), alias = join(parent, 'outside.txt');
+  await writeFile(source, f.entries[0].bytes, { mode: 0o600 }); await link(source, alias);
+  assert.equal((await lstat(source)).nlink, 2);
+  const { prepareArchive, assertPrivateArchiveInputFile } = await api();
+  await assert.rejects(assertPrivateArchiveInputFile(source), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+  await assert.rejects(prepareArchive({ contract: f.contract, expectedContractSha256: bundle(f).expected.contractSha256,
+    expectedJobs: ['build'], requiredCategories: ['logs'], root }), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+  assert.deepEqual(await readFile(source), f.entries[0].bytes); assert.deepEqual(await readFile(alias), f.entries[0].bytes);
+  await rm(alias);
+  const prepared = await prepareArchive({ contract: f.contract, expectedContractSha256: bundle(f).expected.contractSha256,
+    expectedJobs: ['build'], requiredCategories: ['logs'], root });
+  assert.deepEqual(prepared.bytes, bundle(f).bytes);
+});
 const descriptor = m => ({ path: m.path, sha256: m.sha256, size: m.size,
   format: m.format, artifactId: m.artifactId, category: m.category });
 const inventory = ms => ms.map(descriptor).sort((a, b) => sort(a.path, b.path));

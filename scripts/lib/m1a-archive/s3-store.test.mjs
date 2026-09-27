@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, chmod, readdir, readFile, writeFile, rm, symlink, mkdir, open, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, parse, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createS3ArchiveStore, createProductionS3ArchiveStore, assertPrivateArchiveOutputRoot, assertPrivateArchiveOutputFile } from './s3-store.mjs';
@@ -39,6 +39,62 @@ const metadata = { VersionId: 'version-1', ChecksumSHA256: checksum, ContentLeng
   ServerSideEncryption: 'AES256', LastModified: '2026-09-27T00:00:00Z' };
 const privateWindowsFacts = () => ({ sid: 'S-1-5-21-123', owner: 'S-1-5-21-123', protected: true,
   rules: [{ sid: 'S-1-5-21-123', allow: true, rights: 2032127, inheritanceFlags: 3, propagationFlags: 0 }], syncRoots: [] });
+
+test('pr631_configured_sync_roots_refuse_before_raw_or_cloud_io', async t => {
+  const f = await fixture(t);
+  const leaf = join(f.root, 'private'); await mkdir(leaf, { mode: 0o700 });
+  const providers = ['ONEDRIVE', 'DROPBOX', 'GOOGLEDRIVE', 'GOOGLE_DRIVE', 'GOOGLE_DRIVE_HOME', 'ICLOUD', 'BOX_SYNC'];
+  for (const provider of providers) {
+    const previous = process.env[provider];
+    try {
+      for (const sync of [leaf, f.root + sep, parse(f.root).root]) {
+        process.env[provider] = sync;
+        const store = createS3ArchiveStore({ mode: 'upload', privateScratch: leaf,
+          runAws: f.runAws, inspectWindowsPrivacy: async () => privateWindowsFacts() });
+        await assert.rejects(store.get(ref), { code: 'UNSAFE_SCRATCH' });
+        await assert.rejects(store.put({ key, bytes, checksumSha256: checksum }), { code: 'UNSAFE_SCRATCH' });
+        await assert.rejects(assertPrivateArchiveOutputRoot(leaf), { code: 'UNSAFE_SCRATCH' });
+        assert.equal(f.calls.length, 0); assert.deepEqual(await readdir(leaf), []);
+      }
+    } finally { if (previous === undefined) delete process.env[provider]; else process.env[provider] = previous; }
+  }
+});
+
+test('pr631_sync_aliases_and_sibling_prefixes_use_root_containment', async t => {
+  const f = await fixture(t);
+  const sync = join(f.root, 'synced'); await mkdir(sync, { mode: 0o700 });
+  const leaf = join(sync, 'private'); await mkdir(leaf, { mode: 0o700 });
+  const sibling = join(f.root, 'synced-sibling'); await mkdir(sibling, { mode: 0o700 });
+  const alias = join(f.root, 'alias'); await symlink(sync, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const previous = process.env.GOOGLE_DRIVE_HOME;
+  try {
+    process.env.GOOGLE_DRIVE_HOME = alias + sep;
+    const store = createS3ArchiveStore({ mode: 'upload', privateScratch: leaf,
+      runAws: f.runAws, inspectWindowsPrivacy: async () => privateWindowsFacts() });
+    await assert.rejects(store.get(ref), { code: 'UNSAFE_SCRATCH' });
+    await assert.rejects(store.put({ key, bytes, checksumSha256: checksum }), { code: 'UNSAFE_SCRATCH' });
+    await assert.rejects(assertPrivateArchiveOutputRoot(leaf), { code: 'UNSAFE_SCRATCH' });
+    assert.equal(f.calls.length, 0); assert.deepEqual(await readdir(leaf), []);
+    const safe = createS3ArchiveStore({ mode: 'verify', privateScratch: sibling,
+      runAws: f.runAws, inspectWindowsPrivacy: async () => privateWindowsFacts() });
+    assert.deepEqual((await safe.get(ref)).bytes, bytes);
+    process.env.GOOGLE_DRIVE_HOME = join(f.root, 'missing');
+    await assert.rejects(safe.get(ref), { code: 'UNSAFE_SCRATCH' });
+    process.env.GOOGLE_DRIVE_HOME = 'relative-root';
+    await assert.rejects(safe.get(ref), { code: 'UNSAFE_SCRATCH' });
+  } finally { if (previous === undefined) delete process.env.GOOGLE_DRIVE_HOME; else process.env.GOOGLE_DRIVE_HOME = previous; }
+});
+
+test('pr631_posix_output_file_sync_refusal_preserves_raw_bytes', { skip: process.platform === 'win32' }, async t => {
+  const f = await fixture(t); const path = join(f.root, 'receipt');
+  const handle = await open(path, 'wx', 0o600); await handle.writeFile(bytes);
+  const previous = process.env.BOX_SYNC;
+  try {
+    process.env.BOX_SYNC = f.root;
+    await assert.rejects(assertPrivateArchiveOutputFile(path, handle), { code: 'UNSAFE_SCRATCH' });
+    assert.deepEqual(await readFile(path), bytes);
+  } finally { await handle.close(); if (previous === undefined) delete process.env.BOX_SYNC; else process.env.BOX_SYNC = previous; }
+});
 
 test('final_fix_rejects_replaceable_posix_ancestors_before_raw_io', { skip: process.platform === 'win32' }, async t => {
   const f = await fixture(t);
