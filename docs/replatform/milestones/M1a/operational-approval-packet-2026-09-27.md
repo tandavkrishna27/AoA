@@ -1,6 +1,8 @@
 # M1a Operational Approval Packet And Design
 
-Status: proposed design for user review, not an execution or gate approval.
+Status: independently reviewed proposal; operational review NOT CLEAR.
+Not an execution or gate approval. User requested review/start; safe read-only
+capability and source investigation started, production implementation held.
 Baseline: `4aff3ac18b659e3b414a510370390f0d16431bb3` on
 `docs/replatform-program`. PR634 is merged. M1a remains FAIL.
 
@@ -56,6 +58,25 @@ unsuitable; do not provision it as an implicit fallback.
 The private location's actual repository name, billing/capability entitlement,
 reviewer account and protected reference must be designated before deployment.
 No external project is created by approving the choice of architecture alone.
+
+Review correction: `MeteoriteLabs` is a user account, not an organization. Its
+subscription was not exposed by the authenticated API. GitHub required deployment
+reviewers for private repositories require an eligible Enterprise offering;
+Free/Pro/Team do not supply that gate for private repositories. User has confirmed
+Free or Pro, so private deployment reviewers are not the selected approval gate.
+Use a separately controlled signed-approval mechanism only after its concrete
+key custody, pinning, reviewer roles and replay/revocation design are approved.
+Private storage
+and branch review are not substitutes for deployment approval. Verify actual
+entitlement before selecting that mechanism; otherwise separately design an
+externally controlled signed-approval gate. Do not purchase an upgrade by inference.
+
+Standard Linux GitHub-hosted runners provide passwordless sudo. Executing
+candidate scripts on that host cannot preserve a same-host controller or Docker
+restriction against candidate bypass. A separate unprivileged execution sandbox
+with no host Docker socket, sudo, host filesystem write access or approval
+credentials is required. The actual sandbox/privilege model must be selected and
+reviewed before writing the production driver; a PATH wrapper is not enforcement.
 
 ## Trust And Execution Boundaries
 
@@ -197,3 +218,43 @@ User reviews this design and resolves the owner/location/operator choices.
 Then prepare the detailed implementation plan, preserve the subagent-driven
 method and obtain written-plan review before source execution. This document is
 neither an approved policy nor a retrospective disposition for historical runs.
+
+## Independent Review And Started Readiness Audit
+
+Reviewer: separate read-only session Kierkegaard
+`01a0e3e0-5364-7040-84f7-3921427e6557`, original design
+`a0bae57cc05b2b6bb82bcb4110553d2c43377ab9`. No Hubble involvement.
+Seven P1 operational-design findings remain open; do not describe this as
+approved production wiring. The proposal's boundaries were accurately labeled,
+but declarations alone do not implement them.
+
+| Finding | Source checked by parent | Required closure before implementation |
+| --- | --- | --- |
+| Daemon bypass | Journey direct Docker spawn at line216; harness start/restart at3231/3242 | Concrete externally enforced socket/API boundary, denied alternate endpoints, constrained mounts/privileges/commands and adversarial host tests |
+| Build/inspection bootstrap | sbom candidate execution fallback; shipped MinIO version execution | Separately authorized credential-free build/inspection isolation and approved scanner identities, before prospective runtime admission |
+| Real-provider admission | real-transport.ts line213 creates by req.templateId; provider identity evidence is template/build/envdVersion | Mandatory keyed provider profile and supported immutable pre-create enforcement, or owner disposition that preserves H08; no fake OCI/provider attestations |
+| Private execution from first byte | Existing public workflow log streams and uploads | Actual private entry point; inventory/replace all public raw producers before build/test, including provider/model credential containment |
+| Durable terminal collection | D1 uploads precede teardown; teardown errors swallowed; journey deletes scanner state | Independent durable collector/state, preserved private scanner context, authentic teardown observations and cancellation/timeout/runner-loss reconciliation |
+| Complete source/evidence profiles | Tags/local IDs/RepoDigests differ; source-built MinIO and D1 infrastructure differ | Per-profile typed image/build/service mappings and complete job/member manifest demonstrated within current limits |
+| Operator independence | Proposed roles lack designated independent custody | Exact eligible operator/role/conflict matrix and independent expectation preparation; keep Hubble reserved |
+
+Read-only capability audit completed: repository owner is a personal User account;
+account API did not expose its plan. User then confirmed Free or Pro. Organization
+API was unavailable and no token scope elevation was requested. No repository,
+environment, IAM identity, host or subscription was created/changed.
+
+Current source excerpts establish that this is not a small helper-import change:
+the shipped journey uses up, force-recreate, run and exec as well as direct inspect;
+the D1 harness independently starts/restarts. Current D1 raw uploads retain14days,
+shipped uploads30days; final collector additions cannot undo earlier publication.
+Teardown currently uses `|| true` in both workflows. These are investigation
+observations, not new QA verdicts or measured custody proof.
+
+Next work is to resolve the executor/approval mechanism and provider pre-create
+contract, then write the task-by-task implementation plan against those selected
+interfaces. Do not invent implementable interfaces while those choices remain
+open, or execute the earlier completed offline plan again.
+
+Primary capability references checked September27:
+- https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments
+- https://docs.github.com/en/actions/reference/runners/github-hosted-runners
