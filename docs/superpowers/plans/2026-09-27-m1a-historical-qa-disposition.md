@@ -10,6 +10,10 @@
 
 **Spec:** User-authorized bounded historical disposition of PR610/615, 2026-09-27.
 
+**Bounded follow-up:** McClintock P2 requires individual H-01/H-02/H-03/H-04/H-05/H-07 scope, observation and decision even for FAIL. Starting head `916020c0d564527618f192fff280f584dc13f45c`; all ten originals, 85 baseline records and four first corrections remain immutable. Append D1 26/27 and mechanism 32/33, each superseding its immediate candidate-specific correction. Remote/local maxima rechecked: D1 25, mechanism 31 (589 unique local/origin tips). No FAIL exemption; unproven HARD evidence fails, H-06 is residual without waiver, full-lane conditions are not imported into partial scope.
+
+Follow-up author self-verification: 25 existing guard tests; original and baseline blob identity; every introduced QA record unchanged across the base-to-candidate commit walk; metadata, local path links, normative IDs and whitespace. One local commit only after final checks; its SHA is the resulting current document head. Parent performs fresh independent McClintock rereview after return and separately owns PR631. Full runtime typecheck/tests/build remain unrun for this documentation-only wave; no campaign or new measurement is represented.
+
 ## Global Constraints
 
 - No edits in the dirty main checkout or parent PR631 worktree.

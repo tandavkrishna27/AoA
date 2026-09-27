@@ -56,7 +56,20 @@ The redaction narrative is also internally uneven: original 28 reports a fired s
 
 EVID-01/02/03/04 and RET-01 apply to the partial record format. EVID-03 requires normative IDs verbatim: SPINE-EVID-01 maps to EVID-01, SPINE-EVID-RETENTION/MECH-EVID-RETENTION to RET-01, SPINE-/MECH-H06 to H-06, and cleanup claims must distinguish partial resource teardown from H-09. Run/matrix/F10/audit/cost/rollback labels are local traceability labels for the approved partial scope, not newly invented test-gates IDs.
 
-New tables use normative IDs for their actual assertions. They are FAIL disposition tables, **not full passing requirement censuses**. H-01 through H-05 and H-07 are not promoted from predecessor prose; full D1-00 through D1-07, D2-01 onward, full D0 rollups, D4/D6 SLIs, HA and capability requirements remain uncertified/outside this partial historical disposition. H-06 remains the recorded partial-gate residual, never a waiver of the full HARD invariant. H-08 provenance approval and RET-01 custody are separate from successful execution; H-09 resource absence is separate from workflow SUCCESS.
+McClintock's independent P2 review confirmed that all four first corrections omitted individual H-01 through H-05 and H-07 scope/observation/decision rows required by the QA template's final clause. FAIL provides no exemption from that clause. Those four records are immutable and remain untouched; four higher successors now supply the missing rows and applicable partial conditions. Each unproven invariant is FAIL, not certified or an asserted measured product violation. Full D1-00 through D1-07, D2-01 onward, full D0 rollups, D4/D6 SLIs, HA and capability thresholds are not blindly imposed on this partial historical gate. H-06 remains an unresolved residual, never a HARD waiver. H-08 provenance approval and RET-01 custody are separate from successful execution; H-09 resource absence is separate from workflow SUCCESS.
+
+### Bounded review-correction allocation
+
+Starting author head: `916020c0d564527618f192fff280f584dc13f45c`; pinned base remains `0510d482798e62672a8f6085915231c5f8578e87`. Remote heads were rechecked read-only and fetched locally on 2026-09-27; local branch and origin trees (589 unique tips, including retained remote-tracking refs) have maximum D1 25 and mechanism 31. This author alone writes this wave; allocation remains a snapshot to recheck before publication.
+
+| Current successor | Exact candidate prefix | Immediate candidate-specific predecessor |
+|---|---|---|
+| [D1 26](qa/2026-09-27-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a26.md) | f8cdbe92e1cd | D1 24 |
+| [D1 27](qa/2026-09-27-m1-d1-spine-m1a-candidate-446d99f39c8f-a27.md) | 446d99f39c8f | D1 25 |
+| [Mechanism 32](qa/2026-09-27-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a32.md) | f8cdbe92e1cd | Mechanism 30 |
+| [Mechanism 33](qa/2026-09-27-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a33.md) | 446d99f39c8f | Mechanism 31 |
+
+All four remain formal FAIL. Their known identity and prior measurements are carried as attributed historical observations; inherited command tables describe predecessor reviews, not fresh campaign execution. Partial-gate rows retain matrix/F10/worker/control/audit/cost/rollback/credential/redaction/capability/teardown conditions where applicable; unknowns fail rather than borrow another candidate's data. Parent owns PR631 and the fresh independent McClintock rereview. The resulting local commit identifies the current document head; this document does not claim runtime evidence at that head.
 
 ## Review comment mapping
 
