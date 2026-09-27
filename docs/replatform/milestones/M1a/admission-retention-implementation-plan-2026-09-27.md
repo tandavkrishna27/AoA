@@ -1,5 +1,11 @@
 # M1a Local-First Admission and Retention Implementation Plan
 
+> Scope update: the user subsequently selected AWS for the real evidence archive.
+> Read [the AWS archive addendum](./aws-archive-plan-addendum-2026-09-27.md)
+> before execution. This document remains the offline DEV_ONLY tooling plan;
+> its no-cloud constraints do not govern the separately proposed AWS adapter.
+> Neither plan authorizes evidence uploads or campaign execution by itself.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (requested) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Parent review of this written plan is required before execution; do not dispatch implementers or reviewers, change runtime code, or commit during preparation.
 
 **Goal:** Build offline development tooling that exercises complete image admission and exact-version filesystem evidence verification without asserting H-08 approval, RET-01 compliance, or campaign clearance.
