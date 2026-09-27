@@ -302,7 +302,13 @@ async function privateRoot(input) {
     child = stat;
     if (p === dirname(p)) break;
   }
-  if (Object.entries(process.env).some(([k, v]) => /onedrive|dropbox|googledrive|google_drive|icloud|box_sync/i.test(k) && v && contained(path, v))) fail('M1A_SOURCE_NOT_PRIVATE');
+  for (const [key, value] of Object.entries(process.env)) {
+    if (!/onedrive|dropbox|googledrive|google_drive|icloud|box_sync/i.test(key) || !value) continue;
+    if (!isAbsolute(value)) fail('M1A_SOURCE_NOT_PRIVATE');
+    let actualRoot;
+    try { actualRoot = await realpath(value); } catch { fail('M1A_SOURCE_NOT_PRIVATE'); }
+    if (contained(path, value) || contained(path, actualRoot)) fail('M1A_SOURCE_NOT_PRIVATE');
+  }
   const stat = await lstat(path);
   if (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid())) fail('M1A_SOURCE_NOT_PRIVATE');
   return path;

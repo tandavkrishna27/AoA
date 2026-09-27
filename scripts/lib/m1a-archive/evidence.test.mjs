@@ -12,6 +12,52 @@ import { promisify } from 'node:util';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const sort = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 
+test('pr631_source_sync_aliases_and_unavailable_roots_refuse_before_preparation', async t => {
+  const parent = await mkdtemp(join(tmpdir(), 'm1a-source-alias-'));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const root = join(parent, 'private'), sibling = join(parent, 'private-sibling'), alias = join(parent, 'alias');
+  await mkdir(root, { mode: 0o700 }); await mkdir(sibling, { mode: 0o700 });
+  await symlink(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const f = fixture(); const source = join(root, 'job.txt');
+  await writeFile(source, f.entries[0].bytes, { mode: 0o600 });
+  const args = { contract: f.contract, expectedContractSha256: bundle(f).expected.contractSha256,
+    expectedJobs: ['build'], requiredCategories: ['logs'], root };
+  const script = `import assert from 'node:assert/strict';
+    import cp from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module';
+    import { readFile } from 'node:fs/promises';
+    cp.execFile = () => { throw Error('unexpected execution'); };
+    cp.execFile[Symbol.for('nodejs.util.promisify.custom')] = async () => ({stdout:JSON.stringify({
+      sid:'S-1-5-21-123',owner:'S-1-5-21-123',reparse:false,syncRoots:[],
+      rules:[{sid:'S-1-5-21-123',allow:true,rights:2032127}]}),stderr:''});
+    syncBuiltinESMExports();
+    const m = await import(${JSON.stringify(new URL('./evidence.mjs', import.meta.url).href)});
+    const args = JSON.parse(process.argv[1]), alias = process.argv[2], source = process.argv[3], sibling = process.argv[4];
+    const original = await readFile(source);
+    for (const name of ['GOOGLE_DRIVE','GOOGLE_DRIVE_HOME','ICLOUD','BOX_SYNC','OneDrive','DROPBOX']) {
+      process.env[name] = alias;
+      await assert.rejects(m.assertPrivateArchiveInputRoot(args.root),{code:'M1A_SOURCE_NOT_PRIVATE'});
+      await assert.rejects(m.assertPrivateArchiveInputFile(source),{code:'M1A_SOURCE_NOT_PRIVATE'});
+      await assert.rejects(m.prepareArchive(args),{code:'M1A_SOURCE_NOT_PRIVATE'});
+      await m.assertPrivateArchiveInputRoot(sibling);
+      delete process.env[name];
+    }
+    for (const invalid of ['relative-sync-root', sibling + '/missing']) {
+      process.env.GOOGLE_DRIVE = invalid;
+      await assert.rejects(m.assertPrivateArchiveInputRoot(args.root),{code:'M1A_SOURCE_NOT_PRIVATE'});
+    }
+    delete process.env.GOOGLE_DRIVE;
+    assert.deepEqual(await readFile(source),original);
+    const prepared = await m.prepareArchive(args);
+    assert.deepEqual(Buffer.from(JSON.parse(prepared.bytes).members[0].base64,'base64'),original);
+    process.stdout.write('source-alias-refused-original-preserved');`;
+  const allowed = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP']);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => allowed.has(k.toUpperCase())));
+  const result = await promisify(execFile)(process.execPath,
+    ['--input-type=module', '-e', script, JSON.stringify(args), alias, source, sibling],
+    { env, shell: false, windowsHide: true, timeout: 60_000 });
+  assert.equal(result.stdout, 'source-alias-refused-original-preserved'); assert.equal(result.stderr, '');
+});
+
 test('pr631_hermetic_hardlink_privacy_refuses_without_preparing_bytes', async t => {
   const parent = await mkdtemp(join(tmpdir(), 'm1a-link-facts-'));
   t.after(() => rm(parent, { recursive: true, force: true }));
