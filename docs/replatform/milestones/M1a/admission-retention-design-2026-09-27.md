@@ -18,6 +18,26 @@ fresh allocation check. No retroactive image approval is permitted.
 
 ## Chosen approach
 
+### Local-first development decision
+
+The user selected local-first implementation and testing on 2026-09-27. The
+initial deliverable is development tooling and tests only: no AWS provisioning,
+cloud upload, provider campaign, trusted release signing or paid action.
+
+Use a private filesystem archive adapter outside Git to exercise unique-version
+creation, manifest integrity, readback, retention metadata and refusal controls.
+Its receipts must carry an explicit development-only classification; writable
+metadata or a local folder does not establish RET-01 compliance. Test signing
+keys likewise establish test behavior only, never H-08 approval. Production
+workflow paths must refuse development-only policy and archive receipts.
+
+Formal local acceptance would require a separate owner-approved custody design,
+access controls, durable backups, demonstrable 180-day retention and independent
+verification. It is not granted by this development decision. S3 remains an
+optional later controlled-store implementation, not an initial dependency or
+requirement for local tests. Write the concrete implementation plan for this
+development deliverable before source implementation.
+
 Add a distinct M1a admission profile beside, not in place of, the closed
 REL-004 five-artifact release manifest. Reuse the existing per-image admission
 primitives in `scripts/lib/image-admission.mjs`. Build once per campaign, approve
