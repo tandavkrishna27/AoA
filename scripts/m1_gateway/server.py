@@ -1,8 +1,10 @@
-"""Authenticated accept path; no listener/startup or production dispatcher yet."""
+"""Authenticated Unix transport and externally protected startup entrypoint."""
 
 import socket
 import struct
 import sys
+
+from .composition import SuppressResponse
 
 from .protocol import (MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, ProtocolError,
                        deadline, decode_request, decode_response, encode,
@@ -73,6 +75,9 @@ def serve_connection(conn, peer_uid: int, session_lookup, handler) -> None:
         return
     try:
         output = handler(peer_uid, value)
+    except SuppressResponse:
+        # Custody loss must suppress capture, even after a durable terminal write.
+        return
     except Exception:
         _send_refusal(conn, 'handler-error', deadline())
         return
@@ -90,3 +95,10 @@ def serve_connection(conn, peer_uid: int, session_lookup, handler) -> None:
         send_frame(conn, raw, MAX_RESPONSE_BYTES, expires)
     except (ProtocolError, OSError):
         pass
+
+
+def start_gateway(config_path: str) -> None:
+    from .composition import compose_gateway
+    runtime = compose_gateway(config_path)
+    try: runtime.serve()
+    finally: runtime.custody.conn.close()
