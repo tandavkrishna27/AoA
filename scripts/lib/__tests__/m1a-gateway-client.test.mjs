@@ -83,7 +83,7 @@ test('private client rejects path/timeout/argv overrides before host IO', async 
 
 test('Linux DEV private client runs fixed isolated Python and real Unix response', {skip:process.platform !== 'linux'}, async () => {
   const root=fs.mkdtempSync(path.join(os.homedir(),'.gateway-client-'));fs.chmodSync(root,0o700);
-  const repo=fileURLToPath(new URL('../../../',import.meta.url));
+  const repo=path.resolve(fileURLToPath(new URL('../../../',import.meta.url)));
   const socketPath=path.join(root,'gateway.sock');
   const python=spawnSync('python3',['-I','-S','-c','import sys,os;print(os.path.realpath(sys.executable))'],{encoding:'utf8'}).stdout.trim();
   assert(python.startsWith('/'));
