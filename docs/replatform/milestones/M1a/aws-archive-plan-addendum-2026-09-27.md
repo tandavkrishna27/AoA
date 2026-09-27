@@ -1,7 +1,8 @@
 # M1a AWS Archive Plan Addendum
 
-Status: proposed implementation scope; written user review required before
-implementation. This supersedes the local-only operational archive choice, not
+Status: scope approved by the user on 2026-09-27 after the read-only credential
+check. The [detailed implementation plan](./aws-archive-implementation-plan-2026-09-27.md)
+requires written review before source execution. This supersedes the local-only operational archive choice, not
 the DEV_ONLY restrictions on offline tools, historical gate results, or H-08.
 
 ## Verified Setup
