@@ -279,6 +279,7 @@ function contained(path, root) {
   return p === r || p.startsWith(r.endsWith(sep) ? r : r + sep);
 }
 async function privateStat(path, directory) {
+  await privateRoot(dirname(path));
   const stat = await lstat(path);
   if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile()) ||
     (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid()))) fail('M1A_SOURCE_NOT_PRIVATE');
@@ -289,14 +290,22 @@ async function privateRoot(input) {
   if (typeof input !== 'string' || !isAbsolute(input)) fail('M1A_SOURCE_NOT_PRIVATE');
   const path = resolve(input), actual = await realpath(path);
   if (process.platform === 'win32' ? path.toLowerCase() !== actual.toLowerCase() : path !== actual) fail('M1A_SOURCE_NOT_PRIVATE');
+  let child;
   for (let p = path;; p = dirname(p)) {
     const stat = await lstat(p);
     if (!stat.isDirectory() || stat.isSymbolicLink() || /(?:^|[\\/])(onedrive[^\\/]*|dropbox|google drive|googledrive|box sync|icloud[^\\/]*|cloudstorage)(?:[\\/]|$)/i.test(p)) fail('M1A_SOURCE_NOT_PRIVATE');
+    if (process.platform !== 'win32' && (![0, process.getuid()].includes(stat.uid) ||
+      (stat.mode & 0o022) !== 0 && (!(stat.mode & 0o1000) || !child ||
+        ![0, process.getuid()].includes(child.uid) || (child.mode & 0o022) !== 0))) fail('M1A_SOURCE_NOT_PRIVATE');
+    if (process.platform === 'win32') await windowsPrivacy(p);
     try { await lstat(join(p, '.git')); fail('M1A_SOURCE_NOT_PRIVATE'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    child = stat;
     if (p === dirname(p)) break;
   }
   if (Object.entries(process.env).some(([k, v]) => /onedrive|dropbox|googledrive|google_drive|icloud|box_sync/i.test(k) && v && contained(path, v))) fail('M1A_SOURCE_NOT_PRIVATE');
-  await privateStat(path, true); return path;
+  const stat = await lstat(path);
+  if (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid())) fail('M1A_SOURCE_NOT_PRIVATE');
+  return path;
 }
 /** Real privacy only; no caller-selected inspector or extra arguments. */
 export async function assertPrivateArchiveInputRoot(path) {

@@ -130,6 +130,7 @@ async function checkWindowsPrivacy(path, kind, inspector) {
 }
 
 async function privateFile(path, handle, inspector) {
+  await privateDirectory(dirname(path), inspector);
   const actual = await lstat(path);
   const held = await handle.stat();
   if (!actual.isFile() || actual.isSymbolicLink() || actual.ino !== held.ino || actual.dev !== held.dev) fail('UNSAFE_SCRATCH');
@@ -160,10 +161,19 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
     const path = resolve(input);
     const canonical = await realpath(path);
     if (process.platform === 'win32' ? canonical.toLowerCase() !== path.toLowerCase() : canonical !== path) fail('UNSAFE_SCRATCH');
+    let child;
     for (let p = path;; p = dirname(p)) {
       const stat = await lstat(p);
       if (stat.isSymbolicLink() || !stat.isDirectory() || /(?:^|[\\/])(onedrive[^\\/]*|dropbox|google drive|googledrive|box sync|icloud[^\\/]*|cloudstorage)(?:[\\/]|$)/i.test(p)) fail('UNSAFE_SCRATCH');
+      if (process.platform !== 'win32') {
+        // Sticky protects only a trusted, non-writable direct child's name.
+        if (![0, process.getuid()].includes(stat.uid) ||
+          (stat.mode & 0o022) !== 0 && (!(stat.mode & 0o1000) || !child ||
+            ![0, process.getuid()].includes(child.uid) || (child.mode & 0o022) !== 0)) fail('SCRATCH_NOT_PRIVATE');
+      }
+      if (process.platform === 'win32' || inspectWindowsPrivacy) await checkWindowsPrivacy(p, 'directory', inspectWindowsPrivacy);
       try { await access(join(p, '.git')); fail('UNSAFE_SCRATCH'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+      child = stat;
       if (p === parse(p).root) break;
     }
     for (const [k, value] of Object.entries(process.env)) {
@@ -174,9 +184,6 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
     }
     const stat = await lstat(path);
     if (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid())) fail('SCRATCH_NOT_PRIVATE');
-    if (process.platform === 'win32' || inspectWindowsPrivacy) {
-      await checkWindowsPrivacy(path, 'directory', inspectWindowsPrivacy);
-    }
     return path;
   } catch (e) {
     if (['UNSAFE_SCRATCH', 'SCRATCH_NOT_PRIVATE', 'SCRATCH_PRIVACY_UNAVAILABLE'].includes(e.code)) throw e;
@@ -235,8 +242,10 @@ export function createS3ArchiveStore(options) {
     const root = await privateDirectory(privateScratch, inspectWindowsPrivacy);
     const path = join(root, `m1a-${randomUUID()}.tmp`);
     let handle;
+    let identity;
     try {
       handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR | (constants.O_NOFOLLOW ?? 0), 0o600);
+      identity = await handle.stat();
       await privateFile(path, handle, inspectWindowsPrivacy);
       return await action(path, handle);
     } catch (e) {
@@ -244,8 +253,13 @@ export function createS3ArchiveStore(options) {
       fail('SCRATCH_IO_FAILED');
     } finally {
       if (handle) {
-        await handle.close().catch(() => fail('SCRATCH_CLEANUP_FAILED'));
-        await unlink(path).catch(() => fail('SCRATCH_CLEANUP_FAILED'));
+        try {
+          await privateDirectory(root, inspectWindowsPrivacy);
+          const actual = await lstat(path);
+          if (!identity || !actual.isFile() || actual.isSymbolicLink() || actual.dev !== identity.dev || actual.ino !== identity.ino) fail('SCRATCH_CLEANUP_FAILED');
+          await unlink(path);
+        } catch { fail('SCRATCH_CLEANUP_FAILED'); }
+        finally { await handle.close().catch(() => fail('SCRATCH_CLEANUP_FAILED')); }
       }
     }
   }
@@ -276,6 +290,7 @@ export function createS3ArchiveStore(options) {
         const before = await handle.stat();
         const args = referenceArgs(pinned);
         const expected = readMetadata(await call('head-object', [...args, '--checksum-mode', 'ENABLED']), pinned);
+        await privateFile(path, handle, inspectWindowsPrivacy);
         const data = readMetadata(await call('get-object', [...args, '--checksum-mode', 'ENABLED', path]), pinned);
         if (data.size !== expected.size || data.checksumSha256 !== expected.checksumSha256) fail('INVALID_RESPONSE');
         const after = await privateFile(path, handle, inspectWindowsPrivacy);
@@ -302,6 +317,7 @@ export function createS3ArchiveStore(options) {
     let knownVersionId;
     try { return await scratch(async (path, handle) => {
       await handle.writeFile(bytes); await handle.sync();
+      await privateFile(path, handle, inspectWindowsPrivacy);
       const data = await call('put-object', ['--key', key, '--body', path, '--if-none-match', '*',
         '--checksum-sha256', checksumSha256, '--server-side-encryption', 'AES256']);
       let v;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, writeFile, readFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm, symlink, mkdir, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
@@ -47,6 +47,32 @@ async function api() {
   try { return await import('./evidence.mjs'); }
   catch (e) { if (e.code === 'ERR_MODULE_NOT_FOUND') assert.fail('Task 2 offline evidence implementation is missing'); throw e; }
 }
+
+test('final_fix_source_and_input_file_reject_replaceable_posix_ancestors', { skip: process.platform === 'win32' }, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'm1a-ancestor-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const parent = join(root, 'shared'); await mkdir(parent); await chmod(parent, 0o777);
+  const leaf = join(parent, 'private'); await mkdir(leaf, { mode: 0o700 });
+  const path = join(leaf, 'input.json'); await writeFile(path, '{}', { mode: 0o600 });
+  const m = await api();
+  for (const mode of [0o777, 0o770, 0o702]) {
+    await chmod(parent, mode);
+    await assert.rejects(m.assertPrivateArchiveInputRoot(leaf), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+    await assert.rejects(m.assertPrivateArchiveInputFile(path), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+  }
+  await chmod(parent, 0o1777);
+  await m.assertPrivateArchiveInputRoot(leaf); await m.assertPrivateArchiveInputFile(path);
+  await rm(path);
+  const f = fixture(); await writeFile(join(leaf, 'job.txt'), f.entries[0].bytes, { mode: 0o600 });
+  const options = { contract: f.contract, expectedContractSha256: bundle(f).expected.contractSha256,
+    expectedJobs: ['build'], requiredCategories: ['logs'], root: leaf };
+  assert.deepEqual((await m.prepareArchive(options)).bytes, bundle(f).bytes);
+  await chmod(parent, 0o777);
+  await assert.rejects(m.prepareArchive(options), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+  await chmod(parent, 0o1777);
+  await chmod(leaf, 0o777);
+  await assert.rejects(m.assertPrivateArchiveInputFile(join(leaf, 'job.txt')), { code: 'M1A_SOURCE_NOT_PRIVATE' });
+});
 
 test('real_only_input_privacy_wrappers_refuse_extra_capabilities', async t => {
   const m = await api();
