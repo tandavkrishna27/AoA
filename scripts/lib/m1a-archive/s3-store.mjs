@@ -192,6 +192,8 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
  * inspectWindowsPrivacy(path,{kind:'directory'|'file'}) returns ACL/inventory facts;
  * rules include inheritanceFlags and propagationFlags (Windows enum integers).
  * facts still pass the real validator and never bypass filesystem/path checks.
+ * put errors after a validated service VersionId carry knownVersionRef:{key,versionId},
+ * including checksum/encryption refusal and scratch cleanup failure. No inferred ref.
  */
 export function createS3ArchiveStore(options) {
   closed(options, ['mode', 'runAws', 'privateScratch', 'now', 'inspectWindowsPrivacy']);
@@ -287,15 +289,21 @@ export function createS3ArchiveStore(options) {
     const bytes = Buffer.from(input.bytes);
     const { key, checksumSha256 } = input;
     if (!key.endsWith(`/${createHash('sha256').update(bytes).digest('hex')}.json`)) fail('INVALID_INPUT');
-    return scratch(async (path, handle) => {
+    let knownVersionId;
+    try { return await scratch(async (path, handle) => {
       await handle.writeFile(bytes); await handle.sync();
       const data = await call('put-object', ['--key', key, '--body', path, '--if-none-match', '*',
         '--checksum-sha256', checksumSha256, '--server-side-encryption', 'AES256']);
       let v;
       try { v = version(data.VersionId); } catch { fail('INVALID_RESPONSE'); }
+      knownVersionId = v;
       if (checksum(data.ChecksumSHA256) !== checksumSha256 || data.ServerSideEncryption !== 'AES256') fail('INVALID_RESPONSE');
       return { versionId: v, checksumSha256: data.ChecksumSHA256 };
-    });
+    }); } catch (error) {
+      if (!knownVersionId) throw error;
+      const code = ['INVALID_RESPONSE', 'SCRATCH_CLEANUP_FAILED', 'SCRATCH_IO_FAILED'].includes(error?.code) ? error.code : 'INVALID_RESPONSE';
+      throw Object.assign(new Error(code), { code, knownVersionRef: { key, versionId: knownVersionId } });
+    }
   };
   return Object.freeze(store);
 }

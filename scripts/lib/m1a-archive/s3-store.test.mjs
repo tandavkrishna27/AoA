@@ -474,3 +474,35 @@ test('round1_valid_inherited_file_acl_and_equal_length_corruption', async (t) =>
   assert.deepEqual(await readdir(root), []);
   assert.deepEqual(await readdir(corrupted.root), []);
 });
+
+test('put_preserves_validated_version_on_checksum_or_encryption_failure', async t => {
+  for (const change of [v => { v.ChecksumSHA256 = Buffer.alloc(32).toString('base64'); },
+    v => { v.ChecksumSHA256 = 'sensitive malformed checksum'; }, v => { v.ServerSideEncryption = 'aws:kms'; }]) {
+    const value = { ...metadata }; change(value);
+    const f = await fixture(t, { 'put-object': async () => ({ code: 0, stdout: JSON.stringify(value), stderr: 'sensitive stderr' }) });
+    await assert.rejects(f.store.put({ key, bytes, checksumSha256: checksum }), e => {
+      assert.equal(e.code, 'INVALID_RESPONSE'); assert.equal(e.message, e.code); assert.deepEqual(e.knownVersionRef, ref);
+      assert.equal('cause' in e, false); return true;
+    });
+    assert.equal(f.calls.filter(a => a[1] === 'put-object').length, 1);
+  }
+});
+
+test('put_preserves_validated_version_when_scratch_cleanup_fails', async t => {
+  const f = await fixture(t, { 'put-object': async args => {
+    const body = args[args.indexOf('--body') + 1];
+    await rm(body); await mkdir(body);
+    return { code: 0, stdout: JSON.stringify(metadata), stderr: '' };
+  } });
+  await assert.rejects(f.store.put({ key, bytes, checksumSha256: checksum }), e => {
+    assert.equal(e.code, 'SCRATCH_CLEANUP_FAILED'); assert.equal(e.message, e.code); assert.deepEqual(e.knownVersionRef, ref); return true;
+  });
+  assert.equal(f.calls.filter(a => a[1] === 'put-object').length, 1);
+});
+
+test('put_never_fabricates_version_diagnostic', async t => {
+  for (const v of [undefined, '', 'null', '\n', '--bad']) {
+    const f = await fixture(t, { 'put-object': async () => ({ code: 0, stdout: JSON.stringify({ ...metadata, VersionId: v }), stderr: '' }) });
+    await assert.rejects(f.store.put({ key, bytes, checksumSha256: checksum }), e => e.code === 'INVALID_RESPONSE' && !Object.hasOwn(e, 'knownVersionRef'));
+  }
+});
