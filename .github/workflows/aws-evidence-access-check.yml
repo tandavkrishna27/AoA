@@ -1,3 +1,4 @@
+# Registered diagnostic path; this branch performs only the server metadata audit.
 name: M1a server read-only diagnostic
 
 on:
