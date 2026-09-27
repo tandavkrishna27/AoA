@@ -4,14 +4,16 @@
 **Candidate:** `d479709ed8940fe69ef28539daadb90b9b29310b`
 **Candidate ref:** `refs/heads/codex/m1a-candidate-d479709ed894`
 **Integration branch:** `docs/replatform-program`
-**Status:** approved for the named candidate, subject to final exact-head CI and comment verification before merge
+**Status:** proposed; conditional planning approval is not effective until PR #627 lands and a fresh exact-head review and CI/comment check clear
 **Purpose:** replacement freeze after the D1 host-harness repair in PR #628; not campaign evidence, a QA verdict, gate pass, epic-status grant, or handoff
 
 The candidate is the verified merge commit of PR #628. The dedicated candidate ref resolved to the
 exact commit when this inventory was prepared and must never move. The historical freeze merged by
 PR #625 and `refs/heads/codex/m1a-candidate-28151ec8724f` remain preserved for their named candidate;
-they are not edited, moved, or reused. Attempts 19 and 20 remain immutable failed records for that
-historical candidate. Any new result or correction starts at attempt 21 or higher.
+they are not edited, moved, or reused. D1 attempts 19 and 20 are retained on PR #627 but are not yet
+present on this branch's integration base. PR #627 must land first so those records become committed
+history. After that prerequisite, the next D1 result/correction is attempt 21 or higher. The separate
+`M1a-D2-MECHANISM` chain already ends at attempt 25, so its next result remains attempt 26.
 
 No earlier-candidate campaign result, runtime identifier, image digest, provider identity, or QA
 verdict is carried forward. This inventory records source state and planning boundaries only.
@@ -70,7 +72,7 @@ entry-review files, whose bytes are pinned by `git hash-object` before this free
 | Review boundary | Repository path | Git blob SHA |
 |---|---|---|
 | E0-E2 dependency/delta | `docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-d479709ed894.md` | `32566543315c72cd5ae6734e72c271fef0116339` |
-| E3-E6 index and complete matrix inventory | `docs/replatform/milestones/M1a/reachability/d479709ed894/README.md` | `2016350a38b46a171f48a898433ee05a896f2ec6` |
+| E3-E6 index and complete matrix inventory | `docs/replatform/milestones/M1a/reachability/d479709ed894/README.md` | `735ed64ef4bc78ce3f3a065e95d3f56c2c6e0dec` |
 | E3 job-control | `docs/replatform/milestones/M1a/reachability/d479709ed894/E3-job-control.md` | `b600ec4e4f9977f7473eb3fdd0c523b4202fb9a5` |
 | E4 worker-daemon | `docs/replatform/milestones/M1a/reachability/d479709ed894/E4-worker-daemon.md` | `0dc1513fada7fcbd0fdc597825c67925cfb59198` |
 | E5 workspaces/secrets | `docs/replatform/milestones/M1a/reachability/d479709ed894/E5-workspaces-secrets.md` | `eb4b1c6997943d5919462b7b7f471cd9ac39bcd8` |
@@ -88,8 +90,8 @@ Relative to `28151ec8724fc94d3774845d9d23cac5411a489a`, candidate source changes
 
 PR #628 exact head `ee07f09d5830455607263b1b4319a6d2c13c5fde` received Herschel's independent
 **CLEAR** and passed required CI run `36278896363`; merge commit is this candidate. The repair fixes
-the harness cause recorded by failed attempt 20. It does not rewrite that result, prove the campaign,
-or carry forward the prior matrix observations.
+the harness cause retained by D1 attempt 20 on PR #627. It does not rewrite that result, prove the
+campaign, or carry forward the prior matrix observations.
 
 ## Frozen profile inventory
 
@@ -139,8 +141,11 @@ the historical candidate/ref and QA records, no campaign-result carry-forward, a
 
 GitHub Actions run `36281773926` was fully green on that exact head, including policy, evidence
 immutability, Ubuntu and Windows protocol-byte checks, brand-check, and `ci-required`. The later
-approval-attribution commit changes only this status and the two attributed sections; it does not
-change the candidate, any pin, entry review, matrix allocation, or campaign boundary.
+approval-attribution commit changed only the freeze document. Subsequent automated review identified
+that PR #627 had not yet landed, the two gate attempt ordinals were conflated, and the milestone entry
+index still pointed at older reviews. This revision fixes those findings, changes the pinned E3-E6
+index blob accordingly, and requires a fresh independent exact-head review. The earlier CLEAR remains
+historical review evidence for its exact head; it is not asserted as CLEAR for this revised head.
 
 ## Attributed planning approval
 
@@ -150,20 +155,25 @@ certification, **APPROVES** this replacement freeze for candidate
 `d479709ed8940fe69ef28539daadb90b9b29310b` on immutable ref
 `refs/heads/codex/m1a-candidate-d479709ed894`.
 
-Approval is conditioned only on final CI passing and PR comments remaining clear on the exact
-post-attribution head before planning merges with an exact-head guard. It is freeze approval only:
+Approval was conditioned on final CI passing and PR comments remaining clear on the exact
+post-attribution head before planning merges with an exact-head guard. Those conditions were not met
+after new review findings appeared, so approval is not effective. It may become effective only after
+PR #627 lands and a fresh independent review plus exact-head CI/comments clear this revision. It is
+freeze approval only:
 it is not a gate pass, campaign result, E5 closure, epic-status grant, milestone handoff, retry
 authorization, paid-run authorization, or dispatch instruction.
 
 ## Required next steps
 
-1. Require final PR checks green and verify every review/comment remains clear on the exact
-   post-attribution head without rewriting any immutable record.
-2. Planning may then land only with an exact-head guard.
-3. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
+1. Land PR #627 first after its own required independent review, preserving D1 attempts 19 and 20.
+2. Obtain fresh independent review of this exact freeze head and require final PR checks and comments
+   clear without rewriting any immutable record.
+3. Planning may then land only with an exact-head guard.
+4. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
    dispatch and prove no equivalent run is active or complete.
-4. Run fresh free D1 evidence first; new QA starts at attempt 21 or higher. Then follow the approved
-   keyless/keyed sequence and paid-run limits. Failure grants no retry.
+5. Run fresh free D1 evidence first; its new QA starts at attempt 21 or higher. The separate mechanism
+   chain starts at attempt 26. Then follow the approved keyless/keyed sequence and paid-run limits.
+   Failure grants no retry.
 
 No workflow, approval, paid provider action, campaign result, or merge is authorized by this
 inventory. The integration branch name is never a candidate identity.
