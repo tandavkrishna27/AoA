@@ -6,6 +6,36 @@
     "IMPORTANT: a runs verdict means the declaration still matches the tree, NOT observed execution. See scripts/lib/execution-census.mjs."
   ],
   "files": {
+    "scripts/lib/__tests__/m1a-controller.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-evidence-disposition.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-final-evidence.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-image-policy.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-protected-workflow-shape.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-start-guard.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
     "scripts/lib/m1a-archive/evidence.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",
