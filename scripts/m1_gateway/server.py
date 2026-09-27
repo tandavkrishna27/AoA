@@ -74,8 +74,10 @@ def serve_connection(conn, peer_uid: int, session_lookup, handler) -> None:
     try:
         output = handler(peer_uid, value)
     except Exception:
-        _send_refusal(conn, 'handler-error', expires)
+        _send_refusal(conn, 'handler-error', deadline())
         return
+    # Handler execution has its own policy; never consume response framing time.
+    expires = deadline()
     try:
         raw = encode(output, MAX_RESPONSE_BYTES)
         validated = decode_response(raw)

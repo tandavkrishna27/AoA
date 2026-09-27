@@ -103,13 +103,30 @@ class ProtocolTests(unittest.TestCase):
                        {'operationId': None}, {'extra': 'secret'}):
             with self.subTest(change=change), self.assertRaises(ProtocolError):
                 decode_response(json.dumps(good | change).encode())
-        for state in ('accepted', 'dispatching', 'observed-failure', 'outcome-unknown'):
+        for state in ('accepted', 'dispatching', 'outcome-unknown'):
             self.assertEqual(decode_response(json.dumps(good | {'state': state, 'exitCode': None}).encode())['state'], state)
+        self.assertEqual(decode_response(json.dumps(good | {'state': 'observed-failure', 'exitCode': 1}).encode())['exitCode'], 1)
         refused = dict(version=1, operationId=None, state='refused', exitCode=None,
                        result={'code': 'invalid-request'})
         self.assertEqual(decode_response(json.dumps(refused).encode()), refused)
         with self.assertRaises(ProtocolError):
             decode_response(json.dumps(refused | {'result': {'code': 'secret user input'}}).encode())
+
+    def test_response_state_exit_invariant(self):
+        base = dict(version=1, operationId='op_1', result={})
+        for state in ('accepted', 'dispatching', 'outcome-unknown', 'observed-success', 'observed-failure'):
+            for code in (None, 0, 1, 255, -1, 256, True, False, 0.0, 1.0, '1'):
+                value = base | dict(state=state, exitCode=code)
+                valid = ((state in ('accepted', 'dispatching', 'outcome-unknown') and code is None)
+                         or (state == 'observed-success' and type(code) is int and code == 0)
+                         or (state == 'observed-failure' and type(code) is int and 1 <= code <= 255))
+                with self.subTest(state=state, code=code):
+                    if valid:
+                        self.assertEqual(decode_response(json.dumps(value).encode()), value)
+                    else:
+                        with self.assertRaises(ProtocolError) as caught:
+                            decode_response(json.dumps(value).encode())
+                        self.assertEqual(caught.exception.code, 'invalid-response')
 
     def test_response_size_and_strict_json(self):
         good = dict(version=1, operationId='op_1', state='observed-success', exitCode=0, result={})

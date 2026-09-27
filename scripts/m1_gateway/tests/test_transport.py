@@ -46,7 +46,142 @@ def response(conn):
     return json.loads(conn.sent[4:])
 
 
+class ClockConnection(MemoryConnection):
+    def __init__(self, content, clock, delays=()):
+        super().__init__(content, fragment=1)
+        self.clock = clock
+        self.delays = iter(delays)
+        self.connections = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    def connect(self, path):
+        self.connections += 1
+
+    def recv(self, size):
+        delay = next(self.delays, 0)
+        if delay > self.timeouts[-1]:
+            self.clock[0] += self.timeouts[-1]
+            raise TimeoutError('private operation timeout')
+        self.clock[0] += delay
+        return super().recv(size)
+
+
 class TransportTests(unittest.TestCase):
+    def test_delayed_handler_has_fresh_response_deadline(self):
+        for outcome in ('success', 'exception', 'invalid'):
+            with self.subTest(outcome=outcome):
+                clock, calls = [0.0], []
+                conn = MemoryConnection(frame(valid_request()))
+                def handler(*args):
+                    calls.append(args)
+                    clock[0] = 12.0
+                    if outcome == 'exception':
+                        raise RuntimeError('private handler text')
+                    if outcome == 'invalid':
+                        return dict(version=1, operationId='op_1', state='observed-failure', exitCode=0, result={})
+                    return dict(version=1, operationId='op_1', state='observed-success', exitCode=0, result={})
+                with patch.object(protocol.time, 'monotonic', side_effect=lambda: clock[0]):
+                    server.serve_connection(conn, 42, lambda _: 'campaign-1', handler)
+                self.assertEqual(len(calls), 1)
+                self.assertTrue(conn.sent, 'delayed handler must still send a bounded response')
+                result = response(conn)
+                self.assertEqual(result['state'], 'observed-success' if outcome == 'success' else 'refused')
+                if outcome != 'success':
+                    self.assertEqual(result['result']['code'], 'handler-error' if outcome == 'exception' else 'invalid-response')
+                self.assertEqual(conn.timeouts[-1], 5.0)
+                self.assertNotIn(b'private', conn.sent)
+
+    def test_client_operation_wait_then_fragment_deadline(self):
+        good = dict(version=1, operationId='op_1', state='observed-success', exitCode=0, result={})
+        clock = [0.0]
+        conn = ClockConnection(frame(good), clock, [12, 1, 1, 1, 1])
+        with patch.object(protocol.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(client.socket, 'socket', return_value=conn), patch.object(client.socket, 'AF_UNIX', 1, create=True):
+            self.assertEqual(client.request('/protected/gateway.sock', valid_request(), timeout_ms=20000), good)
+        self.assertEqual(conn.connections, 1)
+        self.assertEqual(conn.timeouts[2:7], [20.0, 5.0, 4.0, 3.0, 2.0])
+        self.assertEqual(json.loads(conn.sent[4:]), valid_request())
+
+    def test_client_slow_header_and_body_share_five_seconds(self):
+        good = dict(version=1, operationId='op_1', state='observed-success', exitCode=0, result={})
+        for delays, reads in (([12, 2, 2, 2], 3), ([12, 0, 0, 0, 2, 2, 2], 6)):
+            clock = [0.0]
+            conn = ClockConnection(frame(good), clock, delays)
+            with patch.object(protocol.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(client.socket, 'socket', return_value=conn), patch.object(client.socket, 'AF_UNIX', 1, create=True):
+                with self.assertRaises(ProtocolError) as caught:
+                    client.request('/protected/gateway.sock', valid_request(), timeout_ms=20000)
+            self.assertEqual(caught.exception.code, 'transport-error')
+            self.assertEqual(conn.reads, reads)
+            self.assertEqual(clock[0], 17.0)
+            self.assertEqual(conn.connections, 1)
+
+    def test_client_operation_wait_expiry_never_retries(self):
+        clock = [0.0]
+        conn = ClockConnection(b'x', clock, [21])
+        with patch.object(protocol.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(client.socket, 'socket', return_value=conn), patch.object(client.socket, 'AF_UNIX', 1, create=True):
+            with self.assertRaises(ProtocolError) as caught:
+                client.request('/protected/gateway.sock', valid_request(), timeout_ms=20000)
+        self.assertEqual(caught.exception.code, 'transport-error')
+        self.assertEqual(clock[0], 20.0)
+        self.assertEqual(conn.connections, 1)
+        self.assertEqual(json.loads(conn.sent[4:]), valid_request())
+
+    def test_client_wait_configuration_validated_before_socket(self):
+        for timeout in (None, True, False, 0, -1, 1.5, '20000', float('inf'), float('nan'), 2147483648):
+            with self.subTest(timeout=timeout), patch.object(client.socket, 'socket', side_effect=AssertionError('must not connect')):
+                with self.assertRaises(ProtocolError):
+                    client.request('/protected/gateway.sock', valid_request(), timeout_ms=timeout)
+
+    def test_client_library_wait_starts_after_request_send(self):
+        good = dict(version=1, operationId='op_1', state='observed-success', exitCode=0, result={})
+        clock = [0.0]
+        conn = ClockConnection(frame(good), clock, [4])
+        original_send = conn.sendall
+        def send(data):
+            original_send(data)
+            clock[0] = 4.0
+        conn.sendall = send
+        with patch.object(protocol.time, 'monotonic', side_effect=lambda: clock[0]), patch.object(client.socket, 'socket', return_value=conn), patch.object(client.socket, 'AF_UNIX', 1, create=True):
+            self.assertEqual(client.request('/protected/gateway.sock', valid_request()), good)
+        self.assertEqual(clock[0], 8.0)
+        self.assertEqual(conn.timeouts[2], 5.0)
+        self.assertEqual(conn.connections, 1)
+
+    def test_operation_timeout_bounds_and_request_fields(self):
+        good = dict(version=1, operationId='op_1', state='accepted', exitCode=None, result={})
+        for timeout in (1, protocol.MAX_OPERATION_TIMEOUT_MS):
+            clock = [0.0]
+            conn = ClockConnection(frame(good), clock)
+            with patch.object(client.socket, 'socket', return_value=conn), patch.object(client.socket, 'AF_UNIX', 1, create=True):
+                self.assertEqual(client.request('/protected/gateway.sock', valid_request(), timeout_ms=timeout), good)
+            self.assertEqual(conn.timeouts[2], timeout / 1000)
+        for field in ('timeoutMs', 'timeout_ms', 'operationWait'):
+            with patch.object(client.socket, 'socket', side_effect=AssertionError('must not connect')):
+                with self.assertRaises(ProtocolError):
+                    client.request('/protected/gateway.sock', valid_request() | {field: 20000})
+
+    def test_response_invariant_enforced_on_both_transport_sides(self):
+        base = dict(version=1, operationId='op_1', result={})
+        for state, code in (('accepted', 0), ('dispatching', 1), ('outcome-unknown', 255),
+                            ('observed-success', None), ('observed-success', 1),
+                            ('observed-failure', None), ('observed-failure', 0),
+                            ('observed-failure', True)):
+            bad = base | dict(state=state, exitCode=code)
+            with self.subTest(state=state, code=code):
+                conn, calls = self.serve(frame(valid_request()), handler=lambda *_: bad)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(response(conn)['result'], {'code': 'invalid-response'})
+                conn = ClockConnection(frame(bad), [0.0])
+                with patch.object(client.socket, 'socket', return_value=conn), patch.object(client.socket, 'AF_UNIX', 1, create=True):
+                    with self.assertRaises(ProtocolError) as caught:
+                        client.request('/protected/gateway.sock', valid_request())
+                self.assertEqual(caught.exception.code, 'invalid-response')
+                self.assertEqual(conn.connections, 1)
+
     def serve(self, content, uid=42, session='campaign-1', handler=None):
         conn = MemoryConnection(content)
         calls = []

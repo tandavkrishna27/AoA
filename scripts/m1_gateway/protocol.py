@@ -13,6 +13,8 @@ import uuid
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 1048576 + 65536
 IO_TIMEOUT = 5.0
+# Milliseconds fit a signed 32-bit transport timer; this is not execution policy.
+MAX_OPERATION_TIMEOUT_MS = 2147483647
 IDENTIFIER = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}', re.ASCII)
 UUID = re.compile(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}', re.ASCII)
 LIFECYCLE = frozenset(('create', 'up', 'start', 'restart', 'unpause', 'stop', 'remove'))
@@ -141,7 +143,12 @@ def decode_response(raw: bytes) -> dict:
             _require(type(value['result']['code']) is str and value['result']['code'] in REFUSAL_CODES)
         else:
             _require(state in STATES and _identifier(value['operationId']))
-            _require(exit_code is None or (type(exit_code) is int and 0 <= exit_code <= 255))
+            if state in ('accepted', 'dispatching', 'outcome-unknown'):
+                _require(exit_code is None)
+            elif state == 'observed-success':
+                _require(type(exit_code) is int and exit_code == 0)
+            else:
+                _require(type(exit_code) is int and 1 <= exit_code <= 255)
         return value
     except ProtocolError:
         raise ProtocolError('invalid-response') from None
@@ -188,6 +195,26 @@ def _read_exact(conn, count, expires):
 def receive_frame(conn, maximum, expires):
     try:
         length = struct.unpack('!I', _read_exact(conn, 4, expires))[0]
+        _require(0 < length <= maximum, 'invalid-frame')
+        return _read_exact(conn, length, expires)
+    except OSError:
+        raise ProtocolError('transport-error') from None
+
+
+def validate_operation_timeout(timeout_ms):
+    """Validate trusted caller configuration, never a wire request field."""
+    _require(type(timeout_ms) is int and 1 <= timeout_ms <= MAX_OPERATION_TIMEOUT_MS)
+
+
+def receive_response_frame(conn, maximum, timeout_ms):
+    """Bound operation wait to first byte, then all remaining framing to five seconds."""
+    validate_operation_timeout(timeout_ms)
+    try:
+        conn.settimeout(timeout_ms / 1000)
+        first = conn.recv(1)
+        _require(bool(first), 'transport-error')
+        expires = deadline()
+        length = struct.unpack('!I', first + _read_exact(conn, 3, expires))[0]
         _require(0 < length <= maximum, 'invalid-frame')
         return _read_exact(conn, length, expires)
     except OSError:
