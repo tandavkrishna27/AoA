@@ -208,6 +208,7 @@ class Dispatcher:
                  and 0 <= verdict['revocationCheckedAt'] <= now
                  and current < verdict['revocationValidUntil'] <= 9007199254740991)
         _require(current < (p['cleanupExpiresAt'] if cleanup else policy['expiresAt']))
+        return current
 
     @staticmethod
     def _clock():
@@ -275,6 +276,7 @@ class Dispatcher:
                 prior = next((r for r in records if r['operationId'] == request['operationId']), None)
                 if prior is not None:
                     _require(prior['requestHash'] == request_hash)
+                    prior = self.journal.accept(p['session'], request['operationId'], request_hash)
                     if prior['state'] == 'dispatching':
                         prior = self.journal.transition(p['session'], request['operationId'], 'outcome-unknown', {})
                     # Accepted can be replayed as accepted, never silently dispatched.
@@ -286,11 +288,13 @@ class Dispatcher:
                 invocation = self._invocation(request, owned)
                 self._observation(self.inspector(copy.deepcopy(p)))
                 # Clock sampling follows all potentially blocking inspection/lock waits.
-                self._authority(self._clock(), cleanup)
+                admitted_at = self._authority(self._clock(), cleanup)
                 self.journal.accept(p['session'], request['operationId'], request_hash)
                 self.journal.transition(p['session'], request['operationId'], 'dispatching', {})
                 try:
-                    self._authority(self._clock(), cleanup)
+                    now = self._clock()
+                    _require(now >= admitted_at)
+                    self._authority(now, cleanup)
                 except Exception:
                     # No effect entered: this is a known admission failure, not
                     # an uncertain daemon outcome. Persist before replying.
@@ -315,8 +319,9 @@ class Dispatcher:
                     record = self.journal.transition(p['session'], request['operationId'], state, metadata)
                 except Exception:
                     # This is not a durable completion ACK. The prior dispatching
-                    # record and journal failure latch prevent retries; reopening
-                    # the real journal recovers it to durable outcome-unknown.
+                    # record and journal failure latch prevent retries. Reopening
+                    # recovers dispatching to unknown; a replaced terminal record
+                    # must pass accept's durability refresh before any replay ACK.
                     return dict(version=1, operationId=request['operationId'],
                                 state='outcome-unknown', exitCode=None,
                                 result=dict(exitCode=None, cleanupUncertainty=cleanup))
@@ -326,5 +331,5 @@ class Dispatcher:
                 return response
         except Exception:
             # No raw configuration, policy, stdin or daemon error crosses this seam.
-            # A terminal write failure leaves dispatching for durable recovery.
+            # Journal replay failures cannot acknowledge a durable completion.
             return refusal('handler-error')

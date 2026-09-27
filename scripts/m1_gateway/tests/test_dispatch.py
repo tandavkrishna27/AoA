@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import sys
 import tempfile
@@ -218,6 +219,38 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(self.execute(request('restart'))['state'], 'refused')
         self.assertEqual(len(self.calls), 1)
 
+    def test_completed_replay_refresh_failure_cannot_ack_completion(self):
+        self.assertEqual(self.execute()['state'], 'observed-success')
+        def unavailable(*args):
+            raise JournalError()
+        self.journal.accept = unavailable
+        self.assertEqual(self.execute()['state'], 'refused')
+        self.assertEqual(len(self.calls), 1)
+
+    def test_clock_regression_across_journal_persistence_never_enters_runner(self):
+        for first_return_time in (150, 151):
+            with self.subTest(first_return_time=first_return_time):
+                self.journal = MemoryJournal()
+                self.clock = 150
+                original = self.journal.transition
+                def persist(session, id, state, result):
+                    record = original(session, id, state, result)
+                    if state == 'dispatching':
+                        self.clock = first_return_time - 1
+                    return record
+                self.journal.transition = persist
+                def authority(**kwargs):
+                    verdict = self.authority(**kwargs)
+                    verdict['revocationValidUntil'] = 190
+                    if self.journal.records == {}:
+                        self.clock = first_return_time
+                    return verdict
+                result = self.execute(authority_check=authority)
+                self.assertEqual(result['state'], 'observed-failure')
+                self.assertEqual(result['exitCode'], 1)
+                self.assertEqual(self.execute()['state'], 'observed-failure')
+                self.assertEqual(self.calls, [])
+
     def test_cleanup_requires_durable_exact_owned_resources_and_separate_expiry(self):
         self.assertEqual(self.execute(request('remove'))['state'], 'refused')
         # Seed only durable gateway creation observations, never request/profile claims.
@@ -371,6 +404,41 @@ class LinuxDispatchTests(unittest.TestCase):
         self.assertEqual(self.execute(runner=uncertain)['state'], 'outcome-unknown')
         self.assertEqual(self.execute()['state'], 'outcome-unknown')
         self.assertEqual(self.execute(request(id='op2'))['state'], 'refused')
+        self.assertEqual(len(self.calls), 1)
+
+    def test_terminal_directory_fsync_failure_reopen_replay_requires_refresh(self):
+        real_fsync = os.fsync
+        terminal = Path(self.temp.name) / 'session1' / 'op1.json'
+        failed = []
+        def fail_terminal_directory(fd):
+            if stat.S_ISDIR(os.fstat(fd).st_mode) and terminal.exists():
+                if json.loads(terminal.read_bytes())['state'] == 'observed-success':
+                    failed.append(True)
+                    raise OSError('injected directory fsync failure')
+            return real_fsync(fd)
+        with patch('scripts.m1_gateway.journal.os.fsync', side_effect=fail_terminal_directory):
+            result = self.execute()
+        self.assertEqual(result['state'], 'outcome-unknown')
+        self.assertIsNone(result['exitCode'])
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(json.loads(terminal.read_bytes())['state'], 'observed-success')
+
+        self.journal = Journal(self.temp.name)
+        with patch('scripts.m1_gateway.journal.os.fsync', side_effect=fail_terminal_directory):
+            self.assertEqual(self.execute()['state'], 'refused')
+        self.assertEqual(len(failed), 2)
+        self.assertEqual(len(self.calls), 1)
+
+        self.journal = Journal(self.temp.name)
+        refreshed = []
+        def refresh(fd):
+            refreshed.append('directory' if stat.S_ISDIR(os.fstat(fd).st_mode) else 'file')
+            return real_fsync(fd)
+        with patch('scripts.m1_gateway.journal.os.fsync', side_effect=refresh):
+            replay = self.execute()
+        self.assertEqual(refreshed, ['file', 'file', 'directory'])
+        self.assertEqual(replay['state'], 'observed-success')
+        self.assertEqual(replay['exitCode'], 0)
         self.assertEqual(len(self.calls), 1)
 
     def test_scoped_snapshot_does_not_read_outsider_session_record(self):
