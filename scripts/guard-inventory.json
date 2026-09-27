@@ -214,6 +214,11 @@
       "status": "dormant",
       "reason": "One-off E3 PERF-01 handoff verifier. Neither it nor its self-test is in any workflow; retained as the record of how that handoff was verified."
     },
+    "scripts/verify-m1a-archive.mjs": {
+      "status": "ci_logic_only",
+      "reason": "The M1a archive offline unit tests step declares the verifier's closed-command self-test and synthetic real Task 2/3 roundtrip suite. The live verification CLI is idle pending separate operator approval of the evidence set, externally pinned expectations and authority, and read-only role provisioning. This declaration does not claim observed CI execution or a live caller.",
+      "provenTest": "scripts/verify-m1a-archive.test.mjs"
+    },
     "scripts/verify-image-admission.mjs": {
       "status": "dormant",
       "reason": "SUPERSEDED by check-release-admission.mjs (REL-004), which calls the same evaluateAdmission across all five artifact classes. This CLI was never invoked by anything — the orphan that REL-004's terrain map found."
