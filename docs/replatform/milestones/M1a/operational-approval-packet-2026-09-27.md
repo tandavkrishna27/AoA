@@ -165,7 +165,7 @@ latest-version selection. Storage success and verifier success do not decide RET
 
 | Decision | Recommendation | Required before |
 | --- | --- | --- |
-| Owner appointment | TK as accountable Integration/Security and RET decision owner, with independent review; appointment not yet recorded | Prospective owner rulings |
+| Owner appointment | TK appointed accountable Integration/Security and RET decision owner by explicit user confirmation on September27; independent review remains required | Prospective owner rulings |
 | Controller location/protection | Private trusted location, full revision pin, independent human/account review and no routine bypass | Creation/settings changes and deployment |
 | Image authority | Separate signer custody; complete-set signed policy, identity/provenance/scan/expiry/revocation rules | Signing and each image execution |
 | Source-built handoff | Isolated daemon continuity or approved immutable transfer; preserve F3/DEP015/E6F030 semantics | Production driver implementation |
@@ -319,9 +319,12 @@ disk free, perform a read-only capacity inventory and obtain approval for any
 specific cleanup or storage expansion before builds; no blanket pruning.
 
 User's instruction to finish authorizes continued design and preparation, not
-an invented security-owner appointment or independent verifier identity. Named
-owners, signer custody, verifier access and exact final-byte upload authorization
-remain separate decisions. Historical H08/RET01 and aggregate M1a remain FAIL.
+an invented independent verifier identity. TK subsequently explicitly accepted
+the accountable Integration/Security and RET owner appointment on September27
+with "yes you can add me". This is role designation only: no prospective image
+policy, signer custody, verifier access, exact final-byte upload or campaign is
+approved by that appointment. Independent reviewer/verifier/certifier custody
+remains separate. Historical H08/RET01 and aggregate M1a remain FAIL.
 
 ## Same-Server Enforcement Recommendation
 
