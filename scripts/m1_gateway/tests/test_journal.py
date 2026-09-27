@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from scripts.m1_gateway.journal import Journal, JournalError, _validate_record, _transition
+from scripts.m1_gateway.journal import Journal, JournalError, _validate_record, _transition, _FailureLatch
 
 
 HASH = 'a' * 64
@@ -18,6 +18,25 @@ def accepted():
 
 
 class RecordTests(unittest.TestCase):
+    def test_storage_failure_latches_but_validation_refusal_remains_recoverable(self):
+        latch = _FailureLatch()
+        with self.assertRaises(JournalError):
+            with latch.guard():
+                _validate_record(accepted() | {'schema': True})
+        with latch.guard():
+            self.assertEqual(_validate_record(accepted())['state'], 'accepted')
+        with self.assertRaises(JournalError) as caught:
+            with latch.guard():
+                with latch.guard():
+                    raise OSError('private storage details')
+        self.assertEqual(str(caught.exception), 'journal-refused')
+        for _ in range(2):
+            entered = False
+            with self.assertRaises(JournalError):
+                with latch.guard():
+                    entered = True
+            self.assertFalse(entered)
+
     def test_closed_resource_metadata_is_preserved_and_validated(self):
         dispatching = _transition(accepted(), 'dispatching', {})
         metadata = dict(exitCode=0, resourceIDs=['container1', 'container2'],
@@ -227,6 +246,21 @@ class JournalTests(unittest.TestCase):
         with patch('scripts.m1_gateway.journal.os.write', return_value=0):
             with self.assertRaises(JournalError):
                 restarted.accept('session1', 'op2', HASH)
+        with self.assertRaises(JournalError):
+            restarted.lookup('session1', 'op1')
+        with self.assertRaises(JournalError):
+            restarted.recover()
+
+    def test_root_open_failure_requires_reopening(self):
+        self.journal.accept('session1', 'op1', HASH)
+        with patch('scripts.m1_gateway.journal.os.open', side_effect=OSError('private storage details')):
+            with self.assertRaises(JournalError):
+                self.journal.lookup('session1', 'op1')
+        with self.assertRaises(JournalError):
+            self.journal.lookup('session1', 'op1')
+        with self.assertRaises(JournalError):
+            self.journal.recover()
+        self.assertEqual(Journal(str(self.root)).lookup('session1', 'op1')['state'], 'accepted')
 
     def test_record_is_bounded_and_duplicate_keys_refused(self):
         self.journal.accept('session1', 'op1', HASH)

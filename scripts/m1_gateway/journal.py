@@ -40,6 +40,20 @@ def _require(condition):
         raise JournalError()
 
 
+class _FailureLatch:
+    def __init__(self):
+        self.failed = False
+
+    @contextmanager
+    def guard(self):
+        _require(not self.failed)
+        try:
+            yield
+        except OSError:
+            self.failed = True
+            raise JournalError() from None
+
+
 def _identifier(value):
     _require(type(value) is str and IDENTIFIER.fullmatch(value) is not None)
 
@@ -126,7 +140,7 @@ class Journal:
         self._root_identity = None
         self._mutex = threading.RLock()
         self._held = {}
-        self._failed = False
+        self._failures = _FailureLatch()
         with self._root_fd() as fd:
             self._root_identity = _identity(os.fstat(fd))
         # Startup cannot leave interrupted dispatches eligible for another effect.
@@ -134,27 +148,25 @@ class Journal:
 
     @contextmanager
     def _root_fd(self):
-        fd = None
-        try:
-            fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            _directory(fd)
-            for part in self.root.split('/')[1:]:
-                child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
-                os.close(fd)
-                fd = child
+        with self._failures.guard():
+            fd = None
+            try:
+                fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
                 _directory(fd)
-            _directory(fd, private=True)
-            if self._root_identity is not None:
-                _require(_identity(os.fstat(fd)) == self._root_identity)
-        except (OSError, ValueError, TypeError):
-            if fd is not None:
-                os.close(fd)
-            raise JournalError() from None
-        try:
-            yield fd
-        finally:
-            if fd is not None:
-                os.close(fd)
+                for part in self.root.split('/')[1:]:
+                    child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+                    os.close(fd)
+                    fd = child
+                    _directory(fd)
+                _directory(fd, private=True)
+                if self._root_identity is not None:
+                    _require(_identity(os.fstat(fd)) == self._root_identity)
+                yield fd
+            except (ValueError, TypeError):
+                raise JournalError() from None
+            finally:
+                if fd is not None:
+                    os.close(fd)
 
     def _open_file(self, directory, name, flags=os.O_RDONLY):
         fd = os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
@@ -184,7 +196,8 @@ class Journal:
         offset = 0
         while offset < len(raw):
             count = os.write(fd, raw[offset:])
-            _require(count > 0)
+            if count <= 0:
+                raise OSError('journal-storage-failure')
             offset += count
         os.fsync(fd)
 
@@ -217,8 +230,7 @@ class Journal:
         Storage failure poisons this instance; reopen/recovery is required.
         """
         _identifier(session)
-        with self._mutex:
-            _require(not self._failed)
+        with self._mutex, self._failures.guard():
             directory = lock = None
             try:
                 with self._root_fd() as root:
@@ -257,9 +269,6 @@ class Journal:
                             yield directory
                         finally:
                             del self._held[session]
-            except OSError:
-                self._failed = True
-                raise JournalError() from None
             except (ValueError, TypeError, UnicodeError, RecursionError):
                 raise JournalError() from None
             finally:
@@ -318,8 +327,7 @@ class Journal:
 
     def recover(self):
         records = []
-        with self._mutex:
-            _require(not self._failed)
+        with self._mutex, self._failures.guard():
             with self._root_fd() as root:
                 sessions = sorted(os.listdir(root))
             for session in sessions:
