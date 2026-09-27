@@ -470,3 +470,191 @@ git diff --check exited 0; git diff --name-only HEAD and git diff --numstat HEAD
 The implementation is a reviewable draft, not Task 1 completion. Nine tests require a provably safe scratch path and currently stop at privacy checking. Production capability/environment guards are exercised only with a stubbed executable boundary, never live AWS. The available tests do not yet prove POSIX behavior, every loader/environment variant, or concurrency against hostile local directory replacement. The Windows root DACL admits SYSTEM/Administrators as trusted OS principals; parent review should confirm that trust policy.
 
 Independent review remains pending with the parent. Resolve the privacy context first, rerun the entire focused suite, review the final diff, then commit only the three authorized task files using the already granted local-commit authorization. Do not stage QA or other tracked files.
+
+## Fix Round 1: Latest Authoritative Handoff
+
+Status: REVIEW_FIXES_IMPLEMENTED, pending controller scoped rereview. Base: 2df404bc8. This appended section supersedes pre-review status and findings above; prior history is unchanged.
+
+Read task brief, shared contracts, ledger, report, and affected source/tests. Applied receiving-code-review with the already active TDD and verification skills. All three findings were confirmed against the base implementation before fixes. No architectural ambiguity was resolved by weakening a gate: the controller explicitly pins 128 MiB, and get now performs an additional version-pinned HEAD from the existing approved operation set before download. This extra HEAD was announced before implementing it and is reflected in command-sequence tests.
+
+### Important 1: Archive Ceiling and Bounded Download Reads
+
+Both upload input and HEAD/GET ContentLength must be positive and at most 134217728 bytes (128 MiB); safe-integer metadata alone is no longer sufficient. Oversized upload fails before hashing/copying to scratch or invoking AWS. get performs a pinned HEAD after privacy checks and before GET, rejects oversized metadata, and requires GET size/checksum to match HEAD.
+
+After download, actual path/held-file identity and file size are checked before allocating the result buffer. The descriptor is then read into a fixed expected-size buffer in at most 65536-byte chunks. Size is checked before allocation and around every chunk, followed by an extra EOF-byte probe, another size/identity/privacy check, and exact length/SHA-256 verification. No unbounded readFile or stream accumulation remains in the transport.
+
+RED regressions covered oversized metadata acceptance, actual oversized sparse file with readFile forbidden, bounded reads plus growth between chunks, and valid chunked payload integrity. Additional GREEN coverage confirms equal-length corruption is rejected and incomplete/failed downloads still clean only generated files. Preflight bounds expected object size, not an adversarial external CLI's disk writes while its process is running; allocation stays bounded and oversized/mismatched files are refused afterward.
+
+### Important 2: Windows Directory Inheritance and Actual Generated File Privacy
+
+Directory and file inspections are distinct. Directory rules now include and validate numeric inheritanceFlags and propagationFlags. The owner must have full current access with ObjectInherit + ContainerInherit (3) and no propagation restrictions (0); a noninheritable owner rule is refused. Root DACL remains protected.
+
+Immediately after exclusive creation of the generated EMPTY file, and before any source bytes are written or download AWS call, its actual DACL is inspected and validated. Owner and allowed principals remain current SID / SYSTEM / Administrators; effective full owner access is required and InheritOnly rules cannot prove it. An inherited file DACL may be unprotected, provided its actual rules satisfy the privacy checks. The file is also rechecked after download and after bounded reads. POSIX generated-file ownership/mode checks remain real (0600 creation plus owner/no group-or-other access validation), and path/link/file identity checks are real on both platforms.
+
+Library-only seam is revised for parent ledger/review:
+inspectWindowsPrivacy(path, {kind: 'directory' | 'file'})
+returns {sid,owner,protected,rules:[{sid,allow,rights,inheritanceFlags,propagationFlags}],syncRoots}.
+
+The production factory signature is unchanged, still rejects caller capabilities including inherited/nonenumerable fields, and never forwards this seam. Production reads real directory/file ACLs and real sync inventory; mocking either inspection is confined to library unit tests. Tests separately reject noninheritable directory access and a generated-file Everyone DACL, prove the file is empty at the failing privacy check, assert no AWS invocations, and accept a valid inherited private file DACL. Existing real Git/alias/junction tests remain intact.
+
+Selected registry path: retain the existing fail-closed production implementation; no .NET replacement was attempted in this fix. Parent's corrected diagnosis confirms root enumeration is readable with .NET but a child provider is inaccessible. No provider is silently skipped or assumed safe. Windows real operation remains unsupported here until complete relevant inventory can be read. Mocked unit success is not proof of host privacy. POSIX still requires actual CI verification.
+
+### Minor 3: Read Reference Snapshots
+
+Validated key/version primitives are captured once before awaits. HEAD argv and response comparisons use the captured reference. GET preflight HEAD, GET argv, and both metadata comparisons use the same captured reference. Retention uses the same snapshot helper. Regression mutates the caller reference during HEAD and immediately while GET's scratch checks are pending; original pinned key/version and successful original-version integrity are preserved.
+
+### TDD Evidence
+
+RED command, before implementation:
+node --test --test-name-pattern=round1_ scripts/lib/m1a-archive/s3-store.test.mjs
+
+Exit 1. All five new regressions failed against the reviewed implementation. Full output (blank-line trailing spaces normalized):
+
+```text
+✖ round1_rejects_archive_above_128mib_before_download_or_upload (3.4259ms)
+✖ round1_checks_actual_download_size_without_unbounded_readfile (6.3788ms)
+✖ round1_bounded_reads_detect_growth_and_preserve_exact_checksum (3.9722ms)
+✖ round1_directory_inheritance_and_generated_file_acl_checked_before_raw_bytes_or_aws (6.3239ms)
+✖ round1_read_reference_is_snapshotted_before_async_calls (0.859ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.5251
+
+✖ failing tests:
+
+test at scripts\lib\m1a-archive\s3-store.test.mjs:359:1
+✖ round1_rejects_archive_above_128mib_before_download_or_upload (3.4259ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.test.mjs:363:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { code: 'INVALID_RESPONSE' },
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts\lib\m1a-archive\s3-store.test.mjs:374:1
+✖ round1_checks_actual_download_size_without_unbounded_readfile (6.3788ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    Comparison {
+  +   code: 'SCRATCH_IO_FAILED'
+  -   code: 'INVALID_RESPONSE'
+    }
+
+      at async TestContext.<anonymous> (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.test.mjs:384:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: SCRATCH_IO_FAILED
+        at fail (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:17:43)
+        at scratch (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:191:7)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.test.mjs:384:3)
+        at async Test.run (node:internal/test_runner/test:1125:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:787:7),
+    expected: { code: 'INVALID_RESPONSE' },
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts\lib\m1a-archive\s3-store.test.mjs:389:1
+✖ round1_bounded_reads_detect_growth_and_preserve_exact_checksum (3.9722ms)
+  Error: SCRATCH_IO_FAILED
+      at fail (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:17:43)
+      at scratch (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:191:7)
+      at async TestContext.<anonymous> (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.test.mjs:407:21)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    code: 'SCRATCH_IO_FAILED'
+  }
+
+test at scripts\lib\m1a-archive\s3-store.test.mjs:414:1
+✖ round1_directory_inheritance_and_generated_file_acl_checked_before_raw_bytes_or_aws (6.3239ms)
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async TestContext.<anonymous> (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.test.mjs:419:3)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: { code: 'SCRATCH_NOT_PRIVATE' },
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts\lib\m1a-archive\s3-store.test.mjs:436:1
+✖ round1_read_reference_is_snapshotted_before_async_calls (0.859ms)
+  Error: INVALID_RESPONSE
+      at fail (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:17:43)
+      at readMetadata (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:178:143)
+      at Object.head (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.mjs:218:14)
+      at async TestContext.<anonymous> (file:///C:/Users/TK/.codex/worktrees/m1a-final-handoff/AoA-2.5/scripts/lib/m1a-archive/s3-store.test.mjs:443:17)
+      at async Test.run (node:internal/test_runner/test:1125:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    code: 'INVALID_RESPONSE'
+  }
+```
+
+After implementation, the entire suite first passed 25/25. Self-review added valid-inherited-file/equal-length-corruption coverage and strengthened immediate reference-mutation coverage.
+
+Final GREEN command:
+node --test scripts/lib/m1a-archive/s3-store.test.mjs
+
+Exit 0. Full output:
+
+```text
+✔ pins_account_region_bucket_prefix (8.3299ms)
+✔ rejects_transport_overrides (0.7793ms)
+✔ only_approved_operations (8.4355ms)
+✔ inherits_default_retention (4.0456ms)
+✔ conditional_checksum_upload (5.2545ms)
+✔ read_only_has_no_put (3.1168ms)
+✔ uncertain_upload_is_not_retried (20.2501ms)
+✔ rejects_invalid_refs_checksums_and_responses (2.6587ms)
+✔ refuses_git_sync_aliases_and_nonprivate_scratch_before_writes (4.8367ms)
+✔ library_privacy_facts_are_validated_and_unavailable_inventory_refuses_without_aws (16.2024ms)
+✔ production_rejects_all_caller_capabilities (0.187ms)
+✔ production_uses_real_privacy_boundary_and_refuses_unavailable_inventory_without_aws (211.7808ms)
+✔ incomplete_downloads_are_removed_without_removing_source_files (4.4443ms)
+✔ key_digest_must_match_uploaded_bytes (0.5668ms)
+✔ upload_snapshots_validated_inputs_before_async_scratch_checks (3.9909ms)
+✔ production_runner_is_private_bounded_and_capability_checked (43.9049ms)
+✔ production_rejects_unsafe_environment_without_executing (43.7829ms)
+✔ configuration_and_identity_mismatches_fail_closed (2.9023ms)
+✔ successful_but_incomplete_download_fails_integrity_and_cleans_up (3.0257ms)
+✔ production_missing_cli_or_capabilities_never_reaches_network_operation (168.9765ms)
+✔ round1_rejects_archive_above_128mib_before_download_or_upload (72.0023ms)
+✔ round1_checks_actual_download_size_without_unbounded_readfile (4.0398ms)
+✔ round1_bounded_reads_detect_growth_and_preserve_exact_checksum (7.2236ms)
+✔ round1_directory_inheritance_and_generated_file_acl_checked_before_raw_bytes_or_aws (6.2627ms)
+✔ round1_read_reference_is_snapshotted_before_async_calls (3.4645ms)
+✔ round1_valid_inherited_file_acl_and_equal_length_corruption (10.7ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 718.8411
+```
+
+node --check scripts/lib/m1a-archive/s3-store.mjs and node --check scripts/lib/m1a-archive/s3-store.test.mjs exit 0 with no output. git diff --check is clean. Full workspace typecheck/tests/build remain the controller's responsibility; this worker does not claim they were rerun. Earlier baseline checks reported by parent are not verification of the new fixes.
+
+### Scope and Review Limits
+
+Only scripts/lib/m1a-archive/s3-store.mjs, scripts/lib/m1a-archive/s3-store.test.mjs, and this appended task-1-report.md changed. Same isolated worktree/branch; all existing QA/candidate/history records untouched. No real AWS execution, uploads, credential extraction, OS permission changes, provisioning, dispatch, push, Hubble, or subagent/reviewer was used. Tests use synthetic temporary files, injected OS facts, stubbed AWS boundaries, and descriptor read interception to deterministically expose growth.
+
+The controller authorized this local fix commit after focused verification. Its short hash is reported in the task handoff. Scoped independent rereview remains pending; no certification/compliance or production-platform readiness claim is made. Concurrent hostile privileged local ACL/path mutation and unregistered synchronization software remain platform threat-model limits for reviewer assessment.

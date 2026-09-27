@@ -11,6 +11,8 @@ const REGION = 'us-east-1';
 const BUCKET = 'aoa-platform-evidence-010438509726-us-east-1-an';
 const UPLOADER = `arn:aws:iam::${ACCOUNT}:user/aoa-s3-artifacts`;
 const LIMIT = 1024 * 1024;
+const MAX_ARCHIVE_BYTES = 128 * 1024 * 1024;
+const READ_CHUNK_BYTES = 64 * 1024;
 const systemVariables = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP', 'LANG', 'LC_ALL']);
 const credentialVariables = new Set(['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN']);
 
@@ -90,7 +92,8 @@ async function readWindowsPrivacy(path) {
     '$s=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value;' +
     '$a=Get-Acl -LiteralPath $p;$o=$a.GetOwner([System.Security.Principal.SecurityIdentifier]).Value;' +
     '$r=@($a.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])|ForEach-Object {' +
-    '@{sid=$_.IdentityReference.Value;allow=($_.AccessControlType -eq "Allow");rights=[int]$_.FileSystemRights}});' +
+    '@{sid=$_.IdentityReference.Value;allow=($_.AccessControlType -eq "Allow");rights=[int]$_.FileSystemRights;' +
+    'inheritanceFlags=[int]$_.InheritanceFlags;propagationFlags=[int]$_.PropagationFlags}});' +
     '$roots=@();$reg="Registry::HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\SyncRootManager";' +
     'if(Test-Path -LiteralPath $reg){foreach($provider in Get-ChildItem -LiteralPath $reg){' +
     '$u=Join-Path $provider.PSPath "UserSyncRoots";if(Test-Path -LiteralPath $u){' +
@@ -104,16 +107,52 @@ async function readWindowsPrivacy(path) {
   } catch { fail('SCRATCH_PRIVACY_UNAVAILABLE'); }
 }
 
-function validateWindowsPrivacy(path, acl) {
+function validateWindowsPrivacy(path, acl, kind) {
   if (!acl || !Array.isArray(acl.syncRoots) || acl.syncRoots.some(root => typeof root !== 'string' || !isAbsolute(root))) fail('SCRATCH_PRIVACY_UNAVAILABLE');
   if (acl.syncRoots.some(root => {
     const sync = resolve(root).toLowerCase();
     return path.toLowerCase() === sync || path.toLowerCase().startsWith(sync.endsWith(sep) ? sync : sync + sep);
   })) fail('UNSAFE_SCRATCH');
-  if (acl.protected !== true || typeof acl.sid !== 'string' || !/^S-1-[0-9-]+$/.test(acl.sid) || acl.owner !== acl.sid || !Array.isArray(acl.rules) || !acl.rules.length ||
-    acl.rules.some(r => !r || typeof r.sid !== 'string' || typeof r.allow !== 'boolean' || !Number.isSafeInteger(r.rights)) ||
+  if ((kind === 'directory' && acl.protected !== true) || typeof acl.sid !== 'string' || !/^S-1-[0-9-]+$/.test(acl.sid) || acl.owner !== acl.sid || !Array.isArray(acl.rules) || !acl.rules.length ||
+    acl.rules.some(r => !r || typeof r.sid !== 'string' || typeof r.allow !== 'boolean' || !Number.isSafeInteger(r.rights) ||
+      !Number.isInteger(r.inheritanceFlags) || r.inheritanceFlags < 0 || r.inheritanceFlags > 3 ||
+      !Number.isInteger(r.propagationFlags) || r.propagationFlags < 0 || r.propagationFlags > 3) ||
     acl.rules.some(r => r.allow && ![acl.sid, 'S-1-5-18', 'S-1-5-32-544'].includes(r.sid)) ||
-    !acl.rules.some(r => r.allow && r.sid === acl.sid && (r.rights & 2032127) === 2032127)) fail('SCRATCH_NOT_PRIVATE');
+    !acl.rules.some(r => r.allow && r.sid === acl.sid && (r.rights & 2032127) === 2032127 &&
+      (kind === 'directory' ? r.inheritanceFlags === 3 && r.propagationFlags === 0 : (r.propagationFlags & 2) === 0))) fail('SCRATCH_NOT_PRIVATE');
+}
+
+async function checkWindowsPrivacy(path, kind, inspector) {
+  let facts;
+  try { facts = await (inspector ?? readWindowsPrivacy)(path, { kind }); }
+  catch { fail('SCRATCH_PRIVACY_UNAVAILABLE'); }
+  validateWindowsPrivacy(path, facts, kind);
+}
+
+async function privateFile(path, handle, inspector) {
+  const actual = await lstat(path);
+  const held = await handle.stat();
+  if (!actual.isFile() || actual.isSymbolicLink() || actual.ino !== held.ino || actual.dev !== held.dev) fail('UNSAFE_SCRATCH');
+  if (process.platform !== 'win32' && ((held.mode & 0o077) !== 0 || held.uid !== process.getuid())) fail('SCRATCH_NOT_PRIVATE');
+  if (process.platform === 'win32' || inspector) await checkWindowsPrivacy(path, 'file', inspector);
+  return held;
+}
+
+async function boundedRead(handle, expectedSize) {
+  // Size is checked before allocation and across reads; no readFile/stream accumulation.
+  if ((await handle.stat()).size !== expectedSize) fail('INVALID_RESPONSE');
+  const bytes = Buffer.alloc(expectedSize);
+  let offset = 0;
+  while (offset < expectedSize) {
+    if ((await handle.stat()).size !== expectedSize) fail('INVALID_RESPONSE');
+    const { bytesRead } = await handle.read(bytes, offset, Math.min(READ_CHUNK_BYTES, expectedSize - offset), offset);
+    if (bytesRead === 0) fail('INVALID_RESPONSE');
+    offset += bytesRead;
+    if ((await handle.stat()).size !== expectedSize) fail('INVALID_RESPONSE');
+  }
+  const end = await handle.read(Buffer.alloc(1), 0, 1, expectedSize);
+  if (end.bytesRead !== 0 || (await handle.stat()).size !== expectedSize) fail('INVALID_RESPONSE');
+  return bytes;
 }
 
 async function privateDirectory(input, inspectWindowsPrivacy) {
@@ -136,10 +175,7 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
     const stat = await lstat(path);
     if (process.platform !== 'win32' && ((stat.mode & 0o077) !== 0 || stat.uid !== process.getuid())) fail('SCRATCH_NOT_PRIVATE');
     if (process.platform === 'win32' || inspectWindowsPrivacy) {
-      let facts;
-      try { facts = await (inspectWindowsPrivacy ?? readWindowsPrivacy)(path); }
-      catch { fail('SCRATCH_PRIVACY_UNAVAILABLE'); }
-      validateWindowsPrivacy(path, facts);
+      await checkWindowsPrivacy(path, 'directory', inspectWindowsPrivacy);
     }
     return path;
   } catch (e) {
@@ -153,7 +189,8 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
 /**
  * Fixed-destination Store. checksumSha256 is canonical SHA-256 base64 throughout.
  * runAws and inspectWindowsPrivacy are library-test boundaries only.
- * inspectWindowsPrivacy(path) returns {sid,owner,protected,rules,syncRoots};
+ * inspectWindowsPrivacy(path,{kind:'directory'|'file'}) returns ACL/inventory facts;
+ * rules include inheritanceFlags and propagationFlags (Windows enum integers).
  * facts still pass the real validator and never bypass filesystem/path checks.
  */
 export function createS3ArchiveStore(options) {
@@ -169,13 +206,16 @@ export function createS3ArchiveStore(options) {
     return json(result);
   }
   function reference(ref) {
-    closed(ref, ['key', 'versionId']); keyValid(ref.key); version(ref.versionId);
-    return ['--key', ref.key, '--version-id', ref.versionId];
+    closed(ref, ['key', 'versionId']);
+    const { key, versionId } = ref;
+    keyValid(key); version(versionId);
+    return { key, versionId };
   }
+  const referenceArgs = ref => ['--key', ref.key, '--version-id', ref.versionId];
   function readMetadata(data, ref) {
     let v;
     try { v = version(data.VersionId); } catch { fail('INVALID_RESPONSE'); }
-    if (v !== ref.versionId || !Number.isSafeInteger(data.ContentLength) || data.ContentLength < 0 || data.ServerSideEncryption !== 'AES256') fail('INVALID_RESPONSE');
+    if (v !== ref.versionId || !Number.isSafeInteger(data.ContentLength) || data.ContentLength <= 0 || data.ContentLength > MAX_ARCHIVE_BYTES || data.ServerSideEncryption !== 'AES256') fail('INVALID_RESPONSE');
     return { versionId: v, size: data.ContentLength, checksumSha256: checksum(data.ChecksumSHA256),
       encryption: data.ServerSideEncryption, lastModified: timestamp(data.LastModified) };
   }
@@ -185,9 +225,10 @@ export function createS3ArchiveStore(options) {
     let handle;
     try {
       handle = await open(path, constants.O_CREAT | constants.O_EXCL | constants.O_RDWR | (constants.O_NOFOLLOW ?? 0), 0o600);
+      await privateFile(path, handle, inspectWindowsPrivacy);
       return await action(path, handle);
     } catch (e) {
-      if (['INVALID_INPUT', 'INVALID_RESPONSE', 'AWS_FAILED'].includes(e.code)) throw e;
+      if (['INVALID_INPUT', 'INVALID_RESPONSE', 'AWS_FAILED', 'UNSAFE_SCRATCH', 'SCRATCH_NOT_PRIVATE', 'SCRATCH_PRIVACY_UNAVAILABLE'].includes(e.code)) throw e;
       fail('SCRATCH_IO_FAILED');
     } finally {
       if (handle) {
@@ -214,30 +255,35 @@ export function createS3ArchiveStore(options) {
       return { versioning, encryption, objectLock };
     },
     async head(ref) {
-      const args = reference(ref);
-      return readMetadata(await call('head-object', [...args, '--checksum-mode', 'ENABLED']), ref);
+      const pinned = reference(ref);
+      return readMetadata(await call('head-object', [...referenceArgs(pinned), '--checksum-mode', 'ENABLED']), pinned);
     },
     async get(ref) {
-      const args = reference(ref);
+      const pinned = reference(ref);
       return scratch(async (path, handle) => {
         const before = await handle.stat();
-        const data = readMetadata(await call('get-object', [...args, '--checksum-mode', 'ENABLED', path]), ref);
-        const after = await lstat(path);
-        if (!after.isFile() || after.isSymbolicLink() || after.ino !== before.ino || after.dev !== before.dev) fail('INVALID_RESPONSE');
-        const bytes = await handle.readFile();
+        const args = referenceArgs(pinned);
+        const expected = readMetadata(await call('head-object', [...args, '--checksum-mode', 'ENABLED']), pinned);
+        const data = readMetadata(await call('get-object', [...args, '--checksum-mode', 'ENABLED', path]), pinned);
+        if (data.size !== expected.size || data.checksumSha256 !== expected.checksumSha256) fail('INVALID_RESPONSE');
+        const after = await privateFile(path, handle, inspectWindowsPrivacy);
+        if (after.ino !== before.ino || after.dev !== before.dev || after.size !== data.size) fail('INVALID_RESPONSE');
+        const bytes = await boundedRead(handle, data.size);
+        const final = await privateFile(path, handle, inspectWindowsPrivacy);
+        if (final.ino !== before.ino || final.dev !== before.dev || final.size !== data.size) fail('INVALID_RESPONSE');
         if (bytes.length !== data.size || createHash('sha256').update(bytes).digest('base64') !== data.checksumSha256) fail('INVALID_RESPONSE');
         return { versionId: data.versionId, bytes, checksumSha256: data.checksumSha256, encryption: data.encryption };
       });
     },
     async retention(ref) {
-      const data = (await call('get-object-retention', reference(ref))).Retention;
+      const data = (await call('get-object-retention', referenceArgs(reference(ref)))).Retention;
       if (!data || !['COMPLIANCE', 'GOVERNANCE'].includes(data.Mode)) fail('INVALID_RESPONSE');
       return { mode: data.Mode, retainUntil: timestamp(data.RetainUntilDate) };
     },
   };
   if (mode === 'upload') store.put = async (input) => {
     closed(input, ['key', 'bytes', 'checksumSha256']); keyValid(input.key);
-    if (!Buffer.isBuffer(input.bytes) || !input.bytes.length || createHash('sha256').update(input.bytes).digest('base64') !== input.checksumSha256) fail('INVALID_INPUT');
+    if (!Buffer.isBuffer(input.bytes) || !input.bytes.length || input.bytes.length > MAX_ARCHIVE_BYTES || createHash('sha256').update(input.bytes).digest('base64') !== input.checksumSha256) fail('INVALID_INPUT');
     const bytes = Buffer.from(input.bytes);
     const { key, checksumSha256 } = input;
     if (!key.endsWith(`/${createHash('sha256').update(bytes).digest('hex')}.json`)) fail('INVALID_INPUT');

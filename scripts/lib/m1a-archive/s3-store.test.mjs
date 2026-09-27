@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, chmod, readdir, readFile, writeFile, rm, symlink, mkdir } from 'node:fs/promises';
+import { mkdtemp, chmod, readdir, readFile, writeFile, rm, symlink, mkdir, open } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -16,7 +16,7 @@ const ref = { key, versionId: 'version-1' };
 const metadata = { VersionId: 'version-1', ChecksumSHA256: checksum, ContentLength: bytes.length,
   ServerSideEncryption: 'AES256', LastModified: '2026-09-27T00:00:00Z' };
 const privateWindowsFacts = () => ({ sid: 'S-1-5-21-123', owner: 'S-1-5-21-123', protected: true,
-  rules: [{ sid: 'S-1-5-21-123', allow: true, rights: 2032127 }], syncRoots: [] });
+  rules: [{ sid: 'S-1-5-21-123', allow: true, rights: 2032127, inheritanceFlags: 3, propagationFlags: 0 }], syncRoots: [] });
 
 async function fixture(t, overrides = {}) {
   const root = await mkdtemp(join(tmpdir(), 'm1a-synthetic-'));
@@ -67,7 +67,7 @@ test('only_approved_operations', async (t) => {
   await store.identify(); await store.inspectConfiguration(); await store.put({ key, bytes, checksumSha256: checksum });
   await store.head(ref); await store.get(ref); await store.retention(ref);
   assert.deepEqual(calls.map(a => a[1]), ['get-caller-identity', 'get-bucket-versioning', 'get-bucket-encryption',
-    'get-object-lock-configuration', 'put-object', 'head-object', 'get-object', 'get-object-retention']);
+    'get-object-lock-configuration', 'put-object', 'head-object', 'head-object', 'get-object', 'get-object-retention']);
   assert.equal(store.delete, undefined);
   for (const args of calls.filter(a => ['head-object', 'get-object'].includes(a[1]))) {
     assert.equal(args[args.indexOf('--version-id') + 1], 'version-1');
@@ -161,8 +161,8 @@ test('library_privacy_facts_are_validated_and_unavailable_inventory_refuses_with
     [{ ...privateWindowsFacts(), syncRoots: [join(root, '..')] }, 'UNSAFE_SCRATCH'],
     [{ ...privateWindowsFacts(), protected: false }, 'SCRATCH_NOT_PRIVATE'],
     [{ ...privateWindowsFacts(), owner: 'S-1-5-21-456' }, 'SCRATCH_NOT_PRIVATE'],
-    [{ ...privateWindowsFacts(), rules: [{ sid: 'S-1-1-0', allow: true, rights: 2032127 }] }, 'SCRATCH_NOT_PRIVATE'],
-    [{ ...privateWindowsFacts(), rules: [{ sid: 'S-1-5-21-123', allow: true, rights: 1 }] }, 'SCRATCH_NOT_PRIVATE'],
+    [{ ...privateWindowsFacts(), rules: [{ sid: 'S-1-1-0', allow: true, rights: 2032127, inheritanceFlags: 3, propagationFlags: 0 }] }, 'SCRATCH_NOT_PRIVATE'],
+    [{ ...privateWindowsFacts(), rules: [{ sid: 'S-1-5-21-123', allow: true, rights: 1, inheritanceFlags: 3, propagationFlags: 0 }] }, 'SCRATCH_NOT_PRIVATE'],
     [{ ...privateWindowsFacts(), syncRoots: null }, 'SCRATCH_PRIVACY_UNAVAILABLE'],
   ]) {
     const store = createS3ArchiveStore({ mode: 'upload', privateScratch: root, runAws, inspectWindowsPrivacy: async () => facts });
@@ -354,4 +354,123 @@ test('production_missing_cli_or_capabilities_never_reaches_network_operation', (
     assert.equal(result.calls.some(args => args.includes('get-caller-identity')), false);
     assert.equal(result.calls.length, ['missing', 'v1'].includes(scenario) ? 1 : 2);
   }
+});
+
+test('round1_rejects_archive_above_128mib_before_download_or_upload', async (t) => {
+  const { store, calls, root } = await fixture(t, { 'head-object': async () => ({
+    code: 0, stdout: JSON.stringify({ ...metadata, ContentLength: 128 * 1024 * 1024 + 1 }), stderr: ''
+  }) });
+  await assert.rejects(store.head(ref), { code: 'INVALID_RESPONSE' });
+  await assert.rejects(store.get(ref), { code: 'INVALID_RESPONSE' });
+  assert.equal(calls.some(a => a[1] === 'get-object'), false);
+  const oversized = Buffer.alloc(128 * 1024 * 1024 + 1);
+  const digest = createHash('sha256').update(oversized).digest();
+  await assert.rejects(store.put({ key: key.replace(/[a-f0-9]{64}\.json$/, digest.toString('hex') + '.json'),
+    bytes: oversized, checksumSha256: digest.toString('base64') }), { code: 'INVALID_INPUT' });
+  assert.equal(calls.some(a => a[1] === 'put-object'), false);
+  assert.deepEqual(await readdir(root), []);
+});
+
+test('round1_checks_actual_download_size_without_unbounded_readfile', async (t) => {
+  const { store, root } = await fixture(t, { 'get-object': async args => {
+    const file = await open(args.at(-1), 'r+');
+    try { await file.truncate(128 * 1024 * 1024 + 1); } finally { await file.close(); }
+    return { code: 0, stdout: JSON.stringify(metadata), stderr: '' };
+  } });
+  const probe = await open(join(root, 'probe'), 'wx');
+  const prototype = Object.getPrototypeOf(probe); await probe.close();
+  let unboundedReads = 0;
+  t.mock.method(prototype, 'readFile', async () => { unboundedReads++; throw Error('unbounded read forbidden'); });
+  await assert.rejects(store.get(ref), { code: 'INVALID_RESPONSE' });
+  assert.equal(unboundedReads, 0);
+  assert.deepEqual(await readdir(root), ['probe']);
+});
+
+test('round1_bounded_reads_detect_growth_and_preserve_exact_checksum', async (t) => {
+  const payload = Buffer.alloc(128 * 1024, 65);
+  const facts = { ...metadata, ContentLength: payload.length, ChecksumSHA256: createHash('sha256').update(payload).digest('base64') };
+  const { store, root } = await fixture(t, {
+    'head-object': async () => ({ code: 0, stdout: JSON.stringify(facts), stderr: '' }),
+    'get-object': async args => { await writeFile(args.at(-1), payload); return { code: 0, stdout: JSON.stringify(facts), stderr: '' }; },
+  });
+  const probe = await open(join(root, 'probe'), 'wx');
+  const prototype = Object.getPrototypeOf(probe); await probe.close();
+  const original = prototype.read;
+  let grow = false; let reads = 0;
+  t.mock.method(prototype, 'readFile', async () => { throw Error('unbounded read forbidden'); });
+  t.mock.method(prototype, 'read', async function(buffer, offset, length, position) {
+    assert.ok(length <= 64 * 1024); reads++;
+    const result = await original.call(this, buffer, offset, length, position);
+    if (grow && reads === 1) await this.truncate(payload.length + 1);
+    return result;
+  });
+  assert.deepEqual((await store.get(ref)).bytes, payload);
+  assert.ok(reads >= 2);
+  grow = true; reads = 0;
+  await assert.rejects(store.get(ref), { code: 'INVALID_RESPONSE' });
+  assert.deepEqual(await readdir(root), ['probe']);
+});
+
+test('round1_directory_inheritance_and_generated_file_acl_checked_before_raw_bytes_or_aws', async (t) => {
+  const { root, runAws, calls } = await fixture(t);
+  const noInheritance = { ...privateWindowsFacts(), rules: privateWindowsFacts().rules.map(r => ({ ...r, inheritanceFlags: 0 })) };
+  const badDirectory = createS3ArchiveStore({ mode: 'upload', privateScratch: root, runAws,
+    inspectWindowsPrivacy: async () => noInheritance });
+  await assert.rejects(badDirectory.put({ key, bytes, checksumSha256: checksum }), { code: 'SCRATCH_NOT_PRIVATE' });
+  const inspections = [];
+  const store = createS3ArchiveStore({ mode: 'upload', privateScratch: root, runAws,
+    inspectWindowsPrivacy: async (path, { kind }) => {
+      inspections.push(kind);
+      if (kind === 'directory') return privateWindowsFacts();
+      assert.equal((await readFile(path)).length, 0);
+      return { ...privateWindowsFacts(), protected: false,
+        rules: [{ sid: 'S-1-1-0', allow: true, rights: 2032127, inheritanceFlags: 0, propagationFlags: 0 }] };
+    } });
+  await assert.rejects(store.put({ key, bytes, checksumSha256: checksum }), { code: 'SCRATCH_NOT_PRIVATE' });
+  await assert.rejects(store.get(ref), { code: 'SCRATCH_NOT_PRIVATE' });
+  assert.deepEqual(inspections, ['directory', 'file', 'directory', 'file']);
+  assert.equal(calls.length, 0);
+  assert.deepEqual(await readdir(root), []);
+});
+
+test('round1_read_reference_is_snapshotted_before_async_calls', async (t) => {
+  let caller;
+  const { store, calls } = await fixture(t, { 'head-object': async () => {
+    caller.key = 'outside/prefix'; caller.versionId = 'changed';
+    return { code: 0, stdout: JSON.stringify(metadata), stderr: '' };
+  } });
+  caller = { ...ref };
+  assert.equal((await store.head(caller)).versionId, ref.versionId);
+  caller = { ...ref };
+  const pending = store.get(caller);
+  caller.key = 'outside/prefix'; caller.versionId = 'changed-before-scratch';
+  assert.deepEqual((await pending).bytes, bytes);
+  for (const args of calls) {
+    assert.equal(args[args.indexOf('--key') + 1], ref.key);
+    assert.equal(args[args.indexOf('--version-id') + 1], ref.versionId);
+  }
+});
+
+test('round1_valid_inherited_file_acl_and_equal_length_corruption', async (t) => {
+  const { root, runAws, calls } = await fixture(t);
+  const inspections = [];
+  const store = createS3ArchiveStore({ mode: 'upload', privateScratch: root, runAws,
+    inspectWindowsPrivacy: async (path, { kind }) => {
+      inspections.push(kind);
+      if (kind === 'directory') return privateWindowsFacts();
+      return { ...privateWindowsFacts(), protected: false, rules: privateWindowsFacts().rules.map(r => ({ ...r, inheritanceFlags: 0 })) };
+    } });
+  assert.deepEqual(await store.put({ key, bytes, checksumSha256: checksum }), { versionId: ref.versionId, checksumSha256: checksum });
+  assert.deepEqual(inspections, ['directory', 'file']);
+  inspections.length = 0;
+  assert.deepEqual((await store.get(ref)).bytes, bytes);
+  assert.deepEqual(inspections, ['directory', 'file', 'file', 'file']);
+  assert.equal(calls.filter(a => a[1] === 'get-object').length, 1);
+  const corrupted = await fixture(t, { 'get-object': async args => {
+    await writeFile(args.at(-1), Buffer.alloc(bytes.length, 0));
+    return { code: 0, stdout: JSON.stringify(metadata), stderr: '' };
+  } });
+  await assert.rejects(corrupted.store.get(ref), { code: 'INVALID_RESPONSE' });
+  assert.deepEqual(await readdir(root), []);
+  assert.deepEqual(await readdir(corrupted.root), []);
 });
