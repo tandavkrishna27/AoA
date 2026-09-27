@@ -12,9 +12,9 @@ const module = await import("../m1a-start-guard.mjs").catch(e => {
   if (e.code !== "ERR_MODULE_NOT_FOUND") throw e;
   return {};
 });
-const guard = (...args) => {
+const guard = (input, start, ...options) => {
   assert.equal(typeof module.guardCampaignStart, "function", "guardCampaignStart must exist");
-  return module.guardCampaignStart(...args);
+  return module.guardCampaignStart(input, start, options.length ? options[0] : { classification: "TEST/DEV_ONLY", clock: () => 150 });
 };
 const classification = "TEST/DEV_ONLY";
 const candidate = "a".repeat(40);
@@ -86,7 +86,7 @@ function sourceClosure(graph, target) {
   for (const service of selected) for (const dependency of graph.get(service)) selected.add(dependency);
   return [...selected].sort();
 }
-function fixture(verb = "up", services = ["control-plane"], noDeps = false, profile = "shipped") {
+function fixture(verb = "up", services = ["control-plane"], noDeps = false, profile = "shipped", timing = {}) {
   const projection = structuredClone(profile === "shipped" ? shipped : d1);
   if (profile === "spine") projection.find(([s]) => s === "test-runner")[1] = ["control-plane", "worker-b", "fake-provider"];
   const external = s => ["postgres", "toxiproxy", "test-runner"].includes(s) || (profile !== "shipped" && s === "minio");
@@ -94,7 +94,7 @@ function fixture(verb = "up", services = ["control-plane"], noDeps = false, prof
     service, image: external(service) ? `test-${service}@${digest(i + 1)}` : `aoa-${service === "migrate" || service.startsWith("control-plane") ? "control-plane" : service.includes("worker") ? "worker" : service}:candidate`, dependencies: [...dependencies],
     replicas: service.match(/^worker-[ab][12]$/) ? 2 : 1,
   })).sort((a, b) => a.service.localeCompare(b.service));
-  const revocationEvidence = { classification, policyId: "start-test", sequence: 1, checkedAt: 100, expiresAt: 1000, revokedContentIds: [], revokedRootFingerprints: [] };
+  const revocationEvidence = { classification, policyId: "start-test", sequence: 1, checkedAt: 100, expiresAt: timing.revocationExpiresAt ?? 1000, revokedContentIds: [], revokedRootFingerprints: [] };
   const entries = renderedServices.map((s, i) => {
     const isExternal = external(s.service);
     const contentId = isExternal ? s.image.split("@")[1] : digest(s.image.includes("control-plane") ? 30 : s.image.includes("worker") ? 31 : s.service === "minio" ? 32 : 33);
@@ -102,9 +102,9 @@ function fixture(verb = "up", services = ["control-plane"], noDeps = false, prof
     entry.signature = sign("sha256", Buffer.from(isExternal ? externalTestSigningPayload(entry) : canonicalSigningPayload({ digest: entry.contentId, sourceRevision: candidate })), ec.privateKey).toString("base64");
     return entry;
   });
-  const policy = { schema: 1, classification, policyId: "start-test", candidate, notBefore: 100, expiresAt: 1000, maxScanAgeMs: 200, maxRevocationAgeMs: 200, revocationSequence: 1, revocationSha256: hash(canonicalTestRevocationBytes(revocationEvidence)), entries };
+  const policy = { schema: 1, classification, policyId: "start-test", candidate, notBefore: 100, expiresAt: timing.policyExpiresAt ?? 1000, maxScanAgeMs: timing.maxScanAgeMs ?? 200, maxRevocationAgeMs: timing.maxRevocationAgeMs ?? 200, revocationSequence: 1, revocationSha256: hash(canonicalTestRevocationBytes(revocationEvidence)), entries };
   const bytes = canonicalTestImagePolicyBytes(policy);
-  const protectedBinding = { schema: 1, classification, controllerSha: "1".repeat(40), policyAuthorityPublicKeyPem: authority.publicKey.export({ type: "spki", format: "pem" }).toString(), policyAuthorityFingerprint: hash(authority.publicKey.export({ type: "spki", format: "der" })), ...event, notBefore: 100, expiresAt: 1000, policySha256: hash(bytes) };
+  const protectedBinding = { schema: 1, classification, controllerSha: "1".repeat(40), policyAuthorityPublicKeyPem: authority.publicKey.export({ type: "spki", format: "pem" }).toString(), policyAuthorityFingerprint: hash(authority.publicKey.export({ type: "spki", format: "der" })), ...event, notBefore: 100, expiresAt: timing.controllerExpiresAt ?? 1000, policySha256: hash(bytes) };
   const receipt = authenticateController({ protectedBinding, observedController: { sha: protectedBinding.controllerSha }, event: { ...event }, policyBytes: bytes, policySignature: sign(null, controllerTestSigningPayload({ protectedBinding, policyBytes: bytes }), authority.privateKey).toString("base64"), now: 100 });
   assert.equal(receipt.accepted, true);
   const admission = { mode: classification, authenticatedPolicy: receipt.testPolicyCapability, event: { ...event }, renderedServices: structuredClone(renderedServices), builtInventory: entries.map(({ verification, trustRootPem, trustRootFingerprint, ...e }) => structuredClone(e)), providerInventory: [], now: 150, revocationEvidence };
@@ -112,9 +112,9 @@ function fixture(verb = "up", services = ["control-plane"], noDeps = false, prof
   const q = { admission, renderedServices, observedImageBindings: { classification, snapshot, recheck: async () => structuredClone(snapshot) }, operation: { classification, verb, services, noDeps, build: false, pull: "never", tagFallback: false, lane: "keyed" } };
   return q;
 }
-async function refusal(q, pattern) {
+async function refusal(q, pattern, ...options) {
   let calls = 0;
-  const r = await guard(q, () => { calls++; });
+  const r = await guard(q, () => { calls++; }, ...options);
   assert.equal(calls, 0);
   assert.equal(r.started, false);
   assert.equal(r.classification, classification);
@@ -289,4 +289,68 @@ test("actual_worker_toxiproxy_dependency_binding_missing_or_substituted_refuses"
     };
     await refusal(substituted, /binding/);
   }
+});
+
+for (const [name, timing, advanced, reason] of [
+  ["controller_expiry", { controllerExpiresAt: 200 }, 200, /capability/],
+  ["policy_expiry", { policyExpiresAt: 200 }, 200, /policy.*expired/],
+  ["revocation_expiry", { revocationExpiresAt: 200 }, 200, /revocation/],
+  ["scan_freshness", { maxScanAgeMs: 50 }, 151, /scan/],
+  ["revocation_freshness", { maxRevocationAgeMs: 50 }, 151, /revocation/],
+]) test(`fresh_clock_after_await_refuses_${name}`, async () => {
+  const q = fixture("up", ["control-plane"], false, "shipped", timing);
+  const before = JSON.stringify(q.observedImageBindings.snapshot);
+  let epoch = 150;
+  let samples = 0;
+  q.observedImageBindings.recheck = async () => {
+    await new Promise(resolve => queueMicrotask(resolve));
+    epoch = advanced;
+    return structuredClone(q.observedImageBindings.snapshot);
+  };
+  await refusal(q, reason, { classification, clock: () => { samples++; return epoch; } });
+  assert.equal(samples, 2);
+  assert.equal(q.admission.now, 150);
+  assert.equal(JSON.stringify(q.observedImageBindings.snapshot), before);
+});
+test("fresh_clock_within_window_accepts_unchanged_observations", async () => {
+  const q = fixture(); let epoch = 150; let samples = 0; let starts = 0;
+  q.observedImageBindings.recheck = async () => { await Promise.resolve(); epoch = 160; return structuredClone(q.observedImageBindings.snapshot); };
+  const result = await guard(q, () => { starts++; assert.equal(samples, 2); }, { classification, clock: () => { samples++; return epoch; } });
+  assert.equal(result.started, true, result.reasons.join(" "));
+  assert.equal(starts, 1); assert.equal(q.admission.now, 150);
+});
+test("fresh_clock_is_mandatory_separate_synchronous_TEST_input", async () => {
+  for (const options of [undefined, {}, { classification, clock: null }, { classification: "production", clock: () => 150 },
+    { classification, clock: async () => 150 }, { classification, clock: () => Promise.resolve(150) },
+    ...[NaN, Infinity, -1, 150.5, "150", null, 8640000000000001].map(value => ({ classification, clock: () => value }))]) {
+    await refusal(fixture(), /clock|TEST|fields/, options);
+  }
+  const q = fixture(); q.observedImageBindings.clock = () => 150;
+  await refusal(q, /clock|fields/, undefined);
+});
+test("fresh_clock_rejects_backwards_or_invalid_post_await_samples", async () => {
+  await refusal(fixture(), /clock/, { classification, clock: () => 149 });
+  for (const next of [149, NaN, Infinity, -1, 150.5, "160", Promise.resolve(160)]) {
+    let calls = 0;
+    await refusal(fixture(), /clock/, { classification, clock: () => ++calls === 1 ? 150 : next });
+    assert.equal(calls, 2);
+  }
+});
+test("fresh_clock_capture_and_request_now_mutation_defenses", async () => {
+  const q = fixture(); let epoch = 150; let samples = 0;
+  const options = { classification, clock: () => { samples++; return epoch; } };
+  q.observedImageBindings.recheck = async () => {
+    await Promise.resolve(); epoch = 1000; options.clock = () => 150;
+    return structuredClone(q.observedImageBindings.snapshot);
+  };
+  await refusal(q, /capability/, options); assert.equal(samples, 2);
+  const changed = fixture();
+  changed.observedImageBindings.recheck = async () => { await Promise.resolve(); changed.admission.now = 160; return structuredClone(changed.observedImageBindings.snapshot); };
+  await refusal(changed, /mutated/, { classification, clock: () => 160 });
+});
+test("fresh_clock_initial_sample_is_used_before_observation_recheck", async () => {
+  const q = fixture(); let rechecks = 0;
+  q.observedImageBindings.recheck = async () => { rechecks++; return structuredClone(q.observedImageBindings.snapshot); };
+  await refusal(q, /capability/, { classification, clock: () => 1000 });
+  assert.equal(rechecks, 0);
 });

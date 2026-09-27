@@ -1,4 +1,5 @@
 import { evaluateM1aImageSet } from "./m1a-image-policy.mjs";
+import { isAsyncFunction } from "node:util/types";
 
 const TEST = "TEST/DEV_ONLY";
 const EXISTING = new Set(["start", "restart", "exec", "unpause"]);
@@ -7,6 +8,13 @@ const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const LABEL = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/;
 const fail = message => { throw new Error(message); };
 const refused = reason => ({ classification: TEST, started: false, reasons: [reason] });
+const epoch = value => Number.isSafeInteger(value) && value >= 0 && value <= 8640000000000000;
+
+function sampleClock(clock, previous) {
+  const now = clock();
+  if (!epoch(now) || now < previous) fail("invalid/asynchronous/backwards TEST clock sample");
+  return now;
+}
 
 function record(value, keys) {
   if (!value || Object.getPrototypeOf(value) !== Object.prototype) fail("expected closed own-data record");
@@ -90,31 +98,40 @@ function observations(value, approved, selected, o) {
 }
 
 /** Offline TEST seam only. No Docker inspection or production authority is implemented. */
-export async function guardCampaignStart(input, start) {
+export async function guardCampaignStart(input, start, options) {
   let plan;
   try {
+    // Capture separately supplied TEST orchestration input before reading candidate
+    // observations. No system-clock default or production custody is implied.
+    if (options == null) fail("separate synchronous TEST clock required");
+    const { classification, clock } = record(options, ["classification", "clock"]);
+    if (classification !== TEST || typeof clock !== "function" || isAsyncFunction(clock)) fail("separate synchronous TEST clock required");
     const q = record(input, ["admission", "renderedServices", "observedImageBindings", "operation"]);
     const mode = q.admission && Object.getOwnPropertyDescriptor(q.admission, "mode");
     if (!mode || !("value" in mode) || mode.value !== TEST) return refused("production admission refuses: P2/P3 unresolved; original TEST request required");
     if (typeof start !== "function") fail("injected start required");
     const admission = request(q.admission);
+    if (!epoch(admission.now)) fail("invalid TEST request clock baseline");
     const rendered = copy(q.renderedServices);
     const o = operation(q.operation);
     const observed = record(q.observedImageBindings, ["classification", "snapshot", "recheck"]);
     if (observed.classification !== TEST || typeof observed.recheck !== "function") fail("explicit TEST observations and immediate recheck required");
-    const verdict = evaluateM1aImageSet(admission);
+    const initialNow = sampleClock(clock, admission.now);
+    const verdict = evaluateM1aImageSet({ ...admission, now: initialNow });
     if (!verdict.admitted) return refused(verdict.reasons.join("; "));
     if (JSON.stringify(rendered) !== JSON.stringify(admission.renderedServices)) fail("rendered service/replica/dependency set changed");
     const selected = closure(rendered, o);
     const approved = verdict.bindings.filter(b => b.scope === "runtime");
     const snapshot = observations(observed.snapshot, approved, selected, o);
     const before = JSON.stringify({ admission: { ...admission, authenticatedPolicy: null }, rendered, o });
-    const fresh = observations(await observed.recheck(freeze(copy({ classification: TEST, operation: o, services: selected }))), approved, selected, o);
+    const rechecked = await observed.recheck(freeze(copy({ classification: TEST, operation: o, services: selected })));
+    const finalNow = sampleClock(clock, initialNow);
+    const fresh = observations(rechecked, approved, selected, o);
     const current = request(q.admission);
     const currentObserved = record(q.observedImageBindings, ["classification", "snapshot", "recheck"]);
     if (currentObserved.classification !== TEST || current.authenticatedPolicy !== admission.authenticatedPolicy || observed.recheck !== currentObserved.recheck
       || before !== JSON.stringify({ admission: { ...current, authenticatedPolicy: null }, rendered: copy(q.renderedServices), o: operation(q.operation) })) fail("request mutated during binding recheck");
-    const finalVerdict = evaluateM1aImageSet(current);
+    const finalVerdict = evaluateM1aImageSet({ ...current, now: finalNow });
     if (!finalVerdict.admitted) return refused(finalVerdict.reasons.join("; "));
     if (JSON.stringify(snapshot) !== JSON.stringify(fresh)) fail("image/container binding changed since snapshot");
     plan = freeze({ classification: TEST, operation: o, services: selected,
