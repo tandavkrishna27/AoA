@@ -14,7 +14,8 @@ import re
 import time
 import math
 
-from .protocol import decode_request, encode, MAX_REQUEST_BYTES, refusal, IDENTIFIER
+from .protocol import (decode_request, encode, MAX_REQUEST_BYTES, refusal, IDENTIFIER,
+                       MAX_PRIVATE_STREAM_BYTES)
 
 PROFILE_FIELDS = frozenset(('schema', 'classification', 'controllerSha', 'candidate',
     'session', 'authorityFingerprint', 'profileSha256', 'candidateUid', 'dockerBinary',
@@ -253,12 +254,18 @@ class Dispatcher:
             argv += ['logs', ids[0]]
         else: argv += [op, *ids]
         return dict(operationId=request['operationId'], argv=argv, env={}, stdin=stdin,
-                    timeoutMs=p['timeoutMs'], maxOutputBytes=args.get('limitBytes', 65536))
+                    timeoutMs=p['timeoutMs'], maxOutputBytes=min(args.get('limitBytes',
+                    MAX_PRIVATE_STREAM_BYTES), MAX_PRIVATE_STREAM_BYTES))
 
     @staticmethod
     def _response(record):
         return dict(version=1, operationId=record['operationId'], state=record['state'],
-                    exitCode=record['exitCode'], result=copy.deepcopy(record['result']))
+                    exitCode=record['exitCode'], result=copy.deepcopy(record['result']) |
+                    dict(streams=Dispatcher._unavailable_streams()))
+
+    @staticmethod
+    def _unavailable_streams():
+        return dict(available=False, complete=False, stdoutBase64=None, stderrBase64=None)
 
     def execute(self, peer, request):
         try:
@@ -304,12 +311,17 @@ class Dispatcher:
                 stream = None
                 try:
                     output = self.runner(invocation)
-                    _keys(output, ('exitCode', 'stdout') if request['operation'] == 'logs' else ('exitCode',))
+                    capture = request['operation'] in ('exec', 'logs')
+                    _keys(output, ('exitCode', 'stdout', 'stderr') if capture else ('exitCode',))
                     code = output['exitCode']
                     _require(type(code) is int and 0 <= code <= 255)
-                    if request['operation'] == 'logs':
-                        stream = output['stdout']
-                        _require(type(stream) is bytes and len(stream) <= invocation['maxOutputBytes'])
+                    if capture:
+                        stdout, stderr = output['stdout'], output['stderr']
+                        _require(type(stdout) is bytes and type(stderr) is bytes
+                                 and len(stdout) + len(stderr) <= invocation['maxOutputBytes'])
+                        stream = dict(available=True, complete=True,
+                            stdoutBase64=base64.b64encode(stdout).decode('ascii'),
+                            stderrBase64=base64.b64encode(stderr).decode('ascii'))
                     metadata = dict(exitCode=code)
                     state = 'observed-success' if code == 0 else 'observed-failure'
                 except Exception:
@@ -324,10 +336,11 @@ class Dispatcher:
                     # must pass accept's durability refresh before any replay ACK.
                     return dict(version=1, operationId=request['operationId'],
                                 state='outcome-unknown', exitCode=None,
-                                result=dict(exitCode=None, cleanupUncertainty=cleanup))
+                                result=dict(exitCode=None, cleanupUncertainty=cleanup,
+                                            streams=self._unavailable_streams()))
                 response = self._response(record)
                 if stream is not None:
-                    response['result']['outputBase64'] = base64.b64encode(stream).decode('ascii')
+                    response['result']['streams'] = stream
                 return response
         except Exception:
             # No raw configuration, policy, stdin or daemon error crosses this seam.

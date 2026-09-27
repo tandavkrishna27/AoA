@@ -12,6 +12,7 @@ import uuid
 
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 1048576 + 65536
+MAX_PRIVATE_STREAM_BYTES = 65536
 IO_TIMEOUT = 5.0
 # Milliseconds fit a signed 32-bit transport timer; this is not execution policy.
 MAX_OPERATION_TIMEOUT_MS = 2147483647
@@ -149,9 +150,32 @@ def decode_response(raw: bytes) -> dict:
                 _require(type(exit_code) is int and exit_code == 0)
             else:
                 _require(type(exit_code) is int and 1 <= exit_code <= 255)
+            if 'streams' in value['result']:
+                _validate_streams(value['result']['streams'], state)
         return value
     except ProtocolError:
         raise ProtocolError('invalid-response') from None
+
+
+def _validate_streams(streams, state):
+    _keys(streams, ('available', 'complete', 'stdoutBase64', 'stderrBase64'))
+    _require(type(streams['available']) is bool and type(streams['complete']) is bool)
+    if not streams['available']:
+        _require(streams['complete'] is False and streams['stdoutBase64'] is None
+                 and streams['stderrBase64'] is None)
+        return
+    _require(streams['complete'] is True and state in ('observed-success', 'observed-failure'))
+    size = 0
+    for key in ('stdoutBase64', 'stderrBase64'):
+        encoded = streams[key]
+        _require(type(encoded) is str and len(encoded) <= 87384)
+        try:
+            decoded = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error):
+            raise ProtocolError() from None
+        _require(base64.b64encode(decoded).decode('ascii') == encoded)
+        size += len(decoded)
+    _require(size <= MAX_PRIVATE_STREAM_BYTES)
 
 
 def encode(value: dict, maximum: int) -> bytes:

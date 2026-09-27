@@ -139,6 +139,34 @@ class ProtocolTests(unittest.TestCase):
                 decode_response(content)
             self.assertEqual(caught.exception.code, 'invalid-response')
 
+    def test_closed_private_stream_response(self):
+        base = dict(version=1, operationId='op_1', state='observed-success', exitCode=0)
+        unavailable = dict(available=False, complete=False, stdoutBase64=None, stderrBase64=None)
+        captured = dict(available=True, complete=True, stdoutBase64='', stderrBase64='AP8=')
+        for streams in (unavailable, captured):
+            value = base | dict(result=dict(streams=streams))
+            self.assertEqual(decode_response(json.dumps(value).encode()), value)
+        bad = [captured | dict(extra=1), captured | dict(available=1),
+               captured | dict(complete=False), captured | dict(stdoutBase64=None),
+               captured | dict(stderrBase64='AB=='), captured | dict(stderrBase64='AP8=\n'),
+               captured | dict(stderrBase64='!!'), captured | dict(stderrBase64=1),
+               unavailable | dict(stdoutBase64=''), unavailable | dict(complete=True),
+               dict(available=False), None,
+               captured | dict(stdoutBase64=base64.b64encode(b'a' * 65535).decode())]
+        for streams in bad:
+            with self.subTest(streams=str(streams)[:90]):
+                with self.assertRaises(ProtocolError) as error:
+                    decode_response(json.dumps(base | dict(result=dict(streams=streams))).encode())
+                self.assertEqual(error.exception.code, 'invalid-response')
+        for state in ('accepted', 'dispatching', 'outcome-unknown'):
+            with self.subTest(state=state), self.assertRaises(ProtocolError):
+                decode_response(json.dumps(base | dict(state=state, exitCode=None,
+                    result=dict(streams=captured))).encode())
+        boundary = dict(available=True, complete=True,
+            stdoutBase64=base64.b64encode(b'a' * 65535).decode(), stderrBase64='Yg==')
+        value = base | dict(result=dict(streams=boundary))
+        self.assertEqual(decode_response(json.dumps(value).encode()), value)
+
 
 if __name__ == '__main__':
     unittest.main()

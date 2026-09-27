@@ -1,3 +1,4 @@
+import base64
 import copy
 from contextlib import contextmanager
 import hashlib
@@ -114,6 +115,8 @@ class DispatchTests(unittest.TestCase):
         assert self.journal.held
         assert self.journal.records[invocation['operationId']]['state'] == 'dispatching'
         self.calls.append(invocation)
+        if invocation['argv'][3] == 'exec':
+            return dict(exitCode=0, stdout=b'', stderr=b'')
         return dict(exitCode=0)
 
     def execute(self, req=None, **deps):
@@ -286,18 +289,19 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_logs_are_private_bounded_bytes_not_journal_metadata(self):
-        result = self.execute(request('logs', dict(limitBytes=4)), runner=lambda _: dict(exitCode=0, stdout=b'abcd'))
+        result = self.execute(request('logs', dict(limitBytes=4)), runner=lambda _: dict(exitCode=0, stdout=b'abcd', stderr=b''))
         self.assertEqual(result['state'], 'observed-success')
-        self.assertEqual(result['result']['outputBase64'], 'YWJjZA==')
-        self.assertNotIn('outputBase64', self.journal.records['op1']['result'])
+        self.assertEqual(result['result']['streams'], dict(available=True, complete=True,
+                         stdoutBase64='YWJjZA==', stderrBase64=''))
+        self.assertNotIn('streams', self.journal.records['op1']['result'])
         self.journal = MemoryJournal()
-        result = self.execute(request('logs', dict(limitBytes=4)), runner=lambda _: dict(exitCode=0, stdout=b'abcde'))
+        result = self.execute(request('logs', dict(limitBytes=4)), runner=lambda _: dict(exitCode=0, stdout=b'abcde', stderr=b''))
         self.assertEqual(result['state'], 'outcome-unknown')
 
     def test_logs_do_not_silently_select_a_partial_window(self):
         def logs(invocation):
             self.calls.append(invocation)
-            return dict(exitCode=0, stdout=b'')
+            return dict(exitCode=0, stdout=b'', stderr=b'')
         self.assertEqual(self.execute(request('logs', dict(limitBytes=4)), runner=logs)['state'], 'observed-success')
         self.assertEqual(self.calls[0]['argv'], [self.p['dockerBinary'], '--host', self.p['endpoint'], 'logs', CID])
 
@@ -349,6 +353,110 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(self.execute(request('remove', id='cleanup'))['state'], 'refused')
         self.assertEqual(len(self.calls), 1)
 
+    def stream_request(self, op='exec', id='op1', limit=65536):
+        return request(op, dict(payloadId='probe', stdinBase64='') if op == 'exec'
+                       else dict(limitBytes=limit), id=id)
+
+    def assert_unavailable(self, response):
+        self.assertEqual(response['result']['streams'], dict(available=False,
+                         complete=False, stdoutBase64=None, stderrBase64=None))
+
+    def test_private_stream_capture_empty_binary_nonzero_and_replay(self):
+        for op in ('exec', 'logs'):
+            for code, stdout, stderr in ((0, b'', b''), (7, b'\x00\xff', b'private-error')):
+                with self.subTest(op=op, code=code):
+                    self.journal = MemoryJournal()
+                    self.calls = []
+                    def capture(invocation):
+                        self.calls.append(invocation)
+                        return dict(exitCode=code, stdout=stdout, stderr=stderr)
+                    req = self.stream_request(op)
+                    result = self.execute(req, runner=capture)
+                    self.assertEqual(result['state'], 'observed-success' if code == 0 else 'observed-failure')
+                    self.assertEqual(result['exitCode'], code)
+                    self.assertEqual(result['result']['streams'], dict(available=True,
+                        complete=True, stdoutBase64=base64.b64encode(stdout).decode('ascii'),
+                        stderrBase64=base64.b64encode(stderr).decode('ascii')))
+                    self.assertEqual(self.journal.records['op1']['result'], dict(exitCode=code))
+                    self.assert_unavailable(self.execute(req, runner=capture))
+                    self.assertEqual(len(self.calls), 1)
+
+    def test_combined_stream_limit_and_logs_smaller_limit(self):
+        for op, limit, size in (('exec', 65536, 65536), ('logs', 100000, 65536),
+                               ('logs', 4, 4)):
+            with self.subTest(op=op, limit=limit):
+                self.journal = MemoryJournal()
+                result = self.execute(self.stream_request(op, limit=limit),
+                    runner=lambda invocation: dict(exitCode=0, stdout=b'a' * (size - 1), stderr=b'b'))
+                self.assertEqual(result['state'], 'observed-success')
+                self.journal = MemoryJournal()
+                result = self.execute(self.stream_request(op, limit=limit),
+                    runner=lambda invocation: dict(exitCode=0, stdout=b'a' * size, stderr=b'b'))
+                self.assertEqual(result['state'], 'outcome-unknown')
+                self.assert_unavailable(result)
+
+    def test_malformed_streams_unknown_freeze_and_no_retry(self):
+        outputs = [dict(exitCode=0), dict(exitCode=0, stdout=b''),
+                   dict(exitCode=0, stdout='', stderr=b''),
+                   dict(exitCode=0, stdout=b'', stderr=bytearray()),
+                   dict(exitCode=0, stdout=b'', stderr=b'', extra=b'secret'),
+                   dict(exitCode=True, stdout=b'', stderr=b'')]
+        for op in ('exec', 'logs'):
+            for output in outputs:
+                with self.subTest(op=op, keys=list(output)):
+                    self.journal = MemoryJournal()
+                    self.calls = []
+                    def malformed(invocation):
+                        self.calls.append(invocation)
+                        return output
+                    req = self.stream_request(op)
+                    result = self.execute(req, runner=malformed)
+                    self.assertEqual(result['state'], 'outcome-unknown')
+                    self.assert_unavailable(result)
+                    self.assert_unavailable(self.execute(req, runner=malformed))
+                    self.assertEqual(self.execute(request(id='op2'))['state'], 'refused')
+                    self.assertEqual(len(self.calls), 1)
+                    self.assertNotIn('streams', self.journal.records['op1']['result'])
+
+    def test_capture_not_returned_on_terminal_durability_failure(self):
+        original = self.journal.transition
+        def fail(session, id, state, result):
+            if state == 'observed-success':
+                self.assertEqual(result, dict(exitCode=0))
+                raise JournalError()
+            return original(session, id, state, result)
+        self.journal.transition = fail
+        result = self.execute(self.stream_request(),
+            runner=lambda _: dict(exitCode=0, stdout=b'private-capture', stderr=b'private-error'))
+        self.assertEqual(result['state'], 'outcome-unknown')
+        self.assert_unavailable(result)
+        self.assertNotIn('private', json.dumps(result))
+        self.assertEqual(self.journal.records['op1']['state'], 'dispatching')
+
+    def test_stream_timeout_and_interrupted_replays_are_unavailable(self):
+        req = self.stream_request()
+        def timeout(invocation):
+            self.calls.append(invocation)
+            raise TimeoutError('private-capture')
+        result = self.execute(req, runner=timeout)
+        self.assertEqual(result['state'], 'outcome-unknown')
+        self.assert_unavailable(result)
+        self.assert_unavailable(self.execute(req, runner=timeout))
+        self.assertEqual(len(self.calls), 1)
+        for state in ('accepted', 'dispatching'):
+            with self.subTest(state=state):
+                self.journal = MemoryJournal()
+                digest = hashlib.sha256(json.dumps(req, sort_keys=True, ensure_ascii=True,
+                    separators=(',', ':')).encode('ascii')).hexdigest()
+                with self.journal.session_lock('session1'):
+                    self.journal.accept('session1', 'op1', digest)
+                    if state == 'dispatching':
+                        self.journal.transition('session1', 'op1', state, {})
+                replay = self.execute(req, runner=timeout)
+                self.assertEqual(replay['state'], 'accepted' if state == 'accepted' else 'outcome-unknown')
+                self.assert_unavailable(replay)
+                self.assertEqual(len(self.calls), 1)
+
 
 @unittest.skipUnless(sys.platform == 'linux', 'real journal dispatch requires actual Linux filesystem')
 class LinuxDispatchTests(unittest.TestCase):
@@ -377,6 +485,8 @@ class LinuxDispatchTests(unittest.TestCase):
         assert 'session1' in self.journal._held
         assert self.journal.lookup('session1', invocation['operationId'])['state'] == 'dispatching'
         self.calls.append(invocation)
+        if invocation['argv'][3] == 'exec':
+            return dict(exitCode=0, stdout=b'', stderr=b'')
         return dict(exitCode=0)
 
     # Fixture-only record access tests belong to the portable class.
@@ -408,6 +518,10 @@ class LinuxDispatchTests(unittest.TestCase):
 
     def test_terminal_directory_fsync_failure_reopen_replay_requires_refresh(self):
         real_fsync = os.fsync
+        req = DispatchTests.stream_request(self)
+        def capture(invocation):
+            self.calls.append(invocation)
+            return dict(exitCode=0, stdout=b'private-capture', stderr=b'private-error')
         terminal = Path(self.temp.name) / 'session1' / 'op1.json'
         failed = []
         def fail_terminal_directory(fd):
@@ -417,15 +531,16 @@ class LinuxDispatchTests(unittest.TestCase):
                     raise OSError('injected directory fsync failure')
             return real_fsync(fd)
         with patch('scripts.m1_gateway.journal.os.fsync', side_effect=fail_terminal_directory):
-            result = self.execute()
+            result = self.execute(req, runner=capture)
         self.assertEqual(result['state'], 'outcome-unknown')
+        DispatchTests.assert_unavailable(self, result)
         self.assertIsNone(result['exitCode'])
         self.assertEqual(len(failed), 1)
         self.assertEqual(json.loads(terminal.read_bytes())['state'], 'observed-success')
 
         self.journal = Journal(self.temp.name)
         with patch('scripts.m1_gateway.journal.os.fsync', side_effect=fail_terminal_directory):
-            self.assertEqual(self.execute()['state'], 'refused')
+            self.assertEqual(self.execute(req, runner=capture)['state'], 'refused')
         self.assertEqual(len(failed), 2)
         self.assertEqual(len(self.calls), 1)
 
@@ -435,10 +550,11 @@ class LinuxDispatchTests(unittest.TestCase):
             refreshed.append('directory' if stat.S_ISDIR(os.fstat(fd).st_mode) else 'file')
             return real_fsync(fd)
         with patch('scripts.m1_gateway.journal.os.fsync', side_effect=refresh):
-            replay = self.execute()
+            replay = self.execute(req, runner=capture)
         self.assertEqual(refreshed, ['file', 'file', 'directory'])
         self.assertEqual(replay['state'], 'observed-success')
         self.assertEqual(replay['exitCode'], 0)
+        DispatchTests.assert_unavailable(self, replay)
         self.assertEqual(len(self.calls), 1)
 
     def test_scoped_snapshot_does_not_read_outsider_session_record(self):
@@ -448,3 +564,22 @@ class LinuxDispatchTests(unittest.TestCase):
         outsider.write_bytes(b'invalid outsider record')
         self.assertEqual(self.execute()['state'], 'observed-success')
         self.assertEqual(outsider.read_bytes(), b'invalid outsider record')
+
+    def test_private_streams_never_persist_and_reopen_replay_is_unavailable(self):
+        for op in ('exec', 'logs'):
+            req = DispatchTests.stream_request(self, op, id=op)
+            def capture(invocation):
+                self.calls.append(invocation)
+                return dict(exitCode=7, stdout=b'private-stdout', stderr=b'private-stderr')
+            result = self.execute(req, runner=capture)
+            self.assertEqual(result['state'], 'observed-failure')
+            self.assertTrue(result['result']['streams']['available'])
+            for path in Path(self.temp.name).rglob('*'):
+                if path.is_file():
+                    raw = path.read_bytes()
+                    self.assertNotIn(b'private-', raw)
+                    self.assertNotIn(b'streams', raw)
+                    self.assertNotIn(b'cHJpdmF0ZS', raw)
+            self.journal = Journal(self.temp.name)
+            DispatchTests.assert_unavailable(self, self.execute(req, runner=capture))
+        self.assertEqual(len(self.calls), 2)
