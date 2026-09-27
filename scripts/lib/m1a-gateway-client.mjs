@@ -94,7 +94,7 @@ function installation(options) {
     require(absolute(pin.path) && Number.isSafeInteger(pin.size) && pin.size > 0 && pin.size <= 16777216);
     let parent = path.posix.dirname(pin.path);
     while (true) { require(ancestors.has(parent)); if (parent === '/') break; parent = path.posix.dirname(parent); }
-    const fd = fs.openSync(pin.path, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    const fd = fs.openSync(pin.path, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK | fs.constants.O_NOFOLLOW);
     try {
       const st = fs.fstatSync(fd);
       require(st.isFile() && st.nlink === 1 && st.uid === pin.uid && st.gid === pin.gid &&

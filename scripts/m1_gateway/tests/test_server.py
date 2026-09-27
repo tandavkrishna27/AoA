@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import unittest
+from contextlib import contextmanager
 
 from scripts.m1_gateway import server
 from test_dispatch import profile, CID, DIGEST
@@ -48,6 +49,88 @@ def schema_anchor():
 
 
 class CompositionTests(unittest.TestCase):
+    def authority_runtime(self, clock):
+        c = self.module()
+        runtime = object.__new__(c.SessionRuntime)
+        runtime.anchor = schema_anchor()
+        runtime.profile = profile()
+        runtime.session = dict(policy='policy', signature='signature')
+        runtime.manifest = dict(limits={'authorityTimeoutMs': 1000})
+        runtime.sequence, runtime.revocation_hash = 1, None
+        revoked = dict(schema='m1a-gateway-revocation-v1', installationId='install',
+            generation=1, sequence=1, available=True, checkedAt=100, validUntil=200, revoked=[])
+        class Files:
+            def revocation(self, authority): return json.dumps(revoked).encode()
+            def verify(self, pin): pass
+            def read(self, pin, maximum): return b'public'
+            @contextmanager
+            def directory(self, path): yield None
+        runtime.files = Files()
+        runtime.continuity = lambda: None
+        def verifier(*args):
+            clock[0] = clock[1]
+            return dict(exitCode=0, stderr=b'', stdout=json.dumps(dict(
+                policy={'notBefore': 90, 'expiresAt': 190})).encode())
+        runtime.child = verifier
+        return runtime
+
+    def test_revocation_age_rechecked_after_blocking_verification(self):
+        c = self.module()
+        for returned_at in (131, 200, 99):
+            clock = [100, returned_at]
+            runtime = self.authority_runtime(clock)
+            with self.subTest(returned_at=returned_at), patch.object(c.time, 'time', lambda: clock[0]):
+                with self.assertRaises(c.CompositionError): runtime.authority(now=100, cleanup=False)
+
+    def test_revocation_age_rechecked_after_runner_code_verification_before_spawn(self):
+        c = self.module()
+        for spawn_at in (131, 129):
+            clock = [100, 130]
+            runtime = self.authority_runtime(clock)
+            with self.subTest(spawn_at=spawn_at), patch.object(c.time, 'time', lambda: clock[0]):
+                runtime.authority(now=100, cleanup=False)
+                del runtime.child
+                def delayed_code_check(key): clock[0] = spawn_at
+                runtime.code_check = delayed_code_check
+                with patch.object(c, 'run_private', side_effect=AssertionError('stale logs child started')):
+                    with self.assertRaises(c.CompositionError):
+                        runtime.runner(dict(env={}, stdin=b'', timeoutMs=runtime.profile['timeoutMs'],
+                            argv=[runtime.profile['dockerBinary'], '--host', runtime.profile['endpoint'], 'logs', CID],
+                            maxOutputBytes=100))
+
+    def test_protected_file_opens_nonblocking_before_type_validation(self):
+        c = self.module()
+        store = object.__new__(c.ProtectedFiles)
+        @contextmanager
+        def directory(path): yield 9
+        store.directory = directory
+        def opening(path, flags, **kwargs):
+            self.assertTrue(flags & 0x800, 'FIFO open can block before fstat')
+            raise OSError('fixture refuses before IO')
+        with patch.object(c.os, 'O_NONBLOCK', 0x800, create=True), \
+             patch.object(c.os, 'O_NOFOLLOW', 0x20000, create=True), \
+             patch.object(c.os, 'O_CLOEXEC', 0x80000, create=True), patch.object(c.os, 'open', opening):
+            with self.assertRaises(c.CompositionError): store.read(schema_anchor()['manifest'], 10)
+            with self.assertRaises((c.CompositionError, OSError)):
+                store.revocation(schema_anchor()['authority'])
+
+    def test_revocation_age_rechecked_after_final_continuity_before_popen(self):
+        c = self.module(); clock = [100, 130]
+        runtime = self.authority_runtime(clock)
+        with patch.object(c.time, 'time', lambda: clock[0]):
+            runtime.authority(now=100, cleanup=False)
+            del runtime.child
+            runtime.code_check = lambda key: None
+            def delayed_continuity(): clock[0] = 131
+            runtime.continuity = delayed_continuity
+            entered = []
+            def spawn(*args, **kwargs):
+                entered.append(True); raise AssertionError('stale effect entered')
+            with patch.object(c.subprocess, 'Popen', spawn), self.assertRaises(c.CompositionError):
+                runtime.runner(dict(env={},stdin=b'',timeoutMs=runtime.profile['timeoutMs'],
+                    argv=[runtime.profile['dockerBinary'],'--host',runtime.profile['endpoint'],'logs',CID],maxOutputBytes=100))
+            self.assertEqual(entered, [], 'final continuity wait must not let freshness expire before spawn')
+
     def module(self):
         from scripts.m1_gateway import composition
         return composition
@@ -236,7 +319,50 @@ class CompositionTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == 'linux', 'actual Linux protected FD/custody required')
 class LinuxCompositionTests(unittest.TestCase):
+    def test_actual_fifo_reads_and_verification_refuse_without_waiting_for_writer(self):
+        repo = str(Path(__file__).resolve().parents[3])
+        code = '''import os,sys,tempfile,hashlib
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+from scripts.m1_gateway import composition as c
+with tempfile.TemporaryDirectory(dir=str(Path.home())) as root:
+ os.chmod(root,0o700); path=Path(root)/'fifo'; os.mkfifo(path,0o600)
+ ancestors=[]
+ for directory in [Path(root),*Path(root).parents]:
+  st=directory.stat(); ancestors.append(dict(path=str(directory),uid=st.st_uid,gid=st.st_gid,mode=st.st_mode&0o7777,device=st.st_dev,inode=st.st_ino))
+ st=path.stat(); pin=dict(path=str(path),uid=st.st_uid,gid=st.st_gid,mode=0o600,device=st.st_dev,inode=st.st_ino,size=1,sha256='a'*64)
+ files=c.ProtectedFiles(ancestors)
+ authority=dict(revocationDirectory={'path':root},revocationName='fifo',publisherUid=st.st_uid,publisherGid=st.st_gid)
+ for read in (lambda:files.read(pin,10),lambda:files.verify(pin),lambda:files.revocation(authority)):
+  try: read()
+  except c.CompositionError: pass
+  else: raise AssertionError('FIFO admitted')
+print('refused')
+'''
+        result = subprocess.run([sys.executable, '-I', '-S', '-c', code, repo],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5, env={})
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout,b'refused\n')
+
     def test_dev_pinned_cli_unix_server_node_authority_journal_and_private_response(self):
+        self.composition_fixture('success')
+
+    def test_real_custody_loss_during_inspection(self):
+        self.composition_fixture('inspection')
+
+    def test_real_custody_loss_during_verification(self):
+        self.composition_fixture('verification')
+
+    def test_real_custody_loss_during_runner_restart_never_repeats_logs(self):
+        self.composition_fixture('runner')
+
+    def test_real_release_timeout_preserves_terminal_bytes_and_suppresses_capture(self):
+        self.composition_fixture('release-timeout')
+
+    def test_real_disconnect_then_restart_replay_preserves_terminal_bytes(self):
+        self.composition_fixture('disconnect')
+
+    def composition_fixture(self, scenario):
         import shutil
         import socket
         import threading
@@ -263,6 +389,17 @@ class LinuxCompositionTests(unittest.TestCase):
                 ' b.extend(d)\n'
                 's.close();sys.stdout.buffer.write(b)\n', encoding='ascii')
             os.chmod(shim, 0o700)
+            node_shim = root/'node-cli'
+            node_shim.write_text('#!' + str(Path(sys.executable).resolve()) + ' -I\n' +
+                'import socket,subprocess,sys\n'
+                'child=subprocess.Popen([' + repr(str(Path(node).resolve())) + ',*sys.argv[1:]],env={},close_fds=True)\n'
+                's=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)\n'
+                's.connect(' + repr(str(endpoint)) + ')\n'
+                's.sendall(b\'["verification"]\');s.shutdown(socket.SHUT_WR)\n'
+                'while s.recv(4096): pass\n'
+                's.close()\n'
+                'sys.exit(child.wait())\n', encoding='ascii')
+            os.chmod(node_shim, 0o700)
             p = profile(); p.update(dockerBinary=str(shim), endpoint='unix://'+str(endpoint),
                 composePath=str(root/'compose'), composeSha256=hashlib.sha256(b'compose').hexdigest(),
                 candidateUid=os.getuid(), payloads=[], cleanupExpiresAt=int(__import__('time').time())+600)
@@ -303,7 +440,7 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
             anchor = dict(installationId='dev',generation=1,issuedAt=now-60,validUntil=now+600,
                 accounts={'controllerUid':os.getuid()}, daemon=dict(endpoint=p['endpoint'],daemonId='dev-daemon',endpointGeneration=1),
                 custodyPeer=dict(uid=os.getuid(),gid=os.getgid(),installationDigest='a'*64,enforcementDigest='b'*64),
-                directories={'runtimeCwd':ancestors[str(root)]}, code=dict(node=pin(Path(node).resolve()),docker=pin(shim),
+                directories={'runtimeCwd':ancestors[str(root)]}, code=dict(node=pin(node_shim),docker=pin(shim),
                     authorityBridge=pin(bridge),gatewayClosure=[pin(verifier)],clientClosure=[pin(shim)]),
                 authority=dict(publicKey=pin(root/'public'),fingerprint=p['authorityFingerprint'],
                     revocationDirectory=ancestors[str(root)],revocationName='revocation',publisherUid=os.getuid(),
@@ -315,6 +452,10 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
             daemon = socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); daemon.bind(str(endpoint)); daemon.listen(1)
             left,right = socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET)
             stop = threading.Event()
+            armed = threading.Event(); fault = threading.Event(); logs_entered = threading.Event()
+            logs_continue = threading.Event(); released = threading.Event(); durable_at_release = []
+            messages = []
+            def durable_bytes(): return {str(f.relative_to(journal_root)):f.read_bytes() for f in journal_root.rglob('*.json')}
             def docker_server():
                 try:
                     daemon.settimeout(0.1)
@@ -322,36 +463,61 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
                         try: conn,_ = daemon.accept()
                         except TimeoutError: continue
                         with conn:
+                            conn.settimeout(5)
                             data=bytearray()
                             while True:
                                 chunk=conn.recv(4096)
                                 if not chunk: break
                                 data.extend(chunk)
                             args=json.loads(data); commands.append(args)
-                            if args==['info','--format','{{json .}}']: output=json.dumps({'ID':'dev-daemon'}).encode()
+                            if args==['verification']: output=b''
+                            elif args==['info','--format','{{json .}}']: output=json.dumps({'ID':'dev-daemon'}).encode()
                             elif args==['ps','--all','--no-trunc','--filter','label=com.docker.compose.project=campaign1','--format','{{.ID}}']: output=(CID+'\n').encode()
                             elif args==['inspect','--type','container',CID]: output=json.dumps([raw_container()]).encode()
-                            elif args==['logs',CID]: output=b'private-log'
+                            elif args==['logs',CID]:
+                                logs_entered.set()
+                                if scenario == 'disconnect' and armed.is_set():
+                                    if not logs_continue.wait(5): raise AssertionError('client did not disconnect')
+                                output=b'private-log'
                             else: raise AssertionError(args)
-                            conn.sendall(output)
+                            target = {'inspection':'inspect','verification':'verification','runner':'logs'}.get(scenario)
+                            fault_here = armed.is_set() and args[0] == target and not fault.is_set()
+                            if fault_here:
+                                fault.set(); right.shutdown(socket.SHUT_RDWR)
+                                __import__('time').sleep(0.1)
+                            try: conn.sendall(output)
+                            except BrokenPipeError:
+                                if not fault_here: raise
                 except Exception as error: errors.append(error)
             def custody_server():
                 try:
-                    for _ in range(3):
-                        req=json.loads(right.recv(4096)); binding={k:req[k] for k in ('scope','session','operationId')}
+                    while not stop.is_set():
+                        raw = right.recv(4096)
+                        if not raw: break
+                        req=json.loads(raw); messages.append(req); binding={k:req[k] for k in ('scope','session','operationId')}
                         right.send(json.dumps(dict(schema='m1a-custody-lease-v1',nonce=req['nonce'],leaseId='lease',
                             installationId='dev',generation=1,endpointGeneration=1,daemonId='dev-daemon',
                             installationDigest='a'*64,enforcementDigest='b'*64,holderUid=os.getuid(),**binding,
                             predicates=dict(installationProtected=True,endpointStable=True,actorsExcluded=True,lifetimeHeld=True))).encode())
-                        req=json.loads(right.recv(4096)); right.send(json.dumps(dict(schema='m1a-custody-release-v1',
+                        raw = right.recv(4096)
+                        if not raw: break
+                        req=json.loads(raw); messages.append(req)
+                        if armed.is_set():
+                            durable_at_release.append(durable_bytes()); released.set()
+                            if scenario == 'release-timeout' and not fault.is_set():
+                                fault.set()
+                                stop.wait(1)
+                                break
+                        right.send(json.dumps(dict(schema='m1a-custody-release-v1',
                             nonce=req['nonce'],leaseId='lease',released=True,**binding)).encode())
-                except Exception as error: errors.append(error)
+                except Exception as error:
+                    if not stop.is_set() and not fault.is_set(): errors.append(error)
             right.settimeout(30)
             threads=[threading.Thread(target=docker_server, daemon=True),threading.Thread(target=custody_server, daemon=True)]
             for thread in threads: thread.start()
             gateway, worker = None, None
             try:
-                custody=c.Custody(left,anchor,5000); journal=c.Journal(str(journal_root))
+                custody=c.Custody(left,anchor,100); journal=c.Journal(str(journal_root))
                 runtime=c.SessionRuntime(anchor,manifest,session,files,custody,journal)
                 c.with_custody(custody,c.custody_binding('startup'),lambda:(runtime.dispatcher._authority(int(__import__('time').time()),False),runtime.inspect(copy.deepcopy(p))))
                 socket_parent=root/'socket';socket_parent.mkdir(mode=0o710)
@@ -371,21 +537,63 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
                 while not (socket_parent/'gateway').exists() and __import__('time').monotonic()<until:
                     __import__('time').sleep(0.01)
                 req=dict(version=1,session='session1',operationId='op1',operation='logs',services=['worker'],arguments={'limitBytes':100})
-                first=client.request(str(socket_parent/'gateway'),req,timeout_ms=20000)
-                self.assertEqual(first['state'],'observed-success')
-                self.assertEqual(first['result']['streams']['stdoutBase64'],base64.b64encode(b'private-log').decode())
-                replay=client.request(str(socket_parent/'gateway'),req,timeout_ms=20000)
-                self.assertFalse(replay['result']['streams']['available'])
+                armed.set()
+                if scenario == 'success':
+                    first=client.request(str(socket_parent/'gateway'),req,timeout_ms=20000)
+                    self.assertEqual(first['state'],'observed-success')
+                    self.assertEqual(first['result']['streams']['stdoutBase64'],base64.b64encode(b'private-log').decode())
+                else:
+                    with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as candidate:
+                        candidate.settimeout(10); candidate.connect(str(socket_parent/'gateway')); candidate.sendall(frame(req))
+                        if scenario == 'disconnect':
+                            self.assertTrue(logs_entered.wait(5)); candidate.close(); logs_continue.set()
+                            self.assertTrue(released.wait(5))
+                        else:
+                            self.assertEqual(candidate.recv(1114112), b'', 'custody failure must send no frame/private capture')
                 gateway.close();worker.join(6); self.assertFalse(worker.is_alive())
                 self.assertFalse((socket_parent/'gateway').exists())
-                self.assertEqual(commands.count(['logs',CID]),1)
+                before = durable_bytes()
+                releases = [m for m in messages if m['scope']=='operation' and m['action']=='release']
+                if scenario in ('success','release-timeout','disconnect'):
+                    self.assertEqual(len(releases),1, 'operation release must be attempted once')
+                if scenario in ('inspection', 'verification'):
+                    self.assertEqual(before, {}); self.assertTrue(fault.is_set())
+                    self.assertEqual(commands.count(['logs',CID]),0)
+                else:
+                    self.assertEqual(len(before),1)
+                    record=json.loads(next(iter(before.values())))
+                    self.assertEqual(record['state'], 'outcome-unknown' if scenario == 'runner' else 'observed-success')
+                    if scenario in ('release-timeout', 'disconnect'):
+                        self.assertEqual(before,durable_at_release[0])
+                    if scenario == 'release-timeout': self.assertTrue(fault.is_set())
+                    # Restart the actual listener, channel, runtime and Journal on the same durable files.
+                    left.close(); threads[1].join(6); right.close()
+                    self.assertFalse(threads[1].is_alive())
+                    left,right=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET); right.settimeout(10)
+                    replacement=threading.Thread(target=custody_server,daemon=True); threads.append(replacement); replacement.start()
+                    custody=c.Custody(left,anchor,100)
+                    runtime=c.SessionRuntime(anchor,manifest,session,files,custody,c.Journal(str(journal_root)))
+                    gateway=c.GatewayRuntime(anchor,manifest,files,custody,{os.getuid():runtime})
+                    worker=threading.Thread(target=serve,daemon=True); worker.start()
+                    until=__import__('time').monotonic()+5
+                    while not (socket_parent/'gateway').exists() and __import__('time').monotonic()<until:
+                        __import__('time').sleep(0.01)
+                    replay=client.request(str(socket_parent/'gateway'),req,timeout_ms=20000)
+                    self.assertEqual(replay['state'],record['state'])
+                    self.assertEqual(replay['result']['streams'],dict(available=False,complete=False,stdoutBase64=None,stderrBase64=None))
+                    self.assertEqual(durable_bytes(),before)
+                    self.assertEqual(commands.count(['logs',CID]),1)
+                    gateway.close(); worker.join(6); self.assertFalse(worker.is_alive())
                 for record in journal_root.rglob('*.json'): self.assertNotIn(b'streams',record.read_bytes())
+                for record in journal_root.rglob('*.json'): self.assertNotIn(b'private-log',record.read_bytes())
             finally:
                 if gateway is not None: gateway.close()
                 if worker is not None: worker.join(6)
-                stop.set(); left.close(); right.close()
+                stop.set(); logs_continue.set(); left.close()
                 for thread in threads: thread.join(6)
+                right.close()
                 daemon.close()
+                self.assertTrue(all(not thread.is_alive() for thread in threads))
             self.assertEqual(errors,[])
 
     def test_protected_read_rejects_link_and_unsafe_ancestor(self):

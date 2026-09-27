@@ -341,7 +341,7 @@ class ProtectedFiles:
         pin_schema(pin); require(pin['size'] <= maximum)
         try:
             with self.directory(posixpath.dirname(pin['path'])) as parent:
-                fd = os.open(posixpath.basename(pin['path']), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
+                fd = os.open(posixpath.basename(pin['path']), os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
                 try:
                     self.matches(os.fstat(fd), pin)
                     data, hashed, size = bytearray(), hashlib.sha256(), 0
@@ -360,7 +360,7 @@ class ProtectedFiles:
     def revocation(self, authority):
         path = posixpath.join(authority['revocationDirectory']['path'], authority['revocationName'])
         with self.directory(authority['revocationDirectory']['path']) as parent:
-            fd = os.open(authority['revocationName'], os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
+            fd = os.open(authority['revocationName'], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
             try:
                 info = os.fstat(fd)
                 require(stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and stat.S_IMODE(info.st_mode) == 0o600
@@ -380,13 +380,14 @@ class ProtectedFiles:
             finally: os.close(fd)
 
 
-def run_private(argv, *, cwd, stdin, timeout_ms, maximum, continuity=None):
+def run_private(argv, *, cwd, stdin, timeout_ms, maximum, continuity=None, before_spawn=None):
     require(type(argv) is list and argv and all(type(a) is str and '\x00' not in a for a in argv))
     integer(timeout_ms, 1, 2147483647); integer(maximum, 1, 2097152)
     require(type(stdin) is bytes and len(stdin) <= 2097152)
     if continuity: continuity()
     child, workers = None, []
     try:
+        if before_spawn: before_spawn()
         child = subprocess.Popen(argv, cwd=cwd, env={}, shell=False, close_fds=True,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             bufsize=0, start_new_session=sys.platform == 'linux')
@@ -563,6 +564,7 @@ class SessionRuntime:
                 and p['composePath'] == session['compose']['path']
                 and p['composeSha256'] == session['compose']['sha256'])
         self.sequence, self.revocation_hash = anchor['authority']['minimumRevocationSequence'], None
+        self.admission = None
         self.dispatcher = Dispatcher(p, self.authority, self.inspect, self.runner, journal)
 
     def continuity(self):
@@ -579,10 +581,15 @@ class SessionRuntime:
     def child(self, argv, key, stdin, timeout, maximum):
         self.code_check(key)
         with self.files.directory(self.anchor['directories']['runtimeCwd']['path']):
+            logs = key == 'docker' and argv[3:4] == ['logs']
+            if logs:
+                self.fresh_admission()
             return run_private(argv, cwd=self.anchor['directories']['runtimeCwd']['path'],
-                stdin=stdin, timeout_ms=timeout, maximum=maximum, continuity=self.continuity)
+                stdin=stdin, timeout_ms=timeout, maximum=maximum, continuity=self.continuity,
+                before_spawn=self.fresh_admission if logs else None)
 
     def authority(self, *, now, cleanup):
+        self.admission = None
         require(cleanup is False)
         self.continuity()
         authority = self.anchor['authority']
@@ -616,7 +623,22 @@ class SessionRuntime:
             self.manifest['limits']['authorityTimeoutMs'], 1114112)
         require(output['exitCode'] == 0 and output['stderr'] == b'')
         self.continuity()
-        return strict_json(output['stdout'], 1114112)
+        verdict = strict_json(output['stdout'], 1114112)
+        self.admission = (now, revoked, verdict['policy'])
+        try: self.fresh_admission()
+        except Exception:
+            self.admission = None
+            raise
+        return verdict
+
+    def fresh_admission(self):
+        require(self.admission is not None)
+        admitted_at, revoked, policy = self.admission
+        current = Dispatcher._clock()
+        require(current >= admitted_at and revoked['checkedAt'] <= current < revoked['validUntil']
+                and current - revoked['checkedAt'] <= self.anchor['authority']['maxAgeSeconds']
+                and policy['notBefore'] <= current < policy['expiresAt'])
+        self.admission = (current, revoked, policy)
 
     def docker(self, args, *, maximum=None, timeout=None):
         p, limits = self.profile, self.manifest['limits']
