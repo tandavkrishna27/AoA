@@ -13,6 +13,28 @@ const bytes = Buffer.from('synthetic archive');
 const checksum = createHash('sha256').update(bytes).digest('base64');
 const key = `replatform/m1a/e3/123-r1/a1/${createHash('sha256').update(bytes).digest('hex')}.json`;
 const ref = { key, versionId: 'version-1' };
+
+test('real_only_output_privacy_wrappers_refuse_extra_capabilities', async t => {
+  const m = await import('./s3-store.mjs');
+  assert.equal(typeof m.assertPrivateArchiveOutputRoot, 'function');
+  assert.equal(typeof m.assertPrivateArchiveOutputFile, 'function');
+  const root = await mkdtemp(join(tmpdir(), 'm1a-output-wrapper-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'receipt.json'); const handle = await open(path, 'wx', 0o600);
+  try {
+    await assert.rejects(() => m.assertPrivateArchiveOutputRoot(root, undefined), { code: 'INVALID_INPUT' });
+    await assert.rejects(() => m.assertPrivateArchiveOutputFile(path, handle, () => true), { code: 'INVALID_INPUT' });
+    if (process.platform === 'win32') {
+      await assert.rejects(() => m.assertPrivateArchiveOutputRoot(root), { code: 'SCRATCH_PRIVACY_UNAVAILABLE' });
+      await assert.rejects(() => m.assertPrivateArchiveOutputFile(path, handle), { code: 'SCRATCH_PRIVACY_UNAVAILABLE' });
+    } else {
+      await m.assertPrivateArchiveOutputRoot(root); await m.assertPrivateArchiveOutputFile(path, handle);
+      const other = await open(join(root, 'other'), 'wx', 0o600);
+      try { await assert.rejects(() => m.assertPrivateArchiveOutputFile(path, other), { code: 'UNSAFE_SCRATCH' }); }
+      finally { await other.close(); }
+    }
+  } finally { await handle.close(); }
+});
 const metadata = { VersionId: 'version-1', ChecksumSHA256: checksum, ContentLength: bytes.length,
   ServerSideEncryption: 'AES256', LastModified: '2026-09-27T00:00:00Z' };
 const privateWindowsFacts = () => ({ sid: 'S-1-5-21-123', owner: 'S-1-5-21-123', protected: true,

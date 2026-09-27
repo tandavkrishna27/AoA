@@ -298,6 +298,15 @@ async function privateRoot(input) {
   if (Object.entries(process.env).some(([k, v]) => /onedrive|dropbox|googledrive|google_drive|icloud|box_sync/i.test(k) && v && contained(path, v))) fail('M1A_SOURCE_NOT_PRIVATE');
   await privateStat(path, true); return path;
 }
+/** Real privacy only; no caller-selected inspector or extra arguments. */
+export async function assertPrivateArchiveInputRoot(path) {
+  if (arguments.length !== 1) fail('M1A_INVALID_INPUT');
+  return privateRoot(path);
+}
+export async function assertPrivateArchiveInputFile(path) {
+  if (arguments.length !== 1 || typeof path !== 'string' || !isAbsolute(path)) fail('M1A_INVALID_INPUT');
+  return privateStat(path, false);
+}
 async function sourceInventory(root, expectedPaths) {
   const found = [], allPaths = new Set();
   const allowedDirs = new Set(expectedPaths.flatMap(p => p.split('/').slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'))));

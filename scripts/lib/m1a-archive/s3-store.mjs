@@ -185,6 +185,16 @@ async function privateDirectory(input, inspectWindowsPrivacy) {
 }
 
 /** @typedef {{key:string,versionId:string}} VersionRef */
+/** Real privacy only; production callers supply the OS-opened handle. */
+export async function assertPrivateArchiveOutputRoot(path) {
+  if (arguments.length !== 1 || typeof path !== 'string' || !isAbsolute(path)) fail('INVALID_INPUT');
+  return privateDirectory(path);
+}
+export async function assertPrivateArchiveOutputFile(path, handle) {
+  if (arguments.length !== 2 || typeof path !== 'string' || !isAbsolute(path)) fail('INVALID_INPUT');
+  return privateFile(path, handle);
+}
+
 /** @typedef {{account:string,arn:string}} Identity */
 /**
  * Fixed-destination Store. checksumSha256 is canonical SHA-256 base64 throughout.

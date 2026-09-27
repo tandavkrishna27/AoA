@@ -47,6 +47,22 @@ async function api() {
   try { return await import('./evidence.mjs'); }
   catch (e) { if (e.code === 'ERR_MODULE_NOT_FOUND') assert.fail('Task 2 offline evidence implementation is missing'); throw e; }
 }
+
+test('real_only_input_privacy_wrappers_refuse_extra_capabilities', async t => {
+  const m = await api();
+  assert.equal(typeof m.assertPrivateArchiveInputRoot, 'function');
+  assert.equal(typeof m.assertPrivateArchiveInputFile, 'function');
+  const root = await mkdtemp(join(tmpdir(), 'm1a-input-wrapper-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const path = join(root, 'input.json'); await writeFile(path, '{}', { mode: 0o600 });
+  for (const [fn, p] of [[m.assertPrivateArchiveInputRoot, root], [m.assertPrivateArchiveInputFile, path]]) {
+    await assert.rejects(() => fn(p, undefined), { code: 'M1A_INVALID_INPUT' });
+    await assert.rejects(() => fn(p, () => true), { code: 'M1A_INVALID_INPUT' });
+    if (process.platform === 'win32') await assert.rejects(() => fn(p), { code: 'M1A_SOURCE_PRIVACY_UNAVAILABLE' });
+    else await fn(p);
+  }
+  await assert.rejects(() => m.assertPrivateArchiveInputRoot(process.cwd()));
+});
 async function validate(f, change = () => {}) {
   const args = bundle(f); change(args);
   return (await api()).validateArchiveBytes(args);

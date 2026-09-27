@@ -674,6 +674,14 @@ jobs:
           node --test scripts/lib/__tests__/m1a-redaction-probe.test.mjs scripts/lib/__tests__/m1-provider-identity.test.mjs
           node --test scripts/lib/__tests__/dep-024-worker-driven-seed.test.mjs
 
+      - name: M1a archive offline unit tests
+        env:
+          AWS_ACCESS_KEY_ID: ""
+          AWS_SECRET_ACCESS_KEY: ""
+          AWS_SESSION_TOKEN: ""
+        run: |
+          node --test scripts/lib/m1a-archive/s3-store.test.mjs scripts/lib/m1a-archive/evidence.test.mjs scripts/lib/m1a-archive/readback.test.mjs scripts/m1a-archive.test.mjs scripts/verify-m1a-archive.test.mjs
+
       - name: CI lane routing invariants (DEP-004)
         run: |
           node scripts/check-ci-lanes.mjs
