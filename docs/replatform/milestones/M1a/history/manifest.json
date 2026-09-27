@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Non-adopted historical proposal mirrors; not canonical QA or certification",
+  "baseRevision": "0510d482798e62672a8f6085915231c5f8578e87",
+  "counts": {
+    "originals": 10,
+    "corrections": 8,
+    "sharedPR610": 8
+  },
+  "records": [
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a18.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a18.md",
+      "gitBlob": "0c48e733525bd8f9e135ce9d1ca106fbab153155",
+      "contentSHA256": "1dd389a1b1e4755d143a1ad33afe140539f9ecac670470bb03509fb661fab13f",
+      "bytes": 5493,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a18.md",
+        "gitBlob": "0c48e733525bd8f9e135ce9d1ca106fbab153155"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a19.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a19.md",
+      "gitBlob": "e3da2fdacea1156cf8b6e4351d128d74add17685",
+      "contentSHA256": "243cc5a89cb5c577c476ef30ee6c4a16648b827c653288fc1a6f224e772aaf26",
+      "bytes": 4664,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a19.md",
+        "gitBlob": "e3da2fdacea1156cf8b6e4351d128d74add17685"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a20.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a20.md",
+      "gitBlob": "871f9b5de8c44fc471c0eb671099a7284baa7ea5",
+      "contentSHA256": "39a881817885833b82705e89f6594cdbde555c5a5f8e35e99f18143d16ef001a",
+      "bytes": 5316,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a20.md",
+        "gitBlob": "871f9b5de8c44fc471c0eb671099a7284baa7ea5"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a21.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a21.md",
+      "gitBlob": "b575bbee8b3fc6f8f5ebb4307484ef1b8f3a9ca6",
+      "contentSHA256": "f9df11d508482e6f41ca4c99c610ce01a29df152a4c3c5cb96be49d7a4ccb0eb",
+      "bytes": 9432,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a21.md",
+        "gitBlob": "b575bbee8b3fc6f8f5ebb4307484ef1b8f3a9ca6"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a25.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a25.md",
+      "gitBlob": "1946fbd3c4778f2b3645ece277978b4a79864f52",
+      "contentSHA256": "cc9b96d3a585f5b4bd22d4195fbd39050705201234f4dfab1618ab7e88f3410f",
+      "bytes": 6646,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a25.md",
+        "gitBlob": "1946fbd3c4778f2b3645ece277978b4a79864f52"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a26.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a26.md",
+      "gitBlob": "6053ed394c2ea1569fc0d59c0e9409352ca83ee4",
+      "contentSHA256": "108028ea72883565338bc18e4a6e17e503feda33ffd9aaddb06680adfbf5475c",
+      "bytes": 6594,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a26.md",
+        "gitBlob": "6053ed394c2ea1569fc0d59c0e9409352ca83ee4"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a27.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a27.md",
+      "gitBlob": "fe0de4162d6d8034eb7b6ef28d52ac458478a9ab",
+      "contentSHA256": "06d11af1cf1e8f1977aa80d272ccd1a6cc8404eeada0d768362334d01d58a8ff",
+      "bytes": 4924,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a27.md",
+        "gitBlob": "fe0de4162d6d8034eb7b6ef28d52ac458478a9ab"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a28.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a28.md",
+      "gitBlob": "9829f550db25bdebe4b6ef62ddd834ae59cca860",
+      "contentSHA256": "94a94068a1d38c2dfc6c0860a019fbf18e29baba645b45f26f41e7684ae64293",
+      "bytes": 10906,
+      "sharedSource": {
+        "sourceHead": "f6e5dfc120f2749e6cbcad457e7eec6b9ea7a9c9",
+        "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-25-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a28.md",
+        "gitBlob": "9829f550db25bdebe4b6ef62ddd834ae59cca860"
+      }
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-26-m1-d1-spine-m1a-candidate-446d99f39c8f-a22.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-26-m1-d1-spine-m1a-candidate-446d99f39c8f-a22.md",
+      "gitBlob": "27708d480781adf8c033e7ab5b18df1f7293e35f",
+      "contentSHA256": "4254c9f7e5ddd9530e4553a34ae08fb786eadb426a032136b8d1667d9642d100",
+      "bytes": 3877
+    },
+    {
+      "sourceHead": "af3ca5ceb49f7bcb7d7012ab8f100d5e38894f1d",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-26-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a29.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr610-pr615/originals/2026-09-26-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a29.md",
+      "gitBlob": "a1763791e95c00db4a7a85e5dfdb44c0a6814b3a",
+      "contentSHA256": "de45fa4f310b7d8e192dbc77838febab9e697c3fc0a449460b60231a6f83e1e8",
+      "bytes": 7793
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1-d1-spine-m1a-candidate-446d99f39c8f-a25.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1-d1-spine-m1a-candidate-446d99f39c8f-a25.md",
+      "gitBlob": "9258557032497d6df0c782557348d1b80199216e",
+      "contentSHA256": "557f963e93ef544f1d56c0fe4211a3db50215724c264fd21df296f35252c23b6",
+      "bytes": 5229
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1-d1-spine-m1a-candidate-446d99f39c8f-a27.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1-d1-spine-m1a-candidate-446d99f39c8f-a27.md",
+      "gitBlob": "c815622c30b1bfd176f3167543b412c6d59a800b",
+      "contentSHA256": "a8778b22569fdfb376dbb6fa618867134f829d779e7d1747f9179318854b8276",
+      "bytes": 10475
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a24.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a24.md",
+      "gitBlob": "e4482ddcf48d5623424abd8691018bcc29a16088",
+      "contentSHA256": "f51cc9cbaa7594bd546c6a92b76a0114bd5bb2ae53feb83fe9a1a4908b8dd5dc",
+      "bytes": 6524
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a26.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1-d1-spine-m1a-candidate-f8cdbe92e1cd-a26.md",
+      "gitBlob": "962e330a9954392ba1cd3a0dba30b5977cd70a98",
+      "contentSHA256": "b300726accc48580502314484474f3250d154dc8b22b2abea1f914102ace9aaf",
+      "bytes": 12393
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a31.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a31.md",
+      "gitBlob": "0d21f7cfae0ed873f6fd43373b594cd291ad2a28",
+      "contentSHA256": "661398dd7529bb856cfbc07fd4ced1dc4bb1a6ded0071c8a78358150f61672c1",
+      "bytes": 7817
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a33.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1a-d2-mechanism-m1a-candidate-446d99f39c8f-a33.md",
+      "gitBlob": "a7cc89b7cd1931cefc7c40e73e5c1bc37539e50a",
+      "contentSHA256": "77bd0d5a7a746070a8790f19f037c2e7dc91c57226ecafa8503fa0342580270b",
+      "bytes": 14806
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a30.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a30.md",
+      "gitBlob": "149c1265b6bc368caa2146a12be1fe1dfff8bd87",
+      "contentSHA256": "db2c925d49711785ef45d8884f9db2fae2f555cb34e44237aff2bee6d3e0468a",
+      "bytes": 5936
+    },
+    {
+      "sourceHead": "762d5e48172e951ec012aadf7b08e6ff38330966",
+      "sourcePath": "docs/replatform/milestones/M1a/qa/2026-09-27-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a32.md",
+      "destinationPath": "docs/replatform/milestones/M1a/history/pr632/corrections/2026-09-27-m1a-d2-mechanism-m1a-candidate-f8cdbe92e1cd-a32.md",
+      "gitBlob": "ad99a89cae53449ff9024998a8fe73b00e87e488",
+      "contentSHA256": "b2dcabc899e9048f408032ca7a0a677356ef42f58260f7da53f31dd7d076a261",
+      "bytes": 12699
+    }
+  ]
+}
