@@ -101,7 +101,7 @@ test('Linux DEV private client runs fixed isolated Python and real Unix response
   const descriptor=path.join(root,'descriptor');fs.writeFileSync(descriptor,JSON.stringify({schema:'m1a-gateway-client-installation-v1',
     python:pin(python),moduleLoader:pin(loader),cwd:root,socketPath,serverUid:process.getuid(),socketGid:process.getgid(),
     ancestors:[...ancestors.values()],closure:[pin(loader)]}),{mode:0o600});
-  const fixture=`import socket,struct,json,sys,os\ns=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.bind(sys.argv[1]);os.chmod(sys.argv[1],0o660);s.listen(1);print('ready',flush=True)\nc,_=s.accept()\ndef read(n):\n b=bytearray()\n while len(b)<n:\n  d=c.recv(n-len(b))\n  if not d: raise RuntimeError('disconnect')\n  b.extend(d)\n return bytes(b)\nr=json.loads(read(struct.unpack('!I',read(4))[0]));v={'version':1,'operationId':r['operationId'],'state':'observed-success','exitCode':0,'result':{'streams':{'available':True,'complete':True,'stdoutBase64':'cHJpdmF0ZQ==','stderrBase64':''}}}\nb=json.dumps(v,separators=(',',':')).encode();c.sendall(struct.pack('!I',len(b))+b);c.close();s.close()\n`;
+  const fixture=`import socket,struct,json,sys,os\ns=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.bind(sys.argv[1]);os.chmod(sys.argv[1],0o660);s.listen(2);print('ready',flush=True)\nfor _ in range(2):\n c,_=s.accept()\n def read(n):\n  b=bytearray()\n  while len(b)<n:\n   d=c.recv(n-len(b))\n   if not d: raise RuntimeError('disconnect')\n   b.extend(d)\n  return bytes(b)\n r=json.loads(read(struct.unpack('!I',read(4))[0]));v={'version':1,'operationId':r['operationId'],'state':'observed-success','exitCode':0,'result':{'streams':{'available':True,'complete':True,'stdoutBase64':'cHJpdmF0ZQ==','stderrBase64':''}}}\n b=json.dumps(v,separators=(',',':')).encode();c.sendall(struct.pack('!I',len(b))+b);c.close()\ns.close()\n`;
   const server=spawn(python,['-I','-S','-c',fixture,socketPath],{env:{},stdio:['ignore','pipe','pipe']});
   try {
     await new Promise((resolve,reject)=>{
@@ -110,6 +110,12 @@ test('Linux DEV private client runs fixed isolated Python and real Unix response
       server.once('error',error=>{clearTimeout(timer);reject(error);});
       server.once('exit',()=>{clearTimeout(timer);reject(new Error('fixture exited before readiness'));});
     });
+    const request={version:1,session:'session1',operationId:'op1',operation:'logs',services:['worker'],arguments:{limitBytes:100}};
+    const direct=spawnSync(python,['-I','-S',loader],{env:{},cwd:root,encoding:'utf8',timeout:5000,
+      input:JSON.stringify({schema:'m1a-gateway-client-v1',socketPath,timeoutMs:20000,
+        serverUid:process.getuid(),socketGid:process.getgid(),request})});
+    assert.equal(direct.status,0,`direct Python transport refused: ${direct.stderr}`);
+    assert.equal(JSON.parse(direct.stdout).state,'observed-success');
     const fd=fs.openSync(descriptor,'r');
     let child;
     try {child=spawn(process.execPath,['--input-type=module','-e',`import {gatewayOperation} from ${JSON.stringify(new URL('../m1a-gateway-client.mjs',import.meta.url).href)};const r=await gatewayOperation({version:1,session:'session1',operationId:'op1',operation:'logs',services:['worker'],arguments:{limitBytes:100}},{socketPath:${JSON.stringify(socketPath)},timeoutMs:20000});process.stdout.write(JSON.stringify(r));`],
