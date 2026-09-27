@@ -71,12 +71,12 @@ entry-review files, whose bytes are pinned by `git hash-object` before this free
 
 | Review boundary | Repository path | Git blob SHA |
 |---|---|---|
-| E0-E2 dependency/delta | `docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-d479709ed894.md` | `32566543315c72cd5ae6734e72c271fef0116339` |
+| E0-E2 dependency/delta | `docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-d479709ed894.md` | `55ac3d2ece925c0a0da2e83efd5a5448e70ddda0` |
 | E3-E6 index and complete matrix inventory | `docs/replatform/milestones/M1a/reachability/d479709ed894/README.md` | `cd1767c400e967a9cb4bc60109813ee16d7bb078` |
 | E3 job-control | `docs/replatform/milestones/M1a/reachability/d479709ed894/E3-job-control.md` | `b600ec4e4f9977f7473eb3fdd0c523b4202fb9a5` |
 | E4 worker-daemon | `docs/replatform/milestones/M1a/reachability/d479709ed894/E4-worker-daemon.md` | `0dc1513fada7fcbd0fdc597825c67925cfb59198` |
 | E5 workspaces/secrets | `docs/replatform/milestones/M1a/reachability/d479709ed894/E5-workspaces-secrets.md` | `eb4b1c6997943d5919462b7b7f471cd9ac39bcd8` |
-| E6 deployment/harness | `docs/replatform/milestones/M1a/reachability/d479709ed894/E6-deployment-test-harness.md` | `d9c8fef007176d15a756699d09888cc8b0cfc066` |
+| E6 deployment/harness | `docs/replatform/milestones/M1a/reachability/d479709ed894/E6-deployment-test-harness.md` | `7040e51c1aace403e3e97c22d2e03174ec93f28f` |
 
 ## Source delta and repair disposition
 
