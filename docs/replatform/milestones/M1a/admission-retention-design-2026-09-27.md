@@ -20,15 +20,16 @@ fresh allocation check. No retroactive image approval is permitted.
 
 Add a distinct M1a admission profile beside, not in place of, the closed
 REL-004 five-artifact release manifest. Reuse the existing per-image admission
-primitives in `scripts/lib/image-admission.mjs`. Build once, promote approved
-digests, and consume those digests in the campaign without rebuilding.
+primitives in `scripts/lib/image-admission.mjs`. Build once per campaign, approve
+the resulting inventory, and start only those approved bytes without rebuilding
+between admission and startup. D1 and shipped boot may produce distinct inventories.
 
 Add a distinct controlled campaign archive operation using the immutable
 put/head/get/retention verification pattern in `scripts/run-e3-perf-01.mjs`.
 Do not invoke the E3-PERF runner with D1 evidence or reuse its dedicated object
 namespace. Keep its existing campaign contract and tests unchanged.
 
-Alternative: rebuilding and signing inside every test job retains the current
+Alternative: self-approving images inside every test job retains the current
 approval/identity gap. Expanding REL-004 to include unrelated M1a artifacts
 changes the frozen release contract unnecessarily. Neither is selected.
 
@@ -41,16 +42,17 @@ changes the frozen release contract unnecessarily. Neither is selected.
    specifying the complete image set, permitted source/build identities,
    signer authority, public trust-root fingerprints or provider attestation
    policy, scan requirements, revocation policy, and approval lifetime.
-3. Build and publish candidate images to the designated registry. Retain digest,
+3. Build candidate images in the campaign's isolated build phase. Retain digest,
    source revision, provenance, SBOM and scan identity. A separate authorized
    approval/signing step approves the exact digest inventory. The test job must
    not generate its own trusted signing root or possess the release private key.
 4. Immediately before startup, verify complete-set equality, exact digest,
    source/provenance binding, trusted signature or owner-approved provider
    attestation, approval validity and revocation. Missing data refuses startup.
-5. Resolve all Compose image references by approved digest; disable build and
-   tag fallback in campaign execution. Each of the three D1 jobs records the
-   actual digest set it consumes. Shipped boot follows the same admission rule.
+5. Resolve registry images by approved digest; bind locally built images to
+   verified immutable image IDs and check the binding again at startup. Disable
+   implicit Compose builds, tag fallback and repulls after admission. Each D1
+   job records the actual digest set it consumes. Shipped boot follows the same rule.
 6. A later build or changed digest requires new approval. Mutable tags and
    historical D1 digest approval do not authorize a later keyed rebuild.
 
@@ -59,6 +61,28 @@ images. Do not substitute GitHub/Sigstore attestations without implementing and
 reviewing a verifier for the approved identity policy. Provenance alone is not
 approval. External image provenance must use an explicit approved verification
 path, never fabricated project source revisions.
+
+### Trusted bootstrap and build-contract compatibility
+
+The owner-approved policy and root bundle must be authenticated by a protected
+policy authority outside the candidate checkout. A separately reviewed controller
+workflow/verifier, pinned by exact approved revision in protected configuration,
+loads that authority and verifies a signed profile binding policy ID/version,
+candidate, image inventory, roots, expiry and revocation policy. Candidate files,
+workflow inputs and artifact bundles cannot select the authority or verifier.
+Supplying an internally consistent replacement root/profile/signature must fail.
+Environment approval and restricted workload identity must prevent untrusted
+branches or fork workflows from obtaining signing or archive privileges.
+
+Retain F3/DEP-015 and E6-F030: shipped boot builds the three project images and
+its MinIO image from the frozen candidate in its own build phase. Approval occurs
+after these builds and before any campaign container starts. Keep the driver's
+local-image and truthful `builtFromSource` evidence semantics; do not replace them
+with unsupported registry inputs or claim prebuilt images were built in the lane.
+The implementation plan must explicitly cover `m1-shipped-boot.yml`, its journey
+driver, Compose configuration, image-chain evidence and shipped-boot shape guards.
+If isolated build/approval phases require a normative contract amendment, obtain
+the prospective owner disposition before implementation of that change.
 
 ## Archive boundary
 
@@ -81,7 +105,12 @@ For each campaign:
 4. Verify the returned immutable version ID using exact-version HeadObject,
    GetObject and GetObjectRetention. Rehash retrieved bytes and validate size,
    checksum, COMPLIANCE mode and retain-until date.
-5. An independent verifier repeats exact-version retrieval and retention
+5. A protected post-run collector archives final job status/logs and cleanup
+   observations after all campaign jobs finish, linked to the earlier profile
+   bundle by run ID, run attempt, candidate and hashes. Pre-cleanup uploads alone
+   cannot prove final cleanup. Collector failures remain visible; cancellation
+   must never fabricate success or erase diagnostic bundles.
+6. An independent verifier repeats exact-version retrieval and retention
    checks. Commit only the structured receipt and redacted QA summary. Receipt
    references must not expose credentials or signed temporary URLs.
 
@@ -112,12 +141,15 @@ archive credentials.
 Admission tests must reject an omitted/extra image, mutable tag, altered digest,
 wrong source revision, self-selected root, invalid signature, revoked approval,
 expired approval, missing scan/provenance and bypassed pre-start verifier.
-Demonstrate that refusal occurs before any image starts.
+Also reject substitution of the entire root/profile/signature bundle, a changed
+trusted verifier, and local tag rebinding or implicit rebuild after approval.
+Demonstrate that refusal occurs before any campaign image starts.
 
 Archive tests must reject checksum/size mismatches, absent version IDs, retrieval
 of the wrong version, missing/short retention, wrong lock mode, overwrite,
 missing evidence, secret leakage, unsafe paths and access failures. Verify that
-failure preserves cleanup and cannot produce a pass receipt.
+failure preserves cleanup and cannot produce a pass receipt. Cover post-job
+collector failure, cancellation and missing final cleanup observations.
 
 Add focused workflow controls proving all runtime starts use admitted digests
 and passing campaign assessments require independently verified archive receipts.
@@ -132,8 +164,13 @@ review; obtain the operator inputs before external actions. Source/configuration
 changes require a new candidate and independently approved replacement freeze.
 
 Run fresh free D1 with pre-start admission and controlled retention, then grade
-actual artifacts. Only after passing assessment and authorized preconditions run
-keyless shipped boot, followed by the single existing F8 named mechanism campaign.
+actual artifacts. Advancement requires independent verification of all D1-owned
+required cases/controls, applicable hard invariants including H-08, and RET-01.
+DEP-015 remains explicitly not established by D1; the aggregate M1a assessment
+remains non-passing until the separate lane completes. Planning records the
+attributable prerequisite disposition permitting keyless shipped boot, then the
+single existing F8 named mechanism campaign after keyless evidence passes. This
+does not waive DEP-015 or require a global passing assessment before its execution.
 No repeat paid dispatch is authorized here. Complete immutable QA, explicit M1a
 E5 audit and separate eligible certification, then a superseding non-promoting
 handoff. Hubble remains excluded from implementation and relied-on decisions.
