@@ -12,7 +12,7 @@ lockfile-pinned host-side AST compiler before host evaluators and gives the matr
 byte-identical to the prior candidate.
 
 No result from D1 run `36275492975` or any older candidate is carried forward. Its D1 dispositions
-are retained as attempts 19 and 20 on PR #627, which must land before this freeze approval becomes
+are retained as attempts 19, 20, and 21 on PR #627, which must land before this freeze approval becomes
 effective. Their bytes remain historical evidence for `28151ec...`, never evidence for this candidate.
 The profiles remain distinct: `M1-D1-SPINE` uses the gated fake provider; `M1a-D2-MECHANISM` uses
 real E2B. `required` means a fresh exact-candidate campaign must fire the case; `pending` remains

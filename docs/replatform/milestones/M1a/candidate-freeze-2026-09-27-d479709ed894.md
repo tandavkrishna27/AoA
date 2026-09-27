@@ -10,9 +10,9 @@
 The candidate is the verified merge commit of PR #628. The dedicated candidate ref resolved to the
 exact commit when this inventory was prepared and must never move. The historical freeze merged by
 PR #625 and `refs/heads/codex/m1a-candidate-28151ec8724f` remain preserved for their named candidate;
-they are not edited, moved, or reused. D1 attempts 19 and 20 are retained on PR #627 but are not yet
+they are not edited, moved, or reused. D1 attempts 19, 20, and 21 are retained on PR #627 but are not yet
 present on this branch's integration base. PR #627 must land first so those records become committed
-history. After that prerequisite, the next D1 result/correction is attempt 21 or higher. The separate
+history. After that prerequisite, the next D1 result/correction is attempt 22 or higher. The separate
 `M1a-D2-MECHANISM` chain already ends at attempt 25, so its next result remains attempt 26.
 
 No earlier-candidate campaign result, runtime identifier, image digest, provider identity, or QA
@@ -72,7 +72,7 @@ entry-review files, whose bytes are pinned by `git hash-object` before this free
 | Review boundary | Repository path | Git blob SHA |
 |---|---|---|
 | E0-E2 dependency/delta | `docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-d479709ed894.md` | `32566543315c72cd5ae6734e72c271fef0116339` |
-| E3-E6 index and complete matrix inventory | `docs/replatform/milestones/M1a/reachability/d479709ed894/README.md` | `735ed64ef4bc78ce3f3a065e95d3f56c2c6e0dec` |
+| E3-E6 index and complete matrix inventory | `docs/replatform/milestones/M1a/reachability/d479709ed894/README.md` | `cd1767c400e967a9cb4bc60109813ee16d7bb078` |
 | E3 job-control | `docs/replatform/milestones/M1a/reachability/d479709ed894/E3-job-control.md` | `b600ec4e4f9977f7473eb3fdd0c523b4202fb9a5` |
 | E4 worker-daemon | `docs/replatform/milestones/M1a/reachability/d479709ed894/E4-worker-daemon.md` | `0dc1513fada7fcbd0fdc597825c67925cfb59198` |
 | E5 workspaces/secrets | `docs/replatform/milestones/M1a/reachability/d479709ed894/E5-workspaces-secrets.md` | `eb4b1c6997943d5919462b7b7f471cd9ac39bcd8` |
@@ -90,7 +90,7 @@ Relative to `28151ec8724fc94d3774845d9d23cac5411a489a`, candidate source changes
 
 PR #628 exact head `ee07f09d5830455607263b1b4319a6d2c13c5fde` received Herschel's independent
 **CLEAR** and passed required CI run `36278896363`; merge commit is this candidate. The repair fixes
-the harness cause retained by D1 attempt 20 on PR #627. It does not rewrite that result, prove the
+the harness cause retained by D1 attempt 21 on PR #627. It does not rewrite that result, prove the
 campaign, or carry forward the prior matrix observations.
 
 ## Frozen profile inventory
@@ -165,13 +165,13 @@ authorization, paid-run authorization, or dispatch instruction.
 
 ## Required next steps
 
-1. Land PR #627 first after its own required independent review, preserving D1 attempts 19 and 20.
+1. Land PR #627 first after its own required independent review, preserving D1 attempts 19, 20, and 21.
 2. Obtain fresh independent review of this exact freeze head and require final PR checks and comments
    clear without rewriting any immutable record.
 3. Planning may then land only with an exact-head guard.
 4. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
    dispatch and prove no equivalent run is active or complete.
-5. Run fresh free D1 evidence first; its new QA starts at attempt 21 or higher. The separate mechanism
+5. Run fresh free D1 evidence first; its new QA starts at attempt 22 or higher. The separate mechanism
    chain starts at attempt 26. Then follow the approved keyless/keyed sequence and paid-run limits.
    Failure grants no retry.
 
