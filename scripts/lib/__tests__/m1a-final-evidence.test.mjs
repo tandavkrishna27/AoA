@@ -53,6 +53,25 @@ test('retain_failure_and_cancelled_evidence', async () => {
     const r = await collect(f); assert.equal(r.ready, true); assert.equal(r.finalObservations[0].conclusion, conclusion);
   }
 });
+
+test('reject_members_outside_reviewed_category_profile', async () => {
+  for (const kind of ['artifacts', 'logs']) {
+    const f = fixture();
+    const extra = { ...f[kind][0], path: 'extra.txt', category: 'unreviewed', artifactId: '10',
+      bytes: Buffer.from('extra evidence'), sha256: hash('extra evidence') };
+    f[kind].push(extra);
+    refreshFinal(f);
+    const r = await refuse(f, /category_profile/);
+    assert.deepEqual(r.members, []);
+  }
+});
+
+test('accept_extra_members_in_reviewed_categories', async () => {
+  const f = fixture();
+  f.logs.push({ ...f.logs[0], path: 'extra-post.txt', artifactId: '10' });
+  refreshFinal(f);
+  assert.equal((await collect(f)).ready, true);
+});
 test('teardown_failure_is_preserved', async () => {
   const f = fixture(); Object.assign(f.cleanup[0], { exitCode: 7, residualResources: ['container-test'], uncertainty: ['teardown failed'] }); refreshFinal(f);
   const r = await collect(f); assert.equal(r.ready, true); assert.equal(r.finalObservations[0].cleanupObserved, true);

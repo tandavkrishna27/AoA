@@ -127,6 +127,7 @@ export async function collectFinalEvidence(input) {
     for (const m of [...artifacts, ...logs]) {
       closed(m, ['path', 'category', 'bytes', 'format', 'artifactId', 'jobId', 'binding', 'sha256',
         ...(logs.includes(m) ? ['phase'] : [])], 'inventory');
+      requireFact(profile.requiredCategories.includes(m.category), 'category_profile');
       same(m.binding, run, 'binding');
       requireFact(jobs.some(j => j.jobId === m.jobId), 'job_binding');
       requireFact(Buffer.isBuffer(m.bytes) && m.bytes.length > 0 && (total += m.bytes.length) <= RAW_LIMIT, 'member_bound');
