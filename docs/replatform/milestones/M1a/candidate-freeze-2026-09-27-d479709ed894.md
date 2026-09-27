@@ -4,7 +4,7 @@
 **Candidate:** `d479709ed8940fe69ef28539daadb90b9b29310b`
 **Candidate ref:** `refs/heads/codex/m1a-candidate-d479709ed894`
 **Integration branch:** `docs/replatform-program`
-**Status:** proposed; pending independent freeze review and attributed planning approval
+**Status:** approved for the named candidate, subject to final exact-head CI and comment verification before merge
 **Purpose:** replacement freeze after the D1 host-harness repair in PR #628; not campaign evidence, a QA verdict, gate pass, epic-status grant, or handoff
 
 The candidate is the verified merge commit of PR #628. The dedicated candidate ref resolved to the
@@ -128,16 +128,41 @@ mismatched identity fails closed. No runtime value is invented in this freeze.
 | Reserved E5 audit certifier | remains excluded from implementation, dispatch, relied-on freeze decisions, campaign QA/audit authorship, and handoff preparation |
 
 The implementation CLEAR for PR #628 does not substitute for independent review of this freeze.
-Planning approval is also pending and must be separately attributed after exact-head review.
+
+## Independent freeze review
+
+Herschel `01a0df3b-e8f1-7751-a156-9a7a78b0bf1e` independently reviewed PR #629 at exact head
+`8b6bf05b0bf56cf1a1cda93855e2fbebda244c2b` and explicitly reported **CLEAR**. The review verified
+all 40 path/blob pins, candidate-ref identity and ancestry, candidate-current E0-E6 reviews, the
+complete 29 required/2 pending D1 and 17 required/9 pending mechanism inventories, preservation of
+the historical candidate/ref and QA records, no campaign-result carry-forward, and role separation.
+
+GitHub Actions run `36281773926` was fully green on that exact head, including policy, evidence
+immutability, Ubuntu and Windows protocol-byte checks, brand-check, and `ci-required`. The later
+approval-attribution commit changes only this status and the two attributed sections; it does not
+change the candidate, any pin, entry review, matrix allocation, or campaign boundary.
+
+## Attributed planning approval
+
+The M1 planning session `01a0d96c-ae64-7920-a1cb-af28a360c21c`, acting under founder F2
+delegation and separately from implementation, inventory authorship, independent review, and audit
+certification, **APPROVES** this replacement freeze for candidate
+`d479709ed8940fe69ef28539daadb90b9b29310b` on immutable ref
+`refs/heads/codex/m1a-candidate-d479709ed894`.
+
+Approval is conditioned only on final CI passing and PR comments remaining clear on the exact
+post-attribution head before planning merges with an exact-head guard. It is freeze approval only:
+it is not a gate pass, campaign result, E5 closure, epic-status grant, milestone handoff, retry
+authorization, paid-run authorization, or dispatch instruction.
 
 ## Required next steps
 
-1. Submit this additive inventory in a freeze PR and obtain independent review on its exact head.
-2. Require all PR checks green and resolve every review comment without rewriting an immutable record.
-3. Obtain a separate attributed planning approval and land only with an exact-head guard.
-4. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
+1. Require final PR checks green and verify every review/comment remains clear on the exact
+   post-attribution head without rewriting any immutable record.
+2. Planning may then land only with an exact-head guard.
+3. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
    dispatch and prove no equivalent run is active or complete.
-5. Run fresh free D1 evidence first; new QA starts at attempt 21 or higher. Then follow the approved
+4. Run fresh free D1 evidence first; new QA starts at attempt 21 or higher. Then follow the approved
    keyless/keyed sequence and paid-run limits. Failure grants no retry.
 
 No workflow, approval, paid provider action, campaign result, or merge is authorized by this
