@@ -1,0 +1,187 @@
+# M1a replacement candidate freeze inventory
+
+**Recorded (UTC):** `2026-09-27`
+**Candidate:** `d479709ed8940fe69ef28539daadb90b9b29310b`
+**Candidate ref:** `refs/heads/codex/m1a-candidate-d479709ed894`
+**Integration branch:** `docs/replatform-program`
+**Status:** approved replacement freeze; planning approval is effective for this freeze only
+**Purpose:** replacement freeze after the D1 host-harness repair in PR #628; not campaign evidence, a QA verdict, gate pass, epic-status grant, or handoff
+
+The candidate is the verified merge commit of PR #628. The dedicated candidate ref resolved to the
+exact commit when this inventory was prepared and must never move. The historical freeze merged by
+PR #625 and `refs/heads/codex/m1a-candidate-28151ec8724f` remain preserved for their named candidate;
+they are not edited, moved, or reused. PR #627 landed as merge commit
+`9800ad7184894fbc6afe68068fee462283830936`, preserving D1 attempts 19, 20, and 21 as committed
+history. That prerequisite is satisfied, so the next D1 result/correction is attempt 22 or higher. The separate
+`M1a-D2-MECHANISM` chain already ends at attempt 25, so its next result remains attempt 26.
+
+No earlier-candidate campaign result, runtime identifier, image digest, provider identity, or QA
+verdict is carried forward. This inventory records source state and planning boundaries only.
+
+## Forty immutable blob pins
+
+All hashes are full Git blob object IDs resolved from the candidate tree, except the six additive
+entry-review files, whose bytes are pinned by `git hash-object` before this freeze file is added.
+
+### Ticket-result pins (14)
+
+| Ticket | Repository path | Git blob SHA |
+|---|---|---|
+| MIG-009 | `docs/replatform/epics/E10-desktop-migration-realtime/tickets/MIG-009-wiring-result.md` | `c82257da9899b26f9f60a73f423fd01e8d3911a5` |
+| DAT-007-S3 | `docs/replatform/epics/E5-workspaces-secrets/tickets/DAT-007-S3-result.md` | `5e66a28f868bdfe8821bd19899e9f66d4f13f262` |
+| E7-1-JOURNEY-ARM | `docs/replatform/epics/E7-coding-e2b/tickets/E7-1-JOURNEY-ARM-result.md` | `0afc60541607254fce86a1fd00e7e07be84c8d24` |
+| WRK-013 | `docs/replatform/epics/E4-worker-daemon/tickets/WRK-013-result.md` | `d4c46a1b51923d3e7440cb0c3222a5b5b8e7d6ab` |
+| WRK-018 | `docs/replatform/epics/E4-worker-daemon/tickets/WRK-018-result.md` | `ebad88a48cad04cf7b78f65d431cd4f1c989c6ea` |
+| JOB-016 | `docs/replatform/epics/E3-job-control/tickets/JOB-016-result.md` | `339048ed6673665aefc5f3a1ad1ea97dac357948` |
+| JOB-017 | `docs/replatform/epics/E3-job-control/tickets/JOB-017-result.md` | `568540de67215ae36283e165e41056143cf83717` |
+| DEP-014 | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-014-result.md` | `d5d7aa3f7dd70b0a63ebcc602a5cb3160cb946d7` |
+| DEP-015 | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-015-result.md` | `76d6735b118019acad657c1e42a25b4d1f8dac9c` |
+| DEP-016 | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-016-result.md` | `4f2f57b54b18317921fbbb6a35d8825a5c7fc80d` |
+| DEP-017 | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-017-result.md` | `e4dbd4b6221548321811adacc0945aab2c7feb02` |
+| DEP-018 | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-018-result.md` | `cc14feadef75b599e71020d94eac5aa20095fdef` |
+| DEP-019 | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-019-result.md` | `c8fd0b61c48a132d5f873be34e37add93dd5edcc` |
+| DEP-027 successor | `docs/replatform/epics/E6-deployment-test-harness/tickets/DEP-027-result.md` | `247b2d1446b8f7245c519a6ea1e836f6ef74b329` |
+
+### Candidate boundary pins (20)
+
+| Boundary | Repository path | Git blob SHA |
+|---|---|---|
+| D1 topology | `docker-compose.d1.yml` | `f6f47c21d9f6e25520782237b14d2d531f4b2673` |
+| D1 worker override | `docker/d1/m1-spine.override.yml` | `0cd5d837144f3843428c68295315da9aea978c60` |
+| Campaign environment | `docker/d1/campaign.env` | `4d3d0f2dbe26dd81aaf11a1c79a1e6d4a81eaa3b` |
+| Worker profile | `docker/d1/m1-spine-worker.profile.json` | `75b882f5618c778f6b6440b108d0c62b51d0b87f` |
+| Staging topology | `docker-compose.staging.yml` | `b45e411da9ca608f5e4da447f3b24f01f427a08b` |
+| Shipped-boot overlay | `docker/m1-boot/docker-compose.m1-boot.yml` | `904f94ed747c51717122159b91273fd0694ac1c7` |
+| D1 workflow | `.github/workflows/d1-merge-train.yml` | `bad51b4eabd416650ef65f2d8caec7f13dc63894` |
+| Shipped-boot workflow | `.github/workflows/m1-shipped-boot.yml` | `efecbc9d4c4e44f971b80252b381f721dab28b43` |
+| Fault matrix | `tests/d1/fault-matrix.json` | `c3f6fc8417432e8fbe6b815eef30bd7c43fdd9b7` |
+| E5 seven-clause matrix | `docs/replatform/epics/E5-workspaces-secrets/audit-matrix/2026-09-21-e5-seven-clause-matrix.md` | `4d8a43a55d760bfa6fe84b91c8854082ea488643` |
+| Protocol manifest | `docs/contracts/worker-protocol/v1/manifest.sha256` | `a5198560282b95e922a955fc48ffa8fe2eb67140` |
+| Protocol package | `packages/worker-protocol/package.json` | `51dc7b2c67a1b60884219144a353b7e14e2162b3` |
+| E2B package | `packages/sandbox-e2b-provider/package.json` | `9dd5527bb6fed328ba3e8d122e494b30b0ca902d` |
+| Provider identity resolver | `scripts/lib/m1-provider-identity.mjs` | `97245b4c527bdc2546d95c4a2640ce9774b55a93` |
+| Redaction evidence | `scripts/lib/d1-redaction-evidence.mjs` | `1a8e09a3439689969727e1815f272cb82f3fa874` |
+| Freeze evaluator | `scripts/lib/m1-shipped-boot.mjs` | `1b129e7730d8843a403b78c57bbed4e48df89df7` |
+| Shipped-boot driver | `scripts/m1-shipped-boot/journey.mjs` | `e99ae9a62f121da353d163619cadc4aac65830ed` |
+| Route composition root | `server/src/app.ts` | `792cecdcdc19d0c99b36da3e0cf80e586e3c7d24` |
+| Root versions | `package.json` | `e61d0536511b578bf4ff0739cbb3d5fd45bb0ad4` |
+| Dependency resolution | `pnpm-lock.yaml` | `d9e4fee2660f9612c4d734f0243de907f6b836d9` |
+
+### Candidate-current entry-review pins (6)
+
+| Review boundary | Repository path | Git blob SHA |
+|---|---|---|
+| E0-E2 dependency/delta | `docs/replatform/milestones/M1a/2026-09-27-e0-e2-delta-review-d479709ed894.md` | `55ac3d2ece925c0a0da2e83efd5a5448e70ddda0` |
+| E3-E6 index and complete matrix inventory | `docs/replatform/milestones/M1a/reachability/d479709ed894/README.md` | `cd1767c400e967a9cb4bc60109813ee16d7bb078` |
+| E3 job-control | `docs/replatform/milestones/M1a/reachability/d479709ed894/E3-job-control.md` | `b600ec4e4f9977f7473eb3fdd0c523b4202fb9a5` |
+| E4 worker-daemon | `docs/replatform/milestones/M1a/reachability/d479709ed894/E4-worker-daemon.md` | `0dc1513fada7fcbd0fdc597825c67925cfb59198` |
+| E5 workspaces/secrets | `docs/replatform/milestones/M1a/reachability/d479709ed894/E5-workspaces-secrets.md` | `eb4b1c6997943d5919462b7b7f471cd9ac39bcd8` |
+| E6 deployment/harness | `docs/replatform/milestones/M1a/reachability/d479709ed894/E6-deployment-test-harness.md` | `7040e51c1aace403e3e97c22d2e03174ec93f28f` |
+
+## Source delta and repair disposition
+
+Relative to `28151ec8724fc94d3774845d9d23cac5411a489a`, candidate source changes only:
+
+1. `.github/workflows/d1-merge-train.yml` installs the root package's lockfile-pinned TypeScript
+   compiler with `--ignore-scripts --filter aoa`, proves `require('typescript')`, and raises the
+   fault-matrix timeout to 50 minutes so post-action cleanup remains inside the bound.
+2. `scripts/lib/__tests__/m1-spine-assertions.test.mjs` adds static assertions for that provisioning,
+   install-before-preflight order, and timeout floor.
+
+PR #628 exact head `ee07f09d5830455607263b1b4319a6d2c13c5fde` received Herschel's independent
+**CLEAR** and passed required CI run `36278896363`; merge commit is this candidate. The repair fixes
+the harness cause retained by D1 attempt 21 on PR #627. It does not rewrite that result, prove the
+campaign, or carry forward the prior matrix observations.
+
+## Frozen profile inventory
+
+The full case-ID inventory is pinned in the candidate-current reachability README. Counts are:
+
+| Profile | Required | Pending |
+|---|---:|---:|
+| `M1-D1-SPINE` | 29 | 2 |
+| `M1a-D2-MECHANISM` | 17 | 9 |
+
+These counts are source declarations, not results. Every required case needs fresh exact-candidate
+evidence; every pending case remains debt. The D1 host fix and timeout change do not modify the
+matrix file.
+
+## Topology, exclusions, and provider identity
+
+The prior freeze's topology, tenant set, exclusion categories, provider-identity contract, and
+paid-run boundary remain byte-identical and are repinned above. A fresh campaign must emit rendered
+and running exclusion state for every control-plane replica and retain all workload, desktop,
+mobility, cutover, HA-claim, hosted-beta, crew, tool-surface, public-ingress, cloud-plugin, and
+unsandboxed-multitenant categories. Any parse failure or rendered/running disagreement fails.
+
+Keyless shipped boot precedes any separately authorized keyed run. Before provider spend, the keyed
+lane must resolve one ready template and retain provider-returned `templateID`, immutable UUID-shaped
+`buildID`, nonblank `envdVersion`, and per-sandbox event binding. Missing, ambiguous, changed, or
+mismatched identity fails closed. No runtime value is invented in this freeze.
+
+## Roles and approval boundary
+
+| Role | Owner/state |
+|---|---|
+| Planning, freeze decision, dispatch, rollback, and handoff | M1 planning session `01a0d96c-ae64-7920-a1cb-af28a360c21c` under founder F2 delegation |
+| PR #628 implementation | branch `codex/d1-typescript-runtime`, exact reviewed head `ee07f09d5830455607263b1b4319a6d2c13c5fde` |
+| Candidate inventory and entry-review author | this session; distinct from implementation, planning, and independent freeze review |
+| Independent freeze reviewer | Herschel; **CLEAR** on exact PR #629 head `e4b25142116e54049cda8e5f22da654c925f3fee` |
+| Reserved E5 audit certifier | remains excluded from implementation, dispatch, relied-on freeze decisions, campaign QA/audit authorship, and handoff preparation |
+
+The implementation CLEAR for PR #628 does not substitute for independent review of this freeze.
+
+## Independent freeze review
+
+Herschel `01a0df3b-e8f1-7751-a156-9a7a78b0bf1e` independently reviewed PR #629 at exact head
+`8b6bf05b0bf56cf1a1cda93855e2fbebda244c2b` and explicitly reported **CLEAR**. The review verified
+all 40 path/blob pins, candidate-ref identity and ancestry, candidate-current E0-E6 reviews, the
+complete 29 required/2 pending D1 and 17 required/9 pending mechanism inventories, preservation of
+the historical candidate/ref and QA records, no campaign-result carry-forward, and role separation.
+
+GitHub Actions run `36281773926` was fully green on that exact head, including policy, evidence
+immutability, Ubuntu and Windows protocol-byte checks, brand-check, and `ci-required`. The later
+approval-attribution commit changed only the freeze document. Subsequent automated review identified
+that PR #627 had not yet landed, the two gate attempt ordinals were conflated, and the milestone entry
+index still pointed at older reviews. This revision fixes those findings, changes the pinned E3-E6
+index blob accordingly, and requires a fresh independent exact-head review. The earlier CLEAR remains
+historical review evidence for its exact head; it is not asserted as CLEAR for this revised head.
+
+Herschel subsequently reviewed the corrected freeze at exact PR #629 head
+`e4b25142116e54049cda8e5f22da654c925f3fee` and explicitly reported **CLEAR**. That review verified
+all 40 pins, the fixed candidate ref, the attempt-21 correction, next D1 attempt 22 or higher, next
+mechanism attempt 26, and the HOLD/no-dispatch boundary. Exact-head GitHub Actions run
+`36282643449` passed all required checks, and all review threads were resolved. PR #627 was then
+merged from reviewed head `d87d53979d75f9b2fb8de48f584d6c92bd914548` as merge commit
+`9800ad7184894fbc6afe68068fee462283830936`, satisfying the prerequisite without changing the
+candidate ref or any immutable QA record.
+
+## Attributed planning approval
+
+The M1 planning session `01a0d96c-ae64-7920-a1cb-af28a360c21c`, acting under founder F2
+delegation and separately from implementation, inventory authorship, independent review, and audit
+certification, **APPROVES** this replacement freeze for candidate
+`d479709ed8940fe69ef28539daadb90b9b29310b` on immutable ref
+`refs/heads/codex/m1a-candidate-d479709ed894`.
+
+Approval was conditioned on PR #627 landing and a fresh independent review plus exact-head
+CI/comments clearing the corrected freeze. Those conditions are now satisfied by the verified PR #627
+merge, Herschel's **CLEAR** on `e4b25142116e54049cda8e5f22da654c925f3fee`, GitHub Actions run
+`36282643449`, and resolved review threads. Planning therefore makes this replacement-freeze approval
+effective. It is freeze approval only:
+it is not a gate pass, campaign result, E5 closure, epic-status grant, milestone handoff, retry
+authorization, paid-run authorization, or dispatch instruction.
+
+## Required next steps
+
+1. Planning independently decides whether to merge PR #629 after fresh exact-head review and final
+   PR checks/comments clear; this record does not authorize that merge.
+2. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any separately authorized
+   dispatch and prove no equivalent run is active or complete.
+3. Run fresh free D1 evidence first; its new QA starts at attempt 22 or higher. The separate mechanism
+   chain starts at attempt 26. Then follow the approved keyless/keyed sequence and paid-run limits.
+   Failure grants no retry.
+
+No merge, workflow execution, dispatch, paid provider action, campaign result, gate pass, or
+milestone handoff is authorized by this freeze approval. The integration branch name is never a
+candidate identity.
