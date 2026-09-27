@@ -258,3 +258,29 @@ open, or execute the earlier completed offline plan again.
 Primary capability references checked September27:
 - https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments
 - https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+
+## Existing Server Discovery
+
+User confirmed an existing private Linux server and previously supplied access.
+Metadata/source inspection identifies `.github/workflows/deploy-replatform-campaign.yml`:
+host `204.168.148.126`, port22, userroot, `/opt/aoa`, `/opt/campaign`, Compose
+project `aoa-staging`. It consumes `DEPLOY_SSH_KEY1` and `DEPLOY_PASSPHRASE1`;
+both secret names exist. Do not confuse the testing host in deploy-testing.yml
+or its unsuffixed SSH secrets with this campaign host.
+
+Latest recorded deployment35274876043 succeeded September17 atcbb496fe7.
+This is historical connectivity evidence, not a current live host inspection.
+GitHub does not expose secret plaintext; local SSH agent is unavailable and the
+local SSH directory contains known-host files but no private key. Do not ask the
+user to paste credentials or attempt to retrieve GitHub secret plaintext.
+
+Existing deployment loads provider/model/AWS credentials and modifies campaign
+files/builds/starts services. Do NOT dispatch it for a capability audit. A future
+bounded diagnostic must use only existing SSH authentication, authenticated host
+pinning and read-only system metadata; no deploy/restart/build/provider calls,
+environment/secret-file dumps, logs, raw artifact upload or IAM changes.
+
+Server availability changes the preferred next step to assessing this existing
+host before proposing another server. It does not settle suitability, tenant
+co-residency, kernel/VM isolation, Docker privilege, capacity, custody or approver
+roles. Root SSH credentials must never be made available to candidate processes.
