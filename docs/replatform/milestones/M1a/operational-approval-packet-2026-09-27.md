@@ -322,3 +322,37 @@ User's instruction to finish authorizes continued design and preparation, not
 an invented security-owner appointment or independent verifier identity. Named
 owners, signer custody, verifier access and exact final-byte upload authorization
 remain separate decisions. Historical H08/RET01 and aggregate M1a remain FAIL.
+
+## Same-Server Enforcement Recommendation
+
+Separate read-only reviewer Plato `01a0e3ef-b930-7a83-bc00-41dcd24e7364`
+assessed the selected server and existing dispatch code. Recommendation, not
+operational approval: a trusted typed broker owns a dedicated campaign daemon;
+candidate processes cannot access either its socket or the existing shared
+daemon. The broker owns fixed service definitions, permitted mounts/privileges,
+dependency closure and serialized identity-check/dispatch. Deny arbitrary Docker
+API forwarding, implicit pull/build, alternate endpoints and automatic restart
+paths outside admission. Recheck fresh expiry/revocation on each operation.
+
+Candidate build/test/harness processes run in a separately constrained executor,
+without sudo, Docker group/socket, host namespaces/devices or trusted-directory
+access. Dynamically generated Node exec payloads are candidate code: execute only
+inside the admitted campaign container, never as broker-local programs. Fault
+injection needs explicit bounded kill/start/restart interfaces, not arbitrary
+shell forwarding. The host holds pinned public roots, not signing private keys.
+Approval, archive and verifier credentials stay outside candidate custody.
+
+Implementable offline deliverables are the typed broker contract and complete
+operation/profile inventory, authority/refusal tests, journey/harness migration
+design and durable collector state machine. Deployment requires independently
+demonstrated effective accounts/socket/network restrictions and bypass controls.
+Namespaces/rootless containers share a kernel. If the applicable mandatory threat
+model requires surviving compromise of that kernel, this proposed boundary is
+insufficient; obtain a supported distinct-kernel mechanism or report a blocker.
+Do not infer that requirement is waived by agent-only hosting.
+
+Written design review remains open: signer/owner/verifier custody, exact service
+and provider admission profiles, enforceable execution mechanism, private entry
+point and durable terminal collection must be concrete before a production
+implementation plan is approved. No new production code or host changes were
+made during this assessment.
