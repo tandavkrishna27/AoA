@@ -680,7 +680,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ""
           AWS_SESSION_TOKEN: ""
         run: |
-          node --test scripts/lib/m1a-archive/s3-store.test.mjs scripts/lib/m1a-archive/evidence.test.mjs scripts/lib/m1a-archive/readback.test.mjs scripts/m1a-archive.test.mjs scripts/verify-m1a-archive.test.mjs scripts/lib/__tests__/m1a-controller.test.mjs scripts/lib/__tests__/m1a-image-policy.test.mjs scripts/lib/__tests__/m1a-start-guard.test.mjs scripts/lib/__tests__/m1a-final-evidence.test.mjs scripts/lib/__tests__/m1a-evidence-disposition.test.mjs scripts/lib/__tests__/m1a-protected-workflow-shape.test.mjs
+          node --test scripts/lib/m1a-archive/s3-store.test.mjs scripts/lib/m1a-archive/evidence.test.mjs scripts/lib/m1a-archive/readback.test.mjs scripts/m1a-archive.test.mjs scripts/verify-m1a-archive.test.mjs scripts/lib/__tests__/m1a-controller.test.mjs scripts/lib/__tests__/m1a-image-policy.test.mjs scripts/lib/__tests__/m1a-start-guard.test.mjs scripts/lib/__tests__/m1a-final-evidence.test.mjs scripts/lib/__tests__/m1a-evidence-disposition.test.mjs scripts/lib/__tests__/m1a-protected-workflow-shape.test.mjs scripts/lib/__tests__/m1a-gateway-authority.test.mjs
           sudo -H python3 -B -m scripts.m1_gateway.run_tests
       - name: CI lane routing invariants (DEP-004)
         run: |
