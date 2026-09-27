@@ -174,14 +174,14 @@ authorization, paid-run authorization, or dispatch instruction.
 
 ## Required next steps
 
-1. Land this approval-only update only after fresh independent review and final PR checks/comments
-   clear on its exact head, using an exact-head guard.
-2. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any authorized
+1. Planning independently decides whether to merge PR #629 after fresh exact-head review and final
+   PR checks/comments clear; this record does not authorize that merge.
+2. Re-resolve `refs/heads/codex/m1a-candidate-d479709ed894` immediately before any separately authorized
    dispatch and prove no equivalent run is active or complete.
 3. Run fresh free D1 evidence first; its new QA starts at attempt 22 or higher. The separate mechanism
    chain starts at attempt 26. Then follow the approved keyless/keyed sequence and paid-run limits.
    Failure grants no retry.
 
-No workflow execution, dispatch, paid provider action, campaign result, gate pass, or milestone
-handoff is authorized by this freeze approval. The integration branch name is never a candidate
-identity.
+No merge, workflow execution, dispatch, paid provider action, campaign result, gate pass, or
+milestone handoff is authorized by this freeze approval. The integration branch name is never a
+candidate identity.
