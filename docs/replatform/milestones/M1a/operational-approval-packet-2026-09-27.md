@@ -41,7 +41,8 @@ the proposed execution method after written plan approval.
 
 ## Approach Selection
 
-Recommended: separate private trusted controller/evidence location, immutable
+User-selected executor: existing agent-only server, not a new machine. Keep a
+separate private trusted controller/evidence authority, immutable
 controller pins, isolated ephemeral Linux campaign execution and separate
 signer/uploader/verifier custody. Candidate source is fetched at an exact full
 commit; controller code is never loaded from candidate paths.
@@ -284,3 +285,40 @@ Server availability changes the preferred next step to assessing this existing
 host before proposing another server. It does not settle suitability, tenant
 co-residency, kernel/VM isolation, Docker privilege, capacity, custody or approver
 roles. Root SSH credentials must never be made available to candidate processes.
+
+## Completed Read-Only Audit And Selected Hosting
+
+User approved the read-only audit and subsequently selected this existing
+agent-only server for campaign execution. Run36337226166 completed SUCCESS at
+diagnostic revision `130d0b10ab82c257bc92932fcaa23403269e38f6` on
+`codex/m1a-server-readonly-audit`. The registered diagnostic workflow path was
+used on that isolated branch; no deployment workflow, host mutation, provider
+call or AWS request ran. The diagnostic is not a campaign candidate or QA record.
+
+Validated metadata: x86_64 KVM guest, 2 CPUs, 3906292 KiB total RAM,
+4152332 KiB root disk available of 39020108 KiB. Docker is present with four
+running containers, three in the campaign project; the root-access diagnostic
+observed socket mode660. No dedicated `aoa-campaign` account, exposed `/dev/kvm`,
+Podman or bubblewrap was observed; unshare is present. These are observations,
+not proof of isolation, effective permissions, available memory or custody.
+SSH used the existing recorded host key, not independently certified owner
+host-key provenance. No arbitrary remote output or secret values were published.
+
+Agent-only use settles hosting choice, not gate applicability. Do not provision
+a second machine by inference. The selected design must enforce restricted
+candidate execution and a non-bypassable Docker operation boundary on this host,
+while keeping approval/signing/archive credentials outside candidate control.
+Separate host users or rootless Docker alone do not establish a complete boundary.
+If required protections cannot be demonstrated on this host, report the exact
+failed requirement rather than claiming no risk or weakening it.
+
+The next design revision must specify the actual restricted execution mechanism,
+complete command/mount/privilege allowlist, protected controller/signing custody,
+durable terminal collector and bounded private storage. With only about4 GiB
+disk free, perform a read-only capacity inventory and obtain approval for any
+specific cleanup or storage expansion before builds; no blanket pruning.
+
+User's instruction to finish authorizes continued design and preparation, not
+an invented security-owner appointment or independent verifier identity. Named
+owners, signer custody, verifier access and exact final-byte upload authorization
+remain separate decisions. Historical H08/RET01 and aggregate M1a remain FAIL.
