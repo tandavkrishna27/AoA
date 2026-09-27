@@ -1,0 +1,116 @@
+name: M1a server read-only diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact independently reviewed diagnostic revision
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m1a-server-readonly-audit
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/codex/m1a-server-readonly-audit' && github.sha == inputs.reviewed_sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Inspect metadata without changing server workloads
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY1 }}
+          DEPLOY_PASSPHRASE: ${{ secrets.DEPLOY_PASSPHRASE1 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          key="$RUNNER_TEMP/m1a-audit-key"
+          askpass="$RUNNER_TEMP/m1a-audit-askpass"
+          hosts="$RUNNER_TEMP/m1a-audit-known-hosts"
+          result="$RUNNER_TEMP/m1a-audit-metadata"
+          cleanup() {
+            rm -f -- "$key" "$askpass" "$hosts" "$result"
+            if [[ -n "${SSH_AGENT_PID:-}" ]]; then ssh-agent -k >/dev/null 2>&1 || true; fi
+          }
+          trap cleanup EXIT
+          [[ -n "$DEPLOY_SSH_KEY" ]] || exit 1
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$DEPLOY_PASSPHRASE"' > "$askpass"
+          chmod 600 "$key"
+          chmod 700 "$askpass"
+          # Reuse the existing locally recorded public host key, never a fresh keyscan.
+          printf '%s\n' '204.168.148.126 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPBFIjxkWVHUn99G1ZhhNci4PQ06LVnv3YDK+OpfMIIb' > "$hosts"
+          eval "$(ssh-agent -s)" >/dev/null
+          DISPLAY=:0 SSH_ASKPASS="$askpass" SSH_ASKPASS_REQUIRE=force ssh-add "$key" </dev/null >/dev/null 2>&1
+          unset DEPLOY_SSH_KEY DEPLOY_PASSPHRASE
+          rm -f -- "$askpass" "$key"
+          ulimit -f 16
+          if timeout 120 ssh -p 22 -o BatchMode=yes -o ConnectTimeout=15 \
+            -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
+            -o ForwardAgent=no -o StrictHostKeyChecking=yes \
+            -o HostKeyAlgorithms=ssh-ed25519 -o "UserKnownHostsFile=$hosts" \
+            root@204.168.148.126 'bash -s' > "$result" 2>/dev/null <<'REMOTE'
+          set -euo pipefail
+          exec 2>/dev/null
+          printf 'uid=%s\n' "$(id -u)"
+          printf 'cpus=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+          awk '/^MemTotal:/ {print "memory_kib=" $2}' /proc/meminfo
+          df -Pk / | awk 'NR==2 {print "root_total_kib=" $2; print "root_available_kib=" $4}'
+          printf 'architecture=%s\n' "$(uname -m)"
+          printf 'virtualization=%s\n' "$(systemd-detect-virt || true)"
+          for feature in kvm docker_socket campaign_root deployment_root; do
+            case "$feature" in
+              kvm) target=/dev/kvm ;;
+              docker_socket) target=/var/run/docker.sock ;;
+              campaign_root) target=/opt/campaign ;;
+              deployment_root) target=/opt/aoa ;;
+            esac
+            if test -e "$target"; then printf '%s=present\n' "$feature"; else printf '%s=absent\n' "$feature"; fi
+          done
+          for tool in docker podman unshare bwrap; do
+            if command -v "$tool" >/dev/null 2>&1; then printf '%s=present\n' "$tool"; else printf '%s=absent\n' "$tool"; fi
+          done
+          if test -S /var/run/docker.sock; then
+            stat -c 'docker_socket_mode=%a' /var/run/docker.sock
+            printf 'containers_running=%s\n' "$(docker ps -q | wc -l | tr -d ' ')"
+            printf 'containers_total=%s\n' "$(docker ps -aq | wc -l | tr -d ' ')"
+            printf 'campaign_containers_running=%s\n' "$(docker ps -q --filter label=com.docker.compose.project=aoa-staging | wc -l | tr -d ' ')"
+          fi
+          if getent passwd aoa-campaign >/dev/null; then printf 'dedicated_user=present\n'; else printf 'dedicated_user=absent\n'; fi
+          REMOTE
+          then
+            :
+          else
+            printf '%s\n' 'SSH metadata inspection failed; no remote output published'
+            exit 1
+          fi
+          # Never print arbitrary remote stdout: only a closed metadata schema.
+          python3 - "$result" <<'PY'
+          import pathlib, re, sys
+          path = pathlib.Path(sys.argv[1])
+          if path.stat().st_size > 4096:
+              raise SystemExit('metadata size refused')
+          rows = {}
+          numeric = {'uid', 'cpus', 'memory_kib', 'root_total_kib', 'root_available_kib',
+                     'containers_running', 'containers_total', 'campaign_containers_running', 'docker_socket_mode'}
+          flags = {'kvm', 'docker_socket', 'campaign_root', 'deployment_root', 'docker', 'podman', 'unshare', 'bwrap', 'dedicated_user'}
+          enums = {'architecture': {'x86_64', 'aarch64'}, 'virtualization': {'none', 'kvm', 'qemu', 'vmware', 'microsoft', 'xen', 'lxc', 'docker', 'podman', 'amazon'}}
+          for line in path.read_text(encoding='utf-8').splitlines():
+              key, sep, value = line.partition('=')
+              valid = (key in numeric and re.fullmatch(r'[0-9]{1,16}', value)) or (key in flags and value in {'present', 'absent'}) or (key in enums and value in enums[key])
+              if not sep or key in rows or not valid:
+                  raise SystemExit('metadata schema refused')
+              rows[key] = value
+          required = {'uid', 'cpus', 'memory_kib', 'root_total_kib', 'root_available_kib', 'architecture', 'virtualization'} | flags
+          if not required.issubset(rows):
+              raise SystemExit('metadata incomplete')
+          print('READ_ONLY_DIAGNOSTIC_NOT_CUSTODY_PROOF')
+          for key, value in sorted(rows.items()):
+              print(f'{key}={value}')
+          PY
