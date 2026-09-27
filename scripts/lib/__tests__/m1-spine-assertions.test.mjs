@@ -1378,3 +1378,30 @@ test("worker marker: the d1 lane's usage-suppressed control greps BOTH literals"
   assert.ok(step.includes(`grep -F '${M1_SPINE_COST_MARKER}'`), "the step no longer greps the cost marker");
   assert.ok(step.includes(`grep -F '${M1_SPINE_WORKER_COST_MARKER}'`), "the step does not grep the WORKER-specific marker");
 });
+
+test("D1 host jobs install the lockfile-pinned AST compiler before their Node preflights", () => {
+  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"), "utf8");
+  const jobStarts = ["  d1-merge-train:", "  m1-spine:", "  m1-fault-matrix:"];
+  for (const marker of jobStarts) {
+    const start = workflow.indexOf(marker);
+    assert.notEqual(start, -1, `${marker.trim()} job is missing`);
+    const next = jobStarts
+      .map((candidate) => workflow.indexOf(candidate, start + marker.length))
+      .filter((candidate) => candidate !== -1)
+      .sort((a, b) => a - b)[0] ?? workflow.length;
+    const job = workflow.slice(start, next);
+    const install = job.indexOf("- name: Install the pinned host-side AST compiler");
+    const preflight = job.indexOf("- name: Static ");
+    assert.notEqual(install, -1, `${marker.trim()} does not install the AST compiler`);
+    assert.match(job, /corepack pnpm install --frozen-lockfile --ignore-scripts --filter aoa/);
+    assert.match(job, /node -e "require\('typescript'\)"/);
+    assert.ok(install < preflight, `${marker.trim()} installs the compiler after its Node preflight`);
+  }
+});
+
+test("the fault-matrix job reserves time for action post-step cleanup", () => {
+  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"), "utf8");
+  const start = workflow.indexOf("  m1-fault-matrix:");
+  const job = workflow.slice(start);
+  assert.match(job, /timeout-minutes:\s*50\b/);
+});

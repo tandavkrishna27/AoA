@@ -259,6 +259,14 @@ jobs:
         with:
           node-version: 24
 
+      # The D1 host checks call observeFreezeTopology(), whose structural inventory lazily loads
+      # TypeScript. Images remain dependency-free at this boundary; install only the root package's
+      # lockfile-pinned tooling on the runner and prove the compiler resolves before any preflight.
+      - name: Install the pinned host-side AST compiler
+        run: |
+          corepack pnpm install --frozen-lockfile --ignore-scripts --filter aoa
+          node -e "require('typescript')"
+
       - name: Static topology preflight (fail fast before bring-up)
         run: |
           node scripts/check-d1-compose.mjs
@@ -526,6 +534,11 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install the pinned host-side AST compiler
+        run: |
+          corepack pnpm install --frozen-lockfile --ignore-scripts --filter aoa
+          node -e "require('typescript')"
+
       - name: Static preflight (the profile's own verdict self-test + the compose invariants)
         run: |
           node scripts/check-d1-compose.mjs
@@ -771,7 +784,10 @@ jobs:
     # event `inputs.lanes` is empty, so the first disjunct runs the job exactly as before.
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.lanes == 'all' || inputs.lanes == 'm1-fault-matrix' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Run 36275492975 completed the campaign, verdict, controls, evidence upload and teardown,
+    # then hit 45 minutes during actions/setup-node's post-job cleanup. Keep a bounded margin for
+    # action cleanup; this does not remove or soften any campaign step.
+    timeout-minutes: 50
     env:
       COMPOSE_FILE_PATH: docker-compose.d1.yml
       SPINE_OVERRIDE_PATH: docker/d1/m1-spine.override.yml
@@ -799,6 +815,11 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
+
+      - name: Install the pinned host-side AST compiler
+        run: |
+          corepack pnpm install --frozen-lockfile --ignore-scripts --filter aoa
+          node -e "require('typescript')"
 
       - name: Static preflight (the declaration, its reds, and the compose invariants)
         run: |
