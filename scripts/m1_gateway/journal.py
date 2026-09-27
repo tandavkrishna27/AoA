@@ -325,6 +325,27 @@ class Journal:
         with self.session_lock(session, create=False) as directory:
             return self._record(directory, session, id)
 
+    def session_records(self, session):
+        """Validated snapshot of one existing session, with no recovery or effects.
+
+        Reentrant under the dispatcher's outer session lock. Enumerate only that
+        directory; a malformed outsider record cannot be read or confer custody.
+        """
+        _identifier(session)
+        with self.session_lock(session, create=False) as directory:
+            operations = set()
+            for name in os.listdir(directory):
+                if name == '.lock' or re.fullmatch(r'\.tmp-[0-9a-f]{32}', name):
+                    fd = self._open_file(directory, name)
+                    os.close(fd)
+                    continue
+                _require(name.endswith(('.json', '.claim')))
+                operation = name.rsplit('.', 1)[0]
+                _identifier(operation)
+                operations.add(operation)
+            return [self._record(directory, session, operation)
+                    for operation in sorted(operations)]
+
     def recover(self):
         records = []
         with self._mutex, self._failures.guard():

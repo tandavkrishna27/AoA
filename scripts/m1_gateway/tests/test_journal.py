@@ -18,6 +18,13 @@ def accepted():
 
 
 class RecordTests(unittest.TestCase):
+    def test_exact_session_snapshot_api_rejects_invalid_session_before_io(self):
+        self.assertTrue(callable(getattr(Journal, 'session_records', None)))
+        journal = object.__new__(Journal)
+        for session in ('../other', '', True, None):
+            with self.subTest(session=session), self.assertRaises(JournalError):
+                journal.session_records(session)
+
     def test_storage_failure_latches_but_validation_refusal_remains_recoverable(self):
         latch = _FailureLatch()
         with self.assertRaises(JournalError):
@@ -116,6 +123,34 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(JournalError):
             self.journal.transition('session1', 'op1', 'dispatching', {})
         self.assertEqual(Journal(str(self.root)).lookup('session1', 'op1'), result)
+
+    def test_session_snapshot_never_reads_or_recovers_outsider_records(self):
+        self.journal.accept('session1', 'op1', HASH)
+        self.journal.transition('session1', 'op1', 'dispatching', {})
+        self.journal.accept('other', 'outsider', HASH)
+        outsider = self.root / 'other' / 'outsider.json'
+        outsider.write_bytes(b'private malformed outsider record')
+        with self.journal.session_lock('session1'):
+            records = self.journal.session_records('session1')
+        self.assertEqual([r['operationId'] for r in records], ['op1'])
+        self.assertEqual(records[0]['state'], 'dispatching')
+        self.assertEqual(self.journal.lookup('session1', 'op1')['state'], 'dispatching')
+        self.assertEqual(outsider.read_bytes(), b'private malformed outsider record')
+        records[0]['result']['private'] = 'not durable'
+        self.assertEqual(self.journal.lookup('session1', 'op1')['result'], {})
+
+    def test_session_snapshot_missing_pair_and_storage_failure_latch_refuse(self):
+        self.journal.accept('session1', 'op1', HASH)
+        with patch('scripts.m1_gateway.journal.os.listdir', side_effect=OSError('private')):
+            with self.assertRaises(JournalError) as caught:
+                self.journal.session_records('session1')
+        self.assertNotIn('private', str(caught.exception))
+        with self.assertRaises(JournalError):
+            self.journal.session_records('session1')
+        self.journal = Journal(str(self.root))
+        (self.root / 'session1' / 'op1.json').unlink()
+        with self.assertRaises(JournalError):
+            self.journal.session_records('session1')
 
     def test_restart_preserves_unknown_and_accepted_without_retry(self):
         self.journal.accept('session1', 'op1', HASH)
