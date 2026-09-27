@@ -1,0 +1,53 @@
+name: AWS Evidence Access Check (Read Only Diagnostic)
+
+on:
+  push:
+    branches: [codex/aws-evidence-access-check]
+    paths: [.github/workflows/aws-evidence-access-check.yml]
+
+permissions: {}
+
+jobs:
+  read-only-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_PAGER: ''
+      AWS_EC2_METADATA_DISABLED: 'true'
+      EVIDENCE_BUCKET: aoa-platform-evidence-010438509726-us-east-1-an
+    steps:
+      - name: Verify identity and bucket configuration without writing objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$AWS_ACCESS_KEY_ID" && test -n "$AWS_SECRET_ACCESS_KEY"
+          aws sts get-caller-identity --output json | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)
+          if d.get("Account") != "010438509726" or d.get("Arn") != "arn:aws:iam::010438509726:user/aoa-s3-artifacts":
+              raise SystemExit("FAIL: credentials do not identify the approved artifact user")
+          print("PASS: credentials identify the approved artifact user")'
+          aws s3api get-bucket-versioning --bucket "$EVIDENCE_BUCKET" --expected-bucket-owner 010438509726 --output json | python3 -c '
+          import json, sys
+          if json.load(sys.stdin).get("Status") != "Enabled":
+              raise SystemExit("FAIL: bucket versioning is not enabled")
+          print("PASS: versioning enabled")'
+          aws s3api get-bucket-encryption --bucket "$EVIDENCE_BUCKET" --expected-bucket-owner 010438509726 --output json | python3 -c '
+          import json, sys
+          rules = json.load(sys.stdin).get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
+          if len(rules) != 1 or rules[0].get("ApplyServerSideEncryptionByDefault", {}).get("SSEAlgorithm") != "AES256":
+              raise SystemExit("FAIL: expected SSE-S3 encryption")
+          print("PASS: SSE-S3 encryption enabled")'
+          aws s3api get-object-lock-configuration --bucket "$EVIDENCE_BUCKET" --expected-bucket-owner 010438509726 --output json | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin).get("ObjectLockConfiguration", {})
+          r = d.get("Rule", {}).get("DefaultRetention", {})
+          if d.get("ObjectLockEnabled") != "Enabled" or r.get("Mode") != "COMPLIANCE" or r.get("Days") != 180 or "Years" in r:
+              raise SystemExit("FAIL: expected fixed 180-day Compliance retention")
+          print("PASS: Object Lock and default 180-day Compliance retention enabled")'
+          aws s3api list-object-versions --bucket "$EVIDENCE_BUCKET" --prefix replatform/ --max-keys 1 --expected-bucket-owner 010438509726 --query 'length(Versions || `[]`)' --output json >/dev/null
+          echo 'PASS: evidence-prefix version listing authorized'
+          echo 'DIAGNOSTIC ONLY: no uploads, deletes, retention edits, campaign execution, or milestone certification'
