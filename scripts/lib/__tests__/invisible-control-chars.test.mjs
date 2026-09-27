@@ -192,6 +192,17 @@ test("no extension is in both the text and the binary list", () => {
   assert.deepEqual(both, []);
 });
 
+test("Python source is scanned as text, including raw control bytes", () => {
+  const file = "scripts/lib/m1a-archive/inspect-zip.py";
+  assert.equal(classifyPath(file), "text");
+  const clean = evaluate({ [file]: "print('ok')\n" });
+  assert.equal(clean.scanned, 1);
+  assert.deepEqual(clean.violations, []);
+  const dirty = evaluate({ [file]: `print('${NUL}')\n` });
+  assert.equal(dirty.scanned, 1);
+  assert.equal(dirty.violations.length, 1);
+});
+
 // ---------------------------------------------------------------- the real tree
 
 test("the repository itself is clean, and every tracked type is classified", () => {

@@ -213,7 +213,7 @@ export const BANNED_CODEPOINTS = new Map([
 
 /** Extensions whose contents are text a human reads and reviews. */
 export const TEXT_EXTENSIONS = new Set([
-  ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs",
+  ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".py",
   ".md", ".json", ".jsonl", ".yml", ".yaml", ".toml", ".sql", ".sh", ".ps1", ".cmd", ".bat",
   ".css", ".scss", ".html", ".svg", ".txt", ".patch", ".diff", ".example", ".env",
   ".dockerfile", ".sha256", ".webmanifest", ".key", ".crt", ".pem", ".3",
