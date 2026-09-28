@@ -1,12 +1,18 @@
 import hashlib
 from pathlib import Path
+import socket
 import sys
 import tempfile
+import threading
 import unittest
 
+from scripts.m1_gateway.protocol import (MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES,
+                                         deadline, decode_response, encode,
+                                         receive_response_frame, send_frame)
 from scripts.m1_gateway.render import render_profile_hash
 from scripts.m1_gateway.render_journal import RenderJournal
 from scripts.m1_gateway.render_session import OfflineRenderSession
+from scripts.m1_gateway.server import serve_accepted_connection
 
 
 def profile():
@@ -125,6 +131,50 @@ class OfflineRenderSessionTests(unittest.TestCase):
         self.assertEqual(session.execute(request())['state'], 'observed-success')
         record = self.journal.lookup('session1', 'render1')
         self.assertEqual(record['inputIdentitySha256'], original_input)
+
+    def test_authenticated_unix_transport_replays_metadata_after_lost_reply(self):
+        def send_once(disconnect=False):
+            client, server = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+            committed = threading.Event()
+            release = threading.Event()
+            def handler(_uid, value):
+                response = self.session.execute(value)
+                if disconnect:
+                    committed.set()
+                    release.wait()
+                return response
+            def serve():
+                try:
+                    serve_accepted_connection(server, lambda _uid: 'session1', handler)
+                finally:
+                    server.close()
+            worker = threading.Thread(target=serve, daemon=True)
+            worker.start()
+            try:
+                send_frame(client, encode(request(), MAX_REQUEST_BYTES),
+                           MAX_REQUEST_BYTES, deadline())
+                if disconnect:
+                    self.assertTrue(committed.wait(timeout=5))
+                    client.close()
+                    release.set()
+                    return None
+                return decode_response(receive_response_frame(client, MAX_RESPONSE_BYTES, 5000))
+            finally:
+                release.set()
+                client.close()
+                worker.join(timeout=5)
+                self.assertFalse(worker.is_alive())
+
+        self.assertIsNone(send_once(disconnect=True))
+        record = self.journal.lookup('session1', 'render1')
+        self.assertEqual(record['state'], 'observed-success')
+        replay = send_once()
+        self.assertEqual(replay['state'], 'observed-success')
+        self.assertEqual(replay['result'], record['result'] | {'renderAvailable': False})
+        self.assertNotIn(b'SECRET_CANARY', encode(replay, MAX_RESPONSE_BYTES))
+        for path in (self.root / 'session1').iterdir():
+            self.assertNotIn(b'SECRET_CANARY', path.read_bytes())
+        self.assertEqual(self.calls, ['capture', 'verify'])
 
 
 if __name__ == '__main__':
