@@ -1,6 +1,6 @@
-# M1a Render Journal Durability Decision (Draft)
+# M1a Render Journal Durability Decision
 
-Status: proposed amendment to the approved render projection spec and plan. This document does not yet authorize implementation of the amended Task 4 persistence protocol, installation, a campaign, or certification. Existing authorization for other offline source work is unchanged.
+Status: TK approved the validated-marker recovery interpretation on 2026-09-28 for offline, fail-closed Task 4 source implementation and tests. This does not authorize installation, a campaign, or certification. Production remains blocked pending exact configuration and evidence decisions.
 
 ## Conflict found in Task 4
 
@@ -23,4 +23,4 @@ A failed marker sync may leave a marker visible. Recovery **adopts** a valid sur
 
 ## Owner decision
 
-TK, as accountable Integration/Security owner, must approve or reject this validated-marker recovery interpretation before source implementation is treated as satisfying Task 4. Independent review must then amend the spec and plan wording together. No change to the production hold, exact protected profile decisions, raw evidence custody, or M1a gate follows from this decision alone.
+TK, as accountable Integration/Security owner, approved this interpretation for offline source work. The spec and plan must carry the same rule, and independent review must check their consistency with the implementation. No change to the production hold, exact protected profile decisions, raw evidence custody, or M1a gate follows from this decision alone.

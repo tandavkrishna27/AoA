@@ -73,8 +73,8 @@ TK, as accountable Integration/Security owner, must approve a written protected-
 
 **Interfaces:** Add a separate versioned render-only journal terminal record carrying render digest, profile hash, scoped/positive-control verdicts, stable codes and operation/session binding. Existing v1 terminal shape remains unchanged. A replay returns committed metadata with `renderAvailable: false`, never the bytes or a new check.
 
-- [ ] Write RED tests for pre/post directory-fsync failure, disconnect, verifier failure after Compose entry, two distinct render operations, cross-mode replay and old v1 record replay. Assert unknown before durable acknowledgement, exact committed metadata afterward, zero redispatch and no raw data persisted.
-- [ ] Implement the new record validator/transition and render route under the existing session lock and fsync discipline. Mark uncertain outcomes after command entry; do not convert a prior digest into a current verdict.
+- [ ] Write RED tests for payload write/file-sync and marker creation/directory-sync faults, lost reply, verifier failure after Compose entry, two distinct render operations, cross-mode replay and old v1 record replay. A durably dispatching operation with an absent marker recovers unknown; a present invalid marker refuses; a valid surviving marker is re-synced and replays exact metadata with no redispatch or raw data persisted. Do not infer reply receipt from a sync outcome.
+- [ ] Implement the new record validator/transition and render route under the existing session lock using the approved validated-marker protocol in `gateway-render-durability-decision-2026-09-28.md`. Mark uncertain outcomes after command entry; do not convert a prior digest into a current verdict.
 - [ ] Run targeted GREEN tests and full gateway Python baseline, including real Linux fsync tests in ordinary CI; commit. Fresh reviewer checks immutable old records, unknown-outcome recovery and privacy.
 
 ### Task 5: Handoff Contracts And Consumer Parity
