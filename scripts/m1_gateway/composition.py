@@ -380,15 +380,24 @@ class ProtectedFiles:
             finally: os.close(fd)
 
 
-def run_private(argv, *, cwd, stdin, timeout_ms, maximum, continuity=None, before_spawn=None):
+def run_private(argv, *, cwd, stdin, timeout_ms, maximum, continuity=None, before_spawn=None,
+                environment=None):
     require(type(argv) is list and argv and all(type(a) is str and '\x00' not in a for a in argv))
     integer(timeout_ms, 1, 2147483647); integer(maximum, 1, 2097152)
     require(type(stdin) is bytes and len(stdin) <= 2097152)
+    if environment is None: environment = {}
+    require(type(environment) is dict and set(environment) in (set(), {'E2B_API_KEY'}))
+    if environment:
+        require(len(argv) == 15 and argv[1:2] == ['--host'] and argv[3:4] == ['compose']
+                and argv[-3:] == ['config', '--format', 'json']
+                and type(environment['E2B_API_KEY']) is str
+                and 1 <= len(environment['E2B_API_KEY']) <= 4096
+                and all(33 <= ord(char) <= 126 for char in environment['E2B_API_KEY']))
     if continuity: continuity()
     child, workers = None, []
     try:
         if before_spawn: before_spawn()
-        child = subprocess.Popen(argv, cwd=cwd, env={}, shell=False, close_fds=True,
+        child = subprocess.Popen(argv, cwd=cwd, env=environment, shell=False, close_fds=True,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             bufsize=0, start_new_session=sys.platform == 'linux')
         streams, failure, total = [bytearray(), bytearray()], threading.Event(), [0]

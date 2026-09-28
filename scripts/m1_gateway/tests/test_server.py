@@ -49,6 +49,18 @@ def schema_anchor():
 
 
 class CompositionTests(unittest.TestCase):
+    def test_execution_session_render_request_refuses_before_custody_or_dispatch(self):
+        c = self.module()
+        runtime = object.__new__(c.SessionRuntime)
+        class NoEffect:
+            def __getattr__(self, name):
+                raise AssertionError('execution boundary crossed')
+        runtime.custody = NoEffect()
+        runtime.dispatcher = NoEffect()
+        request = valid_request('inspect', {'projection': 'render'}) | {
+            'services': ['adapter-manager', 'control-plane', 'migrate']}
+        self.assertEqual(runtime.execute(102, request), c.refusal('handler-error'))
+
     def authority_runtime(self, clock):
         c = self.module()
         runtime = object.__new__(c.SessionRuntime)

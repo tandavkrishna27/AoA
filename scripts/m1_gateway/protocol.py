@@ -108,7 +108,9 @@ def decode_request(raw: bytes) -> dict:
         _require(len(decoded) <= 32768)
     elif op == 'inspect':
         _keys(args, ('projection',))
-        _require(args['projection'] in ('binding', 'topology', 'rollout'))
+        _require(args['projection'] in ('binding', 'topology', 'rollout', 'render'))
+        if args['projection'] == 'render':
+            _require(services == sorted(services))
     elif op == 'logs':
         _keys(args, ('limitBytes',))
         _require(type(args['limitBytes']) is int and 1 <= args['limitBytes'] <= 1048576)

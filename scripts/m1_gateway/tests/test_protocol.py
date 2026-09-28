@@ -95,6 +95,17 @@ class ProtocolTests(unittest.TestCase):
                 with self.subTest(op=op), self.assertRaises(ProtocolError):
                     self.decode(valid_request(op, changed))
 
+    def test_render_projection_requires_closed_arguments_and_sorted_services(self):
+        request = valid_request('inspect', {'projection': 'render'}) | {
+            'services': ['adapter-manager', 'control-plane', 'migrate']}
+        self.assertEqual(self.decode(request), request)
+        for change in ({'services': ['migrate', 'control-plane', 'adapter-manager']},
+                       {'services': ['adapter-manager', 'adapter-manager']},
+                       {'arguments': {'projection': 'render', 'project': 'other'}},
+                       {'arguments': {'projection': 'render', 'env': {}}}):
+            with self.subTest(change=change), self.assertRaises(ProtocolError):
+                self.decode(request | change)
+
     def test_response_closed_shape(self):
         good = dict(version=1, operationId='op_1', state='observed-success', exitCode=0, result={})
         self.assertEqual(decode_response(json.dumps(good).encode()), good)

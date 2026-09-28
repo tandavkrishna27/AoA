@@ -8,11 +8,12 @@
 
 **Tech Stack:** Python standard library, Node ESM, existing Compose invariant module and node:test/unittest suites. No new dependency, live Docker, provider call or campaign in source tests.
 
-**Spec:** `docs/replatform/milestones/M1a/gateway-render-projection-spec-2026-09-28.md` (approved for planning on 2026-09-28). The user approved this plan on 2026-09-28; source execution remains gated on the completed, independently reviewed owner decision packet below.
+**Spec:** `docs/replatform/milestones/M1a/gateway-render-projection-spec-2026-09-28.md` (approved for planning on 2026-09-28). The user approved this plan on 2026-09-28 and explicitly authorized offline, fail-closed source work with test fixtures before the owner packet is complete. Production activation remains gated on the completed, independently reviewed packet.
 
 ## Global Constraints
 
-- Source-only work. No host installation, signing, credential provisioning, AWS upload, provider call, campaign, merge or milestone promotion follows from this plan.
+- The current `m1a-gateway-render-profile-offline-v1` / render policy helper is explicitly `OFFLINE_TEST_ONLY`. It binds service names and dependency edges but cannot represent the complete production image, endpoint, dispatch, sensitive-field or substitution-input expectations. Production startup must refuse it. Task 1 is not complete until a separately reviewed production schema and signed input set cover those fields, plus mode-isolated startup and runtime refusal tests.
+- Source-only work. Ephemeral test signatures are allowed; no trusted production signing, host installation, credential provisioning, AWS upload, provider call, campaign, merge or milestone promotion follows from this plan.
 - Preserve the version-one six-key request envelope. Add only `inspect` with exactly `{ "projection": "render" }` and the complete sorted protected render-profile service set.
 - Keep current execution-session startup inspection and logs-only behavior unchanged; render-only accepts no lifecycle, logs, exec/run, probe, rollout or cleanup operation.
 - No caller-controlled Compose path, project, env, endpoint, validator root, service subset or argv. No inherited candidate/job environment or `DOCKER_HOST`.
@@ -22,7 +23,7 @@
 
 ## Decisions Before Source Execution
 
-TK, as accountable Integration/Security owner, must approve a written protected-input/profile packet: exact Compose file/project and substitution-input identities (including private value hashes), complete expected service/dependency/flag/endpoint set, private render byte/time ceilings, closed stable violation-code set, and whether raw bytes require separately authorized evidence custody. These are not inferred from fixtures, the historical candidate or this plan. An independent reviewer must confirm the packet agrees with the execution profile where services overlap. Until then, tasks below are design instructions only; no placeholder profile is promoted to production.
+TK, as accountable Integration/Security owner, must approve a written protected-input/profile packet: exact Compose file/project and substitution-input identities (including private value hashes), complete expected service/dependency/flag/endpoint set, private render byte/time ceilings, closed stable violation-code set, and whether raw bytes require separately authorized evidence custody. These are not inferred from fixtures, the historical candidate or this plan. An independent reviewer must confirm the packet agrees with the execution profile where services overlap. Offline test-fixture implementation is authorized first; production startup must refuse unless the independently reviewed packet is installed as a signed protected profile. No placeholder profile is promoted to production.
 
 ## Review Focus
 
@@ -94,4 +95,4 @@ TK, as accountable Integration/Security owner, must approve a written protected-
 
 ## Execution Handoff
 
-Execute sequentially with fresh implementer/reviewer gates because profile, capture, verifier and journal interfaces depend on each other. The plan is approved, but the owner packet must be completed and independently reviewed before implementation. Later live installation, provider pre-create binding, independent retention verifier, new candidate/freeze, D1, shipped-boot/keyed campaign and E5 certification require their own approvals and evidence; none is supplied by this source plan.
+Execute sequentially with fresh implementer/reviewer gates because profile, capture, verifier and journal interfaces depend on each other. The plan and offline, fail-closed source sequencing are approved; the owner packet must be completed and independently reviewed before any production activation. Later live installation, provider pre-create binding, independent retention verifier, new candidate/freeze, D1, shipped-boot/keyed campaign and E5 certification require their own approvals and evidence; none is supplied by this source plan.
