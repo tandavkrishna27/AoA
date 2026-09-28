@@ -125,9 +125,8 @@ class RenderJournalTests(unittest.TestCase):
             self.assertNotIn(b'SECRET_CANARY', path.read_bytes())
 
     def test_terminal_without_marker_recovers_unknown_not_success(self):
-        self.dispatch()
-        terminal = render_transition(self.journal.lookup('session1', 'render1'),
-                                     SERVICES, 'observed-success', verdict())
+        dispatch = self.dispatch()
+        terminal = render_transition(dispatch, SERVICES, 'observed-success', verdict())
         path = self.root / 'session1' / 'render1.terminal'
         path.write_bytes(json.dumps(terminal, separators=(',', ':')).encode('ascii'))
         path.chmod(0o600)
