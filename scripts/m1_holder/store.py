@@ -17,6 +17,9 @@ import uuid
 MAX_RECORD_BYTES = 65536
 MAX_BYTES = 64 * 1024 * 1024
 KEY = re.compile(r'[0-9a-f]{64}(?::(?:0|[1-9][0-9]*))?\Z', re.ASCII)
+RAW_NAME = re.compile(r'(?:[0-9a-f]{64}(?:-(?:0|[1-9][0-9]*))?\.bin|'
+                      r'\.tmp-[0-9a-f]{64}(?:-(?:0|[1-9][0-9]*))?\.bin-.+)\Z',
+                      re.ASCII)
 
 
 class StoreError(ValueError):
@@ -169,6 +172,21 @@ class Store:
         prefixes = ('.tmp-' + base + '.json-', '.tmp-' + base + '.bin-')
         return any(name.startswith(prefixes) for name in os.listdir(directory))
 
+    @staticmethod
+    def _raw_usage(directory):
+        total = 0
+        for name in os.listdir(directory):
+            if RAW_NAME.fullmatch(name) is None:
+                continue
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                         dir_fd=directory)
+            try:
+                total += _file(fd).st_size
+                _require(total <= MAX_BYTES)
+            finally:
+                os.close(fd)
+        return total
+
     def read(self, key):
         base = self._key(key)
         with self._directory() as fd:
@@ -183,13 +201,14 @@ class Store:
                 self._failed = True
                 raise StoreError() from None
 
-    def read_bytes(self, key):
+    def read_bytes(self, key, limit=MAX_BYTES):
+        _require(type(limit) is int and 0 <= limit <= MAX_BYTES)
         base = self._key(key)
         with self._directory() as fd:
             try:
                 _require(not self._partials(fd, base))
                 record = self._read_file(fd, base + '.json', MAX_RECORD_BYTES)
-                raw = self._read_file(fd, base + '.bin', MAX_BYTES)
+                raw = self._read_file(fd, base + '.bin', limit)
                 _require(record is not None or raw is None)
                 if record is not None:
                     self._record(record)
@@ -219,6 +238,7 @@ class Store:
                     return
                 _require(old_bytes is None)
                 if bytes is not None:
+                    _require(self._raw_usage(fd) + len(bytes) <= MAX_BYTES)
                     self._publish(fd, base + '.bin', bytes)
                 self._publish(fd, base + '.json', encoded)
             except OSError:

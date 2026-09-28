@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.m1_holder.store import Store, StoreError
+from scripts.m1_holder.store import MAX_BYTES, Store, StoreError
 
 
 class PartialMatcherTests(unittest.TestCase):
@@ -73,11 +73,36 @@ class StoreTests(unittest.TestCase):
         store.commit(self.KEY, record, b'abc')
         self.assertEqual(store.read(self.KEY), record)
         self.assertEqual(store.read_bytes(self.KEY), b'abc')
+        with self.assertRaises(StoreError):
+            store.read_bytes(self.KEY, 2)
         store.commit(self.KEY, {'name': 'ready', 'schema': 1}, b'abc')
         with self.assertRaises(StoreError):
             store.commit(self.KEY, record, b'changed')
         with self.assertRaises(StoreError):
             store.commit(self.KEY, {'schema': 2}, b'abc')
+
+    def test_aggregate_limit_survives_restart_and_exact_replay(self):
+        first = b'a' * (MAX_BYTES - 3)
+        self.store().commit(self.KEY, {'v': 1}, first)
+        restarted = self.store()
+        restarted.commit(self.KEY, {'v': 1}, first)
+        with self.assertRaises(StoreError):
+            restarted.commit('b' * 64, {'v': 2}, b'four')
+        restarted.commit('b' * 64, {'v': 2}, b'abc')
+
+    def test_retained_raw_temporary_counts_toward_aggregate(self):
+        temporary = self.root / ('.tmp-' + 'b' * 64 + '.bin-incomplete')
+        temporary.write_bytes(b'a' * (MAX_BYTES - 2))
+        os.chmod(temporary, 0o600)
+        with self.assertRaises(StoreError):
+            self.store().commit(self.KEY, {'v': 1}, b'abc')
+
+    def test_symlink_raw_entry_refuses_without_following_target(self):
+        target = Path(self.tmp.name) / 'target'
+        target.write_bytes(b'a')
+        (self.root / ('b' * 64 + '.bin')).symlink_to(target)
+        with self.assertRaises(StoreError):
+            self.store().commit(self.KEY, {'v': 1}, b'a')
 
     def test_partial_temporary_file_refuses_commit(self):
         store = self.store()
