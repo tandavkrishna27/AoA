@@ -83,6 +83,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate testing-host diagnostic contract
+        run: python3 scripts/m1_host_diagnostic/test_testing_workflow_contract.py
+
       - name: Block manual lockfile edits
         if: github.event_name == 'pull_request'
         run: |
