@@ -544,10 +544,18 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
                     try:
                         gateway.serve()
                     except Exception as error: errors.append(error)
+                def wait_for_listener():
+                    until = __import__('time').monotonic() + 5
+                    while __import__('time').monotonic() < until and not errors:
+                        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                            try:
+                                probe.connect(str(socket_parent/'gateway'))
+                                return
+                            except (FileNotFoundError, ConnectionRefusedError):
+                                __import__('time').sleep(0.01)
+                    self.fail(f'gateway listener did not start: {errors}')
                 worker=threading.Thread(target=serve, daemon=True); worker.start()
-                until=__import__('time').monotonic()+5
-                while not (socket_parent/'gateway').exists() and __import__('time').monotonic()<until:
-                    __import__('time').sleep(0.01)
+                wait_for_listener()
                 req=dict(version=1,session='session1',operationId='op1',operation='logs',services=['worker'],arguments={'limitBytes':100})
                 armed.set()
                 if scenario == 'success':
@@ -556,7 +564,8 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
                     self.assertEqual(first['result']['streams']['stdoutBase64'],base64.b64encode(b'private-log').decode())
                 else:
                     with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as candidate:
-                        candidate.settimeout(10); candidate.connect(str(socket_parent/'gateway')); candidate.sendall(frame(req))
+                        candidate.settimeout(10)
+                        candidate.connect(str(socket_parent/'gateway')); candidate.sendall(frame(req))
                         if scenario == 'disconnect':
                             self.assertTrue(logs_entered.wait(5)); candidate.close(); logs_continue.set()
                             self.assertTrue(released.wait(5))
@@ -587,9 +596,7 @@ signature:crypto.sign(null,bytes,keys.privateKey).toString('base64'),publicKey:k
                     runtime=c.SessionRuntime(anchor,manifest,session,files,custody,c.Journal(str(journal_root)))
                     gateway=c.GatewayRuntime(anchor,manifest,files,custody,{os.getuid():runtime})
                     worker=threading.Thread(target=serve,daemon=True); worker.start()
-                    until=__import__('time').monotonic()+5
-                    while not (socket_parent/'gateway').exists() and __import__('time').monotonic()<until:
-                        __import__('time').sleep(0.01)
+                    wait_for_listener()
                     replay=client.request(str(socket_parent/'gateway'),req,timeout_ms=20000)
                     self.assertEqual(replay['state'],record['state'])
                     self.assertEqual(replay['result']['streams'],dict(available=False,complete=False,stdoutBase64=None,stderrBase64=None))
