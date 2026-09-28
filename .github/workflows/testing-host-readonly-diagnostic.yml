@@ -1,0 +1,154 @@
+name: Testing host read-only diagnostic
+# Operator prerequisite: the host key must be supplied by the owner and verified
+# out of band against the testing host. This workflow cannot establish that trust.
+# No automatic dispatch or registration trigger is permitted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed workflow commit (40 lowercase hex characters)
+        required: true
+        type: string
+      host_public_key:
+        description: Independently verified SSH host public key line for 89.167.10.169
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: testing-host-readonly-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/m1a-host-boundary-dossier'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validate reviewed ref and independent host pin
+        shell: bash
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          HOST_PUBLIC_KEY: ${{ inputs.host_public_key }}
+        run: |
+          set -euo pipefail
+          [[ "$REVIEWED_SHA" =~ ^[0-9a-f]{40}$ && "$GITHUB_SHA" == "$REVIEWED_SHA" ]] || {
+            echo 'Reviewed exact workflow revision required'; exit 1;
+          }
+          [[ "$GITHUB_REF" == refs/heads/codex/m1a-host-boundary-dossier ]] || exit 1
+          [[ "$HOST_PUBLIC_KEY" =~ ^89\.167\.10\.169\ ssh-ed25519\ AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{43}$ ]] || {
+            echo 'Independently verified exact Ed25519 host key required'; exit 1;
+          }
+          printf '%s\n' "$HOST_PUBLIC_KEY" > "$RUNNER_TEMP/testing-host-known-hosts"
+          chmod 600 "$RUNNER_TEMP/testing-host-known-hosts"
+          ssh-keygen -lf "$RUNNER_TEMP/testing-host-known-hosts" >/dev/null 2>&1 || exit 1
+
+      - name: Inspect bounded testing host facts
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PASSPHRASE: ${{ secrets.DEPLOY_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          key="$RUNNER_TEMP/testing-diagnostic-key"
+          askpass="$RUNNER_TEMP/testing-diagnostic-askpass"
+          hosts="$RUNNER_TEMP/testing-host-known-hosts"
+          result="$RUNNER_TEMP/testing-diagnostic-result"
+          cleanup() {
+            rm -f -- "$key" "$askpass" "$hosts" "$result"
+            if [[ -n "${SSH_AGENT_PID:-}" ]]; then ssh-agent -k >/dev/null 2>&1 || true; fi
+          }
+          trap cleanup EXIT
+          [[ -s "$hosts" && -n "$DEPLOY_SSH_KEY" && -n "$DEPLOY_PASSPHRASE" ]] || exit 1
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$DEPLOY_PASSPHRASE"' > "$askpass"
+          chmod 600 "$key"
+          chmod 700 "$askpass"
+          eval "$(ssh-agent -s)" >/dev/null
+          DISPLAY=:0 SSH_ASKPASS="$askpass" SSH_ASKPASS_REQUIRE=force ssh-add "$key" </dev/null >/dev/null 2>&1
+          unset DEPLOY_SSH_KEY DEPLOY_PASSPHRASE
+          rm -f -- "$key" "$askpass"
+          ulimit -f 16
+          if timeout 120 ssh -p 22 -o BatchMode=yes -o ConnectTimeout=15 \
+            -o IdentitiesOnly=no -o PreferredAuthentications=publickey \
+            -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
+            -o ForwardAgent=no -o StrictHostKeyChecking=yes \
+            -o HostKeyAlgorithms=ssh-ed25519 -o "UserKnownHostsFile=$hosts" \
+            root@89.167.10.169 'bash -s' > "$result" 2>/dev/null <<'REMOTE'
+          set -euo pipefail
+          exec 2>/dev/null
+          printf 'uid=%s\n' "$(id -u)"
+          printf 'gid=%s\n' "$(id -g)"
+          printf 'architecture=%s\n' "$(uname -m)"
+          printf 'cpus=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+          awk '/^MemTotal:/ {print "memory_kib=" $2}' /proc/meminfo
+          awk '/^MemAvailable:/ {print "memory_available_kib=" $2}' /proc/meminfo
+          df -Pk / | awk 'NR==2 {print "root_total_kib=" $2; print "root_available_kib=" $4}'
+          if test -S /var/run/docker.sock; then
+            printf 'docker_socket=present\n'
+            stat -Lc 'docker_socket_uid=%u' /var/run/docker.sock
+            stat -Lc 'docker_socket_gid=%g' /var/run/docker.sock
+            stat -Lc 'docker_socket_mode=%a' /var/run/docker.sock
+            printf 'containers_running=%s\n' "$(docker ps -q | wc -l | tr -d ' ')"
+            printf 'containers_total=%s\n' "$(docker ps -aq | wc -l | tr -d ' ')"
+            printf 'testing_containers_running=%s\n' "$(docker ps -q --filter label=com.docker.compose.project=aoa | wc -l | tr -d ' ')"
+          elif test -e /var/run/docker.sock; then
+            exit 1
+          else
+            printf 'docker_socket=absent\n'
+          fi
+          if getent passwd aoa >/dev/null; then
+            printf 'aoa_account=present\n'
+          else
+            test "$?" -eq 2
+            printf 'aoa_account=absent\n'
+          fi
+          if test -d /opt/aoa; then printf 'deployment_root=present\n'; else printf 'deployment_root=absent\n'; fi
+          REMOTE
+          then
+            :
+          else
+            echo 'SSH inspection failed; no host facts published'
+            exit 1
+          fi
+          python3 - "$result" <<'PY'
+          import pathlib, re, sys
+          path = pathlib.Path(sys.argv[1])
+          if path.stat().st_size > 2048:
+              raise SystemExit('Metadata size refused')
+          numeric = {'uid', 'gid', 'cpus', 'memory_kib', 'memory_available_kib',
+                     'root_total_kib', 'root_available_kib', 'docker_socket_uid',
+                     'docker_socket_gid', 'containers_running', 'containers_total',
+                     'testing_containers_running'}
+          flags = {'docker_socket', 'aoa_account', 'deployment_root'}
+          socket = {'docker_socket_uid', 'docker_socket_gid', 'docker_socket_mode',
+                    'containers_running', 'containers_total', 'testing_containers_running'}
+          required = {'uid', 'gid', 'architecture', 'cpus', 'memory_kib',
+                      'memory_available_kib', 'root_total_kib', 'root_available_kib'} | flags
+          rows = {}
+          for line in path.read_text(encoding='utf-8').splitlines():
+              key, sep, value = line.partition('=')
+              valid = ((key in numeric and re.fullmatch(r'[0-9]{1,16}', value))
+                       or (key == 'docker_socket_mode' and re.fullmatch(r'[0-7]{3,4}', value))
+                       or (key in flags and value in {'present', 'absent'})
+                       or (key == 'architecture' and value in {'x86_64', 'aarch64'}))
+              if not sep or key in rows or not valid:
+                  raise SystemExit('Metadata schema refused')
+              rows[key] = value
+          if (not required <= rows.keys() or
+              (socket <= rows.keys()) != (rows['docker_socket'] == 'present') or
+              (socket & rows.keys() and not socket <= rows.keys()) or
+              int(rows['cpus']) == 0 or
+              int(rows['memory_available_kib']) > int(rows['memory_kib']) or
+              int(rows['root_available_kib']) > int(rows['root_total_kib']) or
+              (rows['docker_socket'] == 'present' and not
+               int(rows['testing_containers_running']) <= int(rows['containers_running']) <= int(rows['containers_total']))):
+              raise SystemExit('Metadata incomplete')
+          print('READ_ONLY_DIAGNOSTIC_NOT_CUSTODY_PROOF')
+          for key, value in sorted(rows.items()):
+              print(f'{key}={value}')
+          PY
