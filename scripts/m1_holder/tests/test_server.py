@@ -330,6 +330,8 @@ server._serve(__import__('sys').argv[1], __import__('sys').argv[2],
                 self.stop_all()
                 if os.path.exists(self.path):
                     os.unlink(self.path)
+                self.root = Path(self.tmp.name) / f'private-crash-{point}'
+                self.root.mkdir(mode=0o700)
                 self.start(crash=point)
                 conn = self.connect()
                 self.assertEqual(self.request(conn, {'op': 'lock'}), {'ok': True})
