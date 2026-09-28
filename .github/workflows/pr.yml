@@ -682,6 +682,11 @@ jobs:
         run: |
           node --test scripts/lib/m1a-archive/s3-store.test.mjs scripts/lib/m1a-archive/evidence.test.mjs scripts/lib/m1a-archive/readback.test.mjs scripts/m1a-archive.test.mjs scripts/verify-m1a-archive.test.mjs scripts/lib/__tests__/m1a-controller.test.mjs scripts/lib/__tests__/m1a-image-policy.test.mjs scripts/lib/__tests__/m1a-start-guard.test.mjs scripts/lib/__tests__/m1a-final-evidence.test.mjs scripts/lib/__tests__/m1a-evidence-disposition.test.mjs scripts/lib/__tests__/m1a-protected-workflow-shape.test.mjs
 
+      - name: M1a private holder Linux filesystem tests
+        run: |
+          python3 -c 'import sys; assert sys.platform == "linux"'
+          python3 -m unittest scripts.m1_holder.tests.test_store -v
+
       - name: CI lane routing invariants (DEP-004)
         run: |
           node scripts/check-ci-lanes.mjs
