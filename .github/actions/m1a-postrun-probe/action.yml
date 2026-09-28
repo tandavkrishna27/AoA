@@ -1,0 +1,7 @@
+name: M1a synthetic post-action marker
+description: Inert job-log and artifact identity probe
+runs:
+  using: node20
+  main: main.cjs
+  post: post.cjs
+  post-if: always()

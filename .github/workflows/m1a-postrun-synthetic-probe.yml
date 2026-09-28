@@ -1,0 +1,64 @@
+name: M1a inert post-run export probe
+
+on:
+  push:
+    branches:
+      - codex/m1a-postrun-synthetic-probe
+
+permissions:
+  contents: read
+
+jobs:
+  alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start marker
+        run: echo "M1A_PROBE_START alpha"
+      - name: Main and post marker
+        uses: ./.github/actions/m1a-postrun-probe
+        env:
+          M1A_PROBE_JOB: alpha
+          M1A_PROBE_OUT: ${{ runner.temp }}/m1a-probe
+      - name: Body marker
+        run: echo "M1A_PROBE_BODY alpha"
+      - name: Upload inert identity
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: m1a-probe-alpha-${{ github.run_id }}-r${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m1a-probe/alpha.json
+          retention-days: 1
+          if-no-files-found: error
+      - name: Teardown marker
+        if: always()
+        run: echo "M1A_PROBE_TEARDOWN alpha"
+
+  beta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start marker
+        run: echo "M1A_PROBE_START beta"
+      - name: Main and post marker
+        uses: ./.github/actions/m1a-postrun-probe
+        env:
+          M1A_PROBE_JOB: beta
+          M1A_PROBE_OUT: ${{ runner.temp }}/m1a-probe
+      - name: Body marker
+        run: echo "M1A_PROBE_BODY beta"
+      - name: Upload inert identity
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: m1a-probe-beta-${{ github.run_id }}-r${{ github.run_attempt }}
+          path: ${{ runner.temp }}/m1a-probe/beta.json
+          retention-days: 1
+          if-no-files-found: error
+      - name: Teardown marker
+        if: always()
+        run: echo "M1A_PROBE_TEARDOWN beta"
