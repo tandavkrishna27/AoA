@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   inspect:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/m1a-host-boundary-dossier'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -37,7 +37,7 @@ jobs:
           [[ "$REVIEWED_SHA" =~ ^[0-9a-f]{40}$ && "$GITHUB_SHA" == "$REVIEWED_SHA" ]] || {
             echo 'Reviewed exact workflow revision required'; exit 1;
           }
-          [[ "$GITHUB_REF" == refs/heads/codex/m1a-host-boundary-dossier ]] || exit 1
+          [[ "$GITHUB_REF" == refs/heads/main ]] || exit 1
           [[ "$HOST_PUBLIC_KEY" =~ ^89\.167\.10\.169\ ssh-ed25519\ AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{43}$ ]] || {
             echo 'Independently verified exact Ed25519 host key required'; exit 1;
           }
