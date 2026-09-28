@@ -60,8 +60,10 @@ jobs:
           set -euo pipefail
           exec 2>/dev/null
           printf 'uid=%s\n' "$(id -u)"
+          printf 'gid=%s\n' "$(id -g)"
           printf 'cpus=%s\n' "$(getconf _NPROCESSORS_ONLN)"
           awk '/^MemTotal:/ {print "memory_kib=" $2}' /proc/meminfo
+          awk '/^MemAvailable:/ {print "memory_available_kib=" $2}' /proc/meminfo
           df -Pk / | awk 'NR==2 {print "root_total_kib=" $2; print "root_available_kib=" $4}'
           printf 'architecture=%s\n' "$(uname -m)"
           printf 'virtualization=%s\n' "$(systemd-detect-virt || true)"
@@ -77,13 +79,75 @@ jobs:
           for tool in docker podman unshare bwrap; do
             if command -v "$tool" >/dev/null 2>&1; then printf '%s=present\n' "$tool"; else printf '%s=absent\n' "$tool"; fi
           done
+          if test -e /var/run/docker.sock && ! test -S /var/run/docker.sock; then exit 1; fi
           if test -S /var/run/docker.sock; then
-            stat -c 'docker_socket_mode=%a' /var/run/docker.sock
-            printf 'containers_running=%s\n' "$(docker ps -q | wc -l | tr -d ' ')"
-            printf 'containers_total=%s\n' "$(docker ps -aq | wc -l | tr -d ' ')"
-            printf 'campaign_containers_running=%s\n' "$(docker ps -q --filter label=com.docker.compose.project=aoa-staging | wc -l | tr -d ' ')"
+            stat -Lc 'docker_socket_uid=%u' /var/run/docker.sock
+            stat -Lc 'docker_socket_gid=%g' /var/run/docker.sock
+            stat -Lc 'docker_socket_mode=%a' /var/run/docker.sock
+            containers_running="$(docker ps -q | wc -l | tr -d ' ')"
+            containers_total="$(docker ps -aq | wc -l | tr -d ' ')"
+            campaign_containers_running="$(docker ps -q --filter label=com.docker.compose.project=aoa-staging | wc -l | tr -d ' ')"
+            printf 'containers_running=%s\ncontainers_total=%s\ncampaign_containers_running=%s\n' \
+              "$containers_running" "$containers_total" "$campaign_containers_running"
           fi
-          if getent passwd aoa-campaign >/dev/null; then printf 'dedicated_user=present\n'; else printf 'dedicated_user=absent\n'; fi
+          # ACCOUNT_PROBE_BEGIN
+          if getent passwd aoa-campaign >/dev/null; then
+            campaign_account=present
+          else
+            rc=$?
+            if test "$rc" -ne 2; then exit 1; fi
+            campaign_account=absent
+          fi
+          printf 'dedicated_user=%s\ncampaign_account=%s\n' "$campaign_account" "$campaign_account"
+          if docker_group_entry="$(getent group docker)"; then
+            docker_gid="$(printf '%s\n' "$docker_group_entry" | cut -d: -f3)"
+            case "$docker_gid" in ''|*[!0-9]*) exit 1 ;; esac
+            printf 'docker_group=present\n'
+          else
+            rc=$?
+            if test "$rc" -ne 2; then exit 1; fi
+            docker_gid=''
+            printf 'docker_group=absent\n'
+          fi
+          if test "$campaign_account" = present && test -n "$docker_gid"; then
+            candidate_group_ids="$(id -G aoa-campaign)"
+            [[ "$candidate_group_ids" =~ ^[0-9]+(\ [0-9]+)*$ ]] || exit 1
+            case " $candidate_group_ids " in
+              *" $docker_gid "*) printf 'candidate_in_docker_group=yes\n' ;;
+              *) printf 'candidate_in_docker_group=no\n' ;;
+            esac
+          else
+            printf 'candidate_in_docker_group=not_applicable\n'
+          fi
+          # ACCOUNT_PROBE_END
+          active="$(systemctl is-active docker || true)"
+          case "$active" in active|inactive|failed) ;; *) active=unknown ;; esac
+          printf 'docker_service_active=%s\n' "$active"
+          enabled="$(systemctl is-enabled docker || true)"
+          case "$enabled" in enabled|disabled|static|masked) ;; *) enabled=unknown ;; esac
+          printf 'docker_service_enabled=%s\n' "$enabled"
+          if test -d /run/user; then
+            printf 'rootless_runtime_dir=present\n'
+            rootless_socket_count="$(find /run/user -maxdepth 3 -type s -name docker.sock -printf . | wc -c | tr -d ' ')"
+            printf 'rootless_socket_count=%s\n' "$rootless_socket_count"
+          else
+            printf 'rootless_runtime_dir=absent\n'
+          fi
+          # STORAGE_PROBE_BEGIN
+          if test -d /var/lib/docker; then
+            printf 'docker_storage=present\n'
+            df -Pk /var/lib/docker | awk 'NR==2 {print "docker_storage_total_kib=" $2; print "docker_storage_available_kib=" $4}'
+            root_device="$(stat -Lc %d /)"
+            docker_device="$(stat -Lc %d /var/lib/docker)"
+            if test "$root_device" = "$docker_device"; then
+              printf 'docker_storage_shares_root=yes\n'
+            else
+              printf 'docker_storage_shares_root=no\n'
+            fi
+          else
+            printf 'docker_storage=absent\n'
+          fi
+          # STORAGE_PROBE_END
           REMOTE
           then
             :
@@ -98,18 +162,53 @@ jobs:
           if path.stat().st_size > 4096:
               raise SystemExit('metadata size refused')
           rows = {}
-          numeric = {'uid', 'cpus', 'memory_kib', 'root_total_kib', 'root_available_kib',
-                     'containers_running', 'containers_total', 'campaign_containers_running', 'docker_socket_mode'}
-          flags = {'kvm', 'docker_socket', 'campaign_root', 'deployment_root', 'docker', 'podman', 'unshare', 'bwrap', 'dedicated_user'}
-          enums = {'architecture': {'x86_64', 'aarch64'}, 'virtualization': {'none', 'kvm', 'qemu', 'vmware', 'microsoft', 'xen', 'lxc', 'docker', 'podman', 'amazon'}}
+          numeric = {'uid', 'gid', 'cpus', 'memory_kib', 'memory_available_kib',
+                     'root_total_kib', 'root_available_kib', 'docker_socket_uid',
+                     'docker_socket_gid', 'containers_running', 'containers_total',
+                     'campaign_containers_running', 'rootless_socket_count',
+                     'docker_storage_total_kib', 'docker_storage_available_kib'}
+          flags = {'kvm', 'docker_socket', 'campaign_root', 'deployment_root', 'docker',
+                   'podman', 'unshare', 'bwrap', 'dedicated_user', 'campaign_account',
+                   'docker_group', 'rootless_runtime_dir', 'docker_storage'}
+          enums = {'architecture': {'x86_64', 'aarch64'},
+                   'virtualization': {'none', 'kvm', 'qemu', 'vmware', 'microsoft', 'xen', 'lxc', 'docker', 'podman', 'amazon'},
+                   'candidate_in_docker_group': {'yes', 'no', 'not_applicable'},
+                   'docker_service_active': {'active', 'inactive', 'failed', 'unknown'},
+                   'docker_service_enabled': {'enabled', 'disabled', 'static', 'masked', 'unknown'},
+                   'docker_storage_shares_root': {'yes', 'no'}}
           for line in path.read_text(encoding='utf-8').splitlines():
               key, sep, value = line.partition('=')
-              valid = (key in numeric and re.fullmatch(r'[0-9]{1,16}', value)) or (key in flags and value in {'present', 'absent'}) or (key in enums and value in enums[key])
+              valid = ((key in numeric and re.fullmatch(r'[0-9]{1,16}', value))
+                       or (key == 'docker_socket_mode' and re.fullmatch(r'[0-7]{3,4}', value))
+                       or (key in flags and value in {'present', 'absent'})
+                       or (key in enums and value in enums[key]))
               if not sep or key in rows or not valid:
                   raise SystemExit('metadata schema refused')
               rows[key] = value
-          required = {'uid', 'cpus', 'memory_kib', 'root_total_kib', 'root_available_kib', 'architecture', 'virtualization'} | flags
-          if not required.issubset(rows):
+          required = {'uid', 'gid', 'cpus', 'memory_kib', 'memory_available_kib',
+                      'root_total_kib', 'root_available_kib', 'architecture', 'virtualization',
+                      'candidate_in_docker_group', 'docker_service_active', 'docker_service_enabled'} | flags
+          socket_fields = {'docker_socket_uid', 'docker_socket_gid', 'docker_socket_mode',
+                           'containers_running', 'containers_total', 'campaign_containers_running'}
+          storage_fields = {'docker_storage_total_kib', 'docker_storage_available_kib',
+                            'docker_storage_shares_root'}
+          if (not required.issubset(rows)
+              or (socket_fields <= rows.keys()) != (rows['docker_socket'] == 'present')
+              or (socket_fields & rows.keys() and not socket_fields <= rows.keys())
+              or (storage_fields <= rows.keys()) != (rows['docker_storage'] == 'present')
+              or (storage_fields & rows.keys() and not storage_fields <= rows.keys())
+              or ('rootless_socket_count' in rows) != (rows['rootless_runtime_dir'] == 'present')
+              or (rows['candidate_in_docker_group'] == 'not_applicable') !=
+                 (rows['campaign_account'] == 'absent' or rows['docker_group'] == 'absent')
+              or rows['dedicated_user'] != rows['campaign_account']
+              or int(rows['cpus']) == 0
+              or int(rows['memory_available_kib']) > int(rows['memory_kib'])
+              or int(rows['root_available_kib']) > int(rows['root_total_kib'])
+              or (rows['rootless_runtime_dir'] == 'present' and int(rows['rootless_socket_count']) > 16)
+              or (rows['docker_storage'] == 'present' and
+                  int(rows['docker_storage_available_kib']) > int(rows['docker_storage_total_kib']))
+              or (rows['docker_socket'] == 'present' and
+                  not (int(rows['campaign_containers_running']) <= int(rows['containers_running']) <= int(rows['containers_total'])))):
               raise SystemExit('metadata incomplete')
           print('READ_ONLY_DIAGNOSTIC_NOT_CUSTODY_PROOF')
           for key, value in sorted(rows.items()):
