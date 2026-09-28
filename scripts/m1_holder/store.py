@@ -166,7 +166,8 @@ class Store:
 
     @staticmethod
     def _partials(directory, base):
-        return any(name.startswith('.tmp-' + base) for name in os.listdir(directory))
+        prefixes = ('.tmp-' + base + '.json-', '.tmp-' + base + '.bin-')
+        return any(name.startswith(prefixes) for name in os.listdir(directory))
 
     def read(self, key):
         base = self._key(key)

@@ -9,6 +9,16 @@ from unittest.mock import patch
 from scripts.m1_holder.store import Store, StoreError
 
 
+class PartialMatcherTests(unittest.TestCase):
+    def test_sibling_sequence_temporary_does_not_block_current_key(self):
+        key = 'a' * 64
+        with patch('scripts.m1_holder.store.os.listdir', return_value=[
+            f'.tmp-{key}-10.bin-incomplete',
+        ]):
+            self.assertFalse(Store._partials(0, f'{key}-1'))
+            self.assertTrue(Store._partials(0, f'{key}-10'))
+
+
 @unittest.skipUnless(sys.platform == 'linux', 'requires Linux O_NOFOLLOW and directory fsync')
 class StoreTests(unittest.TestCase):
     KEY = 'a' * 64
@@ -71,9 +81,18 @@ class StoreTests(unittest.TestCase):
 
     def test_partial_temporary_file_refuses_commit(self):
         store = self.store()
-        (self.root / ('.tmp-' + self.KEY + '-partial')).write_bytes(b'partial')
+        (self.root / ('.tmp-' + self.KEY + '.bin-partial')).write_bytes(b'partial')
         with self.assertRaises(StoreError):
             store.commit(self.KEY, {'schema': 1}, b'abc')
+
+    def test_sibling_temporary_does_not_block_persisted_sequence(self):
+        store = self.store()
+        store.commit(self.KEY + ':1', {'schema': 1}, b'abc')
+        (self.root / ('.tmp-' + self.KEY + '-10.bin-partial')).write_bytes(b'partial')
+        self.assertEqual(store.read(self.KEY + ':1'), {'schema': 1})
+        self.assertEqual(store.read_bytes(self.KEY + ':1'), b'abc')
+        with self.assertRaises(StoreError):
+            store.read(self.KEY + ':10')
 
     def test_replay_resyncs_existing_record_and_bytes_before_ack(self):
         store = self.store()
