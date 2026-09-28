@@ -32,10 +32,10 @@ jobs:
           path: ${{ runner.temp }}/m1a-probe/alpha.json
           retention-days: 1
           if-no-files-found: error
-      - name: Intentional failure marker
+      - name: Cancellation hold
         run: |
-          echo "M1A_PROBE_FAILURE alpha"
-          exit 17
+          echo "M1A_PROBE_HOLD alpha"
+          sleep 120
       - name: Teardown marker
         if: always()
         run: echo "M1A_PROBE_TEARDOWN alpha"

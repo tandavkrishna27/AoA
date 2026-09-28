@@ -53,16 +53,16 @@ test('workflow is two-job inert branch-only and has no sensitive capabilities', 
   assert.doesNotMatch(workflow, /workflow_dispatch|secrets\.|ssh|aws|e2b|docker|environment:/i);
 });
 
-test('alpha failure happens after upload and before always-run teardown', () => {
+test('alpha cancellation hold happens after upload and before always-run teardown', () => {
   const workflow = readFileSync(fileURLToPath(new URL('../../workflows/m1a-postrun-synthetic-probe.yml', import.meta.url)), 'utf8');
   const alpha = workflow.split(/\n  alpha:\s*\n/)[1]?.split(/\n  beta:\s*\n/)[0];
   assert.ok(alpha);
   const upload = alpha.indexOf('name: Upload inert identity');
-  const failure = alpha.indexOf('name: Intentional failure marker');
+  const hold = alpha.indexOf('name: Cancellation hold');
   const teardown = alpha.indexOf('name: Teardown marker');
-  assert.ok(upload >= 0 && upload < failure && failure < teardown);
-  const failureStep = alpha.slice(failure, teardown);
-  assert.match(failureStep, /M1A_PROBE_FAILURE alpha/);
-  assert.match(failureStep, /exit 17/);
+  assert.ok(upload >= 0 && upload < hold && hold < teardown);
+  const holdStep = alpha.slice(hold, teardown);
+  assert.match(holdStep, /M1A_PROBE_HOLD alpha/);
+  assert.match(holdStep, /sleep 120/);
   assert.match(alpha, /name: Teardown marker\s*\n\s*if: always\(\)/);
 });
