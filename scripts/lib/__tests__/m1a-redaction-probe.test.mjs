@@ -24,6 +24,10 @@ import {
   redactionProbeMatrixRow,
 } from "../m1a-redaction-probe.mjs";
 
+import { readFileSync } from "node:fs";
+import { evaluateFaultMatrixEvidence } from "../campaign-fault-matrix.mjs";
+import * as driver from "../../m1-shipped-boot/redaction.mjs";
+
 /** A graded arm as the lane observes it when everything works. */
 const GRADED = {
   markerOnEvents: true,
@@ -34,6 +38,8 @@ const GRADED = {
   eventBytes: 4096,
   logBytes: 65_536,
   foreignBytes: 2048,
+  observedOnEvents: true,
+  observedOnLogs: true,
   // DEP-025 finding (b): the arm's own attempt must have reached a durable `succeeded` terminal
   // before anything it observed is used. A withheld-plant job that terminated `failed` AFTER
   // `attempt_started` has a non-empty event stream and no markers, and satisfied the old suppressed
@@ -42,7 +48,10 @@ const GRADED = {
 };
 
 /** The suppressed arm: the same run shape with nothing planted. */
-const SUPPRESSED = { ...GRADED, markerOnEvents: false, markerOnLogs: false };
+const SUPPRESSED = {
+  ...GRADED, markerOnEvents: false, markerOnLogs: false,
+  verbatimControlOnEvents: true, verbatimControlOnLogs: true,
+};
 
 const classify = (o) => classifyRedactionObservation(o);
 const evaluate = (graded, suppressed, declaredStreams) =>
@@ -300,7 +309,9 @@ test("a row from an arm with NO status at all names that, rather than the expect
 });
 
 test("the matrix row carries every field `evaluateFaultMatrixEvidence` grades a redaction case on", () => {
-  const row = redactionProbeMatrixRow(classify(GRADED), { suppressedUnfired: true, suppressedAttemptStatus: "succeeded" });
+  const row = redactionProbeMatrixRow(classify(GRADED), {
+    suppressedArmEvidence: classify(SUPPRESSED), crossTenantCanaryAbsent: true,
+  });
   assert.equal(row.case, REDACTION_PROBE_CASE);
   assert.equal(row.injectionFired, true);
   assert.equal(row.observedClassification, REDACTION_PROBE_EXPECTED_CLASSIFICATION);
@@ -310,6 +321,107 @@ test("the matrix row carries every field `evaluateFaultMatrixEvidence` grades a 
   for (const stream of REDACTION_PROBE_STREAMS) {
     assert.ok(Number(row.streamBytesObserved[stream]) > 0, stream);
   }
+});
+
+function requiredRedactionVerdict(row) {
+  const matrix = JSON.parse(readFileSync(new URL("../../../tests/d1/fault-matrix.json", import.meta.url), "utf8"));
+  const profile = matrix.profiles.find((p) => p.profile === "M1a-D2-MECHANISM");
+  const declaration = profile.cases.find((c) => c.case === REDACTION_PROBE_CASE);
+  // Deliberately required only in this isolated fixture, never in the live declaration.
+  declaration.evidence = "required";
+  declaration.redactionCase.unseededControl = "leaks_inert_canary_verbatim";
+  profile.cases = [declaration];
+  return evaluateFaultMatrixEvidence(matrix, {
+    profile: profile.profile, cases: [JSON.parse(JSON.stringify(row))],
+  });
+}
+
+test("complete checked evidence survives serialization and passes the required matrix fixture", () => {
+  const row = redactionProbeMatrixRow(classify(GRADED), {
+    suppressedArmEvidence: classify(SUPPRESSED), crossTenantCanaryAbsent: true,
+  });
+  assert.deepEqual(requiredRedactionVerdict(row).violations, []);
+  assert.deepEqual(row.suppressedArmEvidence.verbatimCanaryObservedOnStream, { events: true, logs: true });
+});
+
+const refusedControls = [
+  ["empty events", { eventBytes: 0 }],
+  ["empty logs", { logBytes: 0 }],
+  ["missing event nonce", { observedOnEvents: undefined }],
+  ["missing log nonce", { observedOnLogs: undefined }],
+  ["lifecycle-only events", { observedOnEvents: false }],
+  ["stale log nonce", { observedOnLogs: false }],
+  ["wrong event control", { verbatimControlOnEvents: false }],
+  ["missing log control", { verbatimControlOnLogs: undefined }],
+  ["event marker", { markerOnEvents: true }],
+  ["log marker", { markerOnLogs: true }],
+  ["failed terminal", { attemptStatus: "failed" }],
+  ["cancelled terminal", { attemptStatus: "cancelled" }],
+  ["missing terminal", { attemptStatus: undefined }],
+  ["foreign-stream vacuity", { foreignBytes: 0 }],
+  ["capability leak", { logsClean: false }],
+  ["missing marker scan", { markerOnLogs: undefined }],
+];
+for (const [name, mutation] of refusedControls) {
+  test(`suppressed ${name} is refused by both phase and serialized evidence`, () => {
+    const suppressed = classify({ ...SUPPRESSED, ...mutation });
+    const verdict = evaluateRedactionProbeEvidence({ graded: classify(GRADED), suppressed });
+    assert.ok(verdict.violations.length > 0, "phase must refuse");
+    assert.equal(verdict.summary.suppressedUnfired, false);
+    const row = redactionProbeMatrixRow(classify(GRADED), {
+      suppressedArmEvidence: suppressed,
+      suppressedUnfired: true, suppressedAttemptStatus: "succeeded",
+      crossTenantCanaryAbsent: true,
+    });
+    assert.equal(row.positiveControlPassed, false, "legacy summary cannot override checked facts");
+    assert.ok(requiredRedactionVerdict(row).violations.length > 0, "artifact-only judge must refuse");
+  });
+}
+
+test("legacy marker-absence summary alone cannot certify a positive control", () => {
+  const row = redactionProbeMatrixRow(classify(GRADED), {
+    suppressedUnfired: true, suppressedAttemptStatus: "succeeded",
+  });
+  assert.equal(row.positiveControlPassed, false);
+});
+
+test("phase refuses omitted vacuity evidence on either classified arm", () => {
+  for (const arm of ["graded", "suppressed"]) {
+    const input = { graded: classify(GRADED), suppressed: classify(SUPPRESSED) };
+    delete input[arm].vacuity;
+    assert.ok(evaluateRedactionProbeEvidence(input).violations.length > 0, arm);
+  }
+});
+
+test("standalone matrix refuses missing or contradicted suppressed facts despite a true summary", () => {
+  for (const mutate of [
+    (e) => { delete e.streamBytesObserved; },
+    (e) => { e.streamBytesObserved.logs = 0; },
+    (e) => { delete e.redactedOnAllStreams; },
+    (e) => { e.redactedOnAllStreams = false; },
+    (e) => { delete e.nonVacuous; },
+    (e) => { e.nonVacuous = false; },
+  ]) {
+    const row = JSON.parse(JSON.stringify(redactionProbeMatrixRow(classify(GRADED), {
+      suppressedArmEvidence: classify(SUPPRESSED), crossTenantCanaryAbsent: true,
+    })));
+    mutate(row.suppressedArmEvidence);
+    assert.equal(row.positiveControlPassed, true);
+    assert.ok(requiredRedactionVerdict(row).violations.length > 0);
+  }
+});
+
+test("keyed workload builder separates the inert control from the redeemed capability", () => {
+  assert.equal(typeof driver.buildShippedRedactionArmInputs, "function");
+  const args = { nonce: "withheld123", canary: "capability123", controlCanary: "inert123" };
+  const withheld = driver.buildShippedRedactionArmInputs({ ...args, plant: false });
+  const graded = driver.buildShippedRedactionArmInputs({ ...args, plant: true });
+  assert.equal(withheld.secretValue, args.canary);
+  assert.notEqual(withheld.secretValue, args.controlCanary);
+  assert.ok(withheld.workloadArgs[1].includes(`control=${args.controlCanary}`));
+  assert.ok(!withheld.workloadArgs[1].includes(args.canary));
+  assert.ok(graded.workloadArgs[1].includes('"$ANTHROPIC_API_KEY"'));
+  assert.ok(!graded.workloadArgs[1].includes(args.canary));
 });
 
 test("the row NEVER carries a canary or a stream excerpt — only booleans, counts and ids", () => {

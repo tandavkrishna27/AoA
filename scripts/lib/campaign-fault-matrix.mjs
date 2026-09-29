@@ -651,7 +651,17 @@ export function evaluateFaultMatrixEvidence(matrix, bundle) {
         if (suppressed?.attemptStatus !== "succeeded") {
           v("evidence:redaction_suppressed_attempt_failed", `case ${id}: suppressedArmEvidence.attemptStatus=${JSON.stringify(suppressed?.attemptStatus ?? null)} — a withheld-plant control that did not succeed is broken setup`);
         }
+        if (suppressed?.redactedOnAllStreams !== true) {
+          v("evidence:redaction_suppressed_not_clean", `case ${id}: withheld-arm canary absence was not established`);
+        }
+        if (suppressed?.nonVacuous !== true) {
+          v("evidence:redaction_suppressed_vacuous", `case ${id}: withheld-arm non-vacuity was not established`);
+        }
         for (const stream of declaredStreams) {
+          const bytes = suppressed?.streamBytesObserved?.[stream];
+          if (!Number.isFinite(bytes) || bytes <= 0) {
+            v("evidence:redaction_suppressed_stream_vacuous", `case ${id}: withheld ${stream} has no positive finite scoped byte count`);
+          }
           if (suppressedObserved?.[stream] !== true) {
             v("evidence:redaction_suppressed_stream_unobserved", `case ${id}: suppressedArmEvidence.observedOnStream.${stream}=${JSON.stringify(suppressedObserved?.[stream] ?? null)} — every withheld stream must carry its own nonce-scoped probe line`);
           }

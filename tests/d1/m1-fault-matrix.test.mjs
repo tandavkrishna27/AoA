@@ -1282,6 +1282,7 @@ test("fault-matrix: a planted credential canary is SCRUBBED from both streams, a
     assert.equal(logs.ok, true, `${label} worker log read: status=${logs.status}`);
     return {
       nonce,
+      canary: armInputs.secretValue,
       controlCanary,
       attemptStatus: observation.attemptStatus ?? null,
       streams: { events: events.text, logs: logs.text },

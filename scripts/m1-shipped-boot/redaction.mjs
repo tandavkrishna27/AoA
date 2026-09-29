@@ -67,11 +67,23 @@ import {
   REDACTION_PROBE_EVIDENCE_MARKER,
   classifyRedactionObservation,
   evaluateRedactionProbeEvidence,
-  observeNonceScopedProbeLine,
   redactionProbeMatrixRow,
 } from "../lib/m1a-redaction-probe.mjs";
+import { observeRedactionArm, RUN_OUTPUT_PROBE_TAG } from "../lib/redaction-arm-evidence.mjs";
 
 export { REDACTION_PROBE_EVIDENCE_MARKER };
+
+export function buildShippedRedactionArmInputs({ plant, nonce, canary, controlCanary }) {
+  if (!/^[A-Za-z0-9_-]+$/.test(nonce ?? "") || (!plant && !/^[A-Za-z0-9_-]+$/.test(controlCanary ?? ""))) {
+    throw new Error("redaction probe requires shell-safe nonce and inert control tokens");
+  }
+  return {
+    workloadArgs: plant
+      ? ["-c", `printf '${RUN_OUTPUT_PROBE_TAG} arm=${nonce} canary=%s\\n' "$ANTHROPIC_API_KEY"`]
+      : ["-c", `printf '${RUN_OUTPUT_PROBE_TAG} arm=${nonce} control=${controlCanary}\\n'`],
+    secretValue: canary,
+  };
+}
 
 /** The phase's own refusal, carrying whatever rows it had gathered — the same shape
  * `CrossTenantError` uses, and for the same reason: on a refusal the rows ARE the evidence. */
@@ -200,28 +212,6 @@ export async function runRedactionProbeCases({
   };
 
   /**
-   * A line of THIS ARM's probe output: it carries the probe tag, the scrubber's OWN replacement
-   * marker, AND this arm's nonce.
-   *
-   * ★★★ THE NONCE IS WHAT MAKES THE LOG ARM ATTRIBUTABLE (Codex round 2, PR #607 — verified at
-   * source before accepting it). `composeServiceLogs` returns the WHOLE `m1-worker-a` container log,
-   * every run the stack has done. Without the nonce a historical tagged+marked line — from a
-   * repeated phase invocation, or any other probe-producing job on that worker — satisfies the graded
-   * log arm while THIS job's line never arrives, and the run reports that both streams scrubbed a job
-   * whose line never reached the sink. Ordering the arms does not fix that: it is an argument about
-   * what usually happens, and nothing enforces it.
-   *
-   * The nonce is NOT a secret and is deliberately NOT registered with the ledger: masking it would
-   * remove the very token the attribution depends on. It is 8 random bytes of hex per arm, carried in
-   * the probe line's plaintext beside the scrubbed value.
-   */
-  const markedProbeLine = (text, nonce) =>
-    String(text ?? "")
-      .split(/\r?\n/)
-      .some((line) =>
-        line.includes(H.RUN_OUTPUT_PROBE_TAG) && line.includes(H.REDACTION_MARKER) && line.includes(`arm=${nonce}`));
-
-  /**
    * One arm: seed a worker-driven job for tenant A with its own canary as the redeemed value, let
    * the DEPLOYED worker run it in a REAL sandbox, then read both declared streams.
    *
@@ -249,6 +239,9 @@ export async function runRedactionProbeCases({
     // `state.secrets` (so the pre-upload scan searches for it on BOTH surfaces, in raw, base64 and
     // base64url form) and behind an `::add-mask::` directive in the Actions log.
     registerSecret(`REDACTION_CANARY_${label.toUpperCase()}_${nonce}`, canary);
+    // This control is private retained evidence, but never a redeemed/env secret under test.
+    const controlCanary = plant ? undefined : mint(`d2mcontrol${randomBytes(20).toString("hex")}`);
+    if (controlCanary) registerSecret(`REDACTION_CONTROL_${label.toUpperCase()}_${nonce}`, controlCanary);
     const ids = {
       issueId: randomUUID(),
       runId: randomUUID(),
@@ -261,11 +254,9 @@ export async function runRedactionProbeCases({
     // array. A literal would prove the scrubber can remove a string the harness chose, not that it
     // removes what the run redeemed.
     // The per-arm attribution token. Plaintext, not a secret, never registered (see
-    // `markedProbeLine`): it must survive the scrub, which is the whole point of it.
+    // the shared observer): it must survive the scrub, which is the whole point of it.
     const armNonce = `${label}${randomBytes(8).toString("hex")}`;
-    const workloadArgs = plant
-      ? ["-c", `printf '${H.RUN_OUTPUT_PROBE_TAG} arm=${armNonce} canary=%s\\n' "$ANTHROPIC_API_KEY"`]
-      : ["-c", `printf '${H.RUN_OUTPUT_PROBE_TAG} arm=${armNonce} control=unseeded\\n'`];
+    const inputs = buildShippedRedactionArmInputs({ plant, nonce: armNonce, canary, controlCanary });
     const seeded = step(
       H.seedSpineWorkerDrivenJob({
         tenant: A,
@@ -274,9 +265,9 @@ export async function runRedactionProbeCases({
         targetId: A.targetId,
         policyHash,
         command: "sh",
-        workloadArgs,
+        workloadArgs: inputs.workloadArgs,
         secretName: `provider:d2m-redaction-${label}-${nonce}`,
-        secretValue: canary,
+        secretValue: inputs.secretValue,
       }),
       `${label} canary job seed`,
     );
@@ -290,14 +281,22 @@ export async function runRedactionProbeCases({
     if (logs.ok !== true) fail(`${label} worker log read: exit=${logs.status}`);
     if (foreign.ok !== true) fail(`${label} cross-tenant event stream read: ${truncate({ ok: foreign.ok, error: foreign.error ?? null })}`);
 
+    const evidence = observeRedactionArm({
+      nonce: armNonce, canary, controlCanary, attemptStatus: observation.attemptStatus,
+      streams: { events: events.text, logs: logs.text },
+    });
     const row = classifyRedactionObservation({
-      markerOnEvents: markedProbeLine(events.text, armNonce),
-      markerOnLogs: markedProbeLine(logs.text, armNonce),
-      ownEventsClean: !String(events.text ?? "").includes(canary),
-      logsClean: !String(logs.text ?? "").includes(canary),
+      markerOnEvents: evidence.scrubberMarkerObservedOnStream.events,
+      markerOnLogs: evidence.scrubberMarkerObservedOnStream.logs,
+      observedOnEvents: evidence.observedOnStream.events,
+      observedOnLogs: evidence.observedOnStream.logs,
+      verbatimControlOnEvents: evidence.verbatimCanaryObservedOnStream.events,
+      verbatimControlOnLogs: evidence.verbatimCanaryObservedOnStream.logs,
+      ownEventsClean: evidence.canaryAbsentOnStream.events,
+      logsClean: evidence.canaryAbsentOnStream.logs,
       crossTenantClean: !String(foreign.text ?? "").includes(canary),
-      eventBytes: events.bytes ?? 0,
-      logBytes: logs.bytes ?? 0,
+      eventBytes: evidence.streamBytesObserved.events,
+      logBytes: evidence.streamBytesObserved.logs,
       foreignBytes: foreign.bytes ?? 0,
       // ★ DEP-025 finding (b) — the arm's OWN setup must have succeeded, and until now this status
       // was read, logged and put on the row's `detail` while NOTHING asserted it. The harness says
@@ -323,8 +322,8 @@ export async function runRedactionProbeCases({
         crossTenantEventCount: Number(foreign.events ?? 0),
         crossTenantBytes: Number(foreign.bytes ?? 0),
         crossTenantCanaryAbsent: !String(foreign.text ?? "").includes(canary),
-        observedOnEvents: observeNonceScopedProbeLine(events.text, armNonce),
-        observedOnLogs: observeNonceScopedProbeLine(logs.text, armNonce),
+        observedOnEvents: evidence.observedOnStream.events,
+        observedOnLogs: evidence.observedOnStream.logs,
       },
     };
   };
@@ -362,7 +361,7 @@ export async function runRedactionProbeCases({
     crossTenantEventCount: graded.facts.crossTenantEventCount,
     crossTenantCanaryAbsent: graded.facts.crossTenantCanaryAbsent,
   };
-  const rows = [redactionProbeMatrixRow(graded.row, detailFacts)];
+  const rows = [redactionProbeMatrixRow(graded.row, { ...detailFacts, suppressedArmEvidence: suppressed.row })];
   const detail = { arms: { graded: graded.facts, suppressed: suppressed.facts }, summary };
 
   if (violations.length > 0) {
