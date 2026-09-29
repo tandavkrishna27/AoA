@@ -200,6 +200,9 @@ jobs:
           # greps name the driver, its suppression arm, and the harness binding that lets the D1
           # drivers address THIS stack; a candidate with the phase but not the binding would
           # address a stack that is not running.
+          grep -q "observeComposeCleanup" scripts/m1-shipped-boot/journey.mjs || { echo "::error::candidate lacks observed Compose cleanup"; exit 1; }
+          grep -q "purgeSecrets(loadState" scripts/m1-shipped-boot/journey.mjs || { echo "::error::candidate lacks separate scanner-state purge"; exit 1; }
+          grep -q "providerCleanup" scripts/lib/m1-cleanup-evidence.mjs || { echo "::error::candidate lacks scoped cleanup evidence"; exit 1; }
           grep -q "crossTenant(loadState" scripts/m1-shipped-boot/journey.mjs || { echo "::error::the candidate predates DEP-022: its driver has no cross-tenant phase, so the step below would fail after the keyed journey had already spent (missing crossTenant(loadState in scripts/m1-shipped-boot/journey.mjs)"; exit 1; }
           grep -q "runCrossTenantCases" scripts/m1-shipped-boot/cross-tenant.mjs || { echo "::error::the candidate predates DEP-022: it has no cross-tenant driver (missing runCrossTenantCases in scripts/m1-shipped-boot/cross-tenant.mjs)"; exit 1; }
           grep -q "suppressInjection" scripts/m1-shipped-boot/cross-tenant.mjs || { echo "::error::the candidate predates DEP-022: its cross-tenant driver has no suppression arm, so the lane's positive control would have nothing to invert (missing suppressInjection in scripts/m1-shipped-boot/cross-tenant.mjs)"; exit 1; }
@@ -507,6 +510,26 @@ jobs:
             [ "${statuses[1]}" -eq 0 ] || { echo "::error::DEP-015 the job-log capture failed during collect; the log surface is incomplete"; exit 1; }
           fi
 
+      - name: Tear down (stack and volumes; retain scanner state)
+        if: always()
+        id: teardown
+        run: |
+          if [ ! -f "$M1_OUT/state.json" ]; then
+            echo "::error::teardown: no state; cleanup and capture are unproven"
+            exit 1
+          fi
+          set +e
+          node scripts/m1-shipped-boot/journey.mjs teardown --out "$M1_OUT" 2>&1 | node scripts/m1-shipped-boot/log-filter.mjs "$M1_OUT/job-log.txt"
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          if [ "${statuses[1]}" -eq 0 ]; then
+            echo "capture_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::teardown: incomplete job-log capture; evidence must not upload"
+            exit 1
+          fi
+          exit "${statuses[0]}"
+
       # HARD pre-upload check (ruled in under F2 after the distinct review of DEP-015): every job
       # secret, by NAME, in raw / base64 / base64url form — and key material BY SHAPE — against
       # every evidence file AND the job log every phase tees above. Review batch 3A (PR #569)
@@ -520,7 +543,8 @@ jobs:
           if [ -f "$M1_OUT/state.json" ]; then
             node scripts/m1-shipped-boot/journey.mjs leak-scan --out "$M1_OUT"
           else
-            echo "leak-scan: no state (the job stopped before prepare); nothing was collected"
+            echo "::error::leak-scan: no scanner state; refusing evidence publication"
+            exit 1
           fi
 
       # The gate names BOTH steps (Codex P1). A capture that failed during the best-effort collect
@@ -529,7 +553,7 @@ jobs:
       # refuses on the filter's durable marker — two independent arms, neither sufficient alone:
       # this one covers a marker that could not be written, that one covers a later step's failure.)
       - name: Upload the evidence bundle (on pass and fail)
-        if: always() && steps.leak-scan.outcome == 'success' && steps.collect.outcome != 'failure'
+        if: always() && steps.leak-scan.outcome == 'success' && steps.collect.outcome != 'failure' && steps.teardown.outputs.capture_ok == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: m1-shipped-boot-${{ inputs.mode }}-${{ github.run_id }}
@@ -537,13 +561,15 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Tear down (stack, volumes, keypair, secrets)
+      - name: Purge the keypair and scanner secrets after the upload attempt
         if: always()
         env:
           AOA_M1_SECRET_OWNER: "1000:1000"
         run: |
+          status=0
           if [ -f "$M1_OUT/state.json" ]; then
-            node scripts/m1-shipped-boot/journey.mjs teardown --out "$M1_OUT" || true
+            node scripts/m1-shipped-boot/journey.mjs purge-secrets --out "$M1_OUT" || status=$?
           fi
-          sudo rm -rf "$M1_OUT/keys"
-          rm -f docker/images/trust-root.key
+          sudo rm -rf "$M1_OUT/keys" || status=$?
+          rm -f "$M1_OUT/state.json" "$M1_OUT/m1-boot.env" docker/images/trust-root.key || status=$?
+          exit "$status"

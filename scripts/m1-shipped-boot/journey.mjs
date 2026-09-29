@@ -52,7 +52,8 @@
 //   collect            redacted service logs + `compose ps` into the evidence dir
 //   leak-scan          HARD check before upload, on BOTH surfaces: no job secret (raw/base64/
 //                      base64url) and no key material, in the evidence bundle OR the job log
-//   teardown           `compose down -v`, and the keypair + secrets deleted
+//   teardown           `compose down -v` + owned-resource readback; scanner state retained
+//   purge-secrets      keypair + secrets deleted AFTER final scan and upload
 //
 // SECRETS. Every value `prepare` generates, plus E2B_API_KEY / ANTHROPIC_API_KEY, is listed in
 // the state file's `redact` array; every log this driver retains passes through `redactSecrets`.
@@ -106,6 +107,7 @@ import {
   evaluateShippedBootEvidence,
 } from "../lib/m1-shipped-boot.mjs";
 import { readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
+import { observeComposeCleanup } from "../lib/m1-cleanup-evidence.mjs";
 import { evaluateUsageCardinality, formatViolations } from "../lib/m1-spine-assertions.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -1549,14 +1551,37 @@ function faultMatrix(state) {
 }
 
 function teardown(state) {
-  compose(state, ["down", "-v", "--remove-orphans"], { allowFail: true, timeout: 600_000 });
-  for (const dir of [path.join(state.out, "keys")]) {
-    if (process.env.AOA_M1_SECRET_OWNER) spawnSync("sudo", ["rm", "-rf", dir]);
-    else rmSync(dir, { recursive: true, force: true });
+  const result = observeComposeCleanup({
+    candidate: state.candidate,
+    project: PROJECT,
+    down: () => compose(state, ["down", "-v", "--remove-orphans"], { allowFail: true, timeout: 600_000 }),
+    inspect: (kind) => spawnSync("docker", [
+      kind, "ls", ...(kind === "container" ? ["--all"] : []),
+      "--filter", `label=com.docker.compose.project=${PROJECT}`,
+      "--format", kind === "volume" ? "{{.Name}}" : "{{.ID}}",
+    ], { encoding: "utf8", timeout: 30_000, maxBuffer: 1024 * 1024 }),
+  });
+  writeEvidence(state, "compose-cleanup.json", result);
+  if (!result.pass) fail(`Compose teardown unproven: ${result.violations.join(", ")}; see compose-cleanup.json`);
+  console.log("teardown: Compose project absent on readback; provider cleanup NOT assessed; scanner state retained");
+}
+
+function purgeSecrets(state) {
+  const failures = [];
+  const keys = path.join(state.out, "keys");
+  for (const [name, file, directory] of [["keys", keys, true], ["env", state.envFile, false], ["state", statePath(state.out), false]]) {
+    try {
+      if (directory && process.env.AOA_M1_SECRET_OWNER) {
+        const result = spawnSync("sudo", ["rm", "-rf", file], { encoding: "utf8", timeout: 30_000 });
+        if (result.status !== 0 || result.error) failures.push(name);
+      } else rmSync(file, { recursive: directory, force: true });
+      if (existsSync(file) && !failures.includes(name)) failures.push(name);
+    } catch {
+      failures.push(name);
+    }
   }
-  rmSync(state.envFile, { force: true });
-  rmSync(statePath(state.out), { force: true });
-  console.log(`teardown: stack removed with its volumes; keypair, tickets, env and state deleted (${existsSync(path.join(state.out, "keys")) ? "keys dir STILL PRESENT" : "keys dir gone"})`);
+  if (failures.length > 0) fail(`secret purge incomplete: ${failures.join(", ")}`);
+  console.log("purge-secrets: keypair, tickets, env and state deleted");
 }
 
 // --- main ---------------------------------------------------------------------------------------
@@ -1579,6 +1604,7 @@ const PHASES = {
   collect: (args) => collect(loadState(args.out)),
   "leak-scan": (args) => leakScan(loadState(args.out)),
   teardown: (args) => teardown(loadState(args.out)),
+  "purge-secrets": (args) => purgeSecrets(loadState(args.out)),
 };
 
 const args = parseArgs(process.argv);

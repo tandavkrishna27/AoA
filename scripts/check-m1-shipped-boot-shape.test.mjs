@@ -27,6 +27,51 @@ const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
 
+test("teardown is captured before final scan/upload, and secrets are purged last", () => {
+  const text = real();
+  const down = text.indexOf("journey.mjs teardown --out");
+  const scan = text.indexOf("journey.mjs leak-scan --out");
+  const upload = text.indexOf("uses: actions/upload-artifact@");
+  const purge = text.indexOf("journey.mjs purge-secrets --out");
+  assert.ok(down > 0 && down < scan && scan < upload && upload < purge);
+  assert.doesNotMatch(text, /journey\.mjs teardown[^\n]*\|\| true/);
+  assert.match(text, /steps\.teardown\.outputs\.capture_ok == 'true'/);
+});
+
+test("REJECT: teardown moved after the scan or secret purge moved before upload", () => {
+  const text = real();
+  const start = text.indexOf("      - name: Tear down (stack and volumes; retain scanner state)");
+  const end = text.indexOf("      # HARD pre-upload check", start);
+  const block = text.slice(start, end);
+  const late = text.replace(block, "") + block;
+  assert.ok(anyMatch(violationsOf(late), /teardown must run BEFORE the final leak scan/));
+  const purgeStart = text.indexOf("      - name: Purge the keypair");
+  const purge = text.slice(purgeStart);
+  const early = text.slice(0, purgeStart).replace("      - name: Upload the evidence", purge + "      - name: Upload the evidence");
+  assert.ok(anyMatch(violationsOf(early), /purge-secrets must run AFTER the evidence upload/));
+});
+
+test("REJECT: teardown capture completion absent from the upload gate", () => {
+  const text = mutate(real(), " && steps.teardown.outputs.capture_ok == 'true'", "");
+  assert.ok(anyMatch(violationsOf(text), /teardown capture completion/));
+});
+
+test("REJECT: teardown failure masked or either pipeline status ignored", () => {
+  const line = '          node scripts/m1-shipped-boot/journey.mjs teardown --out "$M1_OUT" 2>&1 | node scripts/m1-shipped-boot/log-filter.mjs "$M1_OUT/job-log.txt"';
+  for (const [from, to] of [
+    [line, line + " || true"],
+    ['          exit "${statuses[0]}"', "          exit 0"],
+    ['          if [ "${statuses[1]}" -eq 0 ]; then', "          if true; then"],
+  ]) assert.ok(anyMatch(violationsOf(mutate(real(), from, to)), /teardown.*(status|mask)/));
+});
+
+test("REJECT: missing scanner state treated as success", () => {
+  const text = mutate(real(),
+    '            echo "::error::leak-scan: no scanner state; refusing evidence publication"\n            exit 1',
+    '            echo "no state, nothing to scan"');
+  assert.ok(anyMatch(violationsOf(text), /missing scanner state/));
+});
+
 /** Replace exactly one occurrence, and fail the TEST if the anchor is gone — a mutation that
  * silently did nothing would make its red vacuous. */
 function mutate(text, from, to) {
@@ -236,11 +281,11 @@ test("REJECT: the evidence upload widened to the whole output dir (keys, env, st
 test("REJECT: the evidence upload only on success, or the teardown not always", () => {
   const upload = mutate(
     real(),
-    "      - name: Upload the evidence bundle (on pass and fail)\n        if: always() && steps.leak-scan.outcome == 'success' && steps.collect.outcome != 'failure'\n",
+    "      - name: Upload the evidence bundle (on pass and fail)\n        if: always() && steps.leak-scan.outcome == 'success' && steps.collect.outcome != 'failure' && steps.teardown.outputs.capture_ok == 'true'\n",
     "      - name: Upload the evidence bundle (on pass and fail)\n",
   );
   assert.ok(anyMatch(violationsOf(upload), /evidence upload must run `if: always\(\)`/), violationsOf(upload).join("\n"));
-  const teardown = mutate(real(), "      - name: Tear down (stack, volumes, keypair, secrets)\n        if: always()\n", "      - name: Tear down (stack, volumes, keypair, secrets)\n");
+  const teardown = mutate(real(), "      - name: Tear down (stack and volumes; retain scanner state)\n        if: always()\n", "      - name: Tear down (stack and volumes; retain scanner state)\n");
   assert.ok(anyMatch(violationsOf(teardown), /teardown .* must run `if: always\(\)`/), violationsOf(teardown).join("\n"));
 });
 
@@ -269,7 +314,7 @@ test("REJECT: the leak-scan step removed", () => {
 });
 
 test("REJECT: the upload NOT gated on the leak scan's success (a leaking bundle would publish)", () => {
-  const text = mutate(real(), "        if: always() && steps.leak-scan.outcome == 'success' && steps.collect.outcome != 'failure'\n", "        if: always()\n");
+  const text = mutate(real(), "        if: always() && steps.leak-scan.outcome == 'success' && steps.collect.outcome != 'failure' && steps.teardown.outputs.capture_ok == 'true'\n", "        if: always()\n");
   assert.ok(anyMatch(violationsOf(text), /upload must be gated `if: always\(\) && steps\.leak-scan\.outcome == 'success'`/), violationsOf(text).join("\n"));
 });
 
@@ -354,6 +399,9 @@ test("the candidate-controls gate covers the whole control set, the log FILTER i
   assert.deepEqual(
     CANDIDATE_CONTROL_MARKERS.map(([file, marker]) => `${file}:${marker}`).sort(),
     [
+      "scripts/lib/m1-cleanup-evidence.mjs:providerCleanup",
+      "scripts/m1-shipped-boot/journey.mjs:observeComposeCleanup",
+      "scripts/m1-shipped-boot/journey.mjs:purgeSecrets(loadState",
       "scripts/lib/m1-shipped-boot.mjs:KEY_MATERIAL_MARKERS",
       "scripts/lib/m1-shipped-boot.mjs:createLineRedactor",
       "scripts/m1-shipped-boot/journey.mjs:CONTROL_PLANE_PUBLIC_KEY_PEM",
