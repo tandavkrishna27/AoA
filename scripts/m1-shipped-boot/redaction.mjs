@@ -163,6 +163,7 @@ export async function runRedactionProbeCases({
   ownerSql,
   policyHash,
   registerSecret,
+  registerResourceIntent,
   workerService = "m1-worker-a",
   log = console.log,
 }) {
@@ -249,6 +250,12 @@ export async function runRedactionProbeCases({
       attemptId: randomUUID(),
       handleId: randomUUID(),
     };
+    if (typeof registerResourceIntent !== "function") fail("redaction requires a durable resource intent recorder");
+    registerResourceIntent({
+      id: randomUUID(), kind: "redaction", tenant: A.key, organizationId: A.organizationId,
+      companyId: A.companyId, targetId: A.targetId, worker: workerService,
+      jobId: ids.jobId, attemptId: ids.attemptId,
+    });
     // ★ The plant echoes the ENV VAR, never the literal: the value in the sandbox is the one the
     // worker redeemed through `synthesiseRunSecrets`, which is what puts it into the run's canary
     // array. A literal would prove the scrubber can remove a string the harness chose, not that it

@@ -41,6 +41,9 @@ export const CANDIDATE_CONTROL_MARKERS = [
   ["scripts/m1-shipped-boot/journey.mjs", "observeComposeCleanup"],
   ["scripts/m1-shipped-boot/journey.mjs", "purgeSecrets(loadState"],
   ["scripts/lib/m1-cleanup-evidence.mjs", "providerCleanup"],
+  ["scripts/m1-shipped-boot/journey.mjs", "collectProviderInventory"],
+  ["scripts/m1-shipped-boot/redaction.mjs", "registerResourceIntent"],
+  ["scripts/lib/m1-provider-cleanup.mjs", "observeE2bCleanup"],
   ["scripts/lib/m1-shipped-boot.mjs", "KEY_MATERIAL_MARKERS"],
   // The EXECUTABLE the workflow pipes every phase through: a candidate carrying the symbols but
   // not the file passes the greps above and then dies at the first phase on the missing module
@@ -310,6 +313,9 @@ export function evaluateShippedBootWorkflowShape(text) {
     return src.slice(src.lastIndexOf("- name:", at), end < 0 ? src.length : end);
   };
   const teardownBody = stepAt(teardownIdx);
+  if (!/^\s+E2B_API_KEY:\s*\$\{\{ inputs.mode == 'keyed' && secrets.E2B_API_KEY \|\| '' \}\}/m.test(teardownBody)) {
+    v.push("teardown must receive its keyed-only provider readback credential");
+  }
   if (teardownIdx >= scanIdx) v.push("teardown must run BEFORE the final leak scan");
   if (!/steps\.teardown\.outputs\.capture_ok\s*==\s*'true'/.test(before)) {
     v.push("the upload must require teardown capture completion, independently of cleanup success");

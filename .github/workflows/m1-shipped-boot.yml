@@ -201,6 +201,9 @@ jobs:
           # drivers address THIS stack; a candidate with the phase but not the binding would
           # address a stack that is not running.
           grep -q "observeComposeCleanup" scripts/m1-shipped-boot/journey.mjs || { echo "::error::candidate lacks observed Compose cleanup"; exit 1; }
+          grep -q "collectProviderInventory" scripts/m1-shipped-boot/journey.mjs || { echo "::error::candidate lacks provider resource inventory"; exit 1; }
+          grep -q "registerResourceIntent" scripts/m1-shipped-boot/redaction.mjs || { echo "::error::candidate lacks write-ahead redaction inventory"; exit 1; }
+          grep -q "observeE2bCleanup" scripts/lib/m1-provider-cleanup.mjs || { echo "::error::candidate lacks read-only provider cleanup observation"; exit 1; }
           grep -q "purgeSecrets(loadState" scripts/m1-shipped-boot/journey.mjs || { echo "::error::candidate lacks separate scanner-state purge"; exit 1; }
           grep -q "providerCleanup" scripts/lib/m1-cleanup-evidence.mjs || { echo "::error::candidate lacks scoped cleanup evidence"; exit 1; }
           grep -q "crossTenant(loadState" scripts/m1-shipped-boot/journey.mjs || { echo "::error::the candidate predates DEP-022: its driver has no cross-tenant phase, so the step below would fail after the keyed journey had already spent (missing crossTenant(loadState in scripts/m1-shipped-boot/journey.mjs)"; exit 1; }
@@ -513,6 +516,8 @@ jobs:
       - name: Tear down (stack and volumes; retain scanner state)
         if: always()
         id: teardown
+        env:
+          E2B_API_KEY: ${{ inputs.mode == 'keyed' && secrets.E2B_API_KEY || '' }}
         run: |
           if [ ! -f "$M1_OUT/state.json" ]; then
             echo "::error::teardown: no state; cleanup and capture are unproven"
