@@ -26,6 +26,41 @@
       "workflow": "pr.yml",
       "step": "M1a archive offline unit tests"
     },
+    "scripts/lib/__tests__/m1a-gateway-authority-bridge.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-gateway-client.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-gateway-authority.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-gateway-render-authority.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-gateway-render-authority-bridge.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-gateway-render-verifier.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
+    "scripts/lib/__tests__/m1a-gateway-render-verifier-bridge.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M1a archive offline unit tests"
+    },
     "scripts/lib/__tests__/m1a-protected-workflow-shape.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",
