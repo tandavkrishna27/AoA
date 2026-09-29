@@ -15,13 +15,13 @@ export function buildD1RedactionArmInputs({ plant, nonce, canary, controlCanary,
 
 export function evaluateD1RedactionEvidence({ canary, crossTenantCanaryAbsent, graded, suppressed }) {
   const gradedEvidence = observeRedactionArm({ ...graded, canary });
-  const suppressedEvidence = observeRedactionArm({ ...suppressed, canary: suppressed?.canary ?? canary });
+  const suppressedEvidence = observeRedactionArm(suppressed);
   suppressedEvidence.nonVacuous = D1_REDACTION_STREAMS.every(
     (stream) => suppressedEvidence.streamBytesObserved[stream] > 0,
   );
-  suppressedEvidence.redactedOnAllStreams = D1_REDACTION_STREAMS.every(
-    (stream) => suppressedEvidence.canaryAbsentOnStream[stream] === true,
-  );
+  suppressedEvidence.redactedOnAllStreams = typeof suppressed?.canary === "string"
+    && suppressed.canary.length > 0
+    && D1_REDACTION_STREAMS.every((stream) => suppressedEvidence.canaryAbsentOnStream[stream] === true);
   const gradedSucceeded = gradedEvidence.attemptStatus === D1_REDACTION_REQUIRED_ATTEMPT_STATUS;
   const suppressedSucceeded = suppressedEvidence.attemptStatus === D1_REDACTION_REQUIRED_ATTEMPT_STATUS;
   const gradedObserved = D1_REDACTION_STREAMS.every((stream) => gradedEvidence.observedOnStream[stream] === true);

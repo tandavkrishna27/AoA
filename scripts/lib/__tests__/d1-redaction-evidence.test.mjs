@@ -79,6 +79,7 @@ function arm(nonce, { attemptStatus = "succeeded", eventLine, logLine } = {}) {
   const defaultLine = `${TAG} arm=${nonce} control=${controlCanary}`;
   return {
     nonce,
+    canary: `capability-${nonce}`,
     controlCanary,
     attemptStatus,
     streams: {
@@ -87,6 +88,28 @@ function arm(nonce, { attemptStatus = "succeeded", eventLine, logLine } = {}) {
     },
   };
 }
+
+test("D1 refuses withheld cleanliness when its actual capability secret is missing", () => {
+  const suppressed = arm(NONCES.suppressed);
+  delete suppressed.canary;
+  const judged = moduleUnderTest.evaluateD1RedactionEvidence({
+    canary: "unrelated-graded-canary", crossTenantCanaryAbsent: true, suppressed,
+  });
+  assert.equal(judged.row.suppressedArmEvidence.redactedOnAllStreams, false);
+  assert.equal(judged.row.positiveControlPassed, false);
+});
+
+test("D1 refuses its withheld capability leaking outside the scoped control line", () => {
+  for (const stream of ["events", "logs"]) {
+    const suppressed = arm(NONCES.suppressed);
+    suppressed.streams[stream] += `\nelsewhere: ${suppressed.canary}`;
+    const judged = moduleUnderTest.evaluateD1RedactionEvidence({
+      canary: "unrelated-graded-canary", crossTenantCanaryAbsent: true, suppressed,
+    });
+    assert.equal(judged.row.suppressedArmEvidence.redactedOnAllStreams, false);
+    assert.equal(judged.row.positiveControlPassed, false);
+  }
+});
 
 test("DEP-027 exports the nonce-scoped D1 redaction evidence judge", () => {
   assert.equal(typeof moduleUnderTest.evaluateD1RedactionEvidence, "function");
