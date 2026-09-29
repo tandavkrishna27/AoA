@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { evaluateFaultMatrixEvidence } from "../campaign-fault-matrix.mjs";
 
 const moduleUnderTest = await import("../d1-redaction-evidence.mjs").catch(() => ({}));
+const sharedObserver = await import("../redaction-arm-evidence.mjs").catch(() => ({}));
 
 const NONCES = {
   graded: "graded-0123456789abcdef",
@@ -11,6 +12,67 @@ const NONCES = {
 };
 const TAG = "AOA-RUN-OUTPUT-PROBE";
 const MARKER = "«redacted»";
+
+test("shared arm observation requires exact nonce and inert-control tokens on each stream", () => {
+  assert.equal(typeof sharedObserver.observeRedactionArm, "function");
+  const input = arm(NONCES.suppressed);
+  const valid = sharedObserver.observeRedactionArm(input);
+  assert.deepEqual(valid.observedOnStream, { events: true, logs: true });
+  assert.deepEqual(valid.verbatimCanaryObservedOnStream, { events: true, logs: true });
+  for (const text of ["", "attempt_started", `${TAG} arm=stale control=${input.controlCanary}`,
+    `${TAG} arm=${input.nonce}suffix control=${input.controlCanary}`]) {
+    const observed = sharedObserver.observeRedactionArm({ ...input, streams: { events: text, logs: text } });
+    assert.deepEqual(observed.observedOnStream, { events: false, logs: false });
+    assert.deepEqual(observed.streamBytesObserved, { events: 0, logs: 0 });
+  }
+  for (const control of ["wrong", `${input.controlCanary}suffix`, ""]) {
+    const text = `${TAG} arm=${input.nonce} control=${control}`;
+    const observed = sharedObserver.observeRedactionArm({ ...input, streams: { events: text, logs: text } });
+    assert.deepEqual(observed.verbatimCanaryObservedOnStream, { events: false, logs: false });
+  }
+  const serialized = JSON.stringify(valid);
+  assert.ok(!serialized.includes(input.controlCanary));
+  assert.ok(!serialized.includes(TAG));
+});
+
+test("JSON-encoded control suffixes cannot pass either shared observation or D1 grading", () => {
+  const input = arm(NONCES.suppressed);
+  for (const suffix of ["\\suffix", '"suffix', "suffix"]) {
+    const line = `${TAG} arm=${input.nonce} control=${input.controlCanary}${suffix}`;
+    const streams = {
+      events: `log ${JSON.stringify({ payload: { text: line } })}`,
+      logs: `worker-a-1 | ${JSON.stringify({ msg: line })}`,
+    };
+    const suppressed = { ...input, streams };
+    assert.deepEqual(sharedObserver.observeRedactionArm(suppressed).verbatimCanaryObservedOnStream, { events: false, logs: false });
+    assert.equal(moduleUnderTest.evaluateD1RedactionEvidence({ suppressed }).row.positiveControlPassed, false);
+  }
+  const line = `${TAG} arm=${input.nonce} control=${input.controlCanary}\n`;
+  const valid = sharedObserver.observeRedactionArm({ ...input,
+    streams: {
+      events: `log ${JSON.stringify({ payload: { text: line } })}`,
+      logs: `worker-a-1 | ${JSON.stringify({ msg: line })}`,
+    },
+  });
+  assert.deepEqual(valid.verbatimCanaryObservedOnStream, { events: true, logs: true });
+});
+
+test("D1 complete evidence still passes standalone grading with the strengthened suppressed schema", () => {
+  const input = {
+    canary: "inert-canary", crossTenantCanaryAbsent: true,
+    graded: arm(NONCES.graded, {
+      eventLine: `${TAG} arm=${NONCES.graded} value=${MARKER}`,
+      logLine: `${TAG} arm=${NONCES.graded} value=${MARKER}`,
+    }),
+    suppressed: arm(NONCES.suppressed),
+  };
+  const matrix = JSON.parse(readFileSync(new URL("../../../tests/d1/fault-matrix.json", import.meta.url), "utf8"));
+  const profile = matrix.profiles.find((p) => p.profile === "M1-D1-SPINE");
+  profile.cases = profile.cases.filter((c) => c.case === "d1.redaction.planted_canary_scrubbed");
+  const row = moduleUnderTest.serializeD1FaultMatrixRow(profile.cases[0].case, moduleUnderTest.evaluateD1RedactionEvidence(input).row);
+  assert.equal(row.positiveControlPassed, true);
+  assert.deepEqual(evaluateFaultMatrixEvidence(matrix, { profile: profile.profile, cases: [JSON.parse(JSON.stringify(row))] }).violations, []);
+});
 
 function arm(nonce, { attemptStatus = "succeeded", eventLine, logLine } = {}) {
   const controlCanary = `control-${nonce}`;

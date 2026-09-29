@@ -315,6 +315,9 @@ function completeBundle(profile) {
                 positiveControlPassed: true,
                 suppressedArmEvidence: {
                   attemptStatus: "succeeded",
+                  nonVacuous: true,
+                  redactedOnAllStreams: true,
+                  streamBytesObserved: Object.fromEntries(c.redactionCase.streams.map((k) => [k, 1024])),
                   observedOnStream: Object.fromEntries(c.redactionCase.streams.map((k) => [k, true])),
                   scrubberMarkerObservedOnStream: Object.fromEntries(c.redactionCase.streams.map((k) => [k, false])),
                   verbatimCanaryObservedOnStream: Object.fromEntries(c.redactionCase.streams.map((k) => [k, true])),
