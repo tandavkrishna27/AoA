@@ -158,6 +158,7 @@ function recordingBrokers(): SecretBrokerSet & { calls: string[] } {
     calls,
     async resolveConnectorOAuth(input) { calls.push(`oauth:${input.companyId}:${input.refId}`); return SECRET_MARKER; },
     async resolveProviderOrCompanySecret(input) { calls.push(`secret:${input.refKind}:${input.companyId}:${input.refId}`); return SECRET_MARKER; },
+    async resolveRunJwt(input) { calls.push(`jwt:${input.companyId}:${input.refId}`); return SECRET_MARKER; },
   };
 }
 
@@ -470,6 +471,84 @@ integration("DAT-004 lease-scoped secret broker", () => {
     expect(brokers.calls).toEqual([]);
     expect(JSON.stringify(res)).not.toContain(SECRET_MARKER);
     expect(res.handoff.refId).toBe(PROVIDER_CREDENTIAL);
+  }, 60_000);
+
+  it("device_local: the production reader company predicate denies a matched foreign credential on the same live handle", async () => {
+    const { admin, app, appRaw } = guardCtx();
+    const brokers = recordingBrokers();
+    const { offer } = await activateLease({ kind: "user", id: OWNER_USER });
+    const foreignCredential = crypto.randomUUID();
+    const handle = "h-production-reader-company";
+    // Only company and primary key differ: owner/state/target checks must not mask
+    // a removed company predicate in the actual production reader.
+    await admin`INSERT INTO provider_credentials
+      (id, company_id, provider, owner_user_id, execution_target_id, kind, state, verified_at)
+      VALUES (${foreignCredential}, ${OTHER_COMPANY}, 'anthropic', ${OWNER_USER}, ${TARGET},
+              'personal_subscription', 'verified', now())`;
+    const visibleForeign = await appRaw`
+      SELECT id, company_id, provider, owner_user_id, execution_target_id, kind, state
+      FROM provider_credentials WHERE id = ${foreignCredential}`;
+    expect([...visibleForeign]).toEqual([{
+      id: foreignCredential, company_id: OTHER_COMPANY, provider: "anthropic",
+      owner_user_id: OWNER_USER, execution_target_id: TARGET,
+      kind: "personal_subscription", state: "verified",
+    }]);
+    await mintHandle(offer.job.jobId, handle, {
+      refKind: "device_local", refId: PROVIDER_CREDENTIAL,
+      materialization: "file", usePolicy: "sandbox_local_only",
+      ownerPrincipalKind: "user", ownerPrincipalId: OWNER_USER,
+    });
+    const service = createSecretBrokerService({ appDb: app.db, brokers });
+    const resolve = () => service.resolve({
+      auth: auth(`reader-${crypto.randomUUID()}`), request: request(offer, handle),
+    });
+    const ownHandoff = {
+      outcome: "device_handoff",
+      handoff: {
+        refKind: "device_local", refId: PROVIDER_CREDENTIAL,
+        ownerPrincipalKind: "user", ownerPrincipalId: OWNER_USER,
+        materialization: "file", usePolicy: "sandbox_local_only",
+        companyId: COMPANY, handleId: handle, boundTargetGeneration: null, destination: null,
+      },
+    };
+    await clearDenialRows();
+    expect(await auditRow(handle)).toEqual({ resolveCount: null, lastResolvedAt: null });
+    expect(await resolve()).toEqual(ownHandoff); // Exact shape excludes material/value.
+    expect(brokers.calls).toEqual([]);
+    expect(await denialRows()).toEqual([]);
+    const admittedAudit = await auditRow(handle);
+    expect(admittedAudit.resolveCount).toBe(1);
+    expect(admittedAudit.lastResolvedAt).toBeInstanceOf(Date);
+
+    const changed = await admin`UPDATE job_secret_handles SET ref_id = ${foreignCredential}
+      WHERE organization_id = ${ORG} AND job_id = ${offer.job.jobId} AND handle = ${handle}
+      RETURNING handle`;
+    expect(changed).toHaveLength(1);
+    expect(await resolve()).toEqual({ outcome: "denied", reason: "malformed" });
+    expect(brokers.calls).toEqual([]);
+    expect(await auditRow(handle)).toEqual(admittedAudit);
+    const denials = await denialRows();
+    expect(denials).toHaveLength(1);
+    expect(denials[0]).toMatchObject({
+      action: "security.denied.secret_resolve", actor_type: "system", actor_id: WORKER,
+      company_id: COMPANY, organization_id: ORG,
+      entity_type: "job_secret_handle", entity_id: handle,
+      details: {
+        reason: "credential_not_found", crossing: "DE-29",
+        jobId: offer.job.jobId, leaseId: offer.leaseId,
+      },
+    });
+
+    const restored = await admin`UPDATE job_secret_handles SET ref_id = ${PROVIDER_CREDENTIAL}
+      WHERE organization_id = ${ORG} AND job_id = ${offer.job.jobId} AND handle = ${handle}
+      RETURNING handle`;
+    expect(restored).toHaveLength(1);
+    expect(await resolve()).toEqual(ownHandoff);
+    expect(brokers.calls).toEqual([]);
+    const readmittedAudit = await auditRow(handle);
+    expect(readmittedAudit.resolveCount).toBe(2);
+    expect(readmittedAudit.lastResolvedAt).toBeInstanceOf(Date);
+    expect(await denialRows()).toEqual(denials);
   }, 60_000);
 
   // ---- fence-first + no audit on refusal ----------------------------------
