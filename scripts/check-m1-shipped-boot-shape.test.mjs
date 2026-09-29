@@ -27,6 +27,14 @@ const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
 
+test("REJECT: provider readback loses its keyed credential at teardown", () => {
+  const text = real();
+  const start = text.indexOf("      - name: Tear down (stack and volumes; retain scanner state)");
+  const end = text.indexOf("      # HARD pre-upload check", start);
+  const block = text.slice(start, end).replace(/^\s*E2B_API_KEY:.*$/m, "");
+  assert.ok(anyMatch(violationsOf(text.slice(0, start) + block + text.slice(end)), /teardown.*provider.*credential/));
+});
+
 test("teardown is captured before final scan/upload, and secrets are purged last", () => {
   const text = real();
   const down = text.indexOf("journey.mjs teardown --out");
@@ -400,6 +408,9 @@ test("the candidate-controls gate covers the whole control set, the log FILTER i
     CANDIDATE_CONTROL_MARKERS.map(([file, marker]) => `${file}:${marker}`).sort(),
     [
       "scripts/lib/m1-cleanup-evidence.mjs:providerCleanup",
+      "scripts/m1-shipped-boot/journey.mjs:collectProviderInventory",
+      "scripts/m1-shipped-boot/redaction.mjs:registerResourceIntent",
+      "scripts/lib/m1-provider-cleanup.mjs:observeE2bCleanup",
       "scripts/m1-shipped-boot/journey.mjs:observeComposeCleanup",
       "scripts/m1-shipped-boot/journey.mjs:purgeSecrets(loadState",
       "scripts/lib/m1-shipped-boot.mjs:KEY_MATERIAL_MARKERS",

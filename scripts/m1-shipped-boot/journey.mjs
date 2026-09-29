@@ -52,7 +52,8 @@
 //   collect            redacted service logs + `compose ps` into the evidence dir
 //   leak-scan          HARD check before upload, on BOTH surfaces: no job secret (raw/base64/
 //                      base64url) and no key material, in the evidence bundle OR the job log
-//   teardown           `compose down -v` + owned-resource readback; scanner state retained
+//   teardown           stop workers, inventory jobs, Compose down + provider readback;
+//                      scanner state retained (keyless remains Compose-only)
 //   purge-secrets      keypair + secrets deleted AFTER final scan and upload
 //
 // SECRETS. Every value `prepare` generates, plus E2B_API_KEY / ANTHROPIC_API_KEY, is listed in
@@ -61,7 +62,7 @@
 // -----------------------------------------------------------------------------
 
 import { spawnSync } from "node:child_process";
-import { createHash, generateKeyPairSync, randomBytes, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, randomUUID, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -107,7 +108,8 @@ import {
   evaluateShippedBootEvidence,
 } from "../lib/m1-shipped-boot.mjs";
 import { readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
-import { observeComposeCleanup } from "../lib/m1-cleanup-evidence.mjs";
+import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory } from "../lib/m1-cleanup-evidence.mjs";
+import { observeE2bCleanup } from "../lib/m1-provider-cleanup.mjs";
 import { evaluateUsageCardinality, formatViolations } from "../lib/m1-spine-assertions.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -805,8 +807,16 @@ finally { process.exit(0); }
 
 async function dispatchTenant(state, key) {
   const t = state.tenants[key];
+  const title = `DEP-015 shipped boot journey (${key}, ${t.role}, ${randomUUID()})`;
+  if (state.mode === "keyed") {
+    recordResourceIntent({ out: state.out, candidate: state.candidate, intent: {
+      id: randomUUID(), kind: "journey", tenant: key, organizationId: t.organizationId,
+      companyId: t.companyId, targetId: t.targetId, worker: t.worker, issueTitle: title,
+      expectedDistributedJobs: t.role === "control" ? "none" : "present",
+    } });
+  }
   const issue = await api(state, "POST", `/companies/${t.companyId}/issues`, {
-    title: `DEP-015 shipped boot journey (${key}, ${t.role})`,
+    title,
     description: "Reply with the single word: done.",
     status: "todo",
     assigneeAgentId: t.agentId,
@@ -1362,6 +1372,7 @@ async function redaction(state) {
         trackSecret(state, name, value);
         saveState(state);
       },
+      registerResourceIntent: (intent) => recordResourceIntent({ out: state.out, candidate: state.candidate, intent }),
       workerService: TENANTS.find((t) => t.key === "a").worker,
       log: (line) => console.log(redactSecrets(String(line), state.redact)),
     });
@@ -1550,7 +1561,69 @@ function faultMatrix(state) {
   }
 }
 
-function teardown(state) {
+function readCleanupBindings(state, intent, { timeoutMs }) {
+  // Read before Compose removes Postgres. Match the entire event/lease authority tuple;
+  // a sandbox mentioned by another lease must never satisfy this resource's inventory.
+  const sqlText = `SELECT j.id AS "jobId", j.organization_id AS "organizationId", j.company_id AS "companyId",
+    j.source_identity AS "sourceIdentity", j.source_intent->>'runId' AS "sourceRunId",
+    j.status AS "jobStatus", a.id AS "attemptId", a.status AS "attemptStatus",
+    l.id AS "leaseId", l.status AS "leaseStatus", l.target_id AS "targetId", l.created_at AS "leaseCreatedAt",
+    e.event->'payload'->>'sandboxId' AS "sandboxId"
+    FROM jobs j
+    LEFT JOIN job_attempts a ON a.job_id = j.id AND a.organization_id = j.organization_id AND a.company_id = j.company_id
+    LEFT JOIN leases l ON l.attempt_id = a.id AND l.job_id = j.id AND l.organization_id = j.organization_id AND l.company_id = j.company_id
+    LEFT JOIN job_events e ON e.job_id = j.id AND e.attempt_id = a.id AND e.lease_id = l.id
+      AND e.organization_id = j.organization_id AND e.company_id = j.company_id
+      AND e.event_type = 'attempt_started' AND e.event->'payload'->>'sandboxId' IS NOT NULL
+    WHERE j.organization_id = $1::uuid AND j.company_id = $2::uuid AND ${intent.kind === "redaction"
+      ? "j.id = $3::uuid"
+      : `j.source_kind = 'task_run' AND EXISTS (SELECT 1 FROM issues i
+          WHERE i.company_id = j.company_id AND i.title = $3 AND i.id::text = j.source_intent->>'issueId')`}`;
+  const params = [intent.organizationId, intent.companyId, intent.kind === "redaction" ? intent.jobId : intent.issueTitle];
+  const response = dexec(state, "control-plane", `
+import postgres from "postgres";
+${REPORT}
+const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+try { report({ ok: true, rows: await sql.unsafe(${JSON.stringify(sqlText)}, ${JSON.stringify(params)}) }); }
+catch { report({ ok: false }); }
+finally { await sql.end({ timeout: 5 }); }
+`, { timeout: timeoutMs });
+  if (response.status !== 0 || response.result?.ok !== true || !Array.isArray(response.result.rows))
+    throw new Error("cleanup inventory read failed");
+  return response.result.rows;
+}
+
+async function teardown(state) {
+  let inventory = null;
+  if (state.mode === "keyed") {
+    let stopped = false;
+    try {
+      // Keep the adapter and database alive while workers drain/destroy their runs.
+      const stop = compose(state, ["stop", "--timeout", "180", ...TENANTS.map((tenant) => tenant.worker)],
+        { allowFail: true, timeout: 180_000 });
+      stopped = stop.status === 0 && !stop.error && !stop.signal;
+    } catch { /* Continue with inventory and down; the verdict retains the failed stop. */ }
+    try {
+      const journal = readResourceIntents({ out: state.out, candidate: state.candidate });
+      inventory = collectProviderInventory({ candidate: state.candidate,
+        intents: journal.intents,
+        read: (intent, options) => readCleanupBindings(state, intent, options) });
+      inventory.violations.push(...journal.violations);
+      inventory.complete = inventory.violations.length === 0;
+    } catch {
+      inventory = { candidate: state.candidate, complete: false, resources: [], violations: ["inventory_unavailable"] };
+    }
+    if (!stopped) {
+      inventory.complete = false;
+      inventory.violations.push("worker_stop_failed");
+    }
+    // Retain the pre-down inventory even if subsequent removal fails.
+    try { writeEvidence(state, "provider-resource-inventory.json", inventory); }
+    catch {
+      inventory.complete = false;
+      inventory.violations.push("inventory_evidence_write_failed");
+    }
+  }
   const result = observeComposeCleanup({
     candidate: state.candidate,
     project: PROJECT,
@@ -1562,8 +1635,24 @@ function teardown(state) {
     ], { encoding: "utf8", timeout: 30_000, maxBuffer: 1024 * 1024 }),
   });
   writeEvidence(state, "compose-cleanup.json", result);
+  if (inventory) {
+    let observation;
+    try {
+      const notAfter = new Date().toISOString();
+      observation = await observeE2bCleanup({ apiKey: process.env.E2B_API_KEY,
+        resources: inventory.resources.map((resource) => ({ sandboxId: resource.sandboxId,
+          notBefore: resource.leaseCreatedAt, notAfter })) });
+    } catch { observation = { pass: false, observations: [], violations: ["provider_observer_failed"] }; }
+    const violations = [...inventory.violations, ...observation.violations];
+    if (!result.pass) violations.push("compose_cleanup_unproven");
+    const provider = { candidate: state.candidate, scope: "declared-journey-and-redaction-intents",
+      finishedAt: new Date().toISOString(), inventory, observation,
+      pass: inventory.complete && observation.pass && result.pass, violations };
+    writeEvidence(state, "provider-cleanup.json", provider);
+    if (!provider.pass) fail("Provider teardown unproven; see provider-cleanup.json (Compose cleanup attempted)");
+  }
   if (!result.pass) fail(`Compose teardown unproven: ${result.violations.join(", ")}; see compose-cleanup.json`);
-  console.log("teardown: Compose project absent on readback; provider cleanup NOT assessed; scanner state retained");
+  console.log(`teardown: Compose project absent on readback; provider cleanup ${inventory ? "observed for declared resource inventory" : "NOT assessed (keyless)"}; scanner state retained`);
 }
 
 function purgeSecrets(state) {

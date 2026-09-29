@@ -4,6 +4,10 @@ This describes the bounded Compose cleanup repair, not a campaign result or a
 change to M1a acceptance requirements. Provider cleanup, D1 final collection,
 and full private evidence custody remain separate obligations.
 
+The successor [provider-cleanup repair](./provider-cleanup-verification.md) adds
+declared-resource inventory and provider readback to keyed teardown. This document
+describes the Compose report, whose scope remains unchanged.
+
 ## Phase Order
 
 The shipped-boot workflow collects service snapshots before removing containers,
