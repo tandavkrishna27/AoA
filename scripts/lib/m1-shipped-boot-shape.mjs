@@ -26,11 +26,10 @@ const GATED_SECRET_RE = /\$\{\{\s*inputs\.mode\s*==\s*'keyed'\s*&&\s*secrets\.([
  * file the leak scan reads and PUBLISHES a shape-redacted line to the runner (Codex P1, PR #574:
  * a plain `tee` would publish an unregistered key before any scan could see it). */
 export const JOB_LOG_TEE = ' 2>&1 | node scripts/m1-shipped-boot/log-filter.mjs "$M1_OUT/job-log.txt"';
-/** The phases whose output must be teed. `leak-scan` reads the file and `teardown` deletes the
- * state, so neither writes to it; everything that could print a secret does. */
+/** Finish every producer capture before leak-scan reads the log; purge runs after upload. */
 export const TEED_PHASES = [
   "prepare", "boot-core", "seed", "apply-rollout", "assert-tenants", "provision-targets",
-  "boot-workers", "await-workers", "reconcile", "probe-presign", "dispatch", "cross-tenant", "collect",
+  "boot-workers", "await-workers", "reconcile", "probe-presign", "dispatch", "cross-tenant", "collect", "teardown",
 ];
 
 /** The markers the CANDIDATE's own copy of the lane must carry, or its run would be judged by a
@@ -39,6 +38,9 @@ export const CANDIDATE_CONTROL_MARKERS = [
   ["scripts/m1-shipped-boot/journey.mjs", "CONTROL_PLANE_PUBLIC_KEY_PEM"],
   ["scripts/m1-shipped-boot/journey.mjs", "maskDirectivesFor"],
   ["scripts/m1-shipped-boot/journey.mjs", "stripMaskDirectives"],
+  ["scripts/m1-shipped-boot/journey.mjs", "observeComposeCleanup"],
+  ["scripts/m1-shipped-boot/journey.mjs", "purgeSecrets(loadState"],
+  ["scripts/lib/m1-cleanup-evidence.mjs", "providerCleanup"],
   ["scripts/lib/m1-shipped-boot.mjs", "KEY_MATERIAL_MARKERS"],
   // The EXECUTABLE the workflow pipes every phase through: a candidate carrying the symbols but
   // not the file passes the greps above and then dies at the first phase on the missing module
@@ -302,6 +304,29 @@ export function evaluateShippedBootWorkflowShape(text) {
   //      `journey.mjs leak-scan` BEFORE the upload, and the upload gated on that step's success, so
   //      a bundle that fails the scan is never published.
   const scanIdx = src.indexOf("journey.mjs leak-scan");
+  const stepAt = (at) => {
+    if (at < 0) return "";
+    const end = src.indexOf("- name:", at);
+    return src.slice(src.lastIndexOf("- name:", at), end < 0 ? src.length : end);
+  };
+  const teardownBody = stepAt(teardownIdx);
+  if (teardownIdx >= scanIdx) v.push("teardown must run BEFORE the final leak scan");
+  if (!/steps\.teardown\.outputs\.capture_ok\s*==\s*'true'/.test(before)) {
+    v.push("the upload must require teardown capture completion, independently of cleanup success");
+  }
+  if (!/\bid:\s*teardown\b/.test(teardownBody)
+      || /journey\.mjs teardown[^\n]*\|\|/.test(teardownBody)
+      || !teardownBody.includes('statuses=("${PIPESTATUS[@]}")')
+      || !teardownBody.includes('if [ "${statuses[1]}" -eq 0 ]; then\n            echo "capture_ok=true" >> "$GITHUB_OUTPUT"')
+      || !teardownBody.includes('exit "${statuses[0]}"')) {
+    v.push("teardown must propagate producer and filter status without masking either failure");
+  }
+  const purgeIdx = src.indexOf("journey.mjs purge-secrets --out");
+  if (purgeIdx < uploadIdx) v.push("purge-secrets must run AFTER the evidence upload");
+  if (!/if:\s*always\(\)/.test(stepAt(purgeIdx))) v.push("purge-secrets must run if: always(), including on upload failure");
+  if (!/else\s*\n\s*echo "::error::leak-scan: no scanner state; refusing evidence publication"\s*\n\s*exit 1/.test(stepAt(scanIdx))) {
+    v.push("missing scanner state must fail closed before publication");
+  }
   if (scanIdx === -1) v.push("the lane must run the pre-upload leak scan (`journey.mjs leak-scan`)");
   else if (uploadIdx !== -1 && scanIdx > uploadIdx) v.push("the leak scan must run BEFORE the evidence upload");
   const scanStep = scanIdx === -1 ? "" : src.slice(src.lastIndexOf("- name:", scanIdx), scanIdx);
@@ -351,7 +376,7 @@ export function evaluateShippedBootWorkflowShape(text) {
   if (/journey\.mjs collect[^\n]*\|\|\s*true/.test(src)) {
     v.push("the collect step must not swallow the log filter's exit status with `|| true` — a failed capture would be judged clean");
   }
-  if (!/statuses\[1\]/.test(src)) {
+  if (!/statuses\[1\]/.test(stepAt(collectIdx))) {
     v.push("the collect step must propagate the log filter's own status (PIPESTATUS), so a failed capture fails the run");
   }
 
