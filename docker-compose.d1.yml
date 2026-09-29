@@ -35,6 +35,9 @@ services:
   # --- data tier -------------------------------------------------------------
   postgres:
     image: ${AOA_D1_POSTGRES_IMAGE:-pgvector/pgvector:pg18}
+    # D1-only diagnostics: identify the blocking backend when a lease race
+    # reaches the app pool's 750 ms lock timeout. App timeouts are unchanged.
+    command: ["postgres", "-c", "log_lock_waits=on", "-c", "deadlock_timeout=100ms"]
     environment:
       POSTGRES_USER: "aoa"
       POSTGRES_PASSWORD: "aoa"
