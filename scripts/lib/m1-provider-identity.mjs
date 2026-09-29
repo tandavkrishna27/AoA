@@ -1,5 +1,14 @@
 const BUILD_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export function pinnedE2bTemplateSelector(identity) {
+  const templateId = identity?.templateId;
+  const buildId = identity?.buildId;
+  if (typeof templateId !== "string" || !/^[A-Za-z0-9._-]+$/.test(templateId) || !BUILD_ID_RE.test(String(buildId ?? ""))) {
+    throw new Error("E2B template identity: exact template and build IDs are required for a pinned create");
+  }
+  return `${templateId}:${buildId}`;
+}
+
 function templateNames(row) {
   return [...(Array.isArray(row?.names) ? row.names : []), ...(Array.isArray(row?.aliases) ? row.aliases : [])];
 }

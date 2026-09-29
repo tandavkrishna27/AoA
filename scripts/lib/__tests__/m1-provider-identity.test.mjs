@@ -5,9 +5,17 @@ import {
   selectE2bTemplateIdentity,
   evaluateE2bSandboxBuildBinding,
   resolveE2bTemplateIdentity,
+  pinnedE2bTemplateSelector,
 } from "../m1-provider-identity.mjs";
 
 const BUILD = "12345678-1234-4234-8234-123456789abc";
+
+test("pinned selector names the resolved template and immutable build", () => {
+  assert.equal(pinnedE2bTemplateSelector({ templateId: "tpl_immutable", buildId: BUILD }), `tpl_immutable:${BUILD}`);
+  for (const bad of [{ templateId: "tpl_immutable" }, { templateId: "tpl_immutable:latest", buildId: BUILD }, { templateId: "", buildId: BUILD }]) {
+    assert.throws(() => pinnedE2bTemplateSelector(bad), /exact template and build IDs/);
+  }
+});
 
 test("selectE2bTemplateIdentity retains the immutable current build and template ids", () => {
   assert.deepEqual(selectE2bTemplateIdentity("aoa-base", [{

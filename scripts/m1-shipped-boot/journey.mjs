@@ -107,7 +107,7 @@ import {
   shippedBootAgentCreatePayload,
   evaluateShippedBootEvidence,
 } from "../lib/m1-shipped-boot.mjs";
-import { readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
+import { pinnedE2bTemplateSelector, readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
 import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory } from "../lib/m1-cleanup-evidence.mjs";
 import { observeE2bCleanup } from "../lib/m1-provider-cleanup.mjs";
 import { evaluateUsageCardinality, formatViolations } from "../lib/m1-spine-assertions.mjs";
@@ -385,7 +385,7 @@ async function prepare(args) {
     AOA_M1_ADAPTER_MANAGER_IMAGE: tag("ADAPTER-MANAGER_IMAGE"),
     // Empty tenant set until the Organizations exist (`apply-rollout` writes the real one).
     AOA_M1_DISTRIBUTED_EXECUTION_ROLLOUT: JSON.stringify({ organizations: {} }),
-    AOA_M1_E2B_TEMPLATE: resolvedProviderIdentity?.templateId ?? requestedTemplate,
+    AOA_M1_E2B_TEMPLATE: resolvedProviderIdentity ? pinnedE2bTemplateSelector(resolvedProviderIdentity) : requestedTemplate,
     AOA_M1_CP_SIGNING_KEY_FILE: signingKeyFile,
     AOA_M1_CP_PUBLIC_KEY_FILE: publicKeyFile,
     ...ticketFiles,
@@ -402,6 +402,7 @@ async function prepare(args) {
       requestedTemplate,
       resolvedTemplateId: resolvedProviderIdentity?.templateId ?? null,
       immutableBuildId: resolvedProviderIdentity?.buildId ?? null,
+      createSelector: resolvedProviderIdentity ? pinnedE2bTemplateSelector(resolvedProviderIdentity) : null,
       buildStatus: resolvedProviderIdentity?.buildStatus ?? null,
       envdVersion: resolvedProviderIdentity?.envdVersion ?? null,
       sdkPackage: "e2b",
@@ -409,7 +410,7 @@ async function prepare(args) {
       serviceEndpoint: "api.e2b.dev",
       configSha256: configIdentity,
       binding: args.mode === "keyed" ? "E2B sandbox event sandboxTemplateId + sandboxBuildId" : "not applicable: keyless mode creates no sandbox",
-      note: "The credential-free identity is resolved from E2B before boot; every created sandbox is later bound to this immutable build using E2B's own event API.",
+      note: "The adapter creates from the exact template/build selector; every created sandbox is later bound to this immutable build using E2B's own event API.",
     },
     envValues,
     boardToken,
@@ -701,6 +702,10 @@ async function bootWorkers(state) {
     });
     if (current.templateId !== state.providerIdentity.resolvedTemplateId || current.buildId !== state.providerIdentity.immutableBuildId) {
       fail(`keyed mode: E2B template alias changed after prepare (expected ${state.providerIdentity.resolvedTemplateId}/${state.providerIdentity.immutableBuildId}, got ${current.templateId}/${current.buildId}); refusing before sandbox spend`);
+    }
+    const pinnedSelector = pinnedE2bTemplateSelector(current);
+    if (state.providerIdentity.createSelector !== pinnedSelector || state.envValues.AOA_M1_E2B_TEMPLATE !== pinnedSelector) {
+      fail("keyed mode: adapter-manager template selector is not pinned to the resolved E2B build");
     }
     compose(state, ["up", "-d", "--no-deps", "--wait", "--wait-timeout", "300", "adapter-manager"], { timeout: 600_000 });
     compose(state, ["up", "-d", "--no-deps", "--wait", "--wait-timeout", "300", ...workers], { timeout: 600_000 });

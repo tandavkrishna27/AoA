@@ -103,6 +103,17 @@ function makeDeps(over: Partial<AdapterManagerDeps> & { keyBytes?: Buffer | (() 
 }
 
 describe("bootAdapterManager — the happy path", () => {
+  it("passes an exact E2B build selector to the provider", async () => {
+    const selector = "tpl_immutable:12345678-1234-4234-8234-123456789abc";
+    const { deps, record } = makeDeps();
+    const result = await bootAdapterManager({
+      ...deps,
+      env: { ...deps.env, [TEMPLATE_ENV]: selector },
+    });
+    expect(result.kind).toBe("listening");
+    expect(record.ctorOptions?.templateId).toBe(selector);
+  });
+
   it("constructs the real provider, loads+asserts the ed25519 key, and calls createProviderServer then listen", async () => {
     const { deps, createProviderServer, listen, record, provider } = makeDeps();
     const result = await bootAdapterManager(deps);
