@@ -403,6 +403,12 @@ jobs:
       - name: Bring up the D1 stack
         run: docker compose -f "$COMPOSE_FILE_PATH" up -d --wait --wait-timeout 300
 
+      - name: Verify lock-wait diagnostics
+        if: ${{ github.ref == 'refs/heads/codex/d1-lock-wait-diagnostics' }}
+        run: |
+          docker compose -f "$COMPOSE_FILE_PATH" exec -T postgres \
+            psql -U aoa -d aoa -Atc "SHOW log_lock_waits; SHOW deadlock_timeout;"
+
       - name: Run the E6F campaign (live)
         env:
           AOA_D1_LIVE: "1"
@@ -463,6 +469,22 @@ jobs:
           else
             node --test --test-concurrency=1 ${BOUNDED}
           fi
+
+      - name: Capture PostgreSQL lock-wait log
+        if: ${{ always() && github.ref == 'refs/heads/codex/d1-lock-wait-diagnostics' }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/d1-lock-diagnostics"
+          docker compose -f "$COMPOSE_FILE_PATH" logs --no-color --timestamps postgres \
+            > "$RUNNER_TEMP/d1-lock-diagnostics/postgres.log"
+
+      - name: Upload PostgreSQL lock-wait log
+        if: ${{ always() && github.ref == 'refs/heads/codex/d1-lock-wait-diagnostics' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: d1-postgres-lock-diagnostics-${{ github.run_id }}
+          path: ${{ runner.temp }}/d1-lock-diagnostics/postgres.log
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Collect distributed evidence (on failure)
         if: failure()
