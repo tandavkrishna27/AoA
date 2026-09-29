@@ -1,8 +1,8 @@
-export const D1_REDACTION_STREAMS = Object.freeze(["events", "logs"]);
+import { REDACTION_STREAMS, observeRedactionArm } from "./redaction-arm-evidence.mjs";
+
+export const D1_REDACTION_STREAMS = REDACTION_STREAMS;
 export const D1_REDACTION_REQUIRED_ATTEMPT_STATUS = "succeeded";
 
-const RUN_OUTPUT_PROBE_TAG = "AOA-RUN-OUTPUT-PROBE";
-const REDACTION_MARKER = "«redacted»";
 
 export function buildD1RedactionArmInputs({ plant, nonce, canary, controlCanary, capabilitySecret }) {
   return {
@@ -13,42 +13,15 @@ export function buildD1RedactionArmInputs({ plant, nonce, canary, controlCanary,
   };
 }
 
-function scopedLines(text, nonce) {
-  const token = ` arm=${nonce} `;
-  return String(text ?? "")
-    .split(/\r?\n/)
-    .filter((line) => line.includes(RUN_OUTPUT_PROBE_TAG) && line.includes(token));
-}
-
-function observeArm(arm) {
-  const observedOnStream = {};
-  const scrubberMarkerObservedOnStream = {};
-  const streamBytesObserved = {};
-  const canaryAbsentOnStream = {};
-  const verbatimCanaryObservedOnStream = {};
-  for (const stream of D1_REDACTION_STREAMS) {
-    const lines = scopedLines(arm?.streams?.[stream], arm?.nonce);
-    const scoped = lines.join("\n");
-    observedOnStream[stream] = lines.length > 0;
-    scrubberMarkerObservedOnStream[stream] = lines.some((line) => line.includes(REDACTION_MARKER));
-    streamBytesObserved[stream] = Buffer.byteLength(scoped, "utf8");
-    canaryAbsentOnStream[stream] = !String(arm?.streams?.[stream] ?? "").includes(arm?.canary ?? "\0");
-    verbatimCanaryObservedOnStream[stream] = typeof arm?.controlCanary === "string"
-      && lines.some((line) => line.includes(`control=${arm.controlCanary}`));
-  }
-  return {
-    attemptStatus: arm?.attemptStatus ?? null,
-    observedOnStream,
-    scrubberMarkerObservedOnStream,
-    streamBytesObserved,
-    canaryAbsentOnStream,
-    verbatimCanaryObservedOnStream,
-  };
-}
-
 export function evaluateD1RedactionEvidence({ canary, crossTenantCanaryAbsent, graded, suppressed }) {
-  const gradedEvidence = observeArm({ ...graded, canary });
-  const suppressedEvidence = observeArm(suppressed);
+  const gradedEvidence = observeRedactionArm({ ...graded, canary });
+  const suppressedEvidence = observeRedactionArm(suppressed);
+  suppressedEvidence.nonVacuous = D1_REDACTION_STREAMS.every(
+    (stream) => suppressedEvidence.streamBytesObserved[stream] > 0,
+  );
+  suppressedEvidence.redactedOnAllStreams = typeof suppressed?.canary === "string"
+    && suppressed.canary.length > 0
+    && D1_REDACTION_STREAMS.every((stream) => suppressedEvidence.canaryAbsentOnStream[stream] === true);
   const gradedSucceeded = gradedEvidence.attemptStatus === D1_REDACTION_REQUIRED_ATTEMPT_STATUS;
   const suppressedSucceeded = suppressedEvidence.attemptStatus === D1_REDACTION_REQUIRED_ATTEMPT_STATUS;
   const gradedObserved = D1_REDACTION_STREAMS.every((stream) => gradedEvidence.observedOnStream[stream] === true);
@@ -67,7 +40,8 @@ export function evaluateD1RedactionEvidence({ canary, crossTenantCanaryAbsent, g
     (stream) => suppressedEvidence.verbatimCanaryObservedOnStream[stream] === true,
   );
   const injectionFired = gradedSucceeded && gradedObserved && gradedMarked;
-  const positiveControlPassed = suppressedSucceeded && suppressedObserved && suppressedClean && suppressedVerbatim;
+  const positiveControlPassed = suppressedSucceeded && suppressedObserved && suppressedClean && suppressedVerbatim
+    && suppressedEvidence.nonVacuous && suppressedEvidence.redactedOnAllStreams;
 
   return {
     row: {

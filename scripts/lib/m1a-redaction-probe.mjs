@@ -60,12 +60,7 @@ export const REDACTION_PROBE_EVIDENCE_MARKER = "[redaction-probe:evidence]";
  */
 export const REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS = "succeeded";
 
-export function observeNonceScopedProbeLine(text, nonce) {
-  const token = ` arm=${nonce} `;
-  return String(text ?? "")
-    .split(/\r?\n/)
-    .some((line) => line.includes("AOA-RUN-OUTPUT-PROBE") && line.includes(token));
-}
+export { observeNonceScopedProbeLine } from "./redaction-arm-evidence.mjs";
 
 /**
  * The classification a redaction row files when its own arm's attempt did not succeed.
@@ -100,12 +95,17 @@ export function redactionAttemptFailureClassification(status) {
  * @param {number}  o.eventBytes      bytes observed on the event stream
  * @param {number}  o.logBytes        bytes observed on the container log
  * @param {number}  o.foreignBytes    bytes observed on the other tenant's stream
+ * @param {boolean} o.observedOnEvents current nonce-scoped probe line on events
+ * @param {boolean} o.observedOnLogs current nonce-scoped probe line on logs
+ * @param {boolean} o.verbatimControlOnEvents inert control emitted verbatim on events
+ * @param {boolean} o.verbatimControlOnLogs inert control emitted verbatim on logs
  * @param {string|null} o.attemptStatus the arm's OWN attempt terminal, as the control plane recorded
  *   it. Carried onto the row so the PAIR VERDICT can refuse an arm whose setup did not succeed
  *   (DEP-025 finding (b)); absent ⇒ `null` ⇒ refused, never read as fine.
  */
 export function classifyRedactionObservation(o) {
   const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const bool = (v) => typeof v === "boolean" ? v : null;
   const vacuity = [];
   if (num(o.eventBytes) <= 0) vacuity.push("the job's own event stream is empty, so every scan over it is vacuously clean");
   if (num(o.logBytes) <= 0) vacuity.push("the worker container log is empty, so every scan over it is vacuously clean");
@@ -146,7 +146,9 @@ export function classifyRedactionObservation(o) {
     // `null` rather than to a passing default, because the absence of a status is exactly the
     // "not run" this case must not read as clean.
     attemptStatus: typeof o.attemptStatus === "string" ? o.attemptStatus : null,
-    scrubberMarkerObservedOnStream: { events: o.markerOnEvents === true, logs: o.markerOnLogs === true },
+    observedOnStream: { events: o.observedOnEvents === true, logs: o.observedOnLogs === true },
+    verbatimCanaryObservedOnStream: { events: o.verbatimControlOnEvents === true, logs: o.verbatimControlOnLogs === true },
+    scrubberMarkerObservedOnStream: { events: bool(o.markerOnEvents), logs: bool(o.markerOnLogs) },
     streamBytesObserved: { events: num(o.eventBytes), logs: num(o.logBytes) },
     vacuity,
   };
@@ -189,6 +191,9 @@ export function evaluateRedactionProbeEvidence(input) {
    * drift apart (the asymmetry that produced finding (a) in the first place).
    */
   const requireArmSucceeded = (arm, row) => {
+    if (!Array.isArray(row.vacuity)) {
+      violations.push(`${arm} arm: missing vacuity evidence`);
+    }
     if (row.attemptStatus !== REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS) {
       violations.push(
         `${arm} arm: the seeded job's attempt terminated ${JSON.stringify(row.attemptStatus ?? null)}, not ` +
@@ -219,11 +224,18 @@ export function evaluateRedactionProbeEvidence(input) {
       );
     }
     for (const stream of declared) {
+      if (graded.observedOnStream?.[stream] !== true) {
+        violations.push(`graded arm: stream ${JSON.stringify(stream)} has no current nonce-scoped probe line`);
+      }
       if (Number(graded.streamBytesObserved?.[stream] ?? 0) <= 0) {
         violations.push(`graded arm: stream ${JSON.stringify(stream)} observed zero bytes, so its arm is vacuous`);
       }
     }
-    summary.gradedFired = graded.injectionFired === true;
+    summary.gradedFired = graded.attemptStatus === REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS
+      && graded.injectionFired === true
+      && Array.isArray(graded.vacuity) && graded.vacuity.length === 0
+      && declared.every((stream) => graded.observedOnStream?.[stream] === true
+        && Number.isFinite(graded.streamBytesObserved?.[stream]) && graded.streamBytesObserved[stream] > 0);
   }
 
   if (!suppressed || typeof suppressed !== "object") {
@@ -232,6 +244,7 @@ export function evaluateRedactionProbeEvidence(input) {
       "anything on this stack, and the case's non-vacuity is not demonstrated",
     );
   } else {
+    for (const v of suppressed.vacuity ?? []) violations.push(`suppressed arm: ${v}`);
     // ★ The suppressed arm's OWN non-vacuity: it must have RUN. A suppressed job that never reached
     // the sandbox would report no marker for the same reason a working suppression does.
     if (Number(suppressed.streamBytesObserved?.events ?? 0) <= 0) {
@@ -255,6 +268,15 @@ export function evaluateRedactionProbeEvidence(input) {
     // The AND-collapse is kept BELOW as a backstop for a row whose `injectionFired` was computed
     // some other way; it is no longer the thing that decides.
     for (const stream of declared) {
+      if (!Number.isFinite(suppressed.streamBytesObserved?.[stream]) || suppressed.streamBytesObserved[stream] <= 0) {
+        violations.push(`suppressed arm: stream ${JSON.stringify(stream)} observed zero or invalid scoped bytes`);
+      }
+      if (suppressed.observedOnStream?.[stream] !== true) {
+        violations.push(`suppressed arm: stream ${JSON.stringify(stream)} has no current nonce-scoped probe line`);
+      }
+      if (suppressed.verbatimCanaryObservedOnStream?.[stream] !== true) {
+        violations.push(`suppressed arm: stream ${JSON.stringify(stream)} did not carry the inert control verbatim`);
+      }
       const observed = suppressed.scrubberMarkerObservedOnStream?.[stream];
       if (observed === true) {
         violations.push(
@@ -281,12 +303,20 @@ export function evaluateRedactionProbeEvidence(input) {
     // ★ THE TWIN, fixed with it. This is what becomes the matrix row's `positiveControlPassed`, so
     // the AND-collapse here would have reported a PASSING positive control on the very observation
     // the loop above refuses — a known twin left behind is worse than the original defect.
-    summary.suppressedUnfired =
-      suppressed.injectionFired === false
-      && declared.every((stream) => suppressed.scrubberMarkerObservedOnStream?.[stream] === false);
+    summary.suppressedUnfired = suppressedControlPassed(suppressed);
   }
 
   return { violations, summary };
+}
+
+function suppressedControlPassed(row) {
+  return row?.attemptStatus === REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS
+    && row.injectionFired === false && row.redactedOnAllStreams === true
+    && Array.isArray(row.vacuity) && row.vacuity.length === 0
+    && REDACTION_PROBE_STREAMS.every((stream) => row.observedOnStream?.[stream] === true
+      && row.scrubberMarkerObservedOnStream?.[stream] === false
+      && row.verbatimCanaryObservedOnStream?.[stream] === true
+      && Number.isFinite(row.streamBytesObserved?.[stream]) && row.streamBytesObserved[stream] > 0);
 }
 
 /**
@@ -310,31 +340,28 @@ export function evaluateRedactionProbeEvidence(input) {
  * So the status is now BOTH carried on the row (so a standalone consumer can see it) AND allowed to
  * degrade the fields that would otherwise read as a pass.
  *
- * ★★★ AND THE PROPERTY HOLDS FOR THE GRADED ARM ONLY — stated here rather than left for a reader to
- * assume, because the surrounding prose reads as if it were complete. A SUPPRESSED-arm failure
- * (non-`succeeded`, or a marker on one stream) clears only `positiveControlPassed`, and
- * `evaluateFaultMatrixEvidence`'s `family === "redaction"` branch NEVER READS that field: measured at
- * source, it is read only in the `credential` branch and the `tenantCase` branch. So an artifact-only
- * verdict still passes on that half. That is Codex round 3 on PR #608, verified and HANDED TO THE
- * PLANNING SESSION under rule C's two-round cap — the phase itself still refuses, so an end-to-end
- * keyed run reds, and the case is `pending` so the row cannot enter a graded bundle meanwhile. Two
- * candidate fixes are in `DEP-025-result.md` §11; the general one reds the `required` D1 case.
+ * DEP-026 made the matrix consumer grade the suppressed arm. Both consumers now derive its
+ * positive control from the complete classified observations, not a caller's summary flag.
  *
  * `redactedOnAllStreams` is deliberately left as the RAW observation: the streams really were scanned
  * and really were clean, and forcing it to `false` would make the bundle claim a LEAK — a diagnosis
  * the run does not support, and one whose stated remedy is "revert the surface". `injectionFired`
- * going false is what stops the row passing (`evidence:injection_did_not_fire`), and the
- * classification names the real cause.
+ * going false stops a graded setup failure passing (`evidence:injection_did_not_fire`).
+ *
+ * `detail.suppressedArmEvidence` is the classified suppressed arm, not raw streams. The serializer
+ * projects its measured fields into top-level evidence and removes that input from detail.
  */
 export function redactionProbeMatrixRow(graded, detail) {
+  const { suppressedArmEvidence: suppressed, ...detailFacts } = detail ?? {};
   const gradedAttemptStatus = typeof graded?.attemptStatus === "string" ? graded.attemptStatus : null;
-  const suppressedAttemptStatus = typeof detail?.suppressedAttemptStatus === "string" ? detail.suppressedAttemptStatus : null;
+  const suppressedAttemptStatus = typeof suppressed?.attemptStatus === "string" ? suppressed.attemptStatus
+    : typeof detail?.suppressedAttemptStatus === "string" ? detail.suppressedAttemptStatus : null;
   const gradedSucceeded = gradedAttemptStatus === REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS;
   // FAIL-CLOSED on both: an absent status is refused, never read as succeeded.
-  const suppressedSucceeded = suppressedAttemptStatus === REDACTION_PROBE_REQUIRED_ATTEMPT_STATUS;
+  const { summary } = evaluateRedactionProbeEvidence({ graded, suppressed });
   return {
     case: REDACTION_PROBE_CASE,
-    injectionFired: gradedSucceeded && graded?.injectionFired === true,
+    injectionFired: summary.gradedFired,
     observedClassification: gradedSucceeded
       ? (graded?.observedClassification ?? "no_scrubber_marker_observed")
       : redactionAttemptFailureClassification(gradedAttemptStatus),
@@ -355,18 +382,28 @@ export function redactionProbeMatrixRow(graded, detail) {
     // The same positive-control field the cross-tenant rows carry: here it is the SUPPRESSED arm —
     // which must ALSO have succeeded, or its "no marker" is a failed setup rather than a working
     // suppression, and the row would certify a control that never ran.
-    positiveControlPassed: suppressedSucceeded && detail?.suppressedUnfired === true,
+    positiveControlPassed: suppressedControlPassed(suppressed),
     suppressedArmEvidence: {
       attemptStatus: suppressedAttemptStatus,
       observedOnStream: {
-        events: detail?.suppressedObservedOnEvents === true,
-        logs: detail?.suppressedObservedOnLogs === true,
+        events: suppressed?.observedOnStream?.events === true,
+        logs: suppressed?.observedOnStream?.logs === true,
       },
       scrubberMarkerObservedOnStream: {
-        events: detail?.suppressedMarkerOnEvents === true,
-        logs: detail?.suppressedMarkerOnLogs === true,
+        events: suppressed?.scrubberMarkerObservedOnStream?.events ?? null,
+        logs: suppressed?.scrubberMarkerObservedOnStream?.logs ?? null,
       },
+      streamBytesObserved: {
+        events: suppressed?.streamBytesObserved?.events ?? 0,
+        logs: suppressed?.streamBytesObserved?.logs ?? 0,
+      },
+      verbatimCanaryObservedOnStream: {
+        events: suppressed?.verbatimCanaryObservedOnStream?.events === true,
+        logs: suppressed?.verbatimCanaryObservedOnStream?.logs === true,
+      },
+      redactedOnAllStreams: suppressed?.redactedOnAllStreams === true,
+      nonVacuous: Array.isArray(suppressed?.vacuity) && suppressed.vacuity.length === 0,
     },
-    detail: detail ?? {},
+    detail: detailFacts,
   };
 }
