@@ -1,7 +1,7 @@
 # E2B Provider Key Environment Flow QA
 
 Date: 2026-06-01
-Workspace: C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5\.worktrees\aoa-runtime-cloud-plan-review
+Workspace: [historical AoA worktree]
 URL: http://127.0.0.1:5174
 API: http://127.0.0.1:3110/api
 

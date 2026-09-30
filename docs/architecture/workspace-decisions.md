@@ -348,6 +348,6 @@ Import/export of department configurations can be added later as convenience fea
 
 ## References
 
-- Vibe-kanban codebase studied for UX patterns (at `the upstream project-AoA/vibe-kanban-main/`)
-- the upstream project codebase as source for workspace backend (at `the upstream project-AoA/aoa-master/`)
-- Backend wiring prompt: `the upstream project-AoA/workspace-port-prompt.md`
+- Vibe-kanban codebase studied for UX patterns (historical checkout, location no longer valid)
+- the upstream project codebase as source for workspace backend (historical checkout, location no longer valid)
+- Backend wiring prompt: historical prompt, location no longer valid

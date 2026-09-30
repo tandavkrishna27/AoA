@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - Do not remove an active worktree or process's checkout.
-- Preserve pre-existing untracked user documents and pitch assets unless the owner authorizes editing or relocation of those exact classes.
-- Use the app's worktree archive tooling for managed worktrees; never shell-delete their directories.
+- Preserve pre-existing untracked user documents and pitch assets with external backups before editing. The owner has now authorized removal from documentation, including the presentation files under `docs/strategy/pitch`.
+- Use the app's worktree archive tooling only for worktrees attached to this chat. Classify other registrations and plan their recovery individually; never shell-delete their directories.
 - Git history reconstruction or remote replacement is irreversible for collaborators and requires a separate explicit decision.
 - Do not claim physical zero based only on a text scan that skips archives or binary data.
 
@@ -29,19 +29,21 @@
 ## Verified inventory (2026-09-30)
 
 - Tracked `main` content and paths: zero target-token matches.
-- Nonignored untracked files: 499 total; 36 content matches (24 pitch-build intermediates and scripts, 12 authored product/research/strategy documents); no matching filenames.
-- Those 36 text files contain 247 target-token occurrences. Archive inspection found 27 additional matching PPTX/ZIP files with 132 embedded occurrences among 37 untracked archives checked; these need deliberate document edits or regeneration, not a plain text replace.
+- Nonignored untracked files at the first inventory: 499 total; 36 content matches (24 pitch-build intermediates and scripts, 12 authored product/research/strategy documents); no matching filenames. This is a dated snapshot, not a current total.
+- A no-ignore documentation scan additionally found 26 ignored historical documents and two matching ignored filenames. Together with the 12 authored documents, 38 plain-text docs contained 345 occurrences. All 38 have now been edited with an external backup; the two filenames have been renamed. Ten matching PPTX files under `docs/strategy/pitch` have also been edited and package-validated. A final independent documentation scan is still required.
+- At the first inventory, those 36 text files contained 247 target-token occurrences. Archive inspection found 27 matching PPTX/ZIP files with 132 embedded occurrences among 37 untracked archives checked across the repository. Ten of those archives were under `docs/strategy/pitch` and are now edited; archives outside `docs/` remain a separate cleanup class.
+- Current documentation proof (2026-09-30): a hidden/no-ignore, case-insensitive scan finds zero matching content files and zero matching paths under `docs/`; inspection of all 15 DOCX/PPTX/XLSX/ZIP archives there finds zero embedded matches and no damaged ZIP members. The sole PNG in `docs/` was visually inspected and contains no old branding. Re-run after any further edits or builds.
 - A partial no-ignore scan found 8,720 additional matching files outside `.claude/worktrees`, including 7,866 in nested `.worktrees`, about 735 under `server` runtime output, 19 under `data`, and smaller local cache/log groups. It excluded dependencies, build outputs, and archives, so it is not a whole-folder total.
 - Registered Git worktrees: 223 paths exist; 22 have tracked changes. Three checked-out branches have replatform-related names, but none is exactly `replatform`.
-- Local Git: `main` is four commits ahead and twelve behind `origin/main`; 449 local branches, 457 remote-tracking refs, 406 local tags, seven stashes, and roughly 10,586 commits reachable across refs. About 140 tag names and 1,428 commit subjects contain the target token.
+- Local Git at inventory time: `main` was four commits ahead and twelve behind `origin/main`; 449 local branches, 457 remote-tracking refs, 406 local tags, seven stashes, and roughly 10,586 commits reachable across refs. About 140 tag names and 1,428 commit subjects contained the target token. Recheck these numbers before integration.
 - Published GitHub `main` is protected against force pushes, and eleven pull requests are open. Public clones, forks, caches, and PR records cannot be guaranteed clean through a repository rewrite.
 - The twelve remote-only commits change 258 paths; 35 overlap the 631-path cleanup. They add roughly 80 target-token lines, so a routine merge would reintroduce the term. Integrate remote changes against current AoA contracts with full tests and the zero-match guard.
 
 ## Execution boundaries
 
-1. Reconcile the 36 user-created files with backed-up, reviewed edits. Inspect PPTX and other archives separately; normal text search is insufficient.
+1. Reconcile user-created files with backed-up, reviewed edits. Include ignored documentation and archives; normal text search is insufficient. Scan `docs/` with no-ignore content and pathname searches, then inspect embedded XML in every PPTX/ZIP/DOCX/XLSX file. Keep build intermediates as a separate class.
 2. Classify runtime logs/data by retention need and process ownership; remove or regenerate only confirmed disposable outputs. Preserve any diagnostic or user data outside the repository before removal.
-3. Audit every worktree for tracked/untracked/ignored changes and running processes. Archive only confirmed idle managed worktrees using the Codex app tool. Preserve active work and identify the user's intended replatform checkout before applying changes there.
+3. Audit every worktree for tracked/untracked/ignored changes and running processes. Archive only confirmed idle worktrees attached to this chat using the Codex app tool; plan other worktrees individually with a recoverable Git procedure. Preserve active work and identify the user's intended replatform checkout before applying changes there.
 4. Reconcile local and remote `main` before any history plan. Make a verified mirror backup and rehearse any history rewrite in an isolated mirror. Produce an exact branch/tag map and scan every rewritten ref. The remote rewrite needs an administrator policy window and explicit approval after the rehearsal; it changes commit identities for collaborators.
 5. Rename the physical parent folder only after worktree registrations, launch configs, and external absolute paths have a tested migration path.
 6. Re-scan tracked, untracked, ignored, binary/archive contents, every retained worktree, refs, and the parent path. Report each remaining class rather than claiming literal zero early.
@@ -63,16 +65,17 @@
 
 - [ ] Identify which generated outputs are disposable and which processes use them.
 - [ ] Clean/rebuild disposable outputs through their owning build or package workflow, then rescan.
-- [ ] Present exact user-owned untracked file classes for approval to edit, relocate, or preserve as an explicit exception; retain backups if edited.
+- [x] Back up and edit the authorized documentation classes: authored and ignored Markdown, matching documentation filenames, and PPTX files under `docs/strategy/pitch`. External backup: `C:\Users\TK\.codex\backups\aoa-docs-2026-09-30`.
+- [ ] Review the edited documentation and verify no-ignore content, filename, and embedded-archive zero matches. Classify all remaining user-owned assets outside `docs/` before edits.
 - [ ] Inspect archives after any edit or rebuild and rescan binary formats.
 
 ### Task 3: Nested worktrees
 
-**Files:** Registered and unregistered nested worktrees; baseline is 224 registered worktrees.
+**Files:** Registered and unregistered nested worktrees; baseline is 223 registered worktrees.
 
 - [ ] Inventory each worktree's owner, branch, dirty state, running process, and recoverable content.
 - [ ] Rebase active worktrees onto clean source or keep them active until their owners finish; do not bulk-delete.
-- [ ] Archive eligible managed worktrees with the app worktree tool, preserving snapshots; handle non-managed worktrees through an explicitly reviewed Git procedure.
+- [ ] Archive eligible managed worktrees attached to this chat with the app worktree tool, preserving snapshots; handle every other registration through an explicitly reviewed, recoverable Git procedure.
 - [ ] Rescan nested directories and metadata.
 
 ### Task 4: Git history and folder path decision
@@ -80,7 +83,7 @@
 **Files:** `.git` metadata/history, remote repository, checkout parent directory, absolute-path configuration.
 
 - [ ] Ask the owner to choose whether literal zero includes Git commit history and the parent directory name.
-- [ ] If yes, design a fresh repository or coordinated history rewrite with remote/collaborator migration, backup, and rollback plan; review it before execution.
+- [ ] If yes, design a coordinated history rewrite with remote/collaborator migration, backup, and rollback plan; review it before execution. A temporary mirror is permitted for rehearsal, but no new permanent repository is planned.
 - [ ] Recreate or rewrite metadata only after that review, then verify refs, objects, logs, and worktree registration.
 - [ ] Rename the parent folder only with a coordinated update to launch configs, worktree registrations, and external paths.
 
@@ -89,4 +92,5 @@
 **Files:** Entire physical folder and parent path.
 
 - [ ] Repeat text, pathname, archive/binary, and Git-history scans after all builds and cleanup.
+- [ ] Include ignored documentation, retained worktrees, dependency/build output, Git refs and metadata, and the checkout parent path in the final scope report.
 - [ ] Require zero matches in the agreed literal scope; list any unresolved class as an open gate, never as complete.
