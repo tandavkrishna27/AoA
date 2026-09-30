@@ -4,10 +4,7 @@ import { providerQuotaWindows } from "@armyofagents/db";
 import { listServerAdapters, findServerAdapter } from "../adapters/registry.js";
 import { logger } from "../middleware/logger.js";
 
-// Shape returned by adapter.getQuotaWindows() — mirrors Paperclip's
-// `ProviderQuotaResult` (see paperclip/packages/shared/src/types/quota.ts).
-// AoA keeps adapter contracts source-compatible so a shared adapter package
-// can one day replace these local copies.
+// Shape returned by adapter.getQuotaWindows().
 interface AdapterQuotaWindow {
   label: string;
   usedPercent: number | null;
@@ -26,8 +23,7 @@ interface AdapterQuotaResult {
 
 /**
  * Maps an AoA adapter type to the provider slug stored on the snapshot row.
- * Paperclip uses the same mapping; keeping it aligned lets future shared
- * adapter packages flow between the two codebases without surprises.
+ * The stored provider slug is stable across adapter implementations.
  */
 export function providerSlugForAdapterType(type: string): string {
   switch (type) {

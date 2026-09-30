@@ -56,7 +56,7 @@ import { setDeploymentMode } from "../config/deployment-mode.js";
 import { isCloudPluginExecutionBlocked } from "../services/cloud-plugin-execution.js";
 import { createPluginToolDispatcher, type PluginToolDispatcher } from "../services/plugin-tool-dispatcher.js";
 import type { PluginWorkerManager } from "../services/plugin-worker-manager.js";
-import type { PaperclipPluginManifestV1 } from "@armyofagents/shared";
+import type { AoAPluginManifestV1 } from "@armyofagents/shared";
 
 type EmbeddedPostgresInstance = {
   initialise(): Promise<void>;
@@ -109,7 +109,7 @@ let pluginDbId = "";
 const PLUGIN_KEY = "acme.test";
 const TOOL_NAME = `${PLUGIN_KEY}:search`;
 
-const MANIFEST: PaperclipPluginManifestV1 = {
+const MANIFEST: AoAPluginManifestV1 = {
   id: PLUGIN_KEY,
   apiVersion: 1,
   version: "1.0.0",
@@ -190,7 +190,7 @@ afterAll(async () => {
   if (originalJwtSecret === undefined) delete process.env[JWT_SECRET_ENV];
   else process.env[JWT_SECRET_ENV] = originalJwtSecret;
   setDeploymentMode("local_trusted");
-  delete (globalThis as any).__paperclipPluginToolDispatcher;
+  delete (globalThis as any).__aoaPluginToolDispatcher;
   try {
     if (pg) await pg.stop();
   } catch {
@@ -277,7 +277,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
         db,
       });
       dispatcher.registerPluginTools(PLUGIN_KEY, MANIFEST, pluginDbId, c1);
-      (globalThis as any).__paperclipPluginToolDispatcher = dispatcher;
+      (globalThis as any).__aoaPluginToolDispatcher = dispatcher;
 
       expect(dispatcher.getTool(TOOL_NAME, c1)).not.toBeNull();
     });

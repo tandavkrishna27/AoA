@@ -39,7 +39,7 @@ export function getConfigSchema(): AdapterConfigSchema {
         key: "sessionKey",
         label: "Fixed session key",
         type: "text",
-        default: "paperclip",
+        default: "aoa",
         hint: "Used only when session strategy is Fixed.",
         meta: { visibleWhen: { key: "sessionKeyStrategy", values: ["fixed"] } },
       },
@@ -82,7 +82,7 @@ export function getConfigSchema(): AdapterConfigSchema {
         hint: "When pairing is required, attempt gateway device pairing once and retry.",
       },
       {
-        key: "paperclipApiUrl",
+        key: "aoaApiUrl",
         label: "AoA API URL override",
         type: "text",
         hint: "Optional absolute AoA API URL advertised to OpenClaw.",

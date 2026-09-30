@@ -42,7 +42,7 @@ import {
   ArrowUp,
   ArrowDown,
   AlertTriangle,
-  Paperclip,
+  FilePlus2,
   Hammer,
   ClipboardList,
   Layers,
@@ -1273,7 +1273,7 @@ export function NewIssueDialog() {
             onClick={() => attachInputRef.current?.click()}
             disabled={uploadDescriptionImage.isPending}
           >
-            <Paperclip className="h-3 w-3" />
+            <FilePlus2 className="h-3 w-3" />
             {uploadDescriptionImage.isPending ? "Uploading..." : "Image"}
           </button>
 

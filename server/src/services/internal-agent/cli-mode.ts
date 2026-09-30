@@ -1374,7 +1374,7 @@ export function cliModeService(db: Db) {
           }
 
           // cwd = tmpdir() prevents the CLI from walking up and reading the
-          // project's CLAUDE.md (which mentions "Paperclip" — an internal
+          // project's CLAUDE.md (which mentions "AoA" — an internal
           // implementation detail that must never surface to users).
           //
           // FU-23: when this turn hosts third-party MCP connectors, the CLI —
@@ -1794,7 +1794,7 @@ async function* runCodexTurn(
 
     // cwd = tmpdir() — same reasoning as the claude_cli spawn above: keeps
     // the subprocess from reading project CLAUDE.md / AGENTS.md files that
-    // contain internal implementation details (e.g. "Paperclip") not meant
+    // contain internal implementation details (e.g. "AoA") not meant
     // to surface to users.
     //
     // FU-23 secret scrub (mirrors the claude_cli spawn): when this turn hosts

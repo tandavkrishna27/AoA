@@ -5,7 +5,7 @@
  *
  * 1. **Discovery** — Scans the local plugin directory
  *    (`~/.aoa/plugins/`) and `node_modules` for packages matching
- *    the `paperclip-plugin-*` naming convention. Aggregates results with
+ *    the `aoa-plugin-*` naming convention. Aggregates results with
  *    path-based deduplication.
  *
  * 2. **Installation** — `installPlugin()` downloads from npm (or reads a
@@ -34,7 +34,7 @@ import { conflict } from "../errors.js";
 import { pluginCompanySettings, type Db } from "@armyofagents/db";
 import { and, eq } from "drizzle-orm";
 import type {
-  PaperclipPluginManifestV1,
+  AoAPluginManifestV1,
   PluginCapability,
   PluginLauncherDeclaration,
   PluginRecord,
@@ -78,19 +78,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ---------------------------------------------------------------------------
 
 /**
- * Naming convention for npm-published Paperclip plugins.
- * Packages matching this pattern are considered Paperclip plugins.
+ * Naming convention for npm-published AoA plugins.
+ * Packages matching this pattern are considered AoA plugins.
  *
  * @see PLUGIN_SPEC.md §10 — Package Contract
  */
-export const NPM_PLUGIN_PACKAGE_PREFIX = "paperclip-plugin-";
-
-/**
- * Current AoA naming convention for npm-published plugins.
- * Accepted in addition to the legacy `paperclip-plugin-` prefix and
- * scoped `@scope/plugin-*` packages.
- */
-export const NPM_PLUGIN_PACKAGE_PREFIX_AOA = "aoa-plugin-";
+export const NPM_PLUGIN_PACKAGE_PREFIX = "aoa-plugin-";
 
 /**
  * Default local plugin directory.  The loader scans this directory for
@@ -126,7 +119,7 @@ export interface DiscoveredPlugin {
   /** Source that found this package. */
   source: PluginSource;
   /** The parsed and validated manifest if available, null if discovery-only. */
-  manifest: PaperclipPluginManifestV1 | null;
+  manifest: AoAPluginManifestV1 | null;
 }
 
 /**
@@ -136,7 +129,7 @@ export interface DiscoveredPlugin {
  */
 export type PluginSource =
   | "local-filesystem" // ~/.aoa/plugins/ local directory
-  | "npm" // npm packages matching paperclip-plugin-* convention
+  | "npm" // npm packages matching aoa-plugin-* convention
   | "registry"; // future: remote plugin registry URL
 
 type ParsedSemver = {
@@ -159,7 +152,7 @@ export interface PluginDiscoveryResult {
 }
 
 function getDeclaredPageRoutePaths(
-  manifest: PaperclipPluginManifestV1
+  manifest: AoAPluginManifestV1
 ): string[] {
   return (manifest.ui?.slots ?? [])
     .filter(
@@ -192,7 +185,7 @@ export interface PluginLoaderOptions {
   enableLocalFilesystem?: boolean;
 
   /**
-   * Whether to discover installed npm packages matching the paperclip-plugin-*
+   * Whether to discover installed npm packages matching the aoa-plugin-*
    * naming convention.
    * Defaults to true.
    */
@@ -215,7 +208,7 @@ export interface PluginLoaderOptions {
  */
 export interface PluginInstallOptions {
   /**
-   * npm package name to install (e.g. "paperclip-plugin-linear" or "@acme/plugin-linear").
+   * npm package name to install (e.g. "aoa-plugin-linear" or "@acme/plugin-linear").
    * Either packageName or localPath must be set.
    */
   packageName?: string;
@@ -298,7 +291,7 @@ export interface PluginRuntimeServices {
    */
   buildHostHandlers: (
     pluginId: string,
-    manifest: PaperclipPluginManifestV1
+    manifest: AoAPluginManifestV1
   ) => WorkerToHostHandlers;
   /** Release host-side listeners and timers owned by one plugin worker. */
   disposeHostServices?: (pluginId: string) => void;
@@ -405,8 +398,8 @@ export interface PluginLoader {
   discoverFromLocalFilesystem(dir?: string): Promise<PluginDiscoveryResult>;
 
   /**
-   * Discover Paperclip plugins installed as npm packages in the current
-   * Node.js environment matching the "paperclip-plugin-*" naming convention.
+   * Discover AoA plugins installed as npm packages in the current
+   * Node.js environment matching the "aoa-plugin-*" naming convention.
    *
    * Looks for packages in node_modules that match the naming convention.
    *
@@ -418,15 +411,15 @@ export interface PluginLoader {
    * Load and parse the plugin manifest from a package directory.
    *
    * Reads the package.json, finds the manifest entrypoint declared under
-   * the "paperclipPlugin.manifest" key, loads the manifest module, and
+   * the "aoaPlugin.manifest" key, loads the manifest module, and
    * validates it against the plugin manifest schema.
    *
-   * Returns null if the package is not a Paperclip plugin.
-   * Throws if the package is a Paperclip plugin but the manifest is invalid.
+   * Returns null if the package is not a AoA plugin.
+   * Throws if the package is a AoA plugin but the manifest is invalid.
    *
    * @see PLUGIN_SPEC.md §10 — Package Contract
    */
-  loadManifest(packagePath: string): Promise<PaperclipPluginManifestV1 | null>;
+  loadManifest(packagePath: string): Promise<AoAPluginManifestV1 | null>;
 
   /**
    * Install a plugin package and register it in the database.
@@ -462,8 +455,8 @@ export interface PluginLoader {
     pluginId: string,
     options: Omit<PluginInstallOptions, "companyId" | "catalogItemId">
   ): Promise<{
-    oldManifest: PaperclipPluginManifestV1;
-    newManifest: PaperclipPluginManifestV1;
+    oldManifest: AoAPluginManifestV1;
+    newManifest: AoAPluginManifestV1;
     discovered: DiscoveredPlugin;
     /** Capabilities present in newManifest but absent in oldManifest. Empty array = no escalation. */
     escalatedCaps: string[];
@@ -574,14 +567,13 @@ export interface PluginLoader {
 // ---------------------------------------------------------------------------
 
 /**
- * Check whether a package name matches the Paperclip plugin naming convention.
- * Accepts both the "paperclip-plugin-" prefix and scoped "@scope/plugin-" packages.
+ * Check whether a package name matches the AoA plugin naming convention.
+ * Accepts both the "aoa-plugin-" prefix and scoped "@scope/plugin-" packages.
  *
  * @see PLUGIN_SPEC.md §10 — Package Contract
  */
 export function isPluginPackageName(name: string): boolean {
   if (name.startsWith(NPM_PLUGIN_PACKAGE_PREFIX)) return true;
-  if (name.startsWith(NPM_PLUGIN_PACKAGE_PREFIX_AOA)) return true;
   // Also accept scoped packages like @acme/plugin-linear or @armyofagents/plugin-*
   if (name.includes("/")) {
     const localPart = name.split("/")[1] ?? "";
@@ -611,7 +603,7 @@ async function readPackageJson(
 /**
  * Resolve the manifest entrypoint from a package.json and package root.
  *
- * The spec defines a "paperclipPlugin" key in package.json with a "manifest"
+ * The spec defines a "aoaPlugin" key in package.json with a "manifest"
  * subkey pointing to the manifest module.  This helper resolves the path.
  *
  * @see PLUGIN_SPEC.md §10 — Package Contract
@@ -620,13 +612,13 @@ function resolveManifestPath(
   packageRoot: string,
   pkgJson: Record<string, unknown>
 ): string | null {
-  const paperclipPlugin = pkgJson["paperclipPlugin"];
+  const aoaPlugin = pkgJson["aoaPlugin"];
   if (
-    paperclipPlugin !== null &&
-    typeof paperclipPlugin === "object" &&
-    !Array.isArray(paperclipPlugin)
+    aoaPlugin !== null &&
+    typeof aoaPlugin === "object" &&
+    !Array.isArray(aoaPlugin)
   ) {
-    const manifestRelPath = (paperclipPlugin as Record<string, unknown>)[
+    const manifestRelPath = (aoaPlugin as Record<string, unknown>)[
       "manifest"
     ];
     if (typeof manifestRelPath === "string") {
@@ -721,7 +713,7 @@ function compareSemver(left: string, right: string): number {
 }
 
 function getMinimumHostVersion(
-  manifest: PaperclipPluginManifestV1
+  manifest: AoAPluginManifestV1
 ): string | undefined {
   return manifest.minimumHostVersion ?? manifest.minimumAoaVersion;
 }
@@ -839,7 +831,7 @@ async function resolvePackageNameFromLockfile(
  * `launchers` field and the preferred `ui.launchers` field.
  */
 export function getPluginUiContributionMetadata(
-  manifest: PaperclipPluginManifestV1
+  manifest: AoAPluginManifestV1
 ): PluginUiContributionMetadata | null {
   const slots = manifest.ui?.slots ?? [];
   const launchers = [
@@ -883,7 +875,7 @@ export function getPluginUiContributionMetadata(
  *
  * // Install a specific plugin
  * const discovered = await loader.installPlugin({
- *   packageName: "paperclip-plugin-linear",
+ *   packageName: "aoa-plugin-linear",
  *   version: "^1.0.0",
  * });
  * ```
@@ -971,7 +963,7 @@ export function pluginLoader(
   }
 
   async function assertPageRoutePathsAvailable(
-    manifest: PaperclipPluginManifestV1,
+    manifest: AoAPluginManifestV1,
     companyId: string
   ): Promise<void> {
     const requestedRoutePaths = getDeclaredPageRoutePaths(manifest);
@@ -990,7 +982,7 @@ export function pluginLoader(
     for (const plugin of installedPlugins) {
       if (plugin.pluginKey === manifest.id) continue;
       const installedManifest =
-        plugin.manifestJson as PaperclipPluginManifestV1 | null;
+        plugin.manifestJson as AoAPluginManifestV1 | null;
       if (!installedManifest) continue;
       const installedRoutePaths = new Set(
         getDeclaredPageRoutePaths(installedManifest)
@@ -1213,7 +1205,7 @@ export function pluginLoader(
     const manifestPath = resolveManifestPath(resolvedPackagePath, pkgJson);
     if (!manifestPath || !existsSync(manifestPath)) {
       throw new Error(
-        `Package ${resolvedPackageName} at ${resolvedPackagePath} does not appear to be a Paperclip plugin (no manifest found).`
+        `Package ${resolvedPackageName} at ${resolvedPackagePath} does not appear to be a AoA plugin (no manifest found).`
       );
     }
 
@@ -1274,7 +1266,7 @@ export function pluginLoader(
    */
   async function loadManifestFromPath(
     manifestPath: string
-  ): Promise<PaperclipPluginManifestV1> {
+  ): Promise<AoAPluginManifestV1> {
     // JavaScript manifests are executable modules. Cloud must reject before
     // import(), even if a caller bypasses the normal install/lifecycle routes.
     // RW5a: this is the ONLY sink that actually executes tenant code
@@ -1308,7 +1300,7 @@ export function pluginLoader(
 
   /**
    * Build a DiscoveredPlugin from a resolved package directory, or null
-   * if the package is not a Paperclip plugin.
+   * if the package is not a AoA plugin.
    */
   async function buildDiscoveredPlugin(
     packagePath: string,
@@ -1323,10 +1315,10 @@ export function pluginLoader(
       typeof pkgJson["version"] === "string" ? pkgJson["version"] : "0.0.0";
 
     // Determine if this is a plugin package at all
-    const hasPaperclipPlugin = "paperclipPlugin" in pkgJson;
+    const hasAoAPlugin = "aoaPlugin" in pkgJson;
     const nameMatchesConvention = isPluginPackageName(packageName);
 
-    if (!hasPaperclipPlugin && !nameMatchesConvention) {
+    if (!hasAoAPlugin && !nameMatchesConvention) {
       return null;
     }
 
@@ -1652,16 +1644,16 @@ export function pluginLoader(
 
     async loadManifest(
       packagePath: string
-    ): Promise<PaperclipPluginManifestV1 | null> {
+    ): Promise<AoAPluginManifestV1 | null> {
       const pkgJson = await readPackageJson(packagePath);
       if (!pkgJson) return null;
 
-      const hasPaperclipPlugin = "paperclipPlugin" in pkgJson;
+      const hasAoAPlugin = "aoaPlugin" in pkgJson;
       const packageName =
         typeof pkgJson["name"] === "string" ? pkgJson["name"] : "";
       const nameMatchesConvention = isPluginPackageName(packageName);
 
-      if (!hasPaperclipPlugin && !nameMatchesConvention) {
+      if (!hasAoAPlugin && !nameMatchesConvention) {
         return null;
       }
 
@@ -1763,8 +1755,8 @@ export function pluginLoader(
       pluginId: string,
       upgradeOptions: Omit<PluginInstallOptions, "companyId" | "catalogItemId">
     ): Promise<{
-      oldManifest: PaperclipPluginManifestV1;
-      newManifest: PaperclipPluginManifestV1;
+      oldManifest: AoAPluginManifestV1;
+      newManifest: AoAPluginManifestV1;
       discovered: DiscoveredPlugin;
       escalatedCaps: string[];
     }> {
@@ -1783,7 +1775,7 @@ export function pluginLoader(
         companyId: string;
         packageName: string;
         packagePath: string | null;
-        manifestJson: PaperclipPluginManifestV1;
+        manifestJson: AoAPluginManifestV1;
       } | null;
       if (!plugin) throw new Error(`Plugin not found: ${pluginId}`);
 

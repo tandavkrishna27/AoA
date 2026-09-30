@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -15,14 +14,7 @@ function expandHomePrefix(value: string): string {
 export function resolveAoaHomeDir(): string {
   const envHome = process.env.AOA_HOME?.trim();
   if (envHome) return path.resolve(expandHomePrefix(envHome));
-  const aoaHome = path.resolve(os.homedir(), ".aoa");
-  // Migration fallback: use legacy ~/.paperclip/ if it exists and the new
-  // ~/.aoa/ hasn't been created yet. Remove after the next major.
-  if (!existsSync(aoaHome)) {
-    const legacyHome = path.resolve(os.homedir(), ".paperclip");
-    if (existsSync(legacyHome)) return legacyHome;
-  }
-  return aoaHome;
+  return path.resolve(os.homedir(), ".aoa");
 }
 
 export function resolveAoaInstanceId(): string {

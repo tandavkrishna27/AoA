@@ -83,6 +83,25 @@ function isInsideDir(targetPath: string, parentPath: string): boolean {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+function runPnpm(args: string[], cwd: string): void {
+  if (process.platform !== "win32") {
+    execFileSync("pnpm", args, { cwd, stdio: "pipe" });
+    return;
+  }
+
+  // Node cannot execute a Windows .cmd shim directly with shell disabled.
+  // Invoke pnpm's JavaScript entry instead, keeping paths out of a shell.
+  const candidates = [
+    process.env.npm_execpath,
+    ...((process.env.PATH ?? "").split(path.delimiter).map((dir) =>
+      path.join(dir, "node_modules", "pnpm", "bin", "pnpm.cjs"),
+    )),
+  ];
+  const pnpmEntry = candidates.find((candidate) => candidate && fs.existsSync(candidate));
+  if (!pnpmEntry) throw new Error("Could not locate pnpm's JavaScript entrypoint on PATH");
+  execFileSync(process.execPath, [pnpmEntry, ...args], { cwd, stdio: "pipe" });
+}
+
 function packLocalPackage(packagePath: string, outputDir: string): string {
   const packageJsonPath = path.join(packagePath, "package.json");
   if (!fs.existsSync(packageJsonPath)) {
@@ -96,11 +115,11 @@ function packLocalPackage(packagePath: string, outputDir: string): string {
   const packageName = packageJson.name ?? path.basename(packagePath);
   const packageVersion = packageJson.version ?? "0.0.0";
   const tarballFileName = `${packageName.replace(/^@/, "").replace("/", "-")}-${packageVersion}.tgz`;
-  const sdkBundleDir = path.join(outputDir, ".paperclip-sdk");
+  const sdkBundleDir = path.join(outputDir, ".aoa-sdk");
 
   fs.mkdirSync(sdkBundleDir, { recursive: true });
-  execFileSync("pnpm", ["build"], { cwd: packagePath, stdio: "pipe" });
-  execFileSync("pnpm", ["pack", "--pack-destination", sdkBundleDir], { cwd: packagePath, stdio: "pipe" });
+  runPnpm(["build"], packagePath);
+  runPnpm(["pack", "--pack-destination", sdkBundleDir], packagePath);
 
   const tarballPath = path.join(sdkBundleDir, tarballFileName);
   if (!fs.existsSync(tarballPath)) {
@@ -111,7 +130,7 @@ function packLocalPackage(packagePath: string, outputDir: string): string {
 }
 
 /**
- * Generate a complete Paperclip plugin starter project.
+ * Generate a complete AoA plugin starter project.
  *
  * Output includes manifest/worker/UI entries, SDK harness tests, bundler presets,
  * and a local dev server script for hot-reload workflow.
@@ -136,7 +155,7 @@ export function scaffoldPluginProject(options: ScaffoldPluginOptions): string {
   }
 
   const displayName = options.displayName ?? makeDisplayName(options.pluginName);
-  const description = options.description ?? "A Paperclip plugin";
+  const description = options.description ?? "An AoA plugin";
   const author = options.author ?? "Plugin Author";
   const category = options.category ?? (template === "workspace" ? "workspace" : "connector");
   const manifestId = packageToManifestId(options.pluginName);
@@ -162,16 +181,16 @@ export function scaffoldPluginProject(options: ScaffoldPluginOptions): string {
       build: "node ./esbuild.config.mjs",
       "build:rollup": "rollup -c",
       dev: "node ./esbuild.config.mjs --watch",
-      "dev:ui": "paperclip-plugin-dev-server --root . --ui-dir dist/ui --port 4177",
+      "dev:ui": "aoa-plugin-dev-server --root . --ui-dir dist/ui --port 4177",
       test: "vitest run --config ./vitest.config.ts",
       typecheck: "tsc --noEmit"
     },
-    paperclipPlugin: {
+    aoaPlugin: {
       manifest: "./dist/manifest.js",
       worker: "./dist/worker.js",
       ui: "./dist/ui/"
     },
-    keywords: ["paperclip", "plugin", category],
+    keywords: ["aoa", "plugin", category],
     author,
     license: "MIT",
     ...(packedSharedTarball
@@ -298,9 +317,9 @@ export default defineConfig({
 
   writeFile(
     path.join(outputDir, "src", "manifest.ts"),
-    `import type { PaperclipPluginManifestV1 } from "@armyofagents/plugin-sdk";
+    `import type { AoAPluginManifestV1 } from "@armyofagents/plugin-sdk";
 
-const manifest: PaperclipPluginManifestV1 = {
+const manifest: AoAPluginManifestV1 = {
   id: ${quote(manifestId)},
   apiVersion: 1,
   version: "0.1.0",
@@ -434,10 +453,10 @@ pnpm test
 \`\`\`
 
 ${sdkDependency.startsWith("file:")
-  ? `This scaffold snapshots \`@armyofagents/plugin-sdk\` and \`@armyofagents/shared\` from a local Paperclip checkout at:\n\n\`${toPosixPath(localSdkPath)}\`\n\nThe packed tarballs live in \`.paperclip-sdk/\` for local development. Before publishing this plugin, switch those dependencies to published package versions once they are available on npm.\n\n`
+  ? `This scaffold snapshots \`@armyofagents/plugin-sdk\` and \`@armyofagents/shared\` from a local AoA checkout at:\n\n\`${toPosixPath(localSdkPath)}\`\n\nThe packed tarballs live in \`.aoa-sdk/\` for local development. Before publishing this plugin, switch those dependencies to published package versions once they are available on npm.\n\n`
   : ""}
 
-## Install Into Paperclip
+## Install Into AoA
 
 \`\`\`bash
 curl -X POST http://127.0.0.1:3100/api/plugins/install \\
@@ -452,7 +471,7 @@ curl -X POST http://127.0.0.1:3100/api/plugins/install \\
 `,
   );
 
-  writeFile(path.join(outputDir, ".gitignore"), "dist\nnode_modules\n.paperclip-sdk\n");
+  writeFile(path.join(outputDir, ".gitignore"), "dist\nnode_modules\n.aoa-sdk\n");
 
   return outputDir;
 }
@@ -468,7 +487,7 @@ function runCli() {
   const pluginName = process.argv[2];
   if (!pluginName) {
     // eslint-disable-next-line no-console
-    console.error("Usage: create-paperclip-plugin <name> [--template default|connector|workspace] [--output <dir>] [--sdk-path <paperclip-sdk-path>]");
+    console.error("Usage: create-aoa-plugin <name> [--template default|connector|workspace] [--output <dir>] [--sdk-path <aoa-sdk-path>]");
     process.exit(1);
   }
 
@@ -491,6 +510,6 @@ function runCli() {
   console.log(`Created plugin scaffold at ${out}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(fileURLToPath(import.meta.url)) === path.resolve(process.argv[1])) {
   runCli();
 }

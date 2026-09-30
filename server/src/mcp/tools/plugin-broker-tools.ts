@@ -28,8 +28,8 @@ import { logger } from "../../middleware/logger.js";
 const log = logger.child({ service: "plugin-broker-tools" });
 
 function readPluginDispatcher(): PluginToolDispatcher | undefined {
-  return (globalThis as { __paperclipPluginToolDispatcher?: PluginToolDispatcher })
-    .__paperclipPluginToolDispatcher;
+  return (globalThis as { __aoaPluginToolDispatcher?: PluginToolDispatcher })
+    .__aoaPluginToolDispatcher;
 }
 
 /**

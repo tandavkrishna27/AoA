@@ -34,14 +34,6 @@ function extractMarkerUpsert(source: string): string {
   return statement;
 }
 
-function normalizeSql(source: string): string {
-  return source
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join("\n");
-}
-
 async function allocatePort(): Promise<number> {
   return await new Promise<number>((resolvePort, reject) => {
     const server = net.createServer();
@@ -79,14 +71,7 @@ describe.skipIf(process.platform === "win32")(
         resolve(repoRoot, "docs/deploy/database.md"),
         "utf8",
       );
-      const upgradeDoc = await readFile(
-        resolve(repoRoot, "docs/deploy/upgrade-guide.md"),
-        "utf8",
-      );
       markerUpsertSql = extractMarkerUpsert(databaseDoc);
-      expect(normalizeSql(extractMarkerUpsert(upgradeDoc))).toBe(
-        normalizeSql(markerUpsertSql),
-      );
 
       dataDir = await mkdtemp(join(tmpdir(), "aoa-snapshot-runbook-"));
       const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as {

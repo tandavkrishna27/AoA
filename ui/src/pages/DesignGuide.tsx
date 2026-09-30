@@ -1449,7 +1449,7 @@ export function DesignGuide() {
         <p className="text-sm text-muted-foreground max-w-2xl">
           Per-user thumbs up/down on agent output. Mounts under agent-authored
           task comments on TaskSlideOver. Reason textarea opens on thumbs-down
-          only (matches Paperclip's normalizeReason — upvote reasons are
+          only (matches AoA's normalizeReason — upvote reasons are
           discarded). Click an already-selected thumb to dismiss.
         </p>
         <div className="grid gap-6 md:grid-cols-2 max-w-3xl">

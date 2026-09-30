@@ -340,12 +340,7 @@ export function resolveTerminalLatchFallback(
 }
 
 const HEARTBEAT_RUN_RESULT_SUMMARY_MAX_CHARS = 500;
-// AoA canonical names. Existing rows still using the legacy paperclip-
-// names are read transparently via the helpers below; writes only emit
-// the AoA names and strip the legacy keys from the same blob so we
-// converge over time.
 const DEFERRED_WAKE_CONTEXT_KEY = "_aoaWakeContext";
-const LEGACY_DEFERRED_WAKE_CONTEXT_KEY = "_paperclipWakeContext";
 // Context key set during executeRun when the harness pre-claims the issue via
 // issueService.checkout. Downstream (renderAoaWakePrompt) reads this from the
 // wake payload to suppress the redundant /issues/{id}/checkout agent call.
@@ -1301,7 +1296,6 @@ async function resolveRunScopedMentionedSkillKeys(
 /**
  * Merge run-scoped mentioned skill keys into the adapter config's
  * aoaSkillSync.desiredSkills (preserving any existing selections).
- * Also dual-writes paperclipSkillSync for external back-compat.
  */
 export function applyRunScopedMentionedSkillKeys<T extends Record<string, unknown>>(
   config: T,
@@ -3111,7 +3105,7 @@ export function heartbeatService(db: Db) {
       issueContext.assigneeAgentId === agent.id
     ) {
       const wakeReason = readNonEmptyString(context.wakeReason);
-      // Mirror Paperclip's shouldAutoCheckoutIssueForWake: only fire for
+      // Mirror the shouldAutoCheckoutIssueForWake: only fire for
       // comment-driven wakes; skip execution_* and issue_comment_mentioned.
       const shouldAutoCheckout =
         wakeReason !== null &&
@@ -3617,7 +3611,7 @@ export function heartbeatService(db: Db) {
         }
 
         // Populate context with execution workspace details (mirrors existing path).
-        context.paperclipWorkspace = {
+        context.aoaWorkspace = {
           cwd: threadOutcome.realizedWorkspace.cwd,
           source: threadOutcome.realizedWorkspace.source,
           mode: executionWorkspaceMode,
@@ -3676,7 +3670,7 @@ export function heartbeatService(db: Db) {
         }
 
         // Skip the rest of the isolatedWorkspacesEnabled block (existing path).
-        // Fall through to context.paperclipWorkspaces assignment below.
+        // Fall through to context.aoaWorkspaces assignment below.
       } else {
       // ── Existing per-task workspace path (UNCHANGED) ──────────────────────
       const issueScopedExecutionWorkspace =
@@ -3942,7 +3936,7 @@ export function heartbeatService(db: Db) {
       }
 
       // ── Populate context with execution workspace details ───────────
-      context.paperclipWorkspace = {
+      context.aoaWorkspace = {
         cwd: executionWorkspace.cwd,
         source: executionWorkspace.source,
         mode: executionWorkspaceMode,
@@ -3966,7 +3960,7 @@ export function heartbeatService(db: Db) {
       } // end else (existing per-task workspace path)
     } else {
       // ── Isolated workspaces disabled — use resolvedWorkspace directly ──
-      context.paperclipWorkspace = {
+      context.aoaWorkspace = {
         cwd: resolvedWorkspace.cwd,
         source: resolvedWorkspace.source,
         mode: executionWorkspaceMode,
@@ -3988,7 +3982,7 @@ export function heartbeatService(db: Db) {
         context.projectId = resolvedWorkspace.projectId;
       }
     }
-    context.paperclipWorkspaces = resolvedWorkspace.workspaceHints;
+    context.aoaWorkspaces = resolvedWorkspace.workspaceHints;
 
     // ── Session resolution with effective workspace cwd ──────────────
     const runtimeSessionResolution = resolveRuntimeSessionParamsForWorkspace({
@@ -4023,9 +4017,9 @@ export function heartbeatService(db: Db) {
         : [];
     })();
     if (runtimeServiceIntents.length > 0) {
-      context.paperclipRuntimeServiceIntents = runtimeServiceIntents;
+      context.aoaRuntimeServiceIntents = runtimeServiceIntents;
     } else {
-      delete context.paperclipRuntimeServiceIntents;
+      delete context.aoaRuntimeServiceIntents;
     }
 
     // Enrich context with memory items and company info for the agent
@@ -4373,8 +4367,8 @@ export function heartbeatService(db: Db) {
             : undefined,
         });
         if (runtimeServices.length > 0) {
-          context.paperclipRuntimeServices = runtimeServices;
-          context.paperclipRuntimePrimaryUrl =
+          context.aoaRuntimeServices = runtimeServices;
+          context.aoaRuntimePrimaryUrl =
             runtimeServices.find((service) => readNonEmptyString(service.url))?.url ?? null;
           await db
             .update(heartbeatRuns)
@@ -4546,7 +4540,7 @@ export function heartbeatService(db: Db) {
       // Inject available plugin tools into context
       try {
         const pluginToolDispatcher: PluginToolDispatcher | undefined =
-          (globalThis as any).__paperclipPluginToolDispatcher;
+          (globalThis as any).__aoaPluginToolDispatcher;
         if (pluginToolDispatcher) {
           const pluginTools = pluginToolDispatcher.listToolsForAgent({ companyId: agent.companyId });
           if (pluginTools.length > 0) {
@@ -4865,8 +4859,8 @@ export function heartbeatService(db: Db) {
               ...runtimeServices,
               ...Array.from(adapterManagedRuntimeServicesById.values()),
             ];
-            context.paperclipRuntimeServices = combinedRuntimeServices;
-            context.paperclipRuntimePrimaryUrl =
+            context.aoaRuntimeServices = combinedRuntimeServices;
+            context.aoaRuntimePrimaryUrl =
               combinedRuntimeServices.find((service) => readNonEmptyString(service.url))?.url ?? null;
             await db
               .update(heartbeatRuns)
@@ -5191,8 +5185,8 @@ export function heartbeatService(db: Db) {
             ...runtimeServices,
             ...adapterManagedRuntimeServices,
           ];
-          context.paperclipRuntimeServices = combinedRuntimeServices;
-          context.paperclipRuntimePrimaryUrl =
+          context.aoaRuntimeServices = combinedRuntimeServices;
+          context.aoaRuntimePrimaryUrl =
             combinedRuntimeServices.find((service) => readNonEmptyString(service.url))?.url ?? null;
           await db
             .update(heartbeatRuns)
@@ -5756,7 +5750,7 @@ export function heartbeatService(db: Db) {
 
         const deferredPayload = parseObject(deferred.payload);
         const deferredContextSeed = parseObject(
-          deferredPayload[DEFERRED_WAKE_CONTEXT_KEY] ?? deferredPayload[LEGACY_DEFERRED_WAKE_CONTEXT_KEY],
+          deferredPayload[DEFERRED_WAKE_CONTEXT_KEY],
         );
         const promotedContextSeed: Record<string, unknown> = { ...deferredContextSeed };
         const promotedReason = readNonEmptyString(deferred.reason) ?? "issue_execution_promoted";
@@ -5766,7 +5760,6 @@ export function heartbeatService(db: Db) {
           (readNonEmptyString(deferred.triggerDetail) as WakeupOptions["triggerDetail"]) ?? null;
         const promotedPayload = deferredPayload;
         delete promotedPayload[DEFERRED_WAKE_CONTEXT_KEY];
-        delete promotedPayload[LEGACY_DEFERRED_WAKE_CONTEXT_KEY];
 
         const {
           contextSnapshot: promotedContextSnapshot,
@@ -6176,17 +6169,14 @@ export function heartbeatService(db: Db) {
           if (existingDeferred) {
             const existingDeferredPayload = parseObject(existingDeferred.payload);
             const existingDeferredContext = parseObject(
-              existingDeferredPayload[DEFERRED_WAKE_CONTEXT_KEY] ?? existingDeferredPayload[LEGACY_DEFERRED_WAKE_CONTEXT_KEY],
+              existingDeferredPayload[DEFERRED_WAKE_CONTEXT_KEY],
             );
             const mergedDeferredContext = mergeCoalescedContextSnapshot(
               existingDeferredContext,
               enrichedContextSnapshot,
             );
-            // Spread existing payload then overwrite with AoA key; also strip the legacy
-            // key so that every write converges the row toward the new name.
-            const { [LEGACY_DEFERRED_WAKE_CONTEXT_KEY]: _stripLegacy, ...existingWithoutLegacy } = existingDeferredPayload;
             const mergedDeferredPayload = {
-              ...existingWithoutLegacy,
+              ...existingDeferredPayload,
               ...(payload ?? {}),
               issueId,
               [DEFERRED_WAKE_CONTEXT_KEY]: mergedDeferredContext,

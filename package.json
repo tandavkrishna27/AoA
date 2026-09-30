@@ -35,7 +35,6 @@
     "oauth:rollback-v2": "tsx scripts/rollback-mcp-oauth-v2.ts",
     "db:backup": "./scripts/backup-db.sh",
     "aoa": "node cli/node_modules/tsx/dist/cli.mjs cli/src/index.ts",
-    "paperclipai": "node cli/node_modules/tsx/dist/cli.mjs cli/src/index.ts",
     "build:npm": "./scripts/build-npm.sh",
     "release": "./scripts/release.sh",
     "release:rollback": "./scripts/rollback-latest.sh",

@@ -15,8 +15,8 @@ automated through GitHub Actions and gated by post-publish smoke tests.
 | ID | Decision | Locked value |
 |----|----------|--------------|
 | H.D1 | Distribution format | **Docker + NPM only.** No desktop installer in Phase H. |
-| H.D2 | Versioning | **SemVer** (`MAJOR.MINOR.PATCH`). First version `0.1.0`. Pre-1.0 signals "evolving — may break." Deviates from Paperclip's CalVer. |
-| H.D3 | Intended artifact destinations | **GHCR** (`ghcr.io/${{ github.repository }}` — auto-resolves to current owner; future rename to `anthropic/aoa` is a one-line workflow edit) + **npmjs.org public** for `@armyofagents/*` scoped packages, including `@armyofagents/cli`. These are configured targets, not evidence that an artifact exists. |
+| H.D2 | Versioning | **SemVer** (`MAJOR.MINOR.PATCH`). First version `0.1.0`. Pre-1.0 signals "evolving — may break." Deviates from the upstream project's CalVer. |
+| H.D3 | Intended artifact destinations | **GHCR** (`ghcr.io/${{ github.repository }}` — resolves to the current repository owner) + **npmjs.org public** for `@armyofagents/*` scoped packages, including `@armyofagents/cli`. These are configured targets, not evidence that an artifact exists. |
 | H.D4 | CI service | **GitHub Actions.** |
 | H.D5 | Multi-arch Docker | **amd64 + arm64.** arm/v7 (Raspberry Pi) deferred to Phase I. |
 | H.D6 | Smoke test scope | **Founder entry plus scoped-memory workflows.** The Docker harness uses the explicit `local_trusted` identity. The suite verifies profile and organization creation, health, scoped memory in task context and a real task-agent run, plus saving and approving memory from a Discussion. MCP inbound, budgets, and artifacts remain outside this lane. |
@@ -31,9 +31,9 @@ automated through GitHub Actions and gated by post-publish smoke tests.
   packages on npmjs.org, including the intended `@armyofagents/cli` package
   that provides the `aoa` binary. The local release script derives the owned
   package set from non-private `@armyofagents/*` pnpm workspaces; it excludes
-  the legacy `@paperclipai/*` compatibility workspace.
+  private workspaces.
 
-H.D3 future: when the repo settles at `anthropic/aoa`, the GHCR image moves to `ghcr.io/anthropic/aoa` automatically (since the workflow uses `${{ github.repository }}`). NPM scope rename to `@anthropic/aoa` is a separate Changesets-driven publish.
+GHCR follows the repository owner because the workflow uses `${{ github.repository }}`. A future owner or npm scope change requires a separate release decision.
 
 ## Required secrets
 
@@ -90,7 +90,7 @@ pnpm release:rollback --dry-run   # preview every action without side effects
 pnpm release:rollback --self-test # run internal helper tests
 ```
 
-3-step Changesets-aware flow (NOT a 1-step dist-tag repointer like Paperclip's):
+3-step Changesets-aware flow (NOT a 1-step dist-tag repointer like the upstream project's):
 1. `npm deprecate` each package returned by the shared owned-workspace package
    discovery at that package's current manifest version
    with a message (default: `"Reverted by rollback-latest.sh on <ISO timestamp>"`;
@@ -127,7 +127,7 @@ pnpm docker:smoke                     # full onboard auto-bootstrap smoke (pulls
 
 ## SemVer vs CalVer
 
-AoA uses SemVer; Paperclip uses CalVer. First AoA version is `0.1.0`, signaling "pre-1.0 evolving — APIs may change between minors." Bump rules:
+AoA uses SemVer; the upstream project uses CalVer. First AoA version is `0.1.0`, signaling "pre-1.0 evolving — APIs may change between minors." Bump rules:
 - **patch** (0.1.0 → 0.1.1): bug fixes, no API changes
 - **minor** (0.1.0 → 0.2.0): backward-compatible features (relaxed pre-1.0 — minors may include API changes)
 - **major** (0.1.0 → 1.0.0): API breaking changes; 1.0 declares stability commitment
@@ -136,7 +136,7 @@ Pre-1.0, minor bumps signal "this changed shape" rather than strict additivity. 
 
 ## Known gaps / Phase I follow-ups
 
-- **`anthropic/aoa` repo rename** (H.D3 future) — image destination updates automatically via `${{ github.repository }}`; NPM scope rename is a Changesets-driven publish.
+- **Repository owner or npm scope change** — image destination follows `${{ github.repository }}`; an npm scope change needs a separate Changesets-driven publish.
 - **Canary auto-wiring** — release-smoke.yml exposes `workflow_call` but `release.yml`'s `post-publish-smoke` only fires on stable publish. Canary stays manual.
 - **Desktop installer** (Electron/Tauri) — out of Phase H per H.D1; separate phase.
 - **Expanded smoke coverage** (H.D6) — the founder-entry scenario stops at
@@ -151,5 +151,4 @@ Pre-1.0, minor bumps signal "this changed shape" rather than strict additivity. 
 - **`compute_next_version` + `list_public_package_info` + `set_public_package_version` in `release-lib.sh`** — dead code since H.2-part-2 (`release.sh` port) was SKIPPED (Changesets handles versioning). Decide in Phase I cleanup: delete vs. keep as reference.
 - **Package ownership** — release and rollback share workspace discovery and
   include only public packages in the `@armyofagents/*` scope. The private
-  `@paperclipai/create-paperclip-plugin` compatibility workspace is
-  deliberately outside the publish graph.
+  private workspaces are outside the publish graph.

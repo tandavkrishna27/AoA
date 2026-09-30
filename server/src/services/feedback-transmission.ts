@@ -6,8 +6,7 @@ import { logger } from "../middleware/logger.js";
 // back to writeBundleLocally / log-and-discard). Set → POST JSON to the
 // configured endpoint with optional Bearer auth.
 //
-// This module is AoA-beyond-Paperclip — Paperclip has no equivalent. Shape
-// decisions (env-var names, bundle envelope) are locked by the Phase I.2 plan
+// Shape decisions (env-var names, bundle envelope) are locked by the Phase I.2 plan
 // and documented in docs/telemetry.md.
 // ---------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 /**
  * Unit tests for the run-scoped mentioned-skill pure helpers introduced in
- * Task 17 of the upstream Paperclip resync (2026-04-26).
+ * the AoA heartbeat implementation.
  *
  * extractMentionedSkillIdsFromSources and applyRunScopedMentionedSkillKeys
  * are exported from heartbeat.ts as pure functions with no DB dependencies,
@@ -154,25 +154,15 @@ describe("auto-enable mentioned skills", () => {
       expect(desired.filter((k) => k === "existing-skill")).toHaveLength(1);
     });
 
-    it("dual-writes paperclipSkillSync equal to aoaSkillSync for back-compat", () => {
+    it("writes only the AoA skill preference", () => {
       const result = applyRunScopedMentionedSkillKeys({}, ["x", "y"]);
-      expect(result.paperclipSkillSync).toBeDefined();
-      expect(result.paperclipSkillSync).toEqual(result.aoaSkillSync);
+      expect(result.aoaSkillSync).toEqual({ desiredSkills: ["x", "y"] });
     });
 
     it("returns the config unchanged when skillKeys is empty", () => {
       const config = { aoaSkillSync: { desiredSkills: ["keep-me"] } };
       const result = applyRunScopedMentionedSkillKeys(config, []);
       expect(result).toBe(config);
-    });
-
-    it("merges with existing paperclipSkillSync back-compat data when aoaSkillSync is absent", () => {
-      const config = { paperclipSkillSync: { desiredSkills: ["legacy-skill"] } };
-      const result = applyRunScopedMentionedSkillKeys(config, ["new-skill"]);
-      const aoa = result.aoaSkillSync as Record<string, unknown>;
-      const desired = aoa.desiredSkills as string[];
-      expect(desired).toContain("legacy-skill");
-      expect(desired).toContain("new-skill");
     });
 
     it("does not modify config when no skill mentions present (integration smoke)", async () => {

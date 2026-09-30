@@ -12,7 +12,7 @@ You are reading this as context for working on the AoA codebase. This applies wh
 - **Architectural decisions are locked.** Before changing how a system works, read `docs/architecture/decisions.md`. Do not relitigate them.
 - **AoA is not open source.** Do not add open-source license headers, public contribution guides, or community-facing copy.
 - **Commander** is the name of the always-on internal AI assistant built into AoA. It has its own onboarding context (`server/src/onboarding-assets/`). You are not Commander unless explicitly told so.
-- **Paperclip** is the open-source base AoA forked from. It is not mentioned in user-facing docs. For wire protocol contracts and deprecated table tracking, see `docs/paperclip-migration.md`.
+- AoA began as a fork of an upstream project. The current contract is AoA-only; see `docs/upstream-migration.md` for lineage and `docs/architecture/wire-compat.md` for wire names.
 
 ---
 
@@ -32,10 +32,10 @@ You are reading this as context for working on the AoA codebase. This applies wh
 
 ---
 
-## Paperclip Divergence Points
+## AoA Divergence Points
 
-These are intentional AoA-specific choices that **differ from Paperclip** and must
-survive future Paperclip pull syncs. Future agents: when you see a Paperclip commit
+These are intentional AoA-specific choices that **differ from the upstream project** and must
+survive future upstream pull syncs. Future agents: when you see an upstream commit
 touching these areas, check against this list before porting.
 
 ### D5 — Concurrency clamp (heartbeat)
@@ -44,9 +44,9 @@ touching these areas, check against this list before porting.
   AoA teams opt-up per-agent as they build trust. A founding team of 3-5 people
   running a multi-agent pipeline can set each agent to 3-5, yielding 9-25 concurrent
   runs — well within the clamp.
-- `HEARTBEAT_MAX_CONCURRENT_RUNS_MAX = 50` — raised from Paperclip's 10 in v1.1 (D5).
+- `HEARTBEAT_MAX_CONCURRENT_RUNS_MAX = 50` — raised from the upstream project's 10 in v1.1 (D5).
   Founding teams legitimately need > 10 concurrent runs across all agents.
-- **Do NOT port** any Paperclip commit that raises the DEFAULT above 1 or the MAX
+- **Do NOT port** any upstream commit that raises the DEFAULT above 1 or the MAX
   above 50 unless there is a specific AoA team-size reason to do so.
 
 ### D6 — Hire-approval default by deployment mode (company create)
@@ -58,7 +58,7 @@ touching these areas, check against this list before porting.
   Multi-human board → agent hiring is a governance decision. Default on = safe.
 - DB schema default (`.default(true)`) is unchanged — this is injected server-side
   in `server/src/routes/companies.ts` POST handler using `opts.deploymentMode`.
-- **Do NOT port** any Paperclip commit that sets this field to `false` in
+- **Do NOT port** any upstream commit that sets this field to `false` in
   `authenticated` mode. Multi-human board accountability is the AoA thesis.
 
 ### D8 — Planning mode dispatch gate
@@ -70,7 +70,7 @@ touching these areas, check against this list before porting.
   `server/src/routes/issues-planning-mode-dispatch.ts`.
 - UI: amber "Planning" pill on IssuesList rows, NewIssueDialog chip bar, and
   TaskSlideOver header (click to revert to Standard).
-- **Do NOT port** any Paperclip commit that adds `work_mode` or a similar field
+- **Do NOT port** any upstream commit that adds `work_mode` or a similar field
   differently — AoA's interpretation is that planning tasks are human-curated and
   must not auto-dispatch until the founder switches them to Standard.
 
@@ -114,7 +114,7 @@ Registered in `server/src/adapters/registry.ts`. All agent execution is CLI-only
 | `opencode_local` | OpenCode CLI |
 | `openclaw` | OpenClaw runtime |
 | `gemini_local` | Gemini CLI |
-| `hermes_local` | Hermes (uses `PAPERCLIP_RUN_ID` / `PAPERCLIP_API_KEY` wire protocol — do NOT rename to AOA_*) |
+| `hermes_local` | Hermes through the AoA-owned local adapter (`AOA_RUN_ID` / `AOA_API_KEY`) |
 | `process` | Generic shell process |
 | `http` | HTTP webhook |
 
@@ -131,9 +131,9 @@ Push-based agent execution. `heartbeat.wakeup()` → HeartbeatRun → adapter ex
 - **Atomic checkout:** Issues use `SELECT FOR UPDATE NO WAIT` for single-agent locking.
 - **Goal status machine:** `planned → active → at_risk → achieved/cancelled` with `at_risk → active` recovery.
 - **Why/What/How context:** Agents receive Vision + Mission + Goal + Memory items + Task details.
-- **Agent hire approvals:** When `company.requireBoardApprovalForNewAgents` is true (default for `authenticated` mode), hires queue in Inbox. Agent created as `pending_approval`. In `local_trusted` mode new companies default to `false` (agent created `idle` directly). See `server/src/routes/agents.ts:784` and **Paperclip Divergence Points § D6** above.
+- **Agent hire approvals:** When `company.requireBoardApprovalForNewAgents` is true (default for `authenticated` mode), hires queue in Inbox. Agent created as `pending_approval`. In `local_trusted` mode new companies default to `false` (agent created `idle` directly). See `server/src/routes/agents.ts:784` and **AoA Divergence Points § D6** above.
 - **Inbox Hub:** tab-first, no reading-pane preview. Row-click/deep-link opens and activates a dedicated tab; Home is the attention dashboard. Non-home tabs get the contextual `HubActionBar`; tabs are capped at 12 (Home + 11 closeable). `ask_founder` work questions relay on successful answer so the waiting-lane item closes. See Decision #108.
-- **Concurrency clamp:** `HEARTBEAT_MAX_CONCURRENT_RUNS_DEFAULT = 1` (teaching default; teams opt-up per-agent). `HEARTBEAT_MAX_CONCURRENT_RUNS_MAX = 50` (v1.1 D5 raise from 10). See **Paperclip Divergence Points § D5** above.
+- **Concurrency clamp:** `HEARTBEAT_MAX_CONCURRENT_RUNS_DEFAULT = 1` (teaching default; teams opt-up per-agent). `HEARTBEAT_MAX_CONCURRENT_RUNS_MAX = 50` (v1.1 D5 raise from 10). See **AoA Divergence Points § D5** above.
 - **Run summary comments:** Auto-generated task comments after each heartbeat run (duration, token usage, cost, outcome, detected files). Uses `issue_comments` table. Opt-out via `runtimeConfig.autoRunSummary`. Files truncated to 10 + "+N more". The writer is the shared `postRunSummaryComment` (`server/src/services/run-summary-comment.ts`) — heartbeat delegates to it, and the crew runner (`runAoaAgent`) uses it too (W3a).
 - **Crew result loopback (W3a):** when a CREW agent (kind='aoa') finishes a discussion-spawned task (`issues.originKind='crew_thread'`), `runAoaAgent` posts back into the originating thread — `relayCrewResult` ("Completed: …") on success, `postCrewFailureCard` ("… could not complete …") on failure — plus a `postRunSummaryComment` on the task. Composed as `postCrewRunSuccess`/`postCrewRunFailure` (`internal-agent/aoa-agents/crew-run-outcome.ts`), all best-effort (per-substep try/catch, never fail the run). The `autoRunSummary` opt-out suppresses ONLY the summary comment — the loopback/failure card always post (founder visibility). `detectedFiles` is `[]` for crew until W3b (workspaces). Was heartbeat-only before W3a.
 
@@ -254,7 +254,7 @@ Thumbs-up/down on agent-authored comments (`FeedbackThumbs` in CommentThread). R
 
 ### Company Portability
 
-Export/import full company bundles (`schemaVersion: 2`, 12 sections). Paperclip v1 bundles import compatibly (warn-and-continue for unknown sections). UI: `/export` (checkboxes + preview → JSON download) + `/import` (upload → plan → import). See `docs/api/companies.md` for the full bundle schema and section list.
+Export/import full company bundles (`schemaVersion: 2`, 12 sections). Upstream v1 bundles import compatibly (warn-and-continue for unknown sections). UI: `/export` (checkboxes + preview → JSON download) + `/import` (upload → plan → import). See `docs/api/companies.md` for the full bundle schema and section list.
 
 ### Execution Workspaces
 
@@ -627,5 +627,5 @@ ui/src/lib/                → Shared utilities + constants
 | `docs/cli/` | CLI command reference |
 | `docs/roadmap.md` | Planned features — NOT current behavior |
 | `docs/STANDARDS.md` | Documentation lifecycle and session log extraction rules |
-| `docs/paperclip-migration.md` | Paperclip→AoA tracking: wire protocol, deprecated tables, removed adapters |
+| `docs/upstream-migration.md` | Upstream-to-AoA tracking: wire protocol, deprecated tables, removed adapters |
 | `docs/archive/` | Historical session logs, shipped plans, retired specs — not authoritative |

@@ -11,7 +11,7 @@ import { plugins } from "./plugins.js";
 import type { PluginStateScopeKind } from "@armyofagents/shared";
 
 /**
- * `plugin_entities` table — persistent high-level mapping between Paperclip
+ * `plugin_entities` table — persistent high-level mapping between AoA
  * objects and external plugin-defined entities.
  *
  * This table is used by plugins (e.g. `linear`, `github`) to store pointers

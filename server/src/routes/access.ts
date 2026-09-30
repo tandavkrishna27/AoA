@@ -335,7 +335,7 @@ export function buildJoinDefaultsPayloadForAccept(input: {
   responsesWebhookUrl?: unknown;
   responsesWebhookMethod?: unknown;
   responsesWebhookHeaders?: unknown;
-  paperclipApiUrl?: unknown;
+  aoaApiUrl?: unknown;
   webhookAuthHeader?: unknown;
   inboundOpenClawAuthHeader?: string | null;
   inboundOpenClawTokenHeader?: string | null;
@@ -358,9 +358,9 @@ export function buildJoinDefaultsPayloadForAccept(input: {
     if (legacyMethod) merged.method = legacyMethod.toUpperCase();
   }
 
-  if (!nonEmptyTrimmedString(merged.paperclipApiUrl)) {
-    const legacyAoaApiUrl = nonEmptyTrimmedString(input.paperclipApiUrl);
-    if (legacyAoaApiUrl) merged.paperclipApiUrl = legacyAoaApiUrl;
+  if (!nonEmptyTrimmedString(merged.aoaApiUrl)) {
+    const providedAoaApiUrl = nonEmptyTrimmedString(input.aoaApiUrl);
+    if (providedAoaApiUrl) merged.aoaApiUrl = providedAoaApiUrl;
   }
 
   if (!nonEmptyTrimmedString(merged.webhookAuthHeader)) {
@@ -523,8 +523,8 @@ function summarizeOpenClawDefaultsForLog(defaultsPayload: unknown) {
     keys: defaults ? Object.keys(defaults).sort() : [],
     url: defaults ? nonEmptyTrimmedString(defaults.url) : null,
     method: defaults ? nonEmptyTrimmedString(defaults.method) : null,
-    paperclipApiUrl: defaults
-      ? nonEmptyTrimmedString(defaults.paperclipApiUrl)
+    aoaApiUrl: defaults
+      ? nonEmptyTrimmedString(defaults.aoaApiUrl)
       : null,
     headerKeys: headers ? Object.keys(headers).sort() : [],
     webhookAuthHeader: defaults
@@ -757,8 +757,8 @@ function normalizeAgentDefaultsForJoin(input: {
   }
 
   const rawAoaApiUrl =
-    typeof defaults.paperclipApiUrl === "string"
-      ? defaults.paperclipApiUrl.trim()
+    typeof defaults.aoaApiUrl === "string"
+      ? defaults.aoaApiUrl.trim()
       : "";
   if (rawAoaApiUrl) {
     try {
@@ -768,32 +768,32 @@ function normalizeAgentDefaultsForJoin(input: {
         parsedAoaApiUrl.protocol !== "https:"
       ) {
         diagnostics.push({
-          code: "openclaw_paperclip_api_url_protocol",
+          code: "openclaw_aoa_api_url_protocol",
           level: "warn",
-          message: `paperclipApiUrl must use http:// or https:// (got ${parsedAoaApiUrl.protocol}).`
+          message: `aoaApiUrl must use http:// or https:// (got ${parsedAoaApiUrl.protocol}).`
         });
       } else {
-        normalized.paperclipApiUrl = parsedAoaApiUrl.toString();
+        normalized.aoaApiUrl = parsedAoaApiUrl.toString();
         diagnostics.push({
-          code: "openclaw_paperclip_api_url_configured",
+          code: "openclaw_aoa_api_url_configured",
           level: "info",
-          message: `paperclipApiUrl set to ${parsedAoaApiUrl.toString()}`
+          message: `aoaApiUrl set to ${parsedAoaApiUrl.toString()}`
         });
         if (isLoopbackHost(parsedAoaApiUrl.hostname)) {
           diagnostics.push({
-            code: "openclaw_paperclip_api_url_loopback",
+            code: "openclaw_aoa_api_url_loopback",
             level: "warn",
             message:
-              "paperclipApiUrl uses loopback hostname. Remote OpenClaw workers cannot reach localhost on the AoA host.",
+              "aoaApiUrl uses loopback hostname. Remote OpenClaw workers cannot reach localhost on the AoA host.",
             hint: "Use a reachable hostname/IP and keep it in allowed hostnames for authenticated/private deployments."
           });
         }
       }
     } catch {
       diagnostics.push({
-        code: "openclaw_paperclip_api_url_invalid",
+        code: "openclaw_aoa_api_url_invalid",
         level: "warn",
-        message: `Invalid paperclipApiUrl: ${rawAoaApiUrl}`
+        message: `Invalid aoaApiUrl: ${rawAoaApiUrl}`
       });
     }
   }
@@ -994,7 +994,7 @@ function buildInviteOnboardingManifest(
     invite: toInviteSummaryResponse(req, token, invite),
     onboarding: {
       instructions:
-        "Join as an OpenClaw agent, save your one-time claim secret, wait for board approval, then claim your API key. Save the claim response token to ~/.openclaw/workspace/paperclip-claimed-api-key.json (filename is wire-compat with existing OpenClaw clients) and load AOA_API_KEY from that file before starting heartbeat loops. You MUST include agentDefaultsPayload.headers.x-openclaw-auth in your join request so AoA can authenticate callback requests.",
+        "Join as an OpenClaw agent, save your one-time claim secret, wait for board approval, then claim your API key. Save the claim response token to ~/.openclaw/workspace/aoa-claimed-api-key.json and load AOA_API_KEY from that file before starting heartbeat loops. You MUST include agentDefaultsPayload.headers.x-openclaw-auth in your join request so AoA can authenticate callback requests.",
       inviteMessage: extractInviteMessage(invite),
       recommendedAdapterType: "openclaw",
       requiredFields: {
@@ -1003,7 +1003,7 @@ function buildInviteOnboardingManifest(
         adapterType: "Use 'openclaw' for OpenClaw agents",
         capabilities: "Optional capability summary",
         agentDefaultsPayload:
-          "Adapter config for OpenClaw endpoint. MUST include headers.x-openclaw-auth; include streamTransport ('sse' or 'webhook') plus url/method/paperclipApiUrl (and optional webhookAuthHeader/timeoutSec/payloadTemplate)."
+          "Adapter config for OpenClaw endpoint. MUST include headers.x-openclaw-auth; include streamTransport ('sse' or 'webhook') plus url/method/aoaApiUrl (and optional webhookAuthHeader/timeoutSec/payloadTemplate)."
       },
       registrationEndpoint: {
         method: "POST",
@@ -1143,7 +1143,7 @@ export function buildInviteOnboardingTextDocument(
         capabilities: "OpenClaw agent adapter",
         agentDefaultsPayload: {
           url: "http://127.0.0.1:18789/v1/responses",
-          paperclipApiUrl: "http://host.docker.internal:3100",
+          aoaApiUrl: "http://host.docker.internal:3100",
           streamTransport: "sse",
           method: "POST",
           headers: { "x-openclaw-auth": token },
@@ -1170,7 +1170,7 @@ export function buildInviteOnboardingTextDocument(
       "capabilities": "Optional summary",
       "agentDefaultsPayload": {
         "url": "https://your-openclaw-agent.example/v1/responses",
-        "paperclipApiUrl": "https://aoa-hostname-your-agent-can-reach:3100",
+        "aoaApiUrl": "https://aoa-hostname-your-agent-can-reach:3100",
         "streamTransport": "sse",
         "method": "POST",
         "headers": { "x-openclaw-auth": "replace-me" },
@@ -1203,8 +1203,8 @@ export function buildInviteOnboardingTextDocument(
 
     On successful claim, save the full JSON response to:
 
-    - ~/.openclaw/workspace/paperclip-claimed-api-key.json
-    chmod 600 ~/.openclaw/workspace/paperclip-claimed-api-key.json
+    - ~/.openclaw/workspace/aoa-claimed-api-key.json
+    chmod 600 ~/.openclaw/workspace/aoa-claimed-api-key.json
 
     And set the AOA_API_KEY and AOA_API_URL in your environment variables as specified here:
     https://docs.openclaw.ai/help/environment
@@ -1269,7 +1269,7 @@ export function buildInviteOnboardingTextDocument(
 
       Test each candidate with:
       - GET <candidate>/api/health
-      - set the first reachable candidate as agentDefaultsPayload.paperclipApiUrl when submitting your join request
+      - set the first reachable candidate as agentDefaultsPayload.aoaApiUrl when submitting your join request
 
       If none are reachable: ask your human operator for a reachable hostname/address and help them update network configuration.
       For authenticated/private mode, they may need:
@@ -1352,7 +1352,7 @@ function isLocalImplicit(req: Request) {
 }
 
 async function resolveActorEmail(db: Db, req: Request): Promise<string | null> {
-  if (isLocalImplicit(req)) return "local@paperclip.local";
+  if (isLocalImplicit(req)) return "local@aoa.local";
   const userId = req.actor.userId;
   if (!userId) return null;
   const user = await db
@@ -2141,7 +2141,7 @@ export function accessRoutes(
               responsesWebhookUrl: req.body.responsesWebhookUrl ?? null,
               responsesWebhookMethod: req.body.responsesWebhookMethod ?? null,
               responsesWebhookHeaders: req.body.responsesWebhookHeaders ?? null,
-              paperclipApiUrl: req.body.paperclipApiUrl ?? null,
+              aoaApiUrl: req.body.aoaApiUrl ?? null,
               webhookAuthHeader: req.body.webhookAuthHeader ?? null,
               inboundOpenClawAuthHeader: req.header("x-openclaw-auth") ?? null,
               inboundOpenClawTokenHeader: req.header("x-openclaw-token") ?? null
@@ -2160,7 +2160,7 @@ export function accessRoutes(
             responsesWebhookUrl: nonEmptyTrimmedString(
               req.body.responsesWebhookUrl
             ),
-            paperclipApiUrl: nonEmptyTrimmedString(req.body.paperclipApiUrl),
+            aoaApiUrl: nonEmptyTrimmedString(req.body.aoaApiUrl),
             webhookAuthHeader: summarizeSecretForLog(
               req.body.webhookAuthHeader
             ),
@@ -2359,10 +2359,10 @@ export function accessRoutes(
         if (expectedDefaults.url && !persistedDefaults.url)
           missingPersistedFields.push("url");
         if (
-          expectedDefaults.paperclipApiUrl &&
-          !persistedDefaults.paperclipApiUrl
+          expectedDefaults.aoaApiUrl &&
+          !persistedDefaults.aoaApiUrl
         ) {
-          missingPersistedFields.push("paperclipApiUrl");
+          missingPersistedFields.push("aoaApiUrl");
         }
         if (
           expectedDefaults.webhookAuthHeader &&

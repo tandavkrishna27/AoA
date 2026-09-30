@@ -1,4 +1,3 @@
-import "./config/env-compat.js"; // side-effect: mirror PAPERCLIP_* env to AOA_* for migration
 import { Command } from "commander";
 import { onboard } from "./commands/onboard.js";
 import { doctor } from "./commands/doctor.js";
@@ -83,7 +82,7 @@ program
   .option("-d, --data-dir <path>", DATA_DIR_OPTION_HELP)
   .option("--dir <path>", "Backup output directory (overrides config)")
   .option("--retention-days <days>", "Retention window used for pruning", (value) => Number(value))
-  .option("--filename-prefix <prefix>", "Backup filename prefix", "paperclip")
+  .option("--filename-prefix <prefix>", "Backup filename prefix", "aoa")
   .option("--json", "Print backup metadata as JSON")
   .action(async (opts) => {
     await dbBackupCommand(opts);

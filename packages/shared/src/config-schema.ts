@@ -62,7 +62,7 @@ export const storageLocalDiskConfigSchema = z.object({
 });
 
 export const storageS3ConfigSchema = z.object({
-  bucket: z.string().min(1).default("paperclip"),
+  bucket: z.string().min(1).default("aoa"),
   region: z.string().min(1).default("us-east-1"),
   endpoint: z.string().optional(),
   prefix: z.string().default(""),
@@ -75,7 +75,7 @@ export const storageConfigSchema = z.object({
     baseDir: "~/.aoa/instances/default/data/storage",
   }),
   s3: storageS3ConfigSchema.default({
-    bucket: "paperclip",
+    bucket: "aoa",
     region: "us-east-1",
     prefix: "",
     forcePathStyle: false,
@@ -94,7 +94,7 @@ export const secretsConfigSchema = z.object({
   }),
 });
 
-export const paperclipConfigSchema = z
+export const aoaConfigSchema = z
   .object({
     $meta: configMetaSchema,
     llm: llmConfigSchema.optional(),
@@ -110,7 +110,7 @@ export const paperclipConfigSchema = z
         baseDir: "~/.aoa/instances/default/data/storage",
       },
       s3: {
-        bucket: "paperclip",
+        bucket: "aoa",
         region: "us-east-1",
         prefix: "",
         forcePathStyle: false,
@@ -169,7 +169,7 @@ export const paperclipConfigSchema = z
     }
   });
 
-export type AoaConfig = z.infer<typeof paperclipConfigSchema>;
+export type AoaConfig = z.infer<typeof aoaConfigSchema>;
 export type LlmConfig = z.infer<typeof llmConfigSchema>;
 export type DatabaseConfig = z.infer<typeof databaseConfigSchema>;
 export type LoggingConfig = z.infer<typeof loggingConfigSchema>;

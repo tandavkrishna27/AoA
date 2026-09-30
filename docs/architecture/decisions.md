@@ -40,7 +40,7 @@ Decisions made during product design and development. Do not relitigate unless e
 | 17 | Tasks don't care who does them | Same task model for humans and agents. Experience adapts. |
 | 18 | Agents can only self-transition: todo → in_progress → in_review | Only humans mark done/cancelled. Deliberate control point. |
 | 18A | Decision #18 is superseded by Decision #109 (2026-07-11) | Review-required remains the safe default; explicitly governed tasks may allow agent completion under policy, autonomy, and structured acceptance criteria. |
-| 19 | Drizzle only, no raw SQL | Matches Paperclip patterns. `pnpm db:generate` for all schema DDL. Narrow C14 exception: idempotency guards + data-only backfills may be hand-appended post-generation (e.g. 0189/0195), always idempotent; schema DDL is never hand-authored. |
+| 19 | Drizzle only, no raw SQL | Matches the upstream project patterns. `pnpm db:generate` for all schema DDL. Narrow C14 exception: idempotency guards + data-only backfills may be hand-appended post-generation (e.g. 0189/0195), always idempotent; schema DDL is never hand-authored. |
 | 20 | ~~Sub-goals limited to one level deep~~ **(SUPERSEDED 2026-05-25)** | Superseded by the multi-parent goals model — goals form a freely-nested, multi-parent DAG; integrity (cycles + child⊆parent scope) enforced on write. See `docs/superpowers/plans/2026-05-25-threads-goals-followup.md` B0. |
 | 21 | Task dependencies use a separate `task_dependencies` table, not parentId | parentId = subtasks (hierarchy). Dependencies = blocking relationships (different concept). Separate table, separate logic. |
 | 22 | Cancelled dependency notifies but does NOT auto-cancel dependents | Too aggressive. Founder decides what to do with orphaned tasks. |
@@ -501,15 +501,15 @@ New table: `internal_agent_runs` with triggerType (conversation / proactive / ev
 
 ## Decision (annotation, 2026-04-21): MCP `upsert-task-document` ≡ artifact operations
 
-Paperclip's `paperclipUpsertIssueDocument` tool wraps a markdown body (identified by a `key`) attached to an issue, with an append-only revision history. AoA's equivalent substrate is the existing `artifacts` + `artifact_versions` subsystem, with a 1:1 link from task to artifact via `issues.artifactId`. Phase C (Task C.4) maps Paperclip's document tool surface onto AoA's artifact subsystem:
+the upstream project's `aoaUpsertIssueDocument` tool wraps a markdown body (identified by a `key`) attached to an issue, with an append-only revision history. AoA's equivalent substrate is the existing `artifacts` + `artifact_versions` subsystem, with a 1:1 link from task to artifact via `issues.artifactId`. Phase C (Task C.4) maps the upstream project's document tool surface onto AoA's artifact subsystem:
 
 - `upsert-task-document` → if the task's artifact exists and is of type `document`, add a new immutable version; else create a new artifact of type `document` and link it via `issues.artifactId`
-- `list-task-documents` → return the task's document artifact (0 or 1 item — AoA has a single artifact per task, unlike Paperclip's per-key multiplicity)
+- `list-task-documents` → return the task's document artifact (0 or 1 item — AoA has a single artifact per task, unlike the upstream project's per-key multiplicity)
 - `get-task-document` → return the artifact + its latest version (content + metadata)
 - `list-task-document-revisions` → return all artifact versions ordered ascending by `versionNumber` (immutable history)
 - `restore-task-document-revision` → create a **new** artifact version whose content is copied from the specified older version; the old version is **never mutated** (preserves Decisions #43 / #45 — artifact versions are immutable)
 
-**Surface divergence from Paperclip:** AoA does not accept Paperclip's `key` parameter because its data model is 1:1 task↔artifact. If Paperclip-style per-key multiplicity is ever needed, it would require a schema change (e.g., a `task_documents` junction table), not a tool-surface change.
+**Surface divergence from the upstream project:** AoA does not accept the upstream project's `key` parameter because its data model is 1:1 task↔artifact. If the upstream project-style per-key multiplicity is ever needed, it would require a schema change (e.g., a `task_documents` junction table), not a tool-surface change.
 
 **RBAC:** All five tools enforce company isolation (cross-company access returns 404) and — for scoped users — project-scope membership via the task's `projectId`. Writes additionally require `permissionsSvc.canAccessEntity("artifact", "update", { departmentId: task.projectId })`.
 
@@ -521,58 +521,38 @@ AoA keeps `issues.artifactId` as the primary artifact pointer for artifact-as-in
 
 ---
 
-## Decision #92 — Defer Phase 6 Hermes wire-field rename to upstream coordination
+## Decision #92 — Hermes wire-field deferral (superseded 2026-09-30)
 
-**Status:** Deferred (locked 2026-04-26)
+**Original status:** Locked 2026-04-26. The earlier decision deferred changing two Hermes/OpenClaw execution fields until an external adapter could accept new names. That protected deployments using the external adapter at the time.
 
-**Context:** The Paperclip → AoA rename plan (`docs/archive/sessions/2026-04-25-paperclip-to-aoa-rename.md`) defined Phase 6 as renaming `paperclip_session_key` / `paperclip_stream_transport` JSON field names in the OpenClaw / Hermes wire payload (sent during agent execution from `packages/adapters/openclaw/src/server/execute-webhook.ts` and `packages/adapters/openclaw/src/server/execute-sse.ts`). Hermes is owned by an external project; renaming our send-side without coordinating their receive-side breaks the integration for any operator running an older Hermes build.
-
-**Decision:** Phase 6 stays deferred until either (a) the Hermes maintainer confirms readiness for a coordinated rename, or (b) a Hermes adapter version ships that accepts both old and new names (one-release migration window), the minimum-required Hermes version in `package.json` is bumped to that release, and the old field names are removed from the execute files.
-
-**Consequences:**
-- Existing Hermes wire fields keep `paperclip_session_key` / `paperclip_stream_transport` names. Documented as wire-compat surface #8 in `docs/architecture/wire-compat.md`.
-- Brand-check CI (currently 9 guards in `.github/workflows/pr.yml`) must continue to allow `paperclip` matches inside `packages/adapters/openclaw/**`.
-- Re-open this decision when an upstream coordination window opens. Owner: whoever picks up the Hermes adapter or OpenClaw integration work next.
-
-**Reference:** Original Phase 6 spec lives in the rename plan; do not re-litigate without reading it first. Wire-compat surface #8 in `wire-compat.md` cross-references this decision.
+**Superseding decision:** The AoA clean break replaces that external dependency with an AoA-owned Hermes adapter and adopts AoA-only wire fields (`aoa_session_key`, `aoa_stream_transport`) and environment variables (`AOA_RUN_ID`, `AOA_API_KEY`). There are no existing product installations to migrate. The old compatibility window and its CI exceptions are retired. Hermes execution, session resume, and model discovery remain supported. See `docs/adapters/hermes-local.md` and `docs/architecture/wire-compat.md` for the current contract.
 
 ---
 
-## Decision #93 — Skip standalone `@paperclipai/mcp-server` package port
+## Decision #93 — Skip standalone upstream MCP server package port
 
-**Status:** Locked (2026-04-26)
+**Status:** Locked 2026-04-26.
 
-**Context:** Paperclip released `packages/mcp-server` — a stdio-based MCP server that wraps the Paperclip REST API for external MCP clients (e.g., Claude Desktop, Cursor) to call Paperclip from outside a running instance. It's a separate npm package (~1,148 LOC) that ships with its own bin entry and serves as a bridge: external MCP client → stdio → REST → Paperclip backend.
-
-**Decision:** Do NOT port. At the time this decision was locked, AoA's existing in-server MCP at `server/src/mcp/server.ts` exposed 31 RBAC-scoped, rate-limited tools directly to clients connected to the running AoA backend (read tools, write tools, document tools, approval tools — all per-user-keyed via `mcp_api_keys`). The current generated registry may contain more tools; the standalone-wrapper decision does not depend on that historical count. The wrapper would only matter when the MCP client cannot reach AoA's HTTP endpoint — a use case AoA's local-first deployment model does not currently have.
-
-**Reasoning:**
-- AoA's deployment model assumes the client and server run on the same host or LAN. The in-server MCP serves that case directly without a stdio bridge.
-- Maintaining the standalone package would mean tracking Paperclip's tool surface separately from AoA's. The surfaces had already diverged when this decision was locked, with different RBAC scoping and AoA-specific tools such as `debrief-push` mapped to discussions.
-- The performance + simplicity argument for stdio-MCP doesn't hold when AoA's MCP is already a single in-process call away.
-
-**Revisit when:** AoA grows a multi-tenant cloud deployment where external Claude Desktop / Cursor / etc. clients on a different machine need to talk to a hosted instance. At that point, port the standalone package and rebrand: `@paperclipai/mcp-server` → `@armyofagents/mcp-server`, bin `paperclip-mcp-server` → `aoa-mcp-server`, env vars stay as wire-protocol contracts (`PAPERCLIP_API_KEY` etc.) per Decision #92's rationale.
-
-**Reference:** Plan `docs/archive/sessions/2026-04-26-upstream-paperclip-resync.md` (Tier 5 / D1 skipped).
+The upstream project provided a standalone stdio MCP wrapper around its REST API. AoA uses its in-server MCP implementation with its own RBAC and tool registry, so the standalone wrapper was not ported. This historical decision does not require retaining an upstream package name or binary alias in AoA. If a standalone wrapper is needed later, it should ship under the AoA package scope and current AoA wire contracts.
 
 ---
 
-## Decision #94 — Skip Paperclip `pi-local` skill bin/ PATH support port
+## Decision #94 — Skip the upstream project `pi-local` skill bin/ PATH support port
 
 **Status:** Locked (2026-04-26)
 
-**Context:** Paperclip commit `854fa817` adds skill `bin/` directories to the child process PATH for the `pi-local` adapter so AGENTS.md-invoked skill helpers (`paperclip-get-issue`, `paperclip-add-comment`, etc.) resolve without absolute paths during agent CLI runs.
+**Context:** the upstream project commit `854fa817` adds skill `bin/` directories to the child process PATH for the `pi-local` adapter so AGENTS.md-invoked skill helpers (`aoa-get-issue`, `aoa-add-comment`, etc.) resolve without absolute paths during agent CLI runs.
 
-**Decision:** Do NOT port. AoA's adapter set is `claude_local | opencode_local | openclaw | http | process | cursor | codex_local | hermes_local | gemini_local`. None of these are Paperclip's `pi-local`. Skill helpers via the PATH-prepending mechanism are not part of AoA's heartbeat protocol today — agents communicate with the AoA backend via the in-server MCP, not via shelling out to skill-bundled CLI binaries.
+**Decision:** Do NOT port. AoA's adapter set is `claude_local | opencode_local | openclaw | http | process | cursor | codex_local | hermes_local | gemini_local`. None of these are the upstream project's `pi-local`. Skill helpers via the PATH-prepending mechanism are not part of AoA's heartbeat protocol today — agents communicate with the AoA backend via the in-server MCP, not via shelling out to skill-bundled CLI binaries.
 
 **Reasoning:**
-- The Paperclip change targets a specific adapter (`pi-local`) that AoA does not have and has no plan to add (Sprint 2A / Decision #91 removed API-mode adapters; the adapter list is curated).
+- The upstream project change targets a specific adapter (`pi-local`) that AoA does not have and has no plan to add (Sprint 2A / Decision #91 removed API-mode adapters; the adapter list is curated).
 - AoA's equivalent agent-tool surface is the in-server MCP exposed via per-user keys — agents call MCP tools, not bundled CLI binaries.
 - Adding generic skill-bin PATH support to AoA's other adapters (claude_local, codex_local, etc.) would be feature-creep without a concrete agent workflow that needs it.
 
 **Revisit when:** AoA introduces a similar skill-helper protocol (e.g., bundled CLI binaries that run alongside the agent) or adopts a `pi-local`-family adapter. At that point the PATH-prepending logic in the existing adapter `execute.ts` files is the porting site.
 
-**Reference:** Plan `docs/archive/sessions/2026-04-26-upstream-paperclip-resync.md` (Tier 5 / D5 skipped).
+**Reference:** Plan `docs/archive/sessions/2026-04-26-upstream-resync.md` (Tier 5 / D5 skipped).
 
 ---
 
@@ -1145,7 +1125,7 @@ Design reviewed: W5c plan (staff-eng + Codex review) plus the Task 1 live `app-s
 
 3. **Crew-autonomy dial gates agent-INITIATED work only; explicit founder authorization always dispatches.** Approving a `crew_dispatch` (or manually assigning/reassigning a task to a crew agent) exempts the resulting task wakeup from the company crew-autonomy gate (keyed on `payload.issueId` + `source ∈ {assignment, automation}`, covering both the assignee-wakeup chokepoint and the PATCH-reassign path). `crewPaused` stays the true global kill-switch. This fixes the `skipped_autonomy` behavior where approving a dispatch visibly did nothing at Manual/Assist autonomy.
 
-4. **Dead-type package — build 2, prune 2, defer 2, hide 1.** BUILD now (docs already promised them): `extraction_failed` (emit on CLI-extraction failure; auto-archive on successful reprocess) and `routine_outcome` (failure-only; success never notifies). PRUNE (type-only, superseded): `human_input_needed` and `scope_proposal` — the "agent needs the human" channels are `agent_runtime_decision`/`work_question` + `mention`, and scope proposals surface as thread cards + the `crew_dispatch` approval. DEFER to 1.1 (need schedulers): `reminder` (Commander reminders) and `proactive` (the periodic scan loop — CLAUDE.md corrected to reflect it is unwired today). KEEP internal-only, hidden from settings: `legacy_other` (the catch-all sink stays functional for Paperclip-era company-bundle imports).
+4. **Dead-type package — build 2, prune 2, defer 2, hide 1.** BUILD now (docs already promised them): `extraction_failed` (emit on CLI-extraction failure; auto-archive on successful reprocess) and `routine_outcome` (failure-only; success never notifies). PRUNE (type-only, superseded): `human_input_needed` and `scope_proposal` — the "agent needs the human" channels are `agent_runtime_decision`/`work_question` + `mention`, and scope proposals surface as thread cards + the `crew_dispatch` approval. DEFER to 1.1 (need schedulers): `reminder` (Commander reminders) and `proactive` (the periodic scan loop — CLAUDE.md corrected to reflect it is unwired today). KEEP internal-only, hidden from settings: `legacy_other` (the catch-all sink stays functional for the upstream project-era company-bundle imports).
 
 **Deferred (not decided here, tracked separately) — BOTH NOW RESOLVED 2026-07-04 (see the note below this decision):** the `work_question` **adapter caller** (agents can't yet ask the founder a product question in-run — the service/panel/answer path exist but no bridge raises one; W5b scoped it out) → shipped as the `ask_founder` MCP tool; BUG-6 (`codex_local` supervised turn completes empty) → root-caused (no model on the app-server turn → `gpt-5.3-codex` 400) + fixed. Safety fix shipped for `work_question`: answering one whose run is dead returns an honest 409 + cancels the decision instead of stalling forever.
 
@@ -1263,7 +1243,7 @@ The two items deferred by Decision #107 shipped together on `feat/inbox-hub-tabb
 
 6. **Open sub-claim — do not treat as settled.** Whether `CLAUDE_CONFIG_DIR` also redirects the *user-level* `~/.claude/CLAUDE.md`, or whether that file is reached by a second route, is **not established**. Tier one is proven for `settings.json`/`plugins/`/`skills/` (the per-run directory demonstrably contains only the credential); the user-level `CLAUDE.md` specifically is inferred, not observed. **What would settle it:** during live crew verification, run with a distinctive marker string in the operator's `~/.claude/CLAUDE.md` and assert it is absent from the run transcript. Note that testing this by invoking `claude` from inside an agent session is unreliable — that has produced false findings in this project before.
 
-7. **Tier two was satisfied by accident, and wrongly — CLOSED 2026-07-23.** Crew runs were not workspace-backed: the crew runner never set a workspace, so `cwd` fell through to `process.cwd()` (`claude-local/src/server/execute.ts:188`) — the **AoA server's own repository**. Every crew run therefore loaded *AoA's* `CLAUDE.md` rather than the customer workspace's. This is the most likely mechanism behind the observed live hijack. **Fixed by crew workspace resolution (T5):** the crew runner now populates `context.paperclipWorkspace` by reusing heartbeat's own resolver (`server/src/services/workspace-resolution.ts`, extracted from `heartbeat.ts`), with the per-agent home `<AOA_HOME>/instances/<id>/workspaces/<agentId>` as an always-present floor — so `process.cwd()` is unreachable from the crew path. Crew does **not** realize per-task git worktrees; an `isolated_workspace` / `operator_branch` project policy degrades to the project's shared primary workspace until W3b.
+7. **Tier two was satisfied by accident, and wrongly — CLOSED 2026-07-23.** Crew runs were not workspace-backed: the crew runner never set a workspace, so `cwd` fell through to `process.cwd()` (`claude-local/src/server/execute.ts:188`) — the **AoA server's own repository**. Every crew run therefore loaded *AoA's* `CLAUDE.md` rather than the customer workspace's. This is the most likely mechanism behind the observed live hijack. **Fixed by crew workspace resolution (T5):** the crew runner now populates `context.aoaWorkspace` by reusing heartbeat's own resolver (`server/src/services/workspace-resolution.ts`, extracted from `heartbeat.ts`), with the per-agent home `<AOA_HOME>/instances/<id>/workspaces/<agentId>` as an always-present floor — so `process.cwd()` is unreachable from the crew path. Crew does **not** realize per-task git worktrees; an `isolated_workspace` / `operator_branch` project policy degrades to the project's shared primary workspace until W3b.
 
 **Key files:** `packages/adapters/claude-local/src/server/ambient-config.ts`, `execute.ts`; `packages/adapter-utils/src/server-utils.ts` (`mergeChildEnv`, `foldEnvKey`); `server/src/services/internal-agent/aoa-agents/runner.ts`. Plan: `docs/aoa/plans/2026-07-19-crew-execution-phase1-foundation.md`.
 

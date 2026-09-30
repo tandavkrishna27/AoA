@@ -198,7 +198,7 @@ the checkout for later starts. This starts the API server at
 automatically.
 
 The MeteoriteLabs AoA CLI is not currently published to npm. Do not use
-`npx aoa` or `npx paperclipai`: those package names resolve to other projects.
+`npx aoa`: that package name does not identify this repository. Use the source-checkout command until a scoped release is published.
 
 > **Requirements:** Node.js 20.3+, pnpm 9.15+
 

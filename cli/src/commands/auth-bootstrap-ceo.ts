@@ -21,7 +21,7 @@ function resolveDbUrl(configPath?: string) {
   }
   if (config?.database.mode === "embedded-postgres") {
     const port = config.database.embeddedPostgresPort ?? 54329;
-    return `postgres://paperclip:paperclip@127.0.0.1:${port}/paperclip`;
+    return `postgres://aoa:aoa@127.0.0.1:${port}/aoa`;
   }
   return null;
 }

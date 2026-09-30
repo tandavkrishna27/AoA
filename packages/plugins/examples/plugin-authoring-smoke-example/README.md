@@ -1,6 +1,6 @@
 # Plugin Authoring Smoke Example
 
-A Paperclip plugin
+An AoA plugin
 
 ## Development
 
@@ -11,13 +11,13 @@ pnpm dev:ui         # local dev server with hot-reload events
 pnpm test
 ```
 
-## Install Into Paperclip
+## Install Into AoA
 
 ```bash
-pnpm paperclipai plugin install ./
+pnpm aoa plugin install ./
 ```
 
 ## Build Options
 
-- `pnpm build` uses esbuild presets from `@paperclipai/plugin-sdk/bundlers`.
+- `pnpm build` uses esbuild presets from `@armyofagents/plugin-sdk/bundlers`.
 - `pnpm build:rollup` uses rollup presets from the same SDK.

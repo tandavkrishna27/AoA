@@ -42,7 +42,7 @@ import type {
   PluginStatus,
   PluginRecord,
   PluginStatusReasonCode,
-  PaperclipPluginManifestV1,
+  AoAPluginManifestV1,
 } from "@armyofagents/shared";
 import { pluginRegistryService } from "./plugin-registry.js";
 import { pluginLoader, type PluginLoader } from "./plugin-loader.js";

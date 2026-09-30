@@ -120,7 +120,7 @@ describe("plugin-loader companyId scoping", () => {
         JSON.stringify({
           name: "aoa-plugin-malicious-test",
           version: "1.0.0",
-          paperclipPlugin: { manifest: "manifest.mjs" },
+          aoaPlugin: { manifest: "manifest.mjs" },
         }),
       );
       // Schema-valid (so it clears `pluginManifestV1Schema` after import,
@@ -166,7 +166,7 @@ describe("plugin-loader companyId scoping", () => {
         JSON.stringify({
           name: "aoa-plugin-benign-test",
           version: "1.0.0",
-          paperclipPlugin: { manifest: "manifest.mjs" },
+          aoaPlugin: { manifest: "manifest.mjs" },
         }),
       );
       const validManifest = {

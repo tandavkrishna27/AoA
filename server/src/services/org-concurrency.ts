@@ -30,7 +30,7 @@ export function maxConcurrentRunsFromRuntimeConfig(runtimeConfig: unknown): numb
 
 // Phase 5, Task 10 — mirrors heartbeat.ts's normalizeMaxConcurrentRuns /
 // countRunningRunsForAgent per-agent clamp, layered one level up at the
-// Organization. See the Paperclip Divergence Points section (D5) in CLAUDE.md
+// Organization. See the AoA Divergence Points section (D5) in CLAUDE.md
 // for the sibling per-agent clamp this deliberately mirrors (light default, real max).
 
 export function normalizeOrgConcurrencyCap(value: unknown): number {

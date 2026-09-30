@@ -1,10 +1,10 @@
-# Upstream Paperclip → AoA Resync (Tier 1 + Tier 2) Implementation Plan
+# upstream project → AoA Resync (Tier 1 + Tier 2) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Pull 23 verified-as-portable improvements from Paperclip releases `v2026.414.0`, `v2026.415.0`, `v2026.416.0`, and post-416 master (commit `c036bbfa`) into AoA-2.5 — closing the security/CVE gaps, landing the small UX wins, and adding the bounded backend additions that don't require an architecture change.
+**Goal:** Pull 23 verified-as-portable improvements from Upstream releases `v2026.414.0`, `v2026.415.0`, `v2026.416.0`, and post-416 master (commit `c036bbfa`) into AoA-2.5 — closing the security/CVE gaps, landing the small UX wins, and adding the bounded backend additions that don't require an architecture change.
 
-**Architecture:** Sequential branch `port/upstream-resync-2026-04-26` off `Porting1.1`, organized as 7 phases × 25 tasks (T1–T6, T6.5, T7–T24 + docs). Phase 1 is a critical batch (~30 min, ships as **one bundled commit**). Phases 2–7 are independent task units that ship as their own commits. Tasks are ordered by independence + risk, lightest first. Three migrations land in Phase 6 (numbered `0061`–`0063` to fit AoA's existing namespace). Three Paperclip items are explicitly **skipped** with documented rationale (C4 already-complete, D1 superseded by AoA's in-server MCP, D5 not applicable to AoA's adapter set).
+**Architecture:** Sequential branch `port/upstream-resync-2026-04-26` off `Porting1.1`, organized as 7 phases × 25 tasks (T1–T6, T6.5, T7–T24 + docs). Phase 1 is a critical batch (~30 min, ships as **one bundled commit**). Phases 2–7 are independent task units that ship as their own commits. Tasks are ordered by independence + risk, lightest first. Three migrations land in Phase 6 (numbered `0061`–`0063` to fit AoA's existing namespace). Three Upstream items are explicitly **skipped** with documented rationale (C4 already-complete, D1 superseded by AoA's in-server MCP, D5 not applicable to AoA's adapter set).
 
 **Plan-review pass landed 2026-04-26** — verified each task claim against AoA source-of-truth. Findings folded inline below: (a) several "additions" turned out to already exist in AoA and are now noted as confirmation steps, saving ~3 hr; (b) several import/file-path mismatches caught and corrected; (c) Phase 4 execution order changed (T15 now runs before T13 because T13's Bedrock support depends on T15's `metered_api` billing-type variant); (d) UI tasks got render tests; (e) migration tasks got round-trip rollback verification.
 
@@ -19,27 +19,27 @@
 
 ## Cross-cutting context
 
-**Source branch in fresh Paperclip:** `master` @ `c036bbfa` (working copy at `C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\paperclip-master\paperclip-master`). Fork point: `a0723777` = `v2026.403.0`.
+**Source branch in fresh Upstream:** `master` @ `c036bbfa` (working copy at `C:\Users\TK\OneDrive\Desktop\Claude Data\Upstream-AoA\upstream-master\upstream-master`). Fork point: `a0723777` = `v2026.403.0`.
 
 **Rebrand rules (apply to every task):**
 - `Issue` → `Task` in user-visible UI strings only. DB table stays `issues`. API routes stay `/issues`. Type names like `IssueAttachment` stay (internal).
-- `Paperclip` → `AoA` in user-visible strings (banners, dialog copy, settings).
-- `paperclip-*` plugin keys → `aoa-*` (with `mapLegacyPaperclipKey` fallback).
+- `Upstream` → `AoA` in user-visible strings (banners, dialog copy, settings).
+- `upstream-*` plugin keys → `aoa-*` (with `mapLegacyUpstreamKey` fallback).
 - `pcp_*` token prefixes → `aoa_*`.
-- `PAPERCLIP_*` env vars stay as-is when they're cross-system protocol contracts (e.g., `PAPERCLIP_API_KEY`, `X-Paperclip-Run-Id` headers — these are wire-protocol fields with the Hermes adapter and external skill harness; renaming would break compat). For pure AoA-internal env vars (e.g., `AOA_AGENT_JWT_SECRET`), use the AoA name.
+- `UPSTREAM_*` env vars stay as-is when they're cross-system protocol contracts (e.g., `UPSTREAM_API_KEY`, `X-Upstream-Run-Id` headers — these are wire-protocol fields with the Hermes adapter and external skill harness; renaming would break compat). For pure AoA-internal env vars (e.g., `AOA_AGENT_JWT_SECRET`), use the AoA name.
 
-**Migration namespace:** AoA migrations currently end at `0060_aoa_sentinels.sql`. New migrations in this plan use `0061`, `0062`, `0063`. Paperclip's `0049–0070` collision is irrelevant — we author AoA-numbered migrations from scratch using Paperclip's SQL as a reference.
+**Migration namespace:** AoA migrations currently end at `0060_aoa_sentinels.sql`. New migrations in this plan use `0061`, `0062`, `0063`. Upstream's `0049–0070` collision is irrelevant — we author AoA-numbered migrations from scratch using Upstream's SQL as a reference.
 
 **Verified already-complete in AoA — no port needed (confirmed by review pass 2026-04-26):**
 - **C4 — Adapter capability flags** (`supportsInstructionsBundle`, `instructionsPathKey`, `requiresMaterializedRuntimeSkills`). Already in `packages/adapter-utils/src/types.ts:220-262` and declared on every adapter in `server/src/adapters/registry.ts:70-166`.
 - **D3 partial — `BUILTIN_ROUTINE_VARIABLE_NAMES`, `getBuiltinRoutineVariableValues()`** in `packages/shared/src/routine-variables.ts:6-16`. Only the schema migration + UI dialog parts of D3 remain (Task 11 below).
 - **T10 partial — `extractRoutineVariableNames` and `syncRoutineVariablesWithTemplate`** already exist in `packages/shared/src/routine-variables.ts:27-58`. Task 10 reduced to UI-only work (was 90 min → now ~30 min).
-- **T22 partial — `checkedOutByHarness: boolean`** already on `PaperclipWakePayload` at `packages/adapter-utils/src/server-utils.ts:443`. `normalizePaperclipWakePayload` exists (alias for `normalizeAoaWakePayload`) at line 566. Task 22 reduced to heartbeat-wiring + prompt-rendering only.
+- **T22 partial — `checkedOutByHarness: boolean`** already on `UpstreamWakePayload` at `packages/adapter-utils/src/server-utils.ts:443`. `normalizeUpstreamWakePayload` exists (alias for `normalizeAoaWakePayload`) at line 566. Task 22 reduced to heartbeat-wiring + prompt-rendering only.
 - **T23 partial — `BackupRetentionPolicy` interface + retention presets** (`DAILY/WEEKLY/MONTHLY_RETENTION_PRESETS`) already in `packages/shared/src/types/instance.ts:8-12` plus zod validator in `packages/shared/src/validators/instance.ts:19-23`. Task 23 reduced to backup-lib refactor + UI wire-up + un-hide.
 
 **Explicitly skipped — out of scope:**
-- **D1 — Standalone `@paperclipai/mcp-server` package.** AoA's in-server MCP at `server/src/mcp/server.ts` (31 tools, scoped, rate-limited) supersedes this. The standalone package is a stdio MCP→REST bridge for external clients connecting to a remote Paperclip; AoA's deployment model is local-first, so this package adds no v1.0 value. **Decision lock candidate** for `docs/aoa/reference/decisions.md`.
-- **D5 — Skill bin/ PATH support** (Paperclip commit `854fa817`). Targets `pi-local` adapter, which AoA does not have (Sprint 2A removed API adapters; AoA's adapter set is `claude_local | opencode_local | openclaw | http | process | cursor | codex_local | hermes_local | gemini_local`). If skill helpers ever need PATH-prepending in AoA's adapters, revisit then.
+- **D1 — Standalone `@upstreamai/mcp-server` package.** AoA's in-server MCP at `server/src/mcp/server.ts` (31 tools, scoped, rate-limited) supersedes this. The standalone package is a stdio MCP→REST bridge for external clients connecting to a remote Upstream; AoA's deployment model is local-first, so this package adds no v1.0 value. **Decision lock candidate** for `docs/aoa/reference/decisions.md`.
+- **D5 — Skill bin/ PATH support** (Upstream commit `854fa817`). Targets `pi-local` adapter, which AoA does not have (Sprint 2A removed API adapters; AoA's adapter set is `claude_local | opencode_local | openclaw | http | process | cursor | codex_local | hermes_local | gemini_local`). If skill helpers ever need PATH-prepending in AoA's adapters, revisit then.
 
 ---
 
@@ -122,7 +122,7 @@ pnpm build               # all packages clean
 | `packages/db/src/schema/index.ts` | **Modify** | T19 — re-export new schema |
 | `server/src/services/heartbeat-watchdog.ts` | **Create** | T21 — stale-run sweeper |
 | `server/src/index.ts` | **Modify** | T21 — register watchdog sweeper alongside TTL sweeper |
-| `packages/adapter-utils/src/server-utils.ts` | **Modify** | T22 — add `checkedOutByHarness` to `PaperclipWakePayload` + prompt advisory |
+| `packages/adapter-utils/src/server-utils.ts` | **Modify** | T22 — add `checkedOutByHarness` to `UpstreamWakePayload` + prompt advisory |
 | `packages/db/src/backup-lib.ts` | **Modify** | T23 — gzip pipeline + tiered pruning |
 | `packages/shared/src/types/instance.ts` | **Modify** | T23 — `BackupRetentionPolicy` interface + presets |
 | `packages/shared/src/validators/instance.ts` | **Modify** | T23 — schema for `backupRetention` |
@@ -140,7 +140,7 @@ pnpm build               # all packages clean
 
 ### Task 1: Express 5 wildcard syntax fix on better-auth route
 
-**Why:** AoA is on Express 5 (per CLAUDE.md). Express 5 + path-to-regexp v8 dropped the `*paramName` syntax — the route silently 404s. This means **every `/api/auth/*` request returns 404**, breaking sign-in, session lookup, and password flows. AoA's `server/src/app.ts:152` still uses the broken syntax (currently masked by other middleware or not exercised in the test path that catches it). Paperclip fixed in commit `a8638619`.
+**Why:** AoA is on Express 5 (per CLAUDE.md). Express 5 + path-to-regexp v8 dropped the `*paramName` syntax — the route silently 404s. This means **every `/api/auth/*` request returns 404**, breaking sign-in, session lookup, and password flows. AoA's `server/src/app.ts:152` still uses the broken syntax (currently masked by other middleware or not exercised in the test path that catches it). Upstream fixed in commit `a8638619`.
 
 **Files:**
 - Modify: `server/src/app.ts` (line ~152)
@@ -199,7 +199,7 @@ Hold commit until Phase 1 batch is ready. Stage but don't commit yet.
 
 **Verification:** `curl http://localhost:5174/api/auth/sign-in/email` reaches `betterAuthHandler` (200 from handler), not 404.
 
-**Effort:** 5 min  
+**Effort:** 5 min
 **Dependencies:** none
 
 ---
@@ -240,14 +240,14 @@ Expected: pass (or the same baseline as before — multer 2.1 is API-compatible 
 
 **Verification:** No test regression. `npm audit` no longer flags multer-related HIGH CVEs.
 
-**Effort:** 2 min  
+**Effort:** 2 min
 **Dependencies:** none
 
 ---
 
 ### Task 3: Rollup CVE pin (`>=4.59.0`)
 
-**Why:** Rollup `<4.59.0` has a path-traversal CVE (GHSA-gcx4-mw62-g8wm). Paperclip pins via root-level `pnpm.overrides`. AoA's root `package.json:54-58` has `pnpm.patchedDependencies` but no `overrides` block.
+**Why:** Rollup `<4.59.0` has a path-traversal CVE (GHSA-gcx4-mw62-g8wm). Upstream pins via root-level `pnpm.overrides`. AoA's root `package.json:54-58` has `pnpm.patchedDependencies` but no `overrides` block.
 
 **Files:**
 - Modify: `package.json` (root, lines 54-58)
@@ -283,14 +283,14 @@ Expected: every rollup entry shows `4.59.0` or higher.
 
 **Verification:** `pnpm-lock.yaml` shows rollup ≥ 4.59.0 transitively.
 
-**Effort:** 3 min  
+**Effort:** 3 min
 **Dependencies:** none
 
 ---
 
 ### Task 4: JWT secret `BETTER_AUTH_SECRET` fallback
 
-**Why:** When `AOA_AGENT_JWT_SECRET` is unset but `BETTER_AUTH_SECRET` is set (a normal authenticated-mode deployment), local-adapter JWTs currently fail to mint. Paperclip PR #2866 adds the fallback. Resilience win for self-hosted.
+**Why:** When `AOA_AGENT_JWT_SECRET` is unset but `BETTER_AUTH_SECRET` is set (a normal authenticated-mode deployment), local-adapter JWTs currently fail to mint. Upstream PR #2866 adds the fallback. Resilience win for self-hosted.
 
 **Files:**
 - Modify: `server/src/agent-auth-jwt.ts:29` (or wherever the env read lives)
@@ -365,14 +365,14 @@ pnpm --filter @armyofagents/server exec vitest run src/__tests__/agent-auth-jwt.
 
 **Verification:** Run server with only `BETTER_AUTH_SECRET` set; spawn a `claude_local` heartbeat; logs show JWT minted (no "secret missing or invalid" warning).
 
-**Effort:** 10 min  
+**Effort:** 10 min
 **Dependencies:** none
 
 ---
 
 ### Task 5: A11y viewport meta tag
 
-**Why:** AoA's `ui/index.html:5` has `maximum-scale=1.0, user-scalable=no` — WCAG 2.1 SC 1.4.4 (Resize Text) violation. Modern Safari's auto-zoom on focused inputs is driven by font-size <16px, not viewport restriction, so the restriction is unnecessary. Paperclip removed in `6059c665`.
+**Why:** AoA's `ui/index.html:5` has `maximum-scale=1.0, user-scalable=no` — WCAG 2.1 SC 1.4.4 (Resize Text) violation. Modern Safari's auto-zoom on focused inputs is driven by font-size <16px, not viewport restriction, so the restriction is unnecessary. Upstream removed in `6059c665`.
 
 **Files:**
 - Modify: `ui/index.html:5`
@@ -419,14 +419,14 @@ fix(security,a11y): Tier-1 upstream resync — Express 5 wildcard, JWT fallback,
 - JWT secret BETTER_AUTH_SECRET fallback (#2866 upstream)
 - Viewport meta drops maximum-scale + user-scalable=no (#3726 upstream)
 
-Refs: docs/superpowers/plans/2026-04-26-upstream-paperclip-resync.md (Tasks 1-5)
+Refs: docs/superpowers/plans/2026-04-26-upstream-resync.md (Tasks 1-5)
 EOF
 )"
 ```
 
 **Verification:** Manual UA test. No automated test (CSS/HTML config only).
 
-**Effort:** 2 min  
+**Effort:** 2 min
 **Dependencies:** none
 
 ---
@@ -435,7 +435,7 @@ EOF
 
 ### Task 6: Sign-out button in Instance General Settings
 
-**Why:** No way for an admin to sign out from the Instance Settings page. Paperclip added in `3d685335`. Drop-in copy with Paperclip→AoA string swap.
+**Why:** No way for an admin to sign out from the Instance Settings page. Upstream added in `3d685335`. Drop-in copy with Upstream→AoA string swap.
 
 **Files:**
 - Modify: `ui/src/pages/InstanceSettingsPage.tsx`
@@ -544,7 +544,7 @@ it("Sign out button calls authApi.signOut on click", async () => {
 
 Run: `pnpm --filter @armyofagents/ui exec vitest run src/__tests__/InstanceSettingsPage-signout.test.tsx` — expect PASS.
 
-**Effort:** 15 min (+ 15 min for render test) = 30 min  
+**Effort:** 15 min (+ 15 min for render test) = 30 min
 **Verified by review:** `authApi.signOut()` confirmed at `ui/src/api/auth.ts:71`. `queryKeys.auth.session` confirmed at `ui/src/lib/queryKeys.ts:84`. `LogOut` icon already imported in InstanceSettingsPage. `Button` import needs to be added.
 
 **Dependencies:** none
@@ -630,14 +630,14 @@ git commit -m "refactor(ui): extract keyboard shortcuts to single-source-of-trut
 
 **Verification:** Existing shortcuts still work; typecheck clean; new config exports `KEYBOARD_SHORTCUTS` and helper.
 
-**Effort:** 20 min  
+**Effort:** 20 min
 **Dependencies:** none. T7 depends on this.
 
 ---
 
 ### Task 7: Keyboard shortcut cheatsheet (`?` key)
 
-**Why:** Power users need a visible reference for keyboard shortcuts. Paperclip PR #2772 added a Radix Dialog showing all shortcuts grouped by section, triggered by `?` outside text-input fields.
+**Why:** Power users need a visible reference for keyboard shortcuts. Upstream PR #2772 added a Radix Dialog showing all shortcuts grouped by section, triggered by `?` outside text-input fields.
 
 **Files:**
 - Create: `ui/src/components/KeyboardShortcutsCheatsheet.tsx`
@@ -782,14 +782,14 @@ git commit -m "feat(ui): keyboard shortcut cheatsheet on ? keypress (#2772 upstr
 
 **Verification:** Manual UI test; render test passes; cheatsheet shows correct shortcuts; typecheck clean.
 
-**Effort:** 45 min (+ 15 min for render test) = 60 min  
+**Effort:** 45 min (+ 15 min for render test) = 60 min
 **Dependencies:** **T6.5** (consumes `KEYBOARD_SHORTCUTS` config). Radix Dialog primitive.
 
 ---
 
 ### Task 8: Image gallery modal in chat
 
-**Why:** Click an image in a task comment → fullscreen gallery with arrow nav, instead of just inline. Paperclip added `ImageGalleryModal.tsx` in commit `d0920da4`.
+**Why:** Click an image in a task comment → fullscreen gallery with arrow nav, instead of just inline. Upstream added `ImageGalleryModal.tsx` in commit `d0920da4`.
 
 **Review-pass corrections:**
 - AoA's `IssueAttachment` uses `contentPath`, **not** `url` (`packages/shared/src/types/issue.ts:113-129`). Fields: `id`, `contentType`, `originalFilename`, `contentPath`.
@@ -979,7 +979,7 @@ git commit -m "feat(ui): image gallery modal for task attachments (d0920da4 upst
 
 **Verification:** Manual UI test + render test; typecheck clean.
 
-**Effort:** 60 min (+ 15 min for render test) = 75 min  
+**Effort:** 60 min (+ 15 min for render test) = 75 min
 **Dependencies:** Radix Dialog, lucide-react icons
 
 ---
@@ -988,7 +988,7 @@ git commit -m "feat(ui): image gallery modal for task attachments (d0920da4 upst
 
 ### Task 9: Routine cron+timezone in list trigger response
 
-**Why:** AoA's `RoutineListItem.triggers` Pick currently includes `id|kind|label|enabled|cronExpression|nextRunAt` but **not** `timezone`. UI cannot display the configured timezone for cron triggers in routine list view. Paperclip fixed in `d0a8d4e0`.
+**Why:** AoA's `RoutineListItem.triggers` Pick currently includes `id|kind|label|enabled|cronExpression|nextRunAt` but **not** `timezone`. UI cannot display the configured timezone for cron triggers in routine list view. Upstream fixed in `d0a8d4e0`.
 
 **Files:**
 - Modify: `packages/shared/src/types/routine.ts:101`
@@ -1055,14 +1055,14 @@ git commit -m "fix(routines): include timezone in list trigger response (d0a8d4e
 
 **Verification:** GET `/api/companies/:cid/routines` returns triggers with `timezone` populated.
 
-**Effort:** 15 min  
+**Effort:** 15 min
 **Dependencies:** none
 
 ---
 
 ### Task 10: Routine variables in titles
 
-**Why:** Routine titles like `"Deploy {{environment}} on {{date}}"` should interpolate variables. **Review pass found that `extractRoutineVariableNames` (lines 27-38) and `syncRoutineVariablesWithTemplate` (lines 51-58) already exist in AoA's `packages/shared/src/routine-variables.ts`** alongside the builtin handling. Task 10 is therefore **UI-only** — render variable chips in routine titles. Paperclip's matching commit is `1de5fb93`.
+**Why:** Routine titles like `"Deploy {{environment}} on {{date}}"` should interpolate variables. **Review pass found that `extractRoutineVariableNames` (lines 27-38) and `syncRoutineVariablesWithTemplate` (lines 51-58) already exist in AoA's `packages/shared/src/routine-variables.ts`** alongside the builtin handling. Task 10 is therefore **UI-only** — render variable chips in routine titles. Upstream's matching commit is `1de5fb93`.
 
 **Files:**
 - Verify (no edit expected): `packages/shared/src/routine-variables.ts`
@@ -1193,14 +1193,14 @@ git commit -m "feat(routines): render variable chips in titles (1de5fb93 upstrea
 
 **Verification:** Test suite green; chips render in UI.
 
-**Effort:** ~30 min (shared layer already done; UI-only work)  
+**Effort:** ~30 min (shared layer already done; UI-only work)
 **Dependencies:** none
 
 ---
 
 ### Task 11: Routine draft defaults + run-time overrides
 
-**Why:** Allow saving incomplete routines (no project / no assignee yet) and overriding variable values at dispatch. Paperclip PR #3220 / commit `5d021583`. AoA's shared layer is partially done; missing: schema migration to drop NOT NULL on `project_id` + `assignee_agent_id`, and the runtime override dialog.
+**Why:** Allow saving incomplete routines (no project / no assignee yet) and overriding variable values at dispatch. Upstream PR #3220 / commit `5d021583`. AoA's shared layer is partially done; missing: schema migration to drop NOT NULL on `project_id` + `assignee_agent_id`, and the runtime override dialog.
 
 **Files:**
 - Create: `packages/db/src/migrations/0063_routine_draft_defaults.sql`
@@ -1332,7 +1332,7 @@ git commit -m "feat(routines): draft defaults + run-time variable overrides (#32
 
 **Verification:** Migration applies cleanly. Draft routines save with null project. Run dialog overrides defaults at dispatch.
 
-**Effort:** 120 min  
+**Effort:** 120 min
 **Dependencies:** Task 10 (variable extraction)
 
 ---
@@ -1343,7 +1343,7 @@ git commit -m "feat(routines): draft defaults + run-time variable overrides (#32
 
 ### Task 12: Codex fast mode
 
-**Why:** Codex local adapter on GPT-5.4 supports a `service_tier=fast` execution path that returns lower-latency results. Paperclip PR #3383 / commit `2d8f97fe`. Drop-in feature flag — no breaking changes.
+**Why:** Codex local adapter on GPT-5.4 supports a `service_tier=fast` execution path that returns lower-latency results. Upstream PR #3383 / commit `2d8f97fe`. Drop-in feature flag — no breaking changes.
 
 **Files:**
 - Modify: `packages/adapters/codex-local/src/index.ts`
@@ -1431,7 +1431,7 @@ git commit -m "feat(codex-local): fast mode support on gpt-5.4 (#3383 upstream)"
 
 **Verification:** Create codex_local agent on gpt-5.4 with fastMode=true → run → CLI args include `service_tier="fast"`. Switch to gpt-4o → fast mode silently ignored, log warning emitted.
 
-**Effort:** 45 min  
+**Effort:** 45 min
 **Dependencies:** none
 
 ---
@@ -1440,13 +1440,13 @@ git commit -m "feat(codex-local): fast mode support on gpt-5.4 (#3383 upstream)"
 
 > **MUST RUN AFTER T15** — relies on T15's `metered_api` billing-type variant.
 
-**Why:** Customers running Claude on AWS Bedrock can't use AoA's claude-local adapter today — it always assumes Anthropic API or subscription. Paperclip PR #2793 / commit `b6e40fec` adds env-based detection: when `CLAUDE_CODE_USE_BEDROCK=1` (or `ANTHROPIC_BEDROCK_BASE_URL` is set), skip Anthropic auth, skip `--model` flag (Bedrock model IDs differ), set `biller=aws_bedrock`, billing-type `metered_api`, skip Anthropic quota probe.
+**Why:** Customers running Claude on AWS Bedrock can't use AoA's claude-local adapter today — it always assumes Anthropic API or subscription. Upstream PR #2793 / commit `b6e40fec` adds env-based detection: when `CLAUDE_CODE_USE_BEDROCK=1` (or `ANTHROPIC_BEDROCK_BASE_URL` is set), skip Anthropic auth, skip `--model` flag (Bedrock model IDs differ), set `biller=aws_bedrock`, billing-type `metered_api`, skip Anthropic quota probe.
 
 **Review-pass corrections (verified by reading `packages/adapters/claude-local/src/server/execute.ts` 2026-04-26):**
-- AoA's claude-local **does** have `resolveClaudeBillingType()` (line 127) and `hasNonEmptyEnvValue()` helpers — names match Paperclip. ✓
-- AoA imports differ: uses `buildAoaEnv` (not `buildPaperclipEnv`) at line 14, `redactEnvForLogs` (not `buildInvocationEnvForLogs`) at line 15. **Use AoA's import names.**
+- AoA's claude-local **does** have `resolveClaudeBillingType()` (line 127) and `hasNonEmptyEnvValue()` helpers — names match Upstream. ✓
+- AoA imports differ: uses `buildAoaEnv` (not `buildUpstreamEnv`) at line 14, `redactEnvForLogs` (not `buildInvocationEnvForLogs`) at line 15. **Use AoA's import names.**
 - AoA's claude-local has **no separate `quota.ts` file** — quota logic must be located via grep (probably inline in `execute.ts` or imported from elsewhere). The Bedrock-skip-quota change goes wherever the quota check actually lives.
-- AoA's claude-local-internal env vars are `AOA_API_KEY`, `AOA_RUN_ID`, `AOA_TASK_ID`, etc. (per `execute.ts:155-200`). **Do not rename `PAPERCLIP_API_KEY` for claude-local** — it's already not used here. Only Hermes uses `PAPERCLIP_API_KEY` (T14, wire-protocol contract).
+- AoA's claude-local-internal env vars are `AOA_API_KEY`, `AOA_RUN_ID`, `AOA_TASK_ID`, etc. (per `execute.ts:155-200`). **Do not rename `UPSTREAM_API_KEY` for claude-local** — it's already not used here. Only Hermes uses `UPSTREAM_API_KEY` (T14, wire-protocol contract).
 - AoA's UI provider-label map is **inline** in `ui/src/components/finance/ProviderQuotaCard.tsx:12-17` (`PROVIDER_LABELS` const), **not** `ui/src/lib/utils.ts`. There is no `providerDisplayName()` util.
 
 **Files:**
@@ -1568,14 +1568,14 @@ git commit -m "feat(claude-local): AWS Bedrock auth support (#2793 upstream)"
 
 **Verification:** With `CLAUDE_CODE_USE_BEDROCK=1` in agent env → environment test passes with Bedrock message; heartbeat emits CLI without `--model`; result has `biller="aws_bedrock"`.
 
-**Effort:** 60 min  
+**Effort:** 60 min
 **Dependencies:** **T15** (needs `metered_api` variant on `AdapterBillingType`).
 
 ---
 
 ### Task 14: Hermes JWT injection + session mgmt + command override
 
-**Why:** AoA's `hermes_local` adapter needs (a) the agent's JWT injected into Hermes's env so its API calls back to AoA carry agent identity (not board), (b) session codec for history, (c) `hermesCommand` config field instead of generic `command`. Paperclip's three commits: `8d0c3d2f`, `acfd7c26`, `1bf24243`.
+**Why:** AoA's `hermes_local` adapter needs (a) the agent's JWT injected into Hermes's env so its API calls back to AoA carry agent identity (not board), (b) session codec for history, (c) `hermesCommand` config field instead of generic `command`. Upstream's three commits: `8d0c3d2f`, `acfd7c26`, `1bf24243`.
 
 **Files:**
 - Modify: `server/src/adapters/registry.ts:158-166` (hermes adapter wrapper)
@@ -1603,11 +1603,11 @@ execute: async (ctx) => {
   const adapterConfig = parseObject(ctx.config) as Record<string, unknown>;
   const env = (adapterConfig.env as Record<string, string> | undefined) ?? {};
 
-  // Inject agent JWT if not explicitly configured (wire-protocol contract: PAPERCLIP_API_KEY)
-  if (ctx.authToken && !asString(env.PAPERCLIP_API_KEY, "").trim()) {
-    adapterConfig.env = { ...env, PAPERCLIP_API_KEY: ctx.authToken, PAPERCLIP_RUN_ID: ctx.runId };
+  // Inject agent JWT if not explicitly configured (wire-protocol contract: UPSTREAM_API_KEY)
+  if (ctx.authToken && !asString(env.UPSTREAM_API_KEY, "").trim()) {
+    adapterConfig.env = { ...env, UPSTREAM_API_KEY: ctx.authToken, UPSTREAM_RUN_ID: ctx.runId };
   } else {
-    adapterConfig.env = { ...env, PAPERCLIP_RUN_ID: ctx.runId };
+    adapterConfig.env = { ...env, UPSTREAM_RUN_ID: ctx.runId };
   }
 
   // Honor hermesCommand override; fall back to legacy "command" field for back-compat
@@ -1623,7 +1623,7 @@ execute: async (ctx) => {
 
 - [ ] **Step 3: Verify session codec is registered**
 
-Confirm `sessionCodec: hermesSessionCodec` is already in the adapter declaration. If not, add it. (Check that `hermesSessionCodec` is exported from `hermes-paperclip-adapter/server`.)
+Confirm `sessionCodec: hermesSessionCodec` is already in the adapter declaration. If not, add it. (Check that `hermesSessionCodec` is exported from `hermes-upstream-adapter/server`.)
 
 - [ ] **Step 4: UI config field rename**
 
@@ -1635,22 +1635,22 @@ In `server/src/__tests__/adapter-registry.test.ts`, add:
 
 ```ts
 describe("hermes_local execute wrapper", () => {
-  it("injects PAPERCLIP_API_KEY from ctx.authToken when env doesn't set it", async () => {
+  it("injects UPSTREAM_API_KEY from ctx.authToken when env doesn't set it", async () => {
     const captured: any = {};
     vi.mocked(hermesExecute).mockImplementation(async (ctx) => {
       captured.config = ctx.config;
       return { exitCode: 0, transcript: "" };
     });
     await hermesLocalAdapter.execute({ ctx: { authToken: "tok-xyz", runId: "r-1", config: {} } } as any);
-    expect((captured.config as any).env.PAPERCLIP_API_KEY).toBe("tok-xyz");
-    expect((captured.config as any).env.PAPERCLIP_RUN_ID).toBe("r-1");
+    expect((captured.config as any).env.UPSTREAM_API_KEY).toBe("tok-xyz");
+    expect((captured.config as any).env.UPSTREAM_RUN_ID).toBe("r-1");
   });
 
-  it("preserves explicit PAPERCLIP_API_KEY", async () => {
+  it("preserves explicit UPSTREAM_API_KEY", async () => {
     const captured: any = {};
     vi.mocked(hermesExecute).mockImplementation(async (ctx) => { captured.config = ctx.config; return { exitCode: 0, transcript: "" }; });
-    await hermesLocalAdapter.execute({ authToken: "tok-xyz", runId: "r-1", config: { env: { PAPERCLIP_API_KEY: "explicit" } } } as any);
-    expect((captured.config as any).env.PAPERCLIP_API_KEY).toBe("explicit");
+    await hermesLocalAdapter.execute({ authToken: "tok-xyz", runId: "r-1", config: { env: { UPSTREAM_API_KEY: "explicit" } } } as any);
+    expect((captured.config as any).env.UPSTREAM_API_KEY).toBe("explicit");
   });
 
   it("normalizes hermesCommand from legacy command field", async () => {
@@ -1671,11 +1671,11 @@ git add server/src/adapters/registry.ts server/src/__tests__/adapter-registry.te
 git commit -m "feat(hermes): JWT injection + run-id env + hermesCommand override (8d0c3d2f, 1bf24243 upstream)"
 ```
 
-**Verification:** Spawn hermes_local heartbeat with `authToken` set → confirm Hermes child env has `PAPERCLIP_API_KEY`. API mutations from Hermes attribute to the agent (not board user).
+**Verification:** Spawn hermes_local heartbeat with `authToken` set → confirm Hermes child env has `UPSTREAM_API_KEY`. API mutations from Hermes attribute to the agent (not board user).
 
-**Effort:** 90 min  
-**Dependencies:** `hermes-paperclip-adapter` external package exports `hermesSessionCodec` (verify)  
-**Note:** `PAPERCLIP_API_KEY` and `PAPERCLIP_RUN_ID` are wire-protocol contracts with the external Hermes adapter — keep the names `PAPERCLIP_*`. AoA-internal env vars (e.g. `AOA_AGENT_JWT_SECRET`) use the AoA prefix.
+**Effort:** 90 min
+**Dependencies:** `hermes-upstream-adapter` external package exports `hermesSessionCodec` (verify)
+**Note:** `UPSTREAM_API_KEY` and `UPSTREAM_RUN_ID` are wire-protocol contracts with the external Hermes adapter — keep the names `UPSTREAM_*`. AoA-internal env vars (e.g. `AOA_AGENT_JWT_SECRET`) use the AoA prefix.
 
 ---
 
@@ -1683,7 +1683,7 @@ git commit -m "feat(hermes): JWT injection + run-id env + hermesCommand override
 
 > **Run BEFORE T13** — T13's Bedrock support depends on the new `metered_api` variant landing here.
 
-**Why:** Paperclip expanded `AdapterBillingType` from `"api" | "subscription" | "unknown"` to 8 variants. AoA's `packages/adapter-utils/src/types.ts:33` is still the 3-variant version. Adopting the full 8-variant set keeps AoA's adapter-utils types in lockstep with upstream so future re-ports remain trivial diffs. Review pass found 28 callers of `billingType` across `server/src` and `ui/src`; audit is mostly mechanical (display strings, default cost-calc arms).
+**Why:** Upstream expanded `AdapterBillingType` from `"api" | "subscription" | "unknown"` to 8 variants. AoA's `packages/adapter-utils/src/types.ts:33` is still the 3-variant version. Adopting the full 8-variant set keeps AoA's adapter-utils types in lockstep with upstream so future re-ports remain trivial diffs. Review pass found 28 callers of `billingType` across `server/src` and `ui/src`; audit is mostly mechanical (display strings, default cost-calc arms).
 
 **Files:**
 - Modify: `packages/adapter-utils/src/types.ts:33`
@@ -1757,7 +1757,7 @@ git commit -m "refactor(types): expand AdapterBillingType + handle new variants 
 
 **Verification:** Typecheck clean (no exhaustive-switch errors). Cost UI displays the new variants. Adapters returning new variants don't crash. Pass `pnpm test:run --grep "billing|cost"` to ensure no regression.
 
-**Effort:** ~60 min (mostly the audit pass)  
+**Effort:** ~60 min (mostly the audit pass)
 **Dependencies:** none. **T13 (Bedrock) blocks on this** — must land first.
 
 ---
@@ -1766,7 +1766,7 @@ git commit -m "refactor(types): expand AdapterBillingType + handle new variants 
 
 ### Task 16: Skill slash-command autocomplete
 
-**Why:** Typing `/skillname` in the markdown editor should show a filtered list of company skills, click → inserts a `[name](skill://skillId?s=slug)` mention. Paperclip commit `94d4a01b`.
+**Why:** Typing `/skillname` in the markdown editor should show a filtered list of company skills, click → inserts a `[name](skill://skillId?s=slug)` mention. Upstream commit `94d4a01b`.
 
 **Files:**
 - Modify: `packages/shared/src/project-mentions.ts` (add skill scheme + parsers)
@@ -1911,7 +1911,7 @@ In `ui/src/components/MarkdownEditor.tsx`, wrap the editor root with `<EditorAut
 
 The exact integration depends on whether AoA uses MDXEditor, ProseMirror, or a textarea — choose the lightest path:
 - **Textarea-based editor:** track caret position, listen to `keydown`, on `/` open popover with input filter, on selection insert markdown text at caret.
-- **MDXEditor:** use the existing autocomplete plugin API (mirror Paperclip's integration).
+- **MDXEditor:** use the existing autocomplete plugin API (mirror Upstream's integration).
 
 - [ ] **Step 6: Render skill chips in mention-chips.ts**
 
@@ -1930,18 +1930,18 @@ git commit -m "feat(ui): skill slash-command autocomplete in markdown editor (94
 
 **Verification:** Manual UI test; `extractSkillMentionIds` finds skills in saved comments.
 
-**Effort:** 90 min  
+**Effort:** 90 min
 **Dependencies:** `companySkillsApi.list()` exists (verify in `ui/src/api/companySkills.ts`)
 
 ---
 
 ### Task 17: Skill auto-enable for heartbeat runs
 
-**Why:** When a task description or comment mentions a skill via `[name](skill://id)`, the heartbeat run should auto-enable that skill (without requiring the founder to set it in the agent's skill list). Paperclip commit ~`367065a3`.
+**Why:** When a task description or comment mentions a skill via `[name](skill://id)`, the heartbeat run should auto-enable that skill (without requiring the founder to set it in the agent's skill list). Upstream commit ~`367065a3`.
 
 **Review-pass corrections (verified 2026-04-26):**
-- `readPaperclipSkillSyncPreference` and `writePaperclipSkillSyncPreference` do **not** exist in AoA. Located in Paperclip at `packages/adapter-utils/src/server-utils.ts:1227-1306`.
-- Port them with **AoA-renamed function names** (`readAoaSkillSyncPreference` / `writeAoaSkillSyncPreference`), but the **runtime-config FIELD name** must support both `aoaSkillSync` (forward write) AND `paperclipSkillSync` (back-compat read) — because external adapters like Hermes (`hermes-paperclip-adapter` package, not under our control) may still emit/consume the old field name. Document with comment "// paperclipSkillSync compat read — remove in next major" matching AoA's existing pattern (per CLAUDE.md "Ambient Paperclip-era gaps still open" section).
+- `readUpstreamSkillSyncPreference` and `writeUpstreamSkillSyncPreference` do **not** exist in AoA. Located in Upstream at `packages/adapter-utils/src/server-utils.ts:1227-1306`.
+- Port them with **AoA-renamed function names** (`readAoaSkillSyncPreference` / `writeAoaSkillSyncPreference`), but the **runtime-config FIELD name** must support both `aoaSkillSync` (forward write) AND `upstreamSkillSync` (back-compat read) — because external adapters like Hermes (`hermes-upstream-adapter` package, not under our control) may still emit/consume the old field name. Document with comment "// upstreamSkillSync compat read — remove in next major" matching AoA's existing pattern (per CLAUDE.md "Ambient Upstream-era gaps still open" section).
 
 **Files:**
 - Modify: `packages/adapter-utils/src/server-utils.ts` (port + rename helpers; dual-name field)
@@ -1957,23 +1957,23 @@ In `packages/adapter-utils/src/server-utils.ts`, append:
 /**
  * Read the skill-sync preference from a runtime config.
  * Reads the new `aoaSkillSync` field first; falls back to the
- * pre-rebrand `paperclipSkillSync` field for compat with external
+ * pre-rebrand `upstreamSkillSync` field for compat with external
  * adapters that haven't been updated. Remove the fallback in the
  * next major.
  */
 export function readAoaSkillSyncPreference(
   config: Record<string, unknown>,
 ): { mode: "all" | "explicit" | "none"; keys: string[] } | null {
-  const raw = config.aoaSkillSync ?? config.paperclipSkillSync; // paperclipSkillSync compat read — remove in next major
+  const raw = config.aoaSkillSync ?? config.upstreamSkillSync; // upstreamSkillSync compat read — remove in next major
   if (!raw || typeof raw !== "object") return null;
-  // ...port the body verbatim from Paperclip's readPaperclipSkillSyncPreference (lines 1227-1287)
+  // ...port the body verbatim from Upstream's readUpstreamSkillSyncPreference (lines 1227-1287)
   // adjusting the field-read prelude shown above
   return /* ...parsed shape... */ null;
 }
 
 /**
  * Write the skill-sync preference to a runtime config.
- * Writes BOTH `aoaSkillSync` (forward) AND `paperclipSkillSync` (compat)
+ * Writes BOTH `aoaSkillSync` (forward) AND `upstreamSkillSync` (compat)
  * so external adapters reading the old name continue to work. Remove the
  * compat write in the next major.
  */
@@ -1982,14 +1982,14 @@ export function writeAoaSkillSyncPreference<T extends Record<string, unknown>>(
   keys: string[],
 ): T {
   const next = { ...config };
-  // ...port body verbatim from Paperclip's writePaperclipSkillSyncPreference (lines 1289-1306)
+  // ...port body verbatim from Upstream's writeUpstreamSkillSyncPreference (lines 1289-1306)
   next.aoaSkillSync = /* serialized shape */ undefined;
-  next.paperclipSkillSync = next.aoaSkillSync; // compat write — remove in next major
+  next.upstreamSkillSync = next.aoaSkillSync; // compat write — remove in next major
   return next as T;
 }
 ```
 
-Read Paperclip's full implementation at `paperclip-master/paperclip-master/packages/adapter-utils/src/server-utils.ts:1227-1306` and adapt verbatim with the field-name changes above.
+Read Upstream's full implementation at `upstream-master/upstream-master/packages/adapter-utils/src/server-utils.ts:1227-1306` and adapt verbatim with the field-name changes above.
 
 - [ ] **Step 2: Add unit tests for the helpers**
 
@@ -2004,17 +2004,17 @@ describe("aoaSkillSync helpers", () => {
     expect(result).toEqual({ mode: "explicit", keys: ["foo"] });
   });
 
-  it("falls back to legacy paperclipSkillSync", () => {
+  it("falls back to legacy upstreamSkillSync", () => {
     const result = readAoaSkillSyncPreference({
-      paperclipSkillSync: { mode: "explicit", keys: ["bar"] },
+      upstreamSkillSync: { mode: "explicit", keys: ["bar"] },
     });
     expect(result).toEqual({ mode: "explicit", keys: ["bar"] });
   });
 
-  it("prefers aoaSkillSync over paperclipSkillSync when both present", () => {
+  it("prefers aoaSkillSync over upstreamSkillSync when both present", () => {
     const result = readAoaSkillSyncPreference({
       aoaSkillSync: { mode: "explicit", keys: ["new"] },
-      paperclipSkillSync: { mode: "explicit", keys: ["old"] },
+      upstreamSkillSync: { mode: "explicit", keys: ["old"] },
     });
     expect(result).toEqual({ mode: "explicit", keys: ["new"] });
   });
@@ -2022,7 +2022,7 @@ describe("aoaSkillSync helpers", () => {
   it("writes both fields for compat", () => {
     const out = writeAoaSkillSyncPreference({}, ["x", "y"]);
     expect(out.aoaSkillSync).toBeDefined();
-    expect(out.paperclipSkillSync).toEqual(out.aoaSkillSync);
+    expect(out.upstreamSkillSync).toEqual(out.aoaSkillSync);
   });
 });
 ```
@@ -2104,9 +2104,9 @@ git add packages/adapter-utils/src/server-utils.ts packages/adapter-utils/src/__
 git commit -m "feat(heartbeat): auto-enable skills mentioned in task body/comments (367065a3 upstream)"
 ```
 
-**Verification:** Mention `[deploy-prod](skill://...)` in a task → wake heartbeat → log line shows skill auto-enabled. Compat-read test confirms legacy `paperclipSkillSync` field still readable.
+**Verification:** Mention `[deploy-prod](skill://...)` in a task → wake heartbeat → log line shows skill auto-enabled. Compat-read test confirms legacy `upstreamSkillSync` field still readable.
 
-**Effort:** 90 min (port helpers + dual-write tests + heartbeat wiring + tests)  
+**Effort:** 90 min (port helpers + dual-write tests + heartbeat wiring + tests)
 **Dependencies:** Task 16 (uses `extractSkillMentionIds` from shared)
 
 ---
@@ -2115,7 +2115,7 @@ git commit -m "feat(heartbeat): auto-enable skills mentioned in task body/commen
 
 ### Task 18: Project environment variables
 
-**Why:** Projects don't currently carry an env-var map; agents in a project run with only the agent's own env. Paperclip commit `8f23270f` adds a `projects.env` JSONB column. Trivial migration; routes need GET/PATCH; UI needs an editor section.
+**Why:** Projects don't currently carry an env-var map; agents in a project run with only the agent's own env. Upstream commit `8f23270f` adds a `projects.env` JSONB column. Trivial migration; routes need GET/PATCH; UI needs an editor section.
 
 **Files:**
 - Create: `packages/db/src/migrations/0061_project_environment_variables.sql`
@@ -2237,7 +2237,7 @@ Round-trip proves the migration is reversible. If down isn't supported by AoA's 
 
 **Verification:** Migration applies. PATCH project env → GET returns it → heartbeat run inherits the var.
 
-**Effort:** 45 min  
+**Effort:** 45 min
 **Dependencies:** none
 
 ---
@@ -2397,14 +2397,14 @@ git commit -m "feat(db): heartbeat liveness columns + watchdog decisions table (
 
 **Verification:** Migration applies cleanly on fresh + existing DBs. Schema typecheck clean.
 
-**Effort:** 1.5 hr  
+**Effort:** 1.5 hr
 **Dependencies:** none
 
 ---
 
 ### Task 20: Heartbeat process group + child PID population
 
-**Why:** With the columns from T19 in place, populate them during process spawn so process-group cleanup (`pkill -g`) becomes possible. Paperclip relevant commits: `26d4cabb` (persist child pid before stdin handoff), `bcbbb41a` (heartbeat runtime cleanup hardening).
+**Why:** With the columns from T19 in place, populate them during process spawn so process-group cleanup (`pkill -g`) becomes possible. Upstream relevant commits: `26d4cabb` (persist child pid before stdin handoff), `bcbbb41a` (heartbeat runtime cleanup hardening).
 
 **Files:**
 - Modify: `server/src/services/heartbeat.ts` (or `heartbeat-process-spawn.ts` if extracted)
@@ -2501,14 +2501,14 @@ git commit -m "feat(heartbeat): persist process group + PID + last-output-at dur
 
 **Verification:** Spawn heartbeat, query DB → see `process_pid`, `process_group_id`, `last_output_at` populated. Cancel run → process group terminated.
 
-**Effort:** 1 hr  
+**Effort:** 1 hr
 **Dependencies:** Task 19 (schema)
 
 ---
 
 ### Task 21: Stale-run watchdog service
 
-**Why:** Detect agents that hang (no output for >30 min while run still marked `running`) and record decisions in `heartbeat_run_watchdog_decisions`. Optionally auto-create an "evaluation" issue for founder triage. Paperclip migration `0070_active_run_output_watchdog.sql`.
+**Why:** Detect agents that hang (no output for >30 min while run still marked `running`) and record decisions in `heartbeat_run_watchdog_decisions`. Optionally auto-create an "evaluation" issue for founder triage. Upstream migration `0070_active_run_output_watchdog.sql`.
 
 **Files:**
 - Create: `server/src/services/heartbeat-watchdog.ts`
@@ -2620,22 +2620,22 @@ git commit -m "feat(heartbeat): stale-run watchdog with snooze (#3679-style upst
 
 **Verification:** Stale run → decision recorded → second sweep no-op (snoozed) → after snooze expires, new decision recorded.
 
-**Effort:** 2 hr  
+**Effort:** 2 hr
 **Dependencies:** Tasks 19 + 20
 
 ---
 
 ### Task 22: Auto-checkout for scoped wakes
 
-**Why:** When the heartbeat wakes an agent because of a comment on issue X, the agent's first action is usually `POST /issues/X/checkout`. We can pre-checkout server-side and tell the agent in the prompt — saving an HTTP round-trip and avoiding race-with-other-agents on the comment wake. Paperclip PR #3538 / commits `c1bb9385` + `8e82ac7e`.
+**Why:** When the heartbeat wakes an agent because of a comment on issue X, the agent's first action is usually `POST /issues/X/checkout`. We can pre-checkout server-side and tell the agent in the prompt — saving an HTTP round-trip and avoiding race-with-other-agents on the comment wake. Upstream PR #3538 / commits `c1bb9385` + `8e82ac7e`.
 
 **Review-pass corrections (verified 2026-04-26):**
-- `checkedOutByHarness: boolean` is **already on** the `AoaWakePayload` type at `packages/adapter-utils/src/server-utils.ts:443`. (AoA's canonical name is `AoaWakePayload` — `PaperclipWakePayload` is a legacy alias kept for back-compat at line 566+.)
+- `checkedOutByHarness: boolean` is **already on** the `AoaWakePayload` type at `packages/adapter-utils/src/server-utils.ts:443`. (AoA's canonical name is `AoaWakePayload` — `UpstreamWakePayload` is a legacy alias kept for back-compat at line 566+.)
 - `normalizeAoaWakePayload` (line 532) already normalizes the field via `asBoolean(payload.checkedOutByHarness, false)`. **No type/normalizer change needed.**
 - This task is therefore **just heartbeat-wiring + prompt-advisory (extending `renderAoaWakePrompt`) + checkout-conflict-handling**.
-- AoA's `issues.ts:1085` throws `conflict("Issue checkout conflict", {...})` — the `isCheckoutConflictError` predicate must be ported from Paperclip (`server/src/services/heartbeat.ts:1442`) since AoA doesn't have it.
+- AoA's `issues.ts:1085` throws `conflict("Issue checkout conflict", {...})` — the `isCheckoutConflictError` predicate must be ported from Upstream (`server/src/services/heartbeat.ts:1442`) since AoA doesn't have it.
 
-**Naming convention for this task:** Use AoA's **canonical** names (`AoaWakePayload`, `renderAoaWakePrompt`, `normalizeAoaWakePayload`) in any new code. The `Paperclip*` aliases at lines 566 / 573 / 691 stay (back-compat) but new references should use the canonical AoA names per AoA's rebrand convention.
+**Naming convention for this task:** Use AoA's **canonical** names (`AoaWakePayload`, `renderAoaWakePrompt`, `normalizeAoaWakePayload`) in any new code. The `Upstream*` aliases at lines 566 / 573 / 691 stay (back-compat) but new references should use the canonical AoA names per AoA's rebrand convention.
 
 **Files:**
 - Modify: `packages/adapter-utils/src/server-utils.ts` (only `renderAoaWakePrompt` — type + normalizer already done; legacy aliases at lines 566/573/691 stay)
@@ -2660,7 +2660,7 @@ if (payload.checkedOutByHarness) {
 
 - [ ] **Step 3: Port `isCheckoutConflictError` predicate**
 
-In `server/src/services/heartbeat.ts`, add the predicate (port verbatim from Paperclip's `heartbeat.ts:1442`):
+In `server/src/services/heartbeat.ts`, add the predicate (port verbatim from Upstream's `heartbeat.ts:1442`):
 
 ```ts
 function isCheckoutConflictError(error: unknown): boolean {
@@ -2726,7 +2726,7 @@ git commit -m "feat(heartbeat): auto-checkout scoped issue wakes (PR #3538 upstr
 
 **Verification:** Comment-wake on a task → agent prompt contains "already claimed by the harness" → agent skips redundant checkout call.
 
-**Effort:** ~30 min (type + normalizer already done; just prompt-rendering, predicate, and heartbeat wiring)  
+**Effort:** ~30 min (type + normalizer already done; just prompt-rendering, predicate, and heartbeat wiring)
 **Dependencies:** Existing `issueService.checkout()` in `server/src/services/issues.ts:961`
 
 ---
@@ -2735,14 +2735,14 @@ git commit -m "feat(heartbeat): auto-checkout scoped issue wakes (PR #3538 upstr
 
 ### Task 23: Backup tiered retention + gzip + un-hide tab
 
-**Why:** AoA's BackupsTab is hidden (Sprint 3 Finding X) pending real backup implementation. Paperclip PR #3015 (commits `cc44d309`, `fcbae62b`, `b1e45736`) ships gzipped backups + ISO-week + monthly retention tiers. This unblocks v1.0 launch backup story.
+**Why:** AoA's BackupsTab is hidden (Sprint 3 Finding X) pending real backup implementation. Upstream PR #3015 (commits `cc44d309`, `fcbae62b`, `b1e45736`) ships gzipped backups + ISO-week + monthly retention tiers. This unblocks v1.0 launch backup story.
 
 **Review-pass corrections (verified 2026-04-26):**
 - `BackupRetentionPolicy` interface + `DAILY_RETENTION_PRESETS` / `WEEKLY_RETENTION_PRESETS` / `MONTHLY_RETENTION_PRESETS` are **already in** `packages/shared/src/types/instance.ts:8-12`. The corresponding zod validator `backupRetentionPolicySchema` is **already in** `packages/shared/src/validators/instance.ts:19-23`. **No shared-layer additions needed.**
 - `ui/src/pages/InstanceSettingsPage.tsx:11-12` has comment: "BackupsTab is intentionally unmounted for v1.0 — backup/restore ships in 1.1." Plan must un-hide via the `TABS` array (~line 176).
 - `BackupsTab.tsx` component exists in tree but is unmounted. Re-mount + wire to the new presets.
 - AoA's existing `packages/db/src/backup-lib.ts` does NOT have gzip or tiered pruning. Refactor required there.
-- **Restore-side compatibility:** Plan must detect file extension and decompress with `createGunzip()` only if `.endsWith(".gz")`, so old `.sql` backups remain restorable. (Matches what Paperclip does.)
+- **Restore-side compatibility:** Plan must detect file extension and decompress with `createGunzip()` only if `.endsWith(".gz")`, so old `.sql` backups remain restorable. (Matches what Upstream does.)
 
 **Files:**
 - Modify: `packages/db/src/backup-lib.ts` (gzip pipeline, tiered pruning, extension-detection on restore)
@@ -2753,7 +2753,7 @@ git commit -m "feat(heartbeat): auto-checkout scoped issue wakes (PR #3538 upstr
 
 - [ ] **Step 1: Verify shared layer is already complete**
 
-Read `packages/shared/src/types/instance.ts:8-12` and `packages/shared/src/validators/instance.ts:19-23`. Confirm `BackupRetentionPolicy`, the three preset constants, and `backupRetentionPolicySchema` already exist. **If anything is missing**, port from Paperclip's `packages/shared/src/types/instance.ts`. If complete, no edits to shared layer.
+Read `packages/shared/src/types/instance.ts:8-12` and `packages/shared/src/validators/instance.ts:19-23`. Confirm `BackupRetentionPolicy`, the three preset constants, and `backupRetentionPolicySchema` already exist. **If anything is missing**, port from Upstream's `packages/shared/src/types/instance.ts`. If complete, no edits to shared layer.
 
 - [ ] **Step 2: Confirm `DEFAULT_BACKUP_RETENTION` constant**
 
@@ -2928,14 +2928,14 @@ git commit -m "feat(backups): tiered retention + gzip + re-enable BackupsTab (Fi
 
 **Verification:** Generate 30 daily backups → run prune with `{daily:7,weekly:2,monthly:1}` → exactly 7 daily + 2 weekly + 1 monthly retained. New backup files end in `.sql.gz`. Restore from `.sql.gz` works. Restore from existing `.sql` (uncompressed legacy) **still works** via extension detection.
 
-**Effort:** ~2 hr (shared types already done; just backup-lib refactor + UI wiring + un-hide tab)  
+**Effort:** ~2 hr (shared types already done; just backup-lib refactor + UI wiring + un-hide tab)
 **Dependencies:** none
 
 ---
 
 ### Task 24: Inbox parent-child nesting UI
 
-**Why:** AoA already has `parentId` on issues (per CLAUDE.md task hierarchy). Missing: the toggle to view inbox flat vs nested, the collapse/expand chevrons, and j/k traversal that respects nesting. Paperclip PR #2218 (commits `8cdb65fe`, `d3e66c78`, `58ae23aa`).
+**Why:** AoA already has `parentId` on issues (per CLAUDE.md task hierarchy). Missing: the toggle to view inbox flat vs nested, the collapse/expand chevrons, and j/k traversal that respects nesting. Upstream PR #2218 (commits `8cdb65fe`, `d3e66c78`, `58ae23aa`).
 
 **Review-pass corrections (verified 2026-04-26):**
 - `ui/src/lib/inbox.ts` does **NOT exist** in AoA. **Create**, do not Modify.
@@ -3100,7 +3100,7 @@ git commit -m "feat(inbox): parent-child nesting toggle + j/k traversal (PR #221
 
 **Verification:** Manual UI test + helpers test. Toggle persists across reloads via localStorage. Collapsed parents stay collapsed.
 
-**Effort:** 120 min (+ 15 min for render test) = 135 min  
+**Effort:** 120 min (+ 15 min for render test) = 135 min
 **Dependencies:** **T6.5** (refactored `useKeyboardShortcuts` hook accepts visible-ordered list)
 
 ---
@@ -3117,10 +3117,10 @@ git commit -m "feat(inbox): parent-child nesting toggle + j/k traversal (PR #221
 In `docs/aoa/reference/decisions.md`, append (use the next sequential decision numbers):
 
 ```markdown
-## Decision #92: Skip standalone `@paperclipai/mcp-server` package port
+## Decision #92: Skip standalone `@upstreamai/mcp-server` package port
 
 **Date:** 2026-04-26
-**Context:** Paperclip released `packages/mcp-server` — a stdio-based MCP server that wraps the Paperclip REST API for external MCP clients (e.g., Claude Desktop) to call Paperclip from outside.
+**Context:** Upstream released `packages/mcp-server` — a stdio-based MCP server that wraps the Upstream REST API for external MCP clients (e.g., Claude Desktop) to call Upstream from outside.
 
 **Decision:** Do NOT port. AoA's in-server MCP at `server/src/mcp/server.ts` (31 tools, RBAC-scoped, rate-limited) covers the v1.0 use case directly without a separate package. The standalone wrapper is only useful when the MCP client cannot reach AoA's HTTP endpoint — a use case AoA's local-first deployment model does not currently have.
 
@@ -3129,7 +3129,7 @@ In `docs/aoa/reference/decisions.md`, append (use the next sequential decision n
 ## Decision #93: Skip `pi-local` skill bin/ PATH support port
 
 **Date:** 2026-04-26
-**Context:** Paperclip commit `854fa817` adds skill `bin/` directories to the child process PATH for the `pi-local` adapter so AGENTS.md-invoked skill helpers (`paperclip-get-issue`, etc.) resolve without absolute paths.
+**Context:** Upstream commit `854fa817` adds skill `bin/` directories to the child process PATH for the `pi-local` adapter so AGENTS.md-invoked skill helpers (`upstream-get-issue`, etc.) resolve without absolute paths.
 
 **Decision:** Do NOT port. AoA's adapter set (`claude_local | opencode_local | openclaw | http | process | cursor | codex_local | hermes_local | gemini_local`) does not include `pi-local`. Skill helpers are not part of AoA's heartbeat protocol today.
 
@@ -3172,7 +3172,7 @@ git commit -m "docs: lock decisions #92, #93 — skip MCP server pkg and pi-loca
 
 **Already-in-AoA (no port needed, found by review pass):**
 - T10 partial: `extractRoutineVariableNames` + `syncRoutineVariablesWithTemplate` in `packages/shared/src/routine-variables.ts:27-58`
-- T22 partial: `checkedOutByHarness` field on `PaperclipWakePayload` at `packages/adapter-utils/src/server-utils.ts:443`
+- T22 partial: `checkedOutByHarness` field on `UpstreamWakePayload` at `packages/adapter-utils/src/server-utils.ts:443`
 - T23 partial: `BackupRetentionPolicy` + presets in `packages/shared/src/types/instance.ts:8-12` and validator in `validators/instance.ts:19-23`
 
 **Cross-task dependencies:**

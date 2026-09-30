@@ -96,8 +96,8 @@ export {
   ensureAdapterExecutionTargetRuntimeCommandInstalled,
   maybeRunSandboxInstallCommand,
   adapterExecutionTargetUsesManagedHome,
-  adapterExecutionTargetUsesPaperclipBridge,
-  startAdapterExecutionTargetPaperclipBridge,
+  adapterExecutionTargetUsesAoABridge,
+  startAdapterExecutionTargetAoABridge,
 } from "./execution-target.js";
 export { sanitizeRemoteExecutionEnv } from "./remote-execution-env.js";
 export { buildSandboxEnvAllowlist } from "./sandbox-env-allowlist.js";

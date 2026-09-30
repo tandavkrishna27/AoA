@@ -438,7 +438,7 @@ function invalidateHeartbeatQueries(
   // Broaden invalidation to issue views: a run completion typically changes
   // issue status (in_progress → in_review / done / cancelled), so the list
   // and any cached issue details need to be refreshed.  Mirrors the
-  // issueRefs-loop from Paperclip 68f69975, adapted for AoA (no issueRefs
+  // issueRefs-loop from AoA 68f69975, adapted for AoA (no issueRefs
   // field in the live-event payload — invalidate the whole list instead).
   const status = readString(payload.status);
   if (status && TERMINAL_RUN_STATUSES.has(status)) {

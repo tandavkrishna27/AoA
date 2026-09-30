@@ -1,8 +1,8 @@
-# Paperclip Alignment Follow-ups Implementation Plan
+# Upstream Alignment Follow-ups Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land the four deferred and discovered fixes from the 4-PR CI-unblock execution (2026-05-04). Three independent PRs against `Porting1.1` plus one verification step. All four use Paperclip's existing implementation as the reference (located at `C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\paperclip-master\paperclip-master`).
+**Goal:** Land the four deferred and discovered fixes from the 4-PR CI-unblock execution (2026-05-04). Three independent PRs against `Porting1.1` plus one verification step. All four use Upstream's existing implementation as the reference (located at `C:\Users\TK\OneDrive\Desktop\Claude Data\Upstream-AoA\upstream-master\upstream-master`).
 
 **Architecture:** Each follow-up is independent and lands as its own PR (small, focused, easy to review/revert). Order is by ascending size and risk so each PR is a safe building block. The first PR is the docs we authored locally during the previous session; the second is a small hygiene pass; the third ports a workflow file; the fourth is the only one touching real product code.
 
@@ -10,8 +10,8 @@
 
 **Locked decisions:**
 1. **Each follow-up is its own PR.** Smaller PRs = simpler reviews, partial-merge safety, less rebase pain.
-2. **Use Paperclip's exact patterns where applicable** — copy the function names, signatures, and behavior. Reduces invention surface.
-3. **For Issue #96, port the minimal version** (`signalRunningProcess` + `detached:true` spawn) — not Paperclip's full `terminateLocalService` supervisor pattern with poll-and-SIGKILL retry. Minimal version closes the orphan-process bug; the supervisor pattern can come later if needed.
+2. **Use Upstream's exact patterns where applicable** — copy the function names, signatures, and behavior. Reduces invention surface.
+3. **For Issue #96, port the minimal version** (`signalRunningProcess` + `detached:true` spawn) — not Upstream's full `terminateLocalService` supervisor pattern with poll-and-SIGKILL retry. Minimal version closes the orphan-process bug; the supervisor pattern can come later if needed.
 4. **No production code changes in PR 1, 2, or 3.** Only PR 4 touches `server/src` + `packages/adapter-utils`. Lower risk profile per PR.
 
 ---
@@ -36,14 +36,14 @@ git status --short
 
 Expected: shows `M AGENTS.md` and `?? tests/e2e/fixtures/README.md`. If clean, PR 1 was already shipped — skip to PR 2.
 
-- [ ] **Confirm Paperclip reference repo is accessible.**
+- [ ] **Confirm Upstream reference repo is accessible.**
 
 ```bash
-ls "/c/Users/TK/OneDrive/Desktop/Claude Data/Paperclip-AoA/paperclip-master/paperclip-master/.github/workflows/refresh-lockfile.yml" \
-   "/c/Users/TK/OneDrive/Desktop/Claude Data/Paperclip-AoA/paperclip-master/paperclip-master/packages/adapter-utils/src/server-utils.ts"
+ls "/c/Users/TK/OneDrive/Desktop/Claude Data/Upstream-AoA/upstream-master/upstream-master/.github/workflows/refresh-lockfile.yml" \
+   "/c/Users/TK/OneDrive/Desktop/Claude Data/Upstream-AoA/upstream-master/upstream-master/packages/adapter-utils/src/server-utils.ts"
 ```
 
-Expected: both files exist. If not, the plan can't reference exact line numbers — open the Paperclip GitHub mirror instead.
+Expected: both files exist. If not, the plan can't reference exact line numbers — open the Upstream GitHub mirror instead.
 
 - [ ] **Confirm Issue #96 is still open** (PR 4 closes it).
 
@@ -63,10 +63,10 @@ Expected: `OPEN`. If `CLOSED`, someone already shipped a fix — verify the impl
 | `tests/e2e/fixtures/README.md` | PR 1 | **Ship** (already created locally) | Documents fixture capture date, schema source, when-to-update triggers |
 | `server/src/__tests__/company-export-readme.test.ts` | PR 2 | **Modify** lines 61, 126 | Replace 2× stale `role: "ceo"` → `role: "cxo"` |
 | `server/src/__tests__/unified-org-tree.test.ts` | PR 2 | **Modify** lines 167, 437 | Replace 2× stale `role: "ceo"` → `role: "cxo"` |
-| `.github/workflows/refresh-lockfile.yml` | PR 3 | **Create** | Port Paperclip's auto-bot, adjust `master` → `Porting1.1` |
+| `.github/workflows/refresh-lockfile.yml` | PR 3 | **Create** | Port Upstream's auto-bot, adjust `master` → `Porting1.1` |
 | `AGENTS.md` | PR 3 | **Modify** | Remove "future improvement" caveat in §7 once bot lands |
 | `packages/adapter-utils/src/server-utils.ts` | PR 4 | **Modify** | Replace `safeGetPgid` with `resolveProcessGroupId`; add `signalRunningProcess`; spawn with `detached:true` |
-| `packages/adapter-utils/src/types.ts` | PR 4 | **Possibly modify** | If `RunningProcess.pgid` is exposed in types, rename to `processGroupId` for Paperclip alignment |
+| `packages/adapter-utils/src/types.ts` | PR 4 | **Possibly modify** | If `RunningProcess.pgid` is exposed in types, rename to `processGroupId` for Upstream alignment |
 | `server/src/services/heartbeat.ts` | PR 4 | **Modify** 4 cancellation paths (lines 3828, 3884, 3913, 3939) | Swap `running.child.kill("SIGTERM")` for `signalRunningProcess(running, "SIGTERM")` |
 | `server/src/__tests__/heartbeat-process-tracking.test.ts` | PR 4 | **Modify** | Update `safeGetPgid` test → `resolveProcessGroupId` test asserting it returns `child.pid` on POSIX, `null` on Windows |
 | `(verification only)` | Step 5 | **Read** `LIVE_EVENT_TYPES` consumers | Confirm `memory.*` and `marketplace.*` events flow through correctly |
@@ -104,7 +104,7 @@ AGENTS.md: add §7 "Dependency Change Workflow" describing the
 chore/refresh-lockfile policy-gate exception, the manual flow for
 adding deps, the rebase pattern for consuming PRs, and the
 single-use branch-name caveat. Renumber §7-§10 to §8-§11. Mention
-porting Paperclip's refresh-lockfile.yml as a future improvement
+porting Upstream's refresh-lockfile.yml as a future improvement
 (separate PR coming).
 
 tests/e2e/fixtures/README.md: new file documenting the pinned
@@ -334,15 +334,15 @@ Expected: green CI, merged. **PAUSE for human approval before merging.**
 
 ---
 
-## PR 3: Port Paperclip's `refresh-lockfile.yml` automation
+## PR 3: Port Upstream's `refresh-lockfile.yml` automation
 
-**Context:** AGENTS.md §7 (shipped in PR 1) describes the manual `chore/refresh-lockfile` workflow and mentions Paperclip ships a bot that automates it. This PR ports that bot. After it merges, contributors who add deps just commit `package.json` changes (with the lockfile) on a `chore/refresh-lockfile` branch, and the bot does the rest. Significant DX improvement.
+**Context:** AGENTS.md §7 (shipped in PR 1) describes the manual `chore/refresh-lockfile` workflow and mentions Upstream ships a bot that automates it. This PR ports that bot. After it merges, contributors who add deps just commit `package.json` changes (with the lockfile) on a `chore/refresh-lockfile` branch, and the bot does the rest. Significant DX improvement.
 
 **Files:**
 - Create: `.github/workflows/refresh-lockfile.yml`
 - Modify: `AGENTS.md` §7 — remove the "Future improvement" caveat once the bot is live
 
-Reference: `paperclip-master/.github/workflows/refresh-lockfile.yml` (97 lines).
+Reference: `upstream-master/.github/workflows/refresh-lockfile.yml` (97 lines).
 
 - [ ] **Step 1: Branch**
 
@@ -354,7 +354,7 @@ git checkout -b ci/port-refresh-lockfile-bot
 
 - [ ] **Step 2: Create `.github/workflows/refresh-lockfile.yml`**
 
-This is Paperclip's workflow with two adjustments: `master` → `Porting1.1` (the only protected base in AoA today), and `node-version: 20` → `node-version: 24` (matches the rest of AoA's CI). Verbatim otherwise.
+This is Upstream's workflow with two adjustments: `master` → `Porting1.1` (the only protected base in AoA today), and `node-version: 20` → `node-version: 24` (matches the rest of AoA's CI). Verbatim otherwise.
 
 ```yaml
 name: Refresh Lockfile
@@ -456,11 +456,11 @@ jobs:
           gh pr merge --auto --squash --delete-branch "${{ steps.upsert-pr.outputs.pr_url }}"
 ```
 
-Note the **3 differences from Paperclip**:
+Note the **3 differences from Upstream**:
 1. `branches: [master]` → `branches: [Porting1.1]` (line 6)
 2. `concurrency.group: refresh-lockfile-master` → `refresh-lockfile-Porting1.1` (line 10)
 3. `node-version: 20` → `node-version: 24` (line 34)
-4. `gh pr create` adds `--base Porting1.1` (line 84) — Paperclip relies on the default base; AoA's default branch is `main` not `Porting1.1`, so we must specify explicitly.
+4. `gh pr create` adds `--base Porting1.1` (line 84) — Upstream relies on the default base; AoA's default branch is `main` not `Porting1.1`, so we must specify explicitly.
 
 Save the file at `.github/workflows/refresh-lockfile.yml`.
 
@@ -471,7 +471,7 @@ The current §7 says (at the bottom):
 ```markdown
 ### Future improvement: port the upstream automation
 
-Paperclip ships a [`refresh-lockfile.yml`](https://github.com/anthropic/paperclip/blob/master/.github/workflows/refresh-lockfile.yml) GitHub Action that watches `master` for manifest changes, regenerates the lockfile in CI, opens a `chore/refresh-lockfile` PR automatically, and auto-merges via squash. Porting this workflow to AoA would eliminate the manual ceremony entirely. Tracked separately — not yet implemented.
+Upstream ships a [`refresh-lockfile.yml`](https://github.com/anthropic/upstream/blob/master/.github/workflows/refresh-lockfile.yml) GitHub Action that watches `master` for manifest changes, regenerates the lockfile in CI, opens a `chore/refresh-lockfile` PR automatically, and auto-merges via squash. Porting this workflow to AoA would eliminate the manual ceremony entirely. Tracked separately — not yet implemented.
 ```
 
 Replace with:
@@ -504,15 +504,15 @@ Expected: no output (valid YAML). If error, fix syntax before continuing.
 ```bash
 git add .github/workflows/refresh-lockfile.yml AGENTS.md
 git commit -m "$(cat <<'EOF'
-ci: port Paperclip's refresh-lockfile.yml automation
+ci: port Upstream's refresh-lockfile.yml automation
 
 After PR 1 documented the manual chore/refresh-lockfile flow,
-port Paperclip's GitHub Action that automates it. The bot watches
+port Upstream's GitHub Action that automates it. The bot watches
 Porting1.1 for manifest changes, regenerates the lockfile, opens
 (or updates) the chore/refresh-lockfile PR automatically, and
 enables auto-merge.
 
-Adjustments from Paperclip:
+Adjustments from Upstream:
 - Branch: master → Porting1.1 (we don't have master)
 - Concurrency group key: master → Porting1.1
 - Node version: 20 → 24 (matches the rest of CI)
@@ -523,7 +523,7 @@ the actual automation behavior + when the manual flow still
 applies.
 
 Reference:
-github.com/anthropic/paperclip/blob/master/.github/workflows/refresh-lockfile.yml
+github.com/anthropic/upstream/blob/master/.github/workflows/refresh-lockfile.yml
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -536,11 +536,11 @@ git push -u origin ci/port-refresh-lockfile-bot
 
 ```bash
 gh pr create --base Porting1.1 --head ci/port-refresh-lockfile-bot \
-  --title "ci: port Paperclip's refresh-lockfile.yml automation" \
+  --title "ci: port Upstream's refresh-lockfile.yml automation" \
   --body "$(cat <<'EOF'
 ## Summary
 
-Adds [\`.github/workflows/refresh-lockfile.yml\`](.github/workflows/refresh-lockfile.yml) — ported from Paperclip with 4 small adjustments (branch name, concurrency group, Node version, explicit \`--base\`).
+Adds [\`.github/workflows/refresh-lockfile.yml\`](.github/workflows/refresh-lockfile.yml) — ported from Upstream with 4 small adjustments (branch name, concurrency group, Node version, explicit \`--base\`).
 
 After this lands, manifest changes pushed to \`Porting1.1\` automatically trigger:
 1. \`pnpm install --lockfile-only --no-frozen-lockfile\` in CI
@@ -593,11 +593,11 @@ Expected output: a recent run for the merge SHA, conclusion `success`. If the bo
 
 ---
 
-## PR 4: Fix Issue #96 — port Paperclip's `killProcessTree`
+## PR 4: Fix Issue #96 — port Upstream's `killProcessTree`
 
-**Context:** Issue [#96](https://github.com/MeteoriteLabs/AoA/issues/96) — the entire process-tree-kill infrastructure on Porting1.1 is half-built. `safeGetPgid` always returns `null` (because `process.getpgid` doesn't exist in Node 18/20/22/24); `killProcessTree` is defined but never called from production; the 4 cancellation paths in `heartbeat.ts` use `child.kill("SIGTERM")` directly, leaking child processes (claude/codex/opencode subprocesses' children become orphans). Paperclip already solved this — port their pattern.
+**Context:** Issue [#96](https://github.com/MeteoriteLabs/AoA/issues/96) — the entire process-tree-kill infrastructure on Porting1.1 is half-built. `safeGetPgid` always returns `null` (because `process.getpgid` doesn't exist in Node 18/20/22/24); `killProcessTree` is defined but never called from production; the 4 cancellation paths in `heartbeat.ts` use `child.kill("SIGTERM")` directly, leaking child processes (claude/codex/opencode subprocesses' children become orphans). Upstream already solved this — port their pattern.
 
-**Reference:** `paperclip-master/packages/adapter-utils/src/server-utils.ts` lines 50-55 (`resolveProcessGroupId`) + lines 57-72 (`signalRunningProcess`) + line 1452 (spawn with `detached`).
+**Reference:** `upstream-master/packages/adapter-utils/src/server-utils.ts` lines 50-55 (`resolveProcessGroupId`) + lines 57-72 (`signalRunningProcess`) + line 1452 (spawn with `detached`).
 
 **Files:**
 - Modify: `packages/adapter-utils/src/server-utils.ts`
@@ -632,7 +632,7 @@ Expected: 4 hits at approximately lines 3828, 3884, 3913, 3939 (positions may ha
 
 - [ ] **Step 4: Rewrite the failing test in `heartbeat-process-tracking.test.ts`**
 
-Open the file and replace the `safeGetPgid` describe block (the one we updated in PR #97 to assert `null`) with one that asserts the new Paperclip-style `resolveProcessGroupId` behavior:
+Open the file and replace the `safeGetPgid` describe block (the one we updated in PR #97 to assert `null`) with one that asserts the new Upstream-style `resolveProcessGroupId` behavior:
 
 ```typescript
 import { describe, it, expect } from "vitest";
@@ -690,7 +690,7 @@ Expected: failures saying `resolveProcessGroupId is not exported` (or similar im
 
 - [ ] **Step 6: Update `packages/adapter-utils/src/server-utils.ts`**
 
-Replace the `interface RunningProcess`, `safeGetPgid`, and `killProcessTree` definitions with Paperclip's pattern. Open the file and apply these changes:
+Replace the `interface RunningProcess`, `safeGetPgid`, and `killProcessTree` definitions with Upstream's pattern. Open the file and apply these changes:
 
 **6a. Update `RunningProcess` interface (line ~14):**
 
@@ -793,7 +793,7 @@ Replace with:
  *
  * Caller is responsible for the SIGTERM → SIGKILL escalation timer.
  *
- * Reference impl: paperclip-master/packages/adapter-utils/src/server-utils.ts:57-72
+ * Reference impl: upstream-master/packages/adapter-utils/src/server-utils.ts:57-72
  */
 export function signalRunningProcess(
   running: Pick<RunningProcess, "child" | "processGroupId">,
@@ -1098,7 +1098,7 @@ before POSIX waitpid eventually reaps them, doing real work
 (filesystem writes, API calls, budget consumption) we already
 tried to cancel.
 
-Port Paperclip's working pattern (paperclip-master/packages/
+Port Upstream's working pattern (upstream-master/packages/
 adapter-utils/src/server-utils.ts:50-72):
   - spawn with detached:true on POSIX → child.pid === pgid
   - resolveProcessGroupId(child) replaces safeGetPgid(pid):
@@ -1116,7 +1116,7 @@ to child.kill, Windows path, double-kill guard).
 
 Schema/DB fields unchanged: heartbeat_runs.processGroupId is now
 populated correctly instead of always-null. RunningProcess.pgid
-field renamed to processGroupId for consistency with Paperclip
+field renamed to processGroupId for consistency with Upstream
 and the DB column.
 
 Closes #96
@@ -1136,7 +1136,7 @@ gh pr create --base Porting1.1 --head fix/issue-96-killprocesstree-orphans \
   --body "$(cat <<'EOF'
 ## Summary
 
-Closes [#96](https://github.com/MeteoriteLabs/AoA/issues/96). Replaces the half-built \`safeGetPgid\`/\`killProcessTree\` infrastructure (which was effectively dead code) with Paperclip's working pattern.
+Closes [#96](https://github.com/MeteoriteLabs/AoA/issues/96). Replaces the half-built \`safeGetPgid\`/\`killProcessTree\` infrastructure (which was effectively dead code) with Upstream's working pattern.
 
 ## What was broken
 
@@ -1147,13 +1147,13 @@ Closes [#96](https://github.com/MeteoriteLabs/AoA/issues/96). Replaces the half-
 
 ## Fix
 
-Port Paperclip's pattern from [\`packages/adapter-utils/src/server-utils.ts:50-72\`](https://github.com/anthropic/paperclip/blob/master/packages/adapter-utils/src/server-utils.ts):
+Port Upstream's pattern from [\`packages/adapter-utils/src/server-utils.ts:50-72\`](https://github.com/anthropic/upstream/blob/master/packages/adapter-utils/src/server-utils.ts):
 
 - Spawn with \`detached: true\` on POSIX → child.pid becomes the new process group's pgid
 - \`resolveProcessGroupId(child)\` replaces \`safeGetPgid(pid)\`: returns \`child.pid\` on POSIX, \`null\` on Windows
 - \`signalRunningProcess(running, signal)\` replaces \`killProcessTree\`: \`process.kill(-pgid, signal)\` addresses the whole group; falls back to \`child.kill\` on group-kill failure
 - All 4 cancellation paths in \`heartbeat.ts\` and the \`runChildProcess\` timeout handler now call \`signalRunningProcess\`
-- \`RunningProcess.pgid\` field renamed to \`processGroupId\` (matches Paperclip + the DB column)
+- \`RunningProcess.pgid\` field renamed to \`processGroupId\` (matches Upstream + the DB column)
 
 ## Test coverage
 
@@ -1196,7 +1196,7 @@ Expected: green CI, merged. **PAUSE for human approval before merging.** This is
 After PR 4 merges:
 
 ```bash
-gh issue close 96 --comment "Closed by PR <merge-commit-sha>. \`signalRunningProcess\` ports Paperclip's pattern; cancellation paths now kill the whole process group on POSIX. Verified in heartbeat-process-tracking.test.ts (8 tests passing)."
+gh issue close 96 --comment "Closed by PR <merge-commit-sha>. \`signalRunningProcess\` ports Upstream's pattern; cancellation paths now kill the whole process group on POSIX. Verified in heartbeat-process-tracking.test.ts (8 tests passing)."
 ```
 
 Replace `<merge-commit-sha>` with the actual squash-merge SHA.
@@ -1265,13 +1265,13 @@ After this plan executes, verify:
 - [x] **No placeholders:** Every step has exact commands, files, and expected output. The TDD pattern in PR 4 includes complete test code blocks (no "add tests for X" stubs).
 - [x] **Type consistency:** Function names consistent across PRs — `resolveProcessGroupId`, `signalRunningProcess`, `RunningProcess.processGroupId`, `chore/refresh-lockfile`. PR numbers (#94/#95/#96/#97/#98) used consistently.
 - [x] **Risk callouts:** Each PR identifies its risk profile in the body. PR 4 (the only product-code change) calls out: no external API surface change, no new deps, behavior change limited to POSIX detached spawn.
-- [x] **Decisions locked:** Each follow-up its own PR; minimal port for #96 (not full supervisor pattern); use Paperclip patterns verbatim.
+- [x] **Decisions locked:** Each follow-up its own PR; minimal port for #96 (not full supervisor pattern); use Upstream patterns verbatim.
 
 ---
 
 ## Risks & Open Questions
 
-1. **PR 4's `detached:true` change might surface flakiness in existing adapter tests.** The detached spawn behavior subtly differs (separate process group, different stdio handling). If any existing test relied on parent-process-group inheritance, expect a few test fixes. The Paperclip impl is in production so this is empirically safe, but watch for it on PR 4's first CI run.
+1. **PR 4's `detached:true` change might surface flakiness in existing adapter tests.** The detached spawn behavior subtly differs (separate process group, different stdio handling). If any existing test relied on parent-process-group inheritance, expect a few test fixes. The Upstream impl is in production so this is empirically safe, but watch for it on PR 4's first CI run.
 
 2. **The refresh-lockfile bot's first run may be confusing.** After PR 3 merges, the bot fires on Porting1.1's merge commit. If lockfile drift exists (it shouldn't post-cleanup), the bot creates a chore PR — totally normal but worth being prepared for.
 

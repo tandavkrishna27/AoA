@@ -63,9 +63,8 @@ aoa/
 │       ├── cursor-local/        # Cursor adapter
 │       ├── opencode-local/      # OpenCode adapter
 │       ├── openclaw/            # OpenClaw adapter
-│       └── gemini-local/        # Gemini CLI adapter
-│                                # Note: hermes_local uses the external
-│                                # hermes-paperclip-adapter npm package
+│       ├── gemini-local/        # Gemini CLI adapter
+│       └── hermes-local/        # AoA-owned Hermes CLI adapter
 │
 ├── skills/                      # Agent skills
 │   └── aoa/                     # Core AoA skill (heartbeat protocol)

@@ -11,7 +11,7 @@ import {
   Loader2,
   MessageSquarePlus,
   Mic,
-  Paperclip,
+  FilePlus2,
   PanelLeft,
   Send,
   Square,
@@ -2297,7 +2297,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
                     aria-label="Attach file"
                     onClick={() => commanderFileInputRef.current?.click()}
                   >
-                    <Paperclip className="size-4" aria-hidden="true" />
+                    <FilePlus2 className="size-4" aria-hidden="true" />
                   </ComposerIconButton>
                 </TooltipTrigger>
                 <TooltipContent side="top">Attach file</TooltipContent>

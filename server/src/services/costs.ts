@@ -328,7 +328,7 @@ export function costService(db: Db) {
     },
 
     // Sum of cost events within a rolling window anchored on occurredAt.
-    // AoA-specific shape: a single aggregated row per call. Paperclip's
+    // AoA-specific shape: a single aggregated row per call. AoA's
     // windowSpend returns per-provider breakdowns across all three windows;
     // AoA surfaces per-window totals and leaves per-provider detail to
     // byProvider + quota-windows snapshots.

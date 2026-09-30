@@ -71,23 +71,15 @@ describe("agent local JWT", () => {
     expect(verifyLocalAgentJwt(token!)).toBeNull();
   });
 
-  it("accepts legacy paperclip issuer/audience for backward compatibility", () => {
-    // Simulate an in-flight token created before the rename (iss: "paperclip")
-    process.env[issuerEnv] = "paperclip";
-    process.env[audienceEnv] = "paperclip-api";
+  it("rejects a token with a different issuer and audience", () => {
+    process.env[issuerEnv] = "other-issuer";
+    process.env[audienceEnv] = "other-api";
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     const token = createLocalAgentJwt("agent-1", "company-1", "claude_local", "run-1");
 
-    // Switch to new defaults (simulating server post-rename)
-    delete process.env[issuerEnv];   // falls back to "aoa"
-    delete process.env[audienceEnv]; // falls back to "aoa-api"
-
-    // Old token should still verify via dual-accept
-    const claims = verifyLocalAgentJwt(token!);
-    expect(claims).not.toBeNull();
-    expect(claims!.iss).toBe("paperclip");
-    expect(claims!.aud).toBe("paperclip-api");
-    expect(claims!.sub).toBe("agent-1");
+    delete process.env[issuerEnv];
+    delete process.env[audienceEnv];
+    expect(verifyLocalAgentJwt(token!)).toBeNull();
   });
 
   it("rejects issuer/audience mismatch", () => {

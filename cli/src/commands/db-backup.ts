@@ -29,7 +29,7 @@ function resolveConnectionString(configPath?: string): { value: string; source: 
 
   const port = config?.database.embeddedPostgresPort ?? 54329;
   return {
-    value: `postgres://paperclip:paperclip@127.0.0.1:${port}/paperclip`,
+    value: `postgres://aoa:aoa@127.0.0.1:${port}/aoa`,
     source: `embedded-postgres@${port}`,
   };
 }

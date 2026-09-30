@@ -34,7 +34,7 @@ import {
 } from "@armyofagents/db";
 import type {
   PluginStatus,
-  PaperclipPluginManifestV1,
+  AoAPluginManifestV1,
   PluginBridgeErrorCode,
   PluginLauncherRenderContextSnapshot,
 } from "@armyofagents/shared";
@@ -91,11 +91,11 @@ function respondIfCloudPluginBlocked(error: unknown, res: Response): boolean {
 
 /** UI slot declaration extracted from plugin manifest */
 type PluginUiSlotDeclaration = NonNullable<
-  NonNullable<PaperclipPluginManifestV1["ui"]>["slots"]
+  NonNullable<AoAPluginManifestV1["ui"]>["slots"]
 >[number];
 /** Launcher declaration extracted from plugin manifest */
 type PluginLauncherDeclaration = NonNullable<
-  PaperclipPluginManifestV1["launchers"]
+  AoAPluginManifestV1["launchers"]
 >[number];
 
 /**
@@ -120,7 +120,7 @@ type PluginUiContribution = {
 
 /** Request body for POST /api/plugins/install */
 interface PluginInstallRequest {
-  /** npm package name (e.g., @paperclip/plugin-linear) or local path */
+  /** npm package name (e.g., @aoa/plugin-linear) or local path */
   packageName: string;
   /** Target version for npm packages (optional, defaults to latest) */
   version?: string;
@@ -367,17 +367,9 @@ export function pluginRoutes(
             : undefined;
         if (maybeCode !== "22P02") throw error;
       }
-      const legacyAlias = pluginId.startsWith("aoa.")
-        ? `paperclip.${pluginId.slice(4)}`
-        : pluginId.startsWith("aoa-")
-        ? `paperclip-${pluginId.slice(4)}`
-        : null;
       const matches = (
         await registry.listInstalledForCompanies(undefined)
-      ).filter(
-        (plugin) =>
-          plugin.pluginKey === pluginId || plugin.pluginKey === legacyAlias
-      );
+      ).filter((plugin) => plugin.pluginKey === pluginId);
       if (matches.length > 1) {
         throw conflict(
           "Ambiguous plugin key â€” it is installed in more than one company. Use the plugin UUID or a company-scoped route."
@@ -611,7 +603,7 @@ export function pluginRoutes(
    * [
    *   {
    *     "pluginId": "plg_123",
-   *     "pluginKey": "paperclip.claude-usage",
+   *     "pluginKey": "aoa.claude-usage",
    *     "displayName": "Claude Usage",
    *     "version": "1.0.0",
    *     "uiEntryFile": "index.js",

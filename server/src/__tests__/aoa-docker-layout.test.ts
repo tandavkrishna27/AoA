@@ -8,19 +8,17 @@ const root = path.resolve(import.meta.dirname, "../../..");
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("AOA Docker data layout and CLI compatibility", () => {
-  it("uses /aoa as the canonical home while retaining only a legacy symlink", () => {
+  it("uses /aoa as the canonical home", () => {
     const dockerfile = read("Dockerfile");
     expect(dockerfile).toContain("HOME=/aoa");
     expect(dockerfile).toContain("AOA_HOME=/aoa");
     expect(dockerfile).toContain('VOLUME ["/aoa"]');
-    expect(dockerfile).toContain("ln -s /aoa /paperclip");
-    expect(dockerfile).not.toContain("HOME=/paperclip");
+    expect(dockerfile).not.toContain("ln -s /aoa /aoa");
   });
 
   it("mounts the unchanged named volume at /aoa and exposes explicit auth policy flags", () => {
     const compose = read("docker-compose.yml");
     expect(compose).toContain("aoa-data:/aoa");
-    expect(compose).not.toContain("aoa-data:/paperclip");
     expect(compose).toContain("AOA_INSTALL_PROFILE:");
     expect(compose).toContain("AOA_CODEX_DEVICE_AUTH:");
     expect(compose).toContain("AOA_CLAUDE_PASTE_AUTH:");
@@ -29,9 +27,8 @@ describe("AOA Docker data layout and CLI compatibility", () => {
     );
   });
 
-  it("fails closed for an old Compose mount and records a data-layout sentinel", () => {
+  it("records a data-layout sentinel", () => {
     const entrypoint = read("scripts/docker-entrypoint.sh");
-    expect(entrypoint).toContain('[ ! -L /paperclip ]');
     expect(entrypoint).toContain(".aoa-data-layout-version");
     expect(entrypoint).toContain("unsupported AOA data-layout version");
   });

@@ -100,7 +100,6 @@ function killWindowsProcessTree(pid: number): boolean {
  *
  * Caller is responsible for the SIGTERM → SIGKILL escalation timer.
  *
- * Reference impl: paperclip-master/packages/adapter-utils/src/server-utils.ts:57-72
  */
 export function signalRunningProcess(
   running: Pick<RunningProcess, "child" | "processGroupId">,
@@ -437,12 +436,11 @@ export function mergeChildEnv(
 
 /**
  * Run-scoped bearer env keys that MUST NOT reach a third-party stdio connector
- * child. `AOA_API_KEY` (raw REST as the agent) + its `PAPERCLIP_*` wire alias,
+ * child. `AOA_API_KEY` (raw REST as the agent)
  * and `AOA_RUNTIME_HOOK_TOKEN` (answers/forges runtime permission prompts).
  */
 export const CONNECTOR_STRIPPED_RUN_BEARER_KEYS = [
   "AOA_API_KEY",
-  "PAPERCLIP_API_KEY",
   "AOA_RUNTIME_HOOK_TOKEN",
 ] as const;
 
@@ -455,7 +453,7 @@ export const CONNECTOR_STRIPPED_RUN_BEARER_KEYS = [
  * the overlay itself, BEFORE the merge.
  *
  * Mutates `overlayEnv` in place. Deletes by KEY (case-folded, incl. the
- * `PAPERCLIP_` alias) AND by VALUE — a connector could otherwise inherit the
+ * bearer key) AND by VALUE — a connector could otherwise inherit the
  * token under an arbitrarily-named configured key carrying the same value
  * (Codex plan-review finding). No-op when no connectors are present, so
  * no-connector runs stay byte-identical.
@@ -691,7 +689,6 @@ export async function runChildProcess(
 
 // ---------------------------------------------------------------------------
 // Skills helpers + wake-payload helpers + log-friendly command resolution
-// (ported from Paperclip adapter-utils/server-utils.ts)
 // ---------------------------------------------------------------------------
 
 const AOA_SKILL_ROOT_RELATIVE_CANDIDATES = [
@@ -706,8 +703,6 @@ export interface AoaSkillEntry {
   required?: boolean;
   requiredReason?: string | null;
 }
-// Paperclip-named alias for one-release compatibility (Task 9 consumer ports)
-export type PaperclipSkillEntry = AoaSkillEntry;
 
 export interface InstalledSkillTarget {
   targetPath: string | null;
@@ -789,7 +784,6 @@ export function joinPromptSections(
     .join(separator);
 }
 
-export const buildPaperclipEnv = buildAoaEnv;
 
 const DEFAULT_AOA_INSTANCE_ID = "default";
 const PATH_SEGMENT_RE = /^[A-Za-z0-9._-]+$/;
@@ -813,11 +807,9 @@ export function resolveAoaInstanceRootForAdapter(input: {
   return path.resolve(homeDir, "instances", instanceId);
 }
 
-export const resolvePaperclipInstanceRootForAdapter = resolveAoaInstanceRootForAdapter;
 
 export const DEFAULT_AOA_AGENT_PROMPT_TEMPLATE =
   "You are agent {{agent.id}} ({{agent.name}}). Continue your AoA work.";
-export const DEFAULT_PAPERCLIP_AGENT_PROMPT_TEMPLATE = DEFAULT_AOA_AGENT_PROMPT_TEMPLATE;
 
 // ---------------------------------------------------------------------------
 // Wake payload normalization / prompt rendering
@@ -986,14 +978,12 @@ export function normalizeAoaWakePayload(value: unknown): AoaWakePayload | null {
     fallbackFetchNeeded: asBoolean(payload.fallbackFetchNeeded, false),
   };
 }
-export const normalizePaperclipWakePayload = normalizeAoaWakePayload;
 
 export function stringifyAoaWakePayload(value: unknown): string | null {
   const normalized = normalizeAoaWakePayload(value);
   if (!normalized) return null;
   return JSON.stringify(normalized);
 }
-export const stringifyPaperclipWakePayload = stringifyAoaWakePayload;
 
 export function renderAoaWakePrompt(
   value: unknown,
@@ -1111,11 +1101,9 @@ export function renderAoaWakePrompt(
 
   return lines.join("\n").trim();
 }
-export const renderPaperclipWakePrompt = renderAoaWakePrompt;
 
 export function readAoaIssueWorkModeFromContext(context: Record<string, unknown>): string | null {
   const candidates = [
-    parseObject(context.paperclipWake).issue,
     parseObject(context.aoaWake).issue,
     context.issue,
     context.task,
@@ -1126,7 +1114,6 @@ export function readAoaIssueWorkModeFromContext(context: Record<string, unknown>
   }
   return null;
 }
-export const readPaperclipIssueWorkModeFromContext = readAoaIssueWorkModeFromContext;
 
 // ---------------------------------------------------------------------------
 // Log-friendly env + command resolution
@@ -1235,7 +1222,6 @@ export async function resolveAoaSkillsDir(
 
   return null;
 }
-export const resolvePaperclipSkillsDir = resolveAoaSkillsDir;
 
 export async function listAoaSkillEntries(
   moduleDir: string,
@@ -1259,7 +1245,6 @@ export async function listAoaSkillEntries(
     return [];
   }
 }
-export const listPaperclipSkillEntries = listAoaSkillEntries;
 
 export async function readInstalledSkillTargets(
   skillsHome: string,
@@ -1408,7 +1393,6 @@ export async function readAoaRuntimeSkillEntries(
   if (configuredEntries.length > 0) return configuredEntries;
   return listAoaSkillEntries(moduleDir, additionalCandidates);
 }
-export const readPaperclipRuntimeSkillEntries = readAoaRuntimeSkillEntries;
 
 export async function materializeAoaSkillCopy(source: string, target: string): Promise<{ skippedSymlinks: string[] }> {
   // Codex P2: fs.cp's filter only skips copying matching SOURCE paths — it does
@@ -1442,7 +1426,6 @@ export async function materializeAoaSkillCopy(source: string, target: string): P
   });
   return { skippedSymlinks };
 }
-export const materializePaperclipSkillCopy = materializeAoaSkillCopy;
 
 export async function readAoaSkillMarkdown(
   moduleDir: string,
@@ -1461,14 +1444,12 @@ export async function readAoaSkillMarkdown(
     return null;
   }
 }
-export const readPaperclipSkillMarkdown = readAoaSkillMarkdown;
 
 export function readAoaSkillSyncPreference(config: Record<string, unknown>): {
   explicit: boolean;
   desiredSkills: string[];
 } {
-  // paperclipSkillSync compat read — remove in next major
-  const raw = config.aoaSkillSync ?? config.paperclipSkillSync;
+  const raw = config.aoaSkillSync;
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return { explicit: false, desiredSkills: [] };
   }
@@ -1485,7 +1466,6 @@ export function readAoaSkillSyncPreference(config: Record<string, unknown>): {
     desiredSkills: Array.from(new Set(desired)),
   };
 }
-export const readPaperclipSkillSyncPreference = readAoaSkillSyncPreference;
 
 function canonicalizeDesiredAoaSkillReference(
   reference: string,
@@ -1530,7 +1510,6 @@ export function resolveAoaDesiredSkillNames(
     .filter(Boolean);
   return Array.from(new Set([...requiredSkills, ...desiredSkills]));
 }
-export const resolvePaperclipDesiredSkillNames = resolveAoaDesiredSkillNames;
 
 export function writeAoaSkillSyncPreference(
   config: Record<string, unknown>,
@@ -1550,19 +1529,14 @@ export function writeAoaSkillSyncPreference(
     ),
   );
   next.aoaSkillSync = current;
-  // paperclipSkillSync compat write — remove in next major
-  next.paperclipSkillSync = current;
   return next;
 }
-export const writePaperclipSkillSyncPreference = writeAoaSkillSyncPreference;
 
 export async function ensureAoaSkillSymlink(
   source: string,
   target: string,
   linkSkill: (source: string, target: string) => Promise<void> = (linkSource, linkTarget) =>
-    // AoA deviation from Paperclip: use `junction` on Windows so directory
-    // symlinks don't require admin elevation. Paperclip ships a Linux-first
-    // default; cursor-local already applies the same workaround downstream.
+    // Use a junction on Windows so directory symlinks do not require admin access.
     fs.symlink(linkSource, linkTarget, process.platform === "win32" ? "junction" : undefined),
 ): Promise<"created" | "repaired" | "skipped"> {
   const existing = await fs.lstat(target).catch(() => null);
@@ -1592,7 +1566,6 @@ export async function ensureAoaSkillSymlink(
   await linkSkill(source, target);
   return "repaired";
 }
-export const ensurePaperclipSkillSymlink = ensureAoaSkillSymlink;
 
 export async function removeMaintainerOnlySkillSymlinks(
   skillsHome: string,
@@ -1643,7 +1616,6 @@ export async function removeMaintainerOnlySkillSymlinks(
  * don't drift from each other. Values that are null, undefined, or empty
  * strings are silently skipped (the key is not written to the record).
  *
- * Ports d47ffa87 from paperclip (rebranded paperclip→aoa).
  */
 export function applyAoaWorkspaceEnv(
   env: Record<string, string>,
@@ -1715,7 +1687,6 @@ export function refreshAoaWorkspaceEnvForExecution(input: {
   }
   return input.env;
 }
-export const refreshPaperclipWorkspaceEnvForExecution = refreshAoaWorkspaceEnvForExecution;
 
 export function shapeAoaWorkspaceEnvForExecution(input: {
   env: Record<string, string>;
@@ -1757,8 +1728,7 @@ export function shapeAoaWorkspaceEnvForExecution(input: {
   return next;
 }
 
-export const applyPaperclipWorkspaceEnv = applyAoaWorkspaceEnv;
-export function shapePaperclipWorkspaceEnvForExecution(input: {
+export function shapeAoaWorkspaceContextForExecution(input: {
   workspaceCwd?: string | null;
   workspaceWorktreePath?: string | null;
   workspaceHints?: Array<Record<string, unknown>>;

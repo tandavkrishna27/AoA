@@ -9,7 +9,7 @@ const ACTIVE_REVIEW_APPROVAL_STATUSES = new Set(["pending"]);
 
 /**
  * Guard: reject agent-initiated transitions to `in_review` unless a human
- * review path exists.  Ports the severable middleware slice from Paperclip
+ * review path exists.  Ports the severable middleware slice from AoA
  * commit 68f69975.  AoA-adapted: dropped executionState/monitor predicates
  * (those columns don't exist in AoA).
  *
