@@ -4,7 +4,7 @@
 
 **Goal:** Remove old-brand occurrences from the entire physical repository folder, not only the active tracked source.
 
-**Architecture:** Complete and verify the source implementation first. Inventory ownership and active use of every remaining copy. Clean disposable outputs, reconcile user-created files and worktrees, then reconstruct Git metadata only if the owner explicitly chooses literal history removal.
+**Architecture:** The tracked `main` source is already clean. Preserve and review user-created files before edits; classify runtime data and each worktree before retirement. Treat rewriting published Git history and renaming the checkout parent as separate, coordinated operations.
 
 **Tech Stack:** Git, PowerShell, ripgrep, package manager, archive inspectors.
 
@@ -25,6 +25,24 @@
 - A PPTX, ZIP, or other archive can contain text absent from a normal ripgrep scan.
 - Git refs, reflogs, object packs, and worktree metadata can retain historical bytes after source cleanup.
 - Renaming the checkout parent folder can invalidate absolute launch paths and registered worktrees.
+
+## Verified inventory (2026-09-30)
+
+- Tracked `main` content and paths: zero target-token matches.
+- Nonignored untracked files: 499 total; 36 content matches (24 pitch-build intermediates and scripts, 12 authored product/research/strategy documents); no matching filenames.
+- A partial no-ignore scan found 8,720 additional matching files outside `.claude/worktrees`, including 7,866 in nested `.worktrees`, about 735 under `server` runtime output, 19 under `data`, and smaller local cache/log groups. It excluded dependencies, build outputs, and archives, so it is not a whole-folder total.
+- Registered Git worktrees: 223 paths exist; 22 have tracked changes. Three checked-out branches have replatform-related names, but none is exactly `replatform`.
+- Local Git: `main` is four commits ahead and twelve behind `origin/main`; 449 local branches, 457 remote-tracking refs, 406 local tags, seven stashes, and roughly 10,586 commits reachable across refs. About 140 tag names and 1,428 commit subjects contain the target token.
+- Published GitHub `main` is protected against force pushes, and eleven pull requests are open. Public clones, forks, caches, and PR records cannot be guaranteed clean through a repository rewrite.
+
+## Execution boundaries
+
+1. Reconcile the 36 user-created files with backed-up, reviewed edits. Inspect PPTX and other archives separately; normal text search is insufficient.
+2. Classify runtime logs/data by retention need and process ownership; remove or regenerate only confirmed disposable outputs. Preserve any diagnostic or user data outside the repository before removal.
+3. Audit every worktree for tracked/untracked/ignored changes and running processes. Archive only confirmed idle managed worktrees using the Codex app tool. Preserve active work and identify the user's intended replatform checkout before applying changes there.
+4. Reconcile local and remote `main` before any history plan. Make a verified mirror backup and rehearse any history rewrite in an isolated mirror. Produce an exact branch/tag map and scan every rewritten ref. The remote rewrite needs an administrator policy window and explicit approval after the rehearsal; it changes commit identities for collaborators.
+5. Rename the physical parent folder only after worktree registrations, launch configs, and external absolute paths have a tested migration path.
+6. Re-scan tracked, untracked, ignored, binary/archive contents, every retained worktree, refs, and the parent path. Report each remaining class rather than claiming literal zero early.
 
 ---
 
