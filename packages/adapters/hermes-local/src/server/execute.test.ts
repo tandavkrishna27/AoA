@@ -55,6 +55,14 @@ describe("Hermes local execution", () => {
     expect(result.errorMessage).toMatch(/timed out/i);
   });
 
+  it("keeps recoverable stderr diagnostics from failing a successful run", async () => {
+    runChildProcess.mockResolvedValue({ stdout: "Task completed", stderr: "Error: first tool call failed, recovered on retry", exitCode: 0, signal: null, timedOut: false });
+    const result = await execute(context());
+    expect(result.exitCode).toBe(0);
+    expect(result.summary).toBe("Task completed");
+    expect(result.errorMessage).toBeUndefined();
+  });
+
   it("parses usage and error details", () => {
     expect(parseHermesOutput("Done\nsession_id: abc\ntokens: 12 input 34 output\ncost: $0.25", "Error: failed")).toMatchObject({
       sessionId: "abc", usage: { inputTokens: 12, outputTokens: 34 }, costUsd: 0.25, errorMessage: "Error: failed",

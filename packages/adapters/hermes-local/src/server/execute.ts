@@ -104,7 +104,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
     return {
       exitCode: result.exitCode, signal: result.signal, timedOut: result.timedOut,
       provider: provider ?? null, model, executionCwd: cwd,
-      errorMessage: failed ? parsed.errorMessage ?? (result.timedOut ? `Hermes timed out after ${timeoutSec}s` : result.exitCode === 0 ? "Hermes returned no response" : ((result.stderr ?? "").trim() || `Hermes exited with code ${result.exitCode}`)) : parsed.errorMessage,
+      errorMessage: failed ? parsed.errorMessage ?? (result.timedOut ? `Hermes timed out after ${timeoutSec}s` : result.exitCode === 0 ? "Hermes returned no response" : ((result.stderr ?? "").trim() || `Hermes exited with code ${result.exitCode}`)) : undefined,
       ...(parsed.usage ? { usage: parsed.usage } : {}),
       ...(parsed.costUsd !== undefined ? { costUsd: parsed.costUsd } : {}),
       ...(parsed.response ? { summary: parsed.response.slice(0, 2000) } : {}),
