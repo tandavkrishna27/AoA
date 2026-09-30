@@ -12,14 +12,17 @@
 
 ## Execution status (2026-09-30)
 
-Implementation and review are complete in the isolated `codex/aoa-clean-main`
-worktree. A scan of staged tracked paths and file bytes reports zero target-token
+Implementation and review are complete and were fast-forwarded from the
+`codex/aoa-clean-main` worktree into `main`. A scan of tracked paths and file bytes reports zero target-token
 matches. Frozen lockfile install, repository typecheck, build, and the full
 test suite pass (17,767 passed; 553 configured skips). A fresh embedded
-PostgreSQL replay through migration 0204 also passes. The cleanup is not yet
-integrated into `main`; the original checkout's unrelated working files are
-preserved. Historical migration checksums changed, so existing databases need
+PostgreSQL replay through migration 0204 also passes. The original checkout's
+unrelated untracked files are preserved. Historical migration checksums changed, so existing databases need
 a controlled reset or journal remap. This project has no existing product users.
+The original checkout also contains 499 unrelated untracked files. A separate
+scan found target-token content in 36 of them, primarily pitch build outputs
+and research documents. They were preserved and are outside the tracked `main`
+branch; the optional physical-folder plan covers that separate cleanup.
 
 ## Global Constraints
 
