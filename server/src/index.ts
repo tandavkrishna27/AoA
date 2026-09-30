@@ -1,5 +1,4 @@
 /// <reference path="./types/express.d.ts" />
-import "./env-compat.js"; // side-effect: mirror PAPERCLIP_* env to AOA_* for migration
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
@@ -430,8 +429,8 @@ if (config.databaseUrl) {
     logger.info(`Using embedded PostgreSQL because no DATABASE_URL set (dataDir=${dataDir}, port=${port})`);
     embeddedPostgres = new EmbeddedPostgres({
       databaseDir: dataDir,
-      user: "paperclip",
-      password: "paperclip",
+      user: "aoa",
+      password: "aoa",
       port,
       persistent: true,
       // Force UTF-8 encoding + locale=C at cluster creation. Without this,
@@ -476,13 +475,13 @@ if (config.databaseUrl) {
     embeddedPostgresStartedByThisProcess = true;
   }
 
-  const embeddedAdminConnectionString = `postgres://paperclip:paperclip@127.0.0.1:${port}/postgres`;
-  const dbStatus = await ensurePostgresDatabase(embeddedAdminConnectionString, "paperclip");
+  const embeddedAdminConnectionString = `postgres://aoa:aoa@127.0.0.1:${port}/postgres`;
+  const dbStatus = await ensurePostgresDatabase(embeddedAdminConnectionString, "aoa");
   if (dbStatus === "created") {
-    logger.info("Created embedded PostgreSQL database: paperclip");
+    logger.info("Created embedded PostgreSQL database: aoa");
   }
 
-  const embeddedConnectionString = `postgres://paperclip:paperclip@127.0.0.1:${port}/paperclip`;
+  const embeddedConnectionString = `postgres://aoa:aoa@127.0.0.1:${port}/aoa`;
   const shouldAutoApplyFirstRunMigrations = !clusterAlreadyInitialized || dbStatus === "created";
   if (shouldAutoApplyFirstRunMigrations) {
     logger.info("Detected first-run embedded PostgreSQL setup; applying pending migrations automatically");

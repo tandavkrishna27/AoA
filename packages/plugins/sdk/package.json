@@ -52,7 +52,7 @@
     }
   },
   "bin": {
-    "paperclip-plugin-dev-server": "./dist/dev-cli.js"
+    "aoa-plugin-dev-server": "./dist/dev-cli.js"
   },
   "publishConfig": {
     "access": "public",

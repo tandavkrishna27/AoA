@@ -9,6 +9,6 @@
   "updateInternalDependencies": "patch",
   "ignore": [
     "@armyofagents/ui",
-    "@paperclipai/create-paperclip-plugin"
+    "@armyofagents/create-aoa-plugin"
   ]
 }

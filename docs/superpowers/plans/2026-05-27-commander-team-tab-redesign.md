@@ -126,7 +126,7 @@ No new API endpoints needed — all mutations use existing `agentsApi` / `approv
 - [ ] **Step 6: Run the dev server to confirm no TypeScript errors before continuing**
 
   ```bash
-  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\AoA-2.5"
+  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5"
   pnpm --filter ui typecheck 2>&1 | head -30
   ```
   Expected: exit 0 (or only pre-existing errors, none in TeamPage).
@@ -1133,7 +1133,7 @@ An oversight table with columns: Agent · Trust · Budget (editable limit) · Ca
 - [ ] **Step 1: Check if date-fns is already a dependency**
 
   ```bash
-  grep -r "date-fns" "C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\AoA-2.5\ui\package.json"
+  grep -r "date-fns" "C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5\ui\package.json"
   ```
 
   If `date-fns` appears: **skip the rest of this task**.
@@ -1141,7 +1141,7 @@ An oversight table with columns: Agent · Trust · Budget (editable limit) · Ca
 - [ ] **Step 2 (only if missing): Install date-fns**
 
   ```bash
-  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\AoA-2.5"
+  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5"
   pnpm --filter ui add date-fns
   ```
 
@@ -1202,7 +1202,7 @@ The existing `makeAgent` factory is missing `budgetMonthlyCents`, `spentMonthlyC
 - [ ] **Step 2: Run the existing CommanderTeamTab tests to confirm no regressions**
 
   ```bash
-  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\AoA-2.5"
+  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5"
   pnpm --filter ui vitest run --reporter=verbose ui/src/__tests__/CommanderTeamTab.test.tsx
   ```
   Expected: all 7 existing tests pass.
@@ -1562,7 +1562,7 @@ The existing `makeAgent` factory is missing `budgetMonthlyCents`, `spentMonthlyC
 - [ ] **Step 6: Run all new unit tests**
 
   ```bash
-  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\AoA-2.5"
+  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5"
   pnpm --filter ui vitest run --reporter=verbose \
     ui/src/__tests__/CommanderRosterTab.test.tsx \
     ui/src/__tests__/CommanderKanbanTab.test.tsx \
@@ -1755,7 +1755,7 @@ An E2E smoke test verifies that the full Team page → Commander tab → sub-tab
 - [ ] **Step 2: Verify the test is picked up by the Playwright config**
 
   ```bash
-  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\Paperclip-AoA\AoA-2.5"
+  cd "C:\Users\TK\OneDrive\Desktop\Claude Data\the upstream project-AoA\AoA-2.5"
   pnpm e2e --list --grep "Commander Team"
   ```
   Expected: 3 test lines listed.

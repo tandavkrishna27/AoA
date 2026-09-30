@@ -2,11 +2,31 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "universe-harness",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "pnpm",
+        "-C",
+        ".worktrees\\universe-interface",
+        "--filter",
+        "@armyofagents/ui",
+        "exec",
+        "vite",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5190",
+        "--strictPort"
+      ],
+      "port": 5190
+    },
+    {
       "name": "threads",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "cd /d \"C:\\Users\\TK\\OneDrive\\Desktop\\Claude Data\\Paperclip-AoA\\AoA-threads\" && set PORT=3102 && set AOA_UI_DEV_MIDDLEWARE=true && set AOA_MIGRATION_AUTO_APPLY=true && pnpm dev"
+        "cd /d \"..\\AoA-threads\" && set PORT=3102 && set AOA_UI_DEV_MIDDLEWARE=true && set AOA_MIGRATION_AUTO_APPLY=true && pnpm dev"
       ],
       "port": 3102
     },

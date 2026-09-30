@@ -3,9 +3,9 @@ title: Environment Variables
 summary: Full environment variable reference
 ---
 
-All environment variables that AoA reads. Grouped by concern. The list is verified against `process.env` reads in `server/src/`, `cli/src/`, and `packages/`; the brand-check CI job in `.github/workflows/pr.yml` keeps it in sync.
+All environment variables that AoA reads. Grouped by concern. The list reflects `process.env` reads in `server/src/`, `cli/src/`, and `packages/`.
 
-> **Legacy `PAPERCLIP_*` aliases.** Every `AOA_FOO` env var has a legacy `PAPERCLIP_FOO` alias that's mirrored at startup by `server/src/env-compat.ts` (and `cli/src/config/env-compat.ts` for the CLI). If both are set, `AOA_*` wins. The mirror runs only inside the spawned Node process — bash invocations of project scripts must use `AOA_*` directly.
+Use the `AOA_*` names shown below.
 
 ## Server Configuration
 
@@ -14,7 +14,7 @@ All environment variables that AoA reads. Grouped by concern. The list is verifi
 | `PORT` | `3100` | Server port (alias: `AOA_LISTEN_PORT`, `AOA_SERVER_PORT`) |
 | `HOST` | `127.0.0.1` | Server host binding (alias: `AOA_LISTEN_HOST`, `AOA_SERVER_HOST`) |
 | `DATABASE_URL` | (embedded) | PostgreSQL connection string. If unset, AoA boots `embedded-postgres@18.x` automatically |
-| `AOA_HOME` | `~/.aoa` (with legacy `~/.paperclip` fallback) | Base directory for all AoA data. Resolved by `cli/src/config/home.ts`: prefers `~/.aoa/`, falls back to `~/.paperclip/` if the legacy dir exists and the new one does not |
+| `AOA_HOME` | `~/.aoa` | Base directory for all AoA data. Resolved by `cli/src/config/home.ts`: uses `~/.aoa/` |
 | `AOA_INSTANCE_ID` | `default` | Instance identifier (for multiple local instances on one machine) |
 | `AOA_RUNTIME_PROCESS_OWNER_ID` | host + `AOA_INSTANCE_ID` fingerprint outside `cloud_auth`; unset in `cloud_auth` | Stable identity for the OS PID namespace/replica that owns `local_process` runtime services. It is required before the unsafe cloud override may start a local runtime service **and on every cloud replica that boots while the shared DB still contains PID-bearing local-runtime rows**. Set a unique value per concurrently live replica/PID namespace (for example a Kubernetes Pod UID), and keep it stable while detached children from that owner can survive a server restart. Never share it across replicas. This is process-safety provenance; `AOA_INSTANCE_ID` and `AOA_EXECUTION_TARGET_ID` are not substitutes. |
 | `AOA_DEPLOYMENT_MODE` | `local_trusted` | `local_trusted`, `authenticated`, or `cloud_auth`. Pass the configured value to manual `pnpm db:migrate` runs so migration safety policy is explicit. |
@@ -109,7 +109,7 @@ unsandboxed override disabled until the worker/gVisor runtime lands.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AOA_AGENT_JWT_SECRET` | (auto-generated, persisted in instance config) | HMAC secret for agent JWTs |
-| `AOA_AGENT_JWT_ISSUER` | `paperclip` (wire-compat default) | JWT `iss` claim. Legacy default kept so existing agents validate |
+| `AOA_AGENT_JWT_ISSUER` | `aoa` (wire-compat default) | JWT `iss` claim. Legacy default kept so existing agents validate |
 | `AOA_AGENT_JWT_AUDIENCE` | `aoa` | JWT `aud` claim |
 | `AOA_AGENT_JWT_TTL_SECONDS` | `300` | Token TTL — keep short; the heartbeat refreshes it on each run |
 
@@ -119,7 +119,7 @@ unsandboxed override disabled until the worker/gVisor runtime lands.
 |----------|---------|-------------|
 | `AOA_SECRETS_PROVIDER` | `local_encrypted` | Default secret-storage backend. `local_encrypted` and `aws_secrets_manager` are supported; `gcp_secret_manager` and `vault` are coming-soon stubs |
 | `AOA_SECRETS_MASTER_KEY` | (from file) | 32-byte encryption key (base64/hex/raw). Use the file path variant in production |
-| `AOA_SECRETS_MASTER_KEY_FILE` | `~/.aoa/.../secrets/master.key` (with legacy `~/.paperclip/` fallback) | Path to key file. Auto-created by `pnpm aoa onboard` |
+| `AOA_SECRETS_MASTER_KEY_FILE` | `~/.aoa/.../secrets/master.key` | Path to key file. Auto-created by `pnpm aoa onboard` |
 | `AOA_SECRETS_STRICT_MODE` | `false` | When `true`, sensitive env keys (`*_API_KEY`, `*_TOKEN`, `*_SECRET`) must use secret references instead of inline plain values |
 
 ## Storage
@@ -360,7 +360,7 @@ The server sets these automatically when invoking adapters. They appear in the s
 | `AOA_API_URL` | AoA API base URL the agent should call back to |
 | `AOA_HUMAN_QUESTION_CAPABILITIES` | JSON-encoded provider capability contract for structured human questions. Set automatically for adapter runs; `ask_and_park` persists the question and resumes later, while live relay requires a provider that explicitly supports pausing and resuming the same invocation |
 | `AOA_API_KEY` | Short-lived JWT for API auth (rotates each heartbeat) |
-| `AOA_RUN_ID` | Current heartbeat run ID — also sent in `X-Aoa-Run-Id` HTTP header |
+| `AOA_RUN_ID` | Current heartbeat run ID — also sent in `X-AoA-Run-Id` HTTP header |
 | `AOA_TASK_ID` | Issue (task) that triggered this wake, if any |
 | `AOA_WAKE_REASON` | Wake trigger reason (`assignment`, `timer`, `mention`, etc.) |
 | `AOA_WAKE_COMMENT_ID` | Comment that triggered this wake, if any |
@@ -427,6 +427,7 @@ These are read by tests and dev scripts; you should not need to set them in prod
 | `AOA_E2E_FAKE_AWS_SECRETS_MANAGER` | Playwright/vitest harness flag for the fake AWS Secrets Manager provider |
 | `AOA_E2E_PORT` / `AOA_E2E_SKIP_LLM` / `AOA_E2E_SKIP_MCP` | Playwright e2e harness — see `tests/README.md` |
 | `AOA_RUN_WIN_INTEGRATION` | Opt-in flag for real embedded-Postgres integration tests on Windows. Unset ⇒ Windows skips those tests |
+| `AOA_FORCE_EMBEDDED_TESTS` | Opts specific embedded PostgreSQL migration tests into running on Windows. Use only in a test environment. |
 | `AOA_STRIP_CC_ENV` | Dev/sandbox opt-in (`=1`). At server startup (`server/src/index.ts`) strips inherited `CLAUDE_CODE_*` / staging-OAuth / `ANTHROPIC_BASE_URL` vars so spawned CLIs (Commander, extraction, crew/org runs, the auth probe) fall back to the machine's own `claude` login instead of a host Claude Code session's endpoint. No-op in a normal terminal (vars absent); never needed in production |
 | `AOA_E2E_FAKE_CREW_LLM` | Playwright e2e harness flag (`=1`) that swaps the real crew CLI for the deterministic fake-crew harness (`fake-crew-llm.ts`). Never activates when `NODE_ENV=production`. |
 | `AOA_E2E_FAKE_CREW_CONTROL` | E2E only. Path to a JSON control file that scripts the fake-crew harness per test (e.g. the controller-mode Adjutant scope turn). Read fresh on every fake turn; absent/invalid ⇒ legacy fake behavior. Set by `tests/e2e/playwright.config.ts`. No effect unless `AOA_E2E_FAKE_CREW_LLM=1`. |

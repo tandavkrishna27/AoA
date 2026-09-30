@@ -106,21 +106,21 @@ export function OpenClawConfigFields({
       </Field>
       {!isCreate && (
         <>
-          {/* NOTE: `paperclipApiUrl` is the stored adapter-config key shape used by
+          {/* NOTE: `aoaApiUrl` is the stored adapter-config key shape used by
               existing OpenClaw configs in the DB. Renaming would orphan every existing
               config. Treat as wire-compat — change requires a coordinated Drizzle
               migration on `agents.adapterConfig`. See docs/superpowers/plans/
-              2026-04-25-paperclip-to-aoa-rename.md (deferred from Phase 1). */}
+              2026-04-25-aoa-to-aoa-rename.md (deferred from Phase 1). */}
           <Field label="AoA API URL override">
             <DraftInput
               value={
                 eff(
                   "adapterConfig",
-                  "paperclipApiUrl",
-                  String(config.paperclipApiUrl ?? ""),
+                  "aoaApiUrl",
+                  String(config.aoaApiUrl ?? ""),
                 )
               }
-              onCommit={(v) => mark("adapterConfig", "paperclipApiUrl", v || undefined)}
+              onCommit={(v) => mark("adapterConfig", "aoaApiUrl", v || undefined)}
               immediate
               className={inputClass}
               placeholder="https://aoa.example"

@@ -31,7 +31,7 @@
               "start/quickstart",
               "start/core-concepts",
               "start/architecture",
-              "start/paperclip-vs-aoa",
+              "start/upstream-vs-aoa",
               "start/openclaw-integration"
             ]
           }

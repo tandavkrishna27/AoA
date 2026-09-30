@@ -25,10 +25,6 @@ function resolveAoaHomeDir(): string {
   const envHome = process.env.AOA_HOME?.trim();
   if (envHome) return path.resolve(expandHomePrefix(envHome));
   const aoaHome = path.resolve(os.homedir(), ".aoa");
-  if (!existsSync(aoaHome)) {
-    const legacyHome = path.resolve(os.homedir(), ".paperclip");
-    if (existsSync(legacyHome)) return legacyHome;
-  }
   return aoaHome;
 }
 
@@ -74,7 +70,7 @@ function resolveConnectionString(config: PartialConfig | null): string {
   }
 
   const port = resolveEmbeddedPort(config);
-  return `postgres://paperclip:paperclip@127.0.0.1:${port}/paperclip`;
+  return `postgres://aoa:aoa@127.0.0.1:${port}/aoa`;
 }
 
 function resolveDefaultBackupDir(): string {

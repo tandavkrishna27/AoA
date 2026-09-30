@@ -138,7 +138,7 @@ This avoids duplicate actions and makes the workflow legible.
 
 ## Agent Instructions Migration
 
-Paperclip-era and early AoA agents may store instructions in `adapterConfig.promptTemplate`. New AoA agents should use managed instructions bundles with files such as:
+the upstream project-era and early AoA agents may store instructions in `adapterConfig.promptTemplate`. New AoA agents should use managed instructions bundles with files such as:
 
 - `AGENTS.md`
 - `SOUL.md`

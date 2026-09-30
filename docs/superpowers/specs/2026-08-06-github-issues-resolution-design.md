@@ -25,7 +25,7 @@ This design document specifies the architecture, data model modifications, and s
 
 #### Problem
 - GC Step 1 currently uses a 2-hour wall-clock age from run start (`internal_agent_runs.created_at`) to force-fail running runs because no activity heartbeat exists.
-- Dual write-authority exists between direct runner self-commits ([`runner.ts:1167`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/Paperclip-AoA/AoA-2.5/server/src/services/internal-agent/aoa-agents/runner.ts#L1167)) and controller sweeps (`sweep-controller.ts:109`), forcing reliance on per-action CAS (`claimActionForCommit`) as the primary lock.
+- Dual write-authority exists between direct runner self-commits ([`runner.ts:1167`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/the upstream project-AoA/AoA-2.5/server/src/services/internal-agent/aoa-agents/runner.ts#L1167)) and controller sweeps (`sweep-controller.ts:109`), forcing reliance on per-action CAS (`claimActionForCommit`) as the primary lock.
 
 #### Architecture & Changes
 1. **Schema Update (`packages/db/src/schema/internal_agent.ts`)**:
@@ -67,8 +67,8 @@ This design document specifies the architecture, data model modifications, and s
 2. **Config Drift (`server/src/services/internal-agent/providers/index.ts`)**:
    - Add `GOOGLE_API_KEY` and `GEMINI_API_KEY` to `PROVIDER_ENV_KEYS` and `PROVIDER_SECRET_NAMES` so fallback resolution succeeds when keys are supplied under standard environment names.
 3. **Artifact Lifecycle Hard Delete**:
-   - Land `deleteArtifact` in [`server/src/services/artifacts.ts`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/Paperclip-AoA/AoA-2.5/server/src/services/artifacts.ts) with activity logging.
-   - Land `DELETE /artifacts/:id` in [`server/src/routes/artifacts.ts`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/Paperclip-AoA/AoA-2.5/server/src/routes/artifacts.ts) gated by `assertBoard` and founder role checks.
+   - Land `deleteArtifact` in [`server/src/services/artifacts.ts`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/the upstream project-AoA/AoA-2.5/server/src/services/artifacts.ts) with activity logging.
+   - Land `DELETE /artifacts/:id` in [`server/src/routes/artifacts.ts`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/the upstream project-AoA/AoA-2.5/server/src/routes/artifacts.ts) gated by `assertBoard` and founder role checks.
 
 ---
 
@@ -79,7 +79,7 @@ This design document specifies the architecture, data model modifications, and s
    - Remove static top-level imports `import { PDFParse } from "pdf-parse";` and `import mammoth from "mammoth";`.
    - Inside `extractTextFromBuffer`, dynamically `await import("pdf-parse")` and `await import("mammoth")` only when processing `application/pdf` or DOCX MIME types.
    - Plain text extraction (`text/plain`, `.md`, `.json`) executes natively using `buffer.toString("utf-8")` with zero module evaluation overhead.
-   - Remove `it.skipIf(process.platform === "win32")` from [`server/src/__tests__/file-import-service.test.ts`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/Paperclip-AoA/AoA-2.5/server/src/__tests__/file-import-service.test.ts#L68).
+   - Remove `it.skipIf(process.platform === "win32")` from [`server/src/__tests__/file-import-service.test.ts`](file:///c:/Users/TK/OneDrive/Desktop/Claude%20Data/the upstream project-AoA/AoA-2.5/server/src/__tests__/file-import-service.test.ts#L68).
 2. **Windows E2E CI (`.github/workflows/cross-platform-weekly.yml`)**:
    - Add PostgreSQL service container to `windows-latest` matrix leg.
    - Supply `DATABASE_URL: postgres://postgres:postgres@localhost:5432/aoa` to Playwright step.

@@ -689,7 +689,7 @@ export type {
   PluginLauncherDeclaration,
   PluginMinimumHostVersion,
   PluginUiDeclaration,
-  PaperclipPluginManifestV1,
+  AoAPluginManifestV1,
   PluginRecord,
   PluginStateRecord,
   PluginConfig,
@@ -1351,7 +1351,7 @@ export {
 } from "./redaction.js";
 
 export {
-  paperclipConfigSchema,
+  aoaConfigSchema,
   configMetaSchema,
   llmConfigSchema,
   databaseBackupConfigSchema,

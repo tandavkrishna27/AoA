@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DEPLOYMENT_MODES } from "../constants.js";
-import { paperclipConfigSchema } from "../config-schema.js";
+import { aoaConfigSchema } from "../config-schema.js";
 
 const base = {
   // configMetaSchema requires updatedAt/source; the plan's fixture omitted them.
@@ -17,14 +17,14 @@ describe("cloud_auth deployment mode", () => {
   });
 
   it("requires public exposure + explicit base URL", () => {
-    const bad = paperclipConfigSchema.safeParse({
+    const bad = aoaConfigSchema.safeParse({
       ...base,
       server: { deploymentMode: "cloud_auth", exposure: "private", host: "0.0.0.0", port: 3101, allowedHostnames: [], serveUi: true },
       auth: { baseUrlMode: "auto" },
     });
     expect(bad.success).toBe(false);
 
-    const good = paperclipConfigSchema.safeParse({
+    const good = aoaConfigSchema.safeParse({
       ...base,
       server: { deploymentMode: "cloud_auth", exposure: "public", host: "0.0.0.0", port: 3101, allowedHostnames: [], serveUi: true },
       auth: { baseUrlMode: "explicit", publicBaseUrl: "https://app.example.com" },

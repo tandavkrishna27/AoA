@@ -50,7 +50,7 @@ import {
   ListTree,
   MessageSquare,
   MoreHorizontal,
-  Paperclip,
+  FilePlus2,
   Plus,
   Search,
   SlidersHorizontal,
@@ -888,7 +888,7 @@ export function IssueDetail() {
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadAttachment.isPending}
             >
-              <Paperclip className="h-3.5 w-3.5 mr-1.5" />
+              <FilePlus2 className="h-3.5 w-3.5 mr-1.5" />
               {uploadAttachment.isPending ? "Uploading..." : "Upload image"}
             </Button>
           </div>

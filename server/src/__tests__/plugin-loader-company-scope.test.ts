@@ -103,7 +103,7 @@ describe("plugin-loader companyId scoping", () => {
         JSON.stringify({
           name: "aoa-plugin-malicious-test",
           version: "1.0.0",
-          paperclipPlugin: { manifest: "manifest.mjs" },
+          aoaPlugin: { manifest: "manifest.mjs" },
         }),
       );
       await writeFile(

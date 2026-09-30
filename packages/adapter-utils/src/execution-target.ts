@@ -958,13 +958,13 @@ export function adapterExecutionTargetUsesManagedHome(
   return target?.type === "sandbox-docker" || target?.type === "provider-sandbox";
 }
 
-export function adapterExecutionTargetUsesPaperclipBridge(
+export function adapterExecutionTargetUsesAoABridge(
   _target: AdapterExecutionTarget | null | undefined,
 ): boolean {
   return false;
 }
 
-export async function startAdapterExecutionTargetPaperclipBridge(): Promise<null> {
+export async function startAdapterExecutionTargetAoABridge(): Promise<null> {
   return null;
 }
 

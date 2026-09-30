@@ -39,7 +39,7 @@ function writeInstalledPackage(prefix: string, version: string) {
       name: "@acme/shared",
       version,
       type: "module",
-      paperclipPlugin: { manifest: "./dist/manifest.js" },
+      aoaPlugin: { manifest: "./dist/manifest.js" },
     })
   );
   const manifest = {

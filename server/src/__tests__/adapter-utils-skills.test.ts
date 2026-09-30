@@ -5,12 +5,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   buildPersistentSkillSnapshot,
   ensureAoaSkillSymlink,
-  ensurePaperclipSkillSymlink,
   joinPromptSections,
   listAoaSkillEntries,
-  listPaperclipSkillEntries,
   normalizeAoaWakePayload,
-  normalizePaperclipWakePayload,
   readAoaRuntimeSkillEntries,
   readAoaSkillMarkdown,
   readAoaSkillSyncPreference,
@@ -142,22 +139,6 @@ describe("adapter-utils skills helpers", () => {
       expect(result.desiredSkills.sort()).toEqual(["bar", "foo"]);
     });
 
-    it("falls back to paperclipSkillSync when aoaSkillSync is absent (back-compat)", () => {
-      const result = readAoaSkillSyncPreference({
-        paperclipSkillSync: { desiredSkills: ["legacy-key"] },
-      });
-      expect(result.explicit).toBe(true);
-      expect(result.desiredSkills).toContain("legacy-key");
-    });
-
-    it("prefers aoaSkillSync over paperclipSkillSync when both are present", () => {
-      const result = readAoaSkillSyncPreference({
-        aoaSkillSync: { desiredSkills: ["new-key"] },
-        paperclipSkillSync: { desiredSkills: ["old-key"] },
-      });
-      expect(result.desiredSkills).toContain("new-key");
-      expect(result.desiredSkills).not.toContain("old-key");
-    });
   });
 
   describe("writeAoaSkillSyncPreference", () => {
@@ -170,19 +151,10 @@ describe("adapter-utils skills helpers", () => {
       expect(sync.desiredSkills).toEqual(["a", "b"]);
     });
 
-    it("writes both aoaSkillSync and paperclipSkillSync for back-compat", () => {
+    it("writes the AoA skill preference", () => {
       const out = writeAoaSkillSyncPreference({} as Record<string, unknown>, ["x", "y"]);
-      expect(out.aoaSkillSync).toBeDefined();
-      expect(out.paperclipSkillSync).toBeDefined();
-      expect(out.paperclipSkillSync).toEqual(out.aoaSkillSync);
-    });
-
-    it("dual-writes the same desiredSkills array into both fields", () => {
-      const out = writeAoaSkillSyncPreference({}, ["deploy-prod", "qa-agent"]);
-      const aoa = out.aoaSkillSync as Record<string, unknown>;
-      const pcp = out.paperclipSkillSync as Record<string, unknown>;
-      expect(aoa.desiredSkills).toEqual(["deploy-prod", "qa-agent"]);
-      expect(pcp.desiredSkills).toEqual(["deploy-prod", "qa-agent"]);
+      expect(out.aoaSkillSync).toEqual({ desiredSkills: ["x", "y"] });
+      expect(Object.keys(out)).toEqual(["aoaSkillSync"]);
     });
   });
 
@@ -364,7 +336,7 @@ describe("adapter-utils skills helpers", () => {
       });
       expect(prompt).toContain("## AoA Wake Payload");
       expect(prompt).toContain("take a look");
-      expect(prompt).not.toContain("Paperclip");
+      expect(prompt).toContain("AoA");
     });
   });
 
@@ -413,11 +385,5 @@ describe("adapter-utils skills helpers", () => {
     });
   });
 
-  describe("Paperclip-named aliases", () => {
-    it("exposes the same function identity as the AoA-named primaries", () => {
-      expect(normalizePaperclipWakePayload).toBe(normalizeAoaWakePayload);
-      expect(listPaperclipSkillEntries).toBe(listAoaSkillEntries);
-      expect(ensurePaperclipSkillSymlink).toBe(ensureAoaSkillSymlink);
-    });
-  });
+
 });

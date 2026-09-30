@@ -257,6 +257,19 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/adapters/hermes-local:
+    dependencies:
+      '@armyofagents/adapter-utils':
+        specifier: workspace:*
+        version: link:../../adapter-utils
+    devDependencies:
+      '@types/node':
+        specifier: ^24.6.0
+        version: 24.12.0
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/adapters/openclaw:
     dependencies:
       '@armyofagents/adapter-utils':
@@ -358,7 +371,7 @@ importers:
         specifier: ^3.2.6
         version: 3.2.6(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3)
 
-  packages/plugins/create-paperclip-plugin:
+  packages/plugins/create-aoa-plugin:
     dependencies:
       '@armyofagents/plugin-sdk':
         specifier: workspace:*
@@ -370,6 +383,9 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+      vitest:
+        specifier: ^3.2.6
+        version: 3.2.6(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(jsdom@29.1.1(@noble/hashes@2.2.0))(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3)
 
   packages/plugins/examples/plugin-authoring-smoke-example:
     dependencies:
@@ -571,6 +587,9 @@ importers:
       '@armyofagents/adapter-grok-local':
         specifier: workspace:*
         version: link:../packages/adapters/grok-local
+      '@armyofagents/adapter-hermes-local':
+        specifier: workspace:*
+        version: link:../packages/adapters/hermes-local
       '@armyofagents/adapter-openclaw':
         specifier: workspace:*
         version: link:../packages/adapters/openclaw
@@ -655,9 +674,6 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
-      hermes-paperclip-adapter:
-        specifier: 0.1.1
-        version: 0.1.1
       http-proxy:
         specifier: ^1.18.1
         version: 1.18.1
@@ -2767,9 +2783,6 @@ packages:
   '@opentelemetry/semantic-conventions@1.42.0':
     resolution: {integrity: sha512-icc5xCzndZfhuJMy5oqk5AvloWquR7jtae74qzpkKkhGp8BivK+oCcEXgGnjCdTfp8hA44l+w8gE8yYJbocJJw==}
     engines: {node: '>=14'}
-
-  '@paperclipai/adapter-utils@0.3.1':
-    resolution: {integrity: sha512-W66k+hJkQE8ma0asM/Sd90AC8HHy/BLG/sd0aOC+rDWw+gOasQyUkTnDoPv1zhQuTyKEEvLFV6ByOOKqEiAz/A==}
 
   '@paralleldrive/cuid2@2.3.1':
     resolution: {integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==}
@@ -6028,10 +6041,6 @@ packages:
 
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
-
-  hermes-paperclip-adapter@0.1.1:
-    resolution: {integrity: sha512-kbdX349VxExSkVL8n4RwTpP9fUBf2yWpsTsJp02X12A9NynRJatlpYqt0vEkFyE/X7qEXqdJvpBm9tlvUHahsA==}
-    engines: {node: '>=20.0.0'}
 
   highlight.js@11.11.1:
     resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
@@ -10806,8 +10815,6 @@ snapshots:
 
   '@opentelemetry/semantic-conventions@1.42.0': {}
 
-  '@paperclipai/adapter-utils@0.3.1': {}
-
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
       '@noble/hashes': 1.8.0
@@ -12746,6 +12753,14 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
+  '@vitest/mocker@3.2.6(vite@6.4.3(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3))':
+    dependencies:
+      '@vitest/spy': 3.2.6
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 6.4.3(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3)
+
   '@vitest/mocker@3.2.6(vite@6.4.3(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3))':
     dependencies:
       '@vitest/spy': 3.2.6
@@ -14369,11 +14384,6 @@ snapshots:
   helmet@8.1.0: {}
 
   help-me@5.0.0: {}
-
-  hermes-paperclip-adapter@0.1.1:
-    dependencies:
-      '@paperclipai/adapter-utils': 0.3.1
-      picocolors: 1.1.1
 
   highlight.js@11.11.1: {}
 
@@ -16784,7 +16794,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.6
-      '@vitest/mocker': 3.2.6(vite@6.4.3(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3))
+      '@vitest/mocker': 3.2.6(vite@6.4.3(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.22.4)(yaml@2.8.3))
       '@vitest/pretty-format': 3.2.6
       '@vitest/runner': 3.2.6
       '@vitest/snapshot': 3.2.6

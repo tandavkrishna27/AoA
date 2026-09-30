@@ -26,8 +26,8 @@ corresponding defaults, so review inherited environment variables before using
 `--yes`.
 
 > The MeteoriteLabs AoA CLI is not currently published to npm. The package
-> names `aoa` and `paperclipai` resolve to other projects, so do not use
-> `npx aoa` or `npx paperclipai` for AoA. Until a scoped release is published
+> unscoped `aoa` does not identify this repository, so do not use
+> `npx aoa` for AoA. Until a scoped release is published
 > and smoke-tested, use `pnpm aoa` from this repository.
 
 Open [http://localhost:3100](http://localhost:3100). A new user is routed to

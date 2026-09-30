@@ -9,7 +9,7 @@ drizzle/meta/
 coverage/
 .DS_Store
 data/
-.paperclip/
+.aoa/
 .pnpm-store/
 tmp-*
 cli/tmp/
@@ -41,7 +41,7 @@ tmp/
 .vscode/
 .claude/settings.local.json
 .claude/worktrees/
-.paperclip-local/
+.aoa-local/
 .worktrees/
 docs/superpowers/
 plans/

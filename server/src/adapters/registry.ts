@@ -123,11 +123,11 @@ import {
   execute as hermesExecute,
   testEnvironment as hermesTestEnvironment,
   sessionCodec as hermesSessionCodec,
-} from "hermes-paperclip-adapter/server";
+} from "@armyofagents/adapter-hermes-local/server";
 import {
   agentConfigurationDoc as hermesAgentConfigurationDoc,
   models as hermesModels,
-} from "hermes-paperclip-adapter";
+} from "@armyofagents/adapter-hermes-local";
 import {
   parseObject,
   asString,
@@ -438,16 +438,15 @@ const hermesLocalAdapter: ServerAdapterModule = {
       nextEnv[k] = s;
     }
 
-    // Always inject PAPERCLIP_RUN_ID.
-    // PAPERCLIP_API_KEY and PAPERCLIP_RUN_ID are wire-protocol contracts with
-    // hermes-paperclip-adapter — do NOT rename these to AOA_*.
-    nextEnv.PAPERCLIP_RUN_ID = ctx.runId;
+    nextEnv.AOA_RUN_ID = ctx.runId;
+    const taskId = asString(ctx.config.taskId, "").trim();
+    if (taskId) nextEnv.AOA_TASK_ID = taskId;
 
-    // Inject PAPERCLIP_API_KEY from agent JWT only when not explicitly
+    // Inject AOA_API_KEY from agent JWT only when not explicitly
     // configured — an explicit key takes precedence over the JWT.
-    const explicitApiKey = asString(env.PAPERCLIP_API_KEY, "").trim();
+    const explicitApiKey = asString(env.AOA_API_KEY, "").trim();
     if (!explicitApiKey && ctx.authToken) {
-      nextEnv.PAPERCLIP_API_KEY = ctx.authToken;
+      nextEnv.AOA_API_KEY = ctx.authToken;
     }
     agentConfig.env = nextEnv;
 

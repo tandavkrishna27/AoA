@@ -178,156 +178,37 @@ jobs:
         with:
           node-version: 24
 
-      - name: Check for stale Paperclip references in user-facing surfaces
+      - name: Check tracked content and paths for former-brand tokens
         run: |
-          # Guard against regressions of the AoA rebrand (Sprint 3 polish, rc.4).
-          # Only the highest-signal user-facing patterns are enforced.
-          # Intentional wire-compat/backward-compat residuals are documented
-          # in docs/telemetry.md and CLAUDE.md and explicitly allowed here:
-          #   - PAPERCLIP_* env vars (mirrored to AOA_*)
-          #   - paperclipai CLI bin alias
-          #   - paperclipPlugin / __paperclipPluginBridge__ (plugin wire protocol)
-          #   - paperclip-feedback-envelope-v2 / paperclip-feedback-bundle-v2
-          #   - hermes-paperclip-adapter (external npm package)
-          #   - PaperclipPluginManifest / paperclipConfigSchema (type aliases)
-          # Guards 5-7 have their own allow-list:
-          #   Guard 5: paperclip:/. localStorage legacy reads allowed only in
-          #            lib/storage-migrations.ts, __tests__/storage-migration,
-          #            and ui/index.html (FOUC bootstrap legacy fallback read).
-          #   Guard 6: [paperclip] allowed only in normalize-transcript.ts
-          #            (matches upstream CLI binary's stderr output, not our
-          #            own log prefix — see brand-check-ignore comment there).
-          #   Guard 7: no allow-list; paperclip-* CSS classes are fully renamed.
-          #   Guard 8: quoted "Paperclip <Word>" prose strings; allow-listed for
-          #            wire-compat field-name prose ("paperclipApiUrl ..."),
-          #            test fixtures using "Paperclip" as a literal name
-          #            ("Paperclip Hook", "Paperclip Test", "Paperclip runtime
-          #            note:" assertions in cursor-local-execute.test.ts which
-          #            mirror the renamed AoA prompt text — these are now
-          #            "AoA runtime note:" so they no longer trip), and the
-          #            historical changelog title in cli/CHANGELOG.md.
-          #
-          # Guards (1-9): pcp_ tokens, paperclip plugin keys, PAPERCLIP banner,
-          #               user-visible Paperclip strings, paperclip:/. localStorage
-          #               keys, [paperclip] log prefix, paperclip-* CSS classes,
-          #               quoted "Paperclip <Word>" prose in shipping code,
-          #               AOA_* env-var doc completeness (catches docs drift).
-          failed=0
+          python3 <<'PYEOF'
+          import os
+          import re
+          import subprocess
+          import sys
 
-          # 1. No pcp_ token prefixes in source (all renamed to aoa_).
-          pcp_hits=$(grep -rnE '"pcp_(invite|mcp|claim)_|'\''pcp_(invite|mcp|claim)_' \
-            --include='*.ts' --include='*.tsx' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            server/src ui/src cli/src packages/plugins/examples 2>/dev/null || true)
-          if [ -n "$pcp_hits" ]; then
-            echo "::error::Found pcp_ token prefixes in source (should be aoa_):"
-            printf '%s\n' "$pcp_hits"
-            failed=1
-          fi
+          token = re.compile(rb"p[a]per[\s_-]*clip", re.IGNORECASE)
+          paths = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          hits = []
+          for path in filter(None, paths):
+              display = os.fsdecode(path)
+              if token.search(path):
+                  hits.append(f"path: {display}")
+              try:
+                  data = open(path, "rb").read()
+              except FileNotFoundError:
+                  continue
+              for match in token.finditer(data):
+                  number = data.count(b"\n", 0, match.start()) + 1
+                  hits.append(f"content: {display}:{number}")
+          if hits:
+              print("::error::Former-brand token found in tracked tree")
+              print("\n".join(hits))
+              sys.exit(1)
+          print("Tracked content and path scan passed")
+          PYEOF
 
-          # 2. No "paperclip.*-example" plugin keys in source (renamed to aoa.*).
-          plugin_hits=$(grep -rnE '"paperclip[.-](hello-world|file-browser|kitchen-sink)' \
-            --include='*.ts' --include='*.tsx' --include='*.md' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            server/src ui/src cli/src packages/plugins/examples 2>/dev/null \
-            | grep -v 'mapLegacyPaperclipKey' || true)
-          if [ -n "$plugin_hits" ]; then
-            echo "::error::Found paperclip.* plugin keys in source (should be aoa.*):"
-            printf '%s\n' "$plugin_hits"
-            failed=1
-          fi
-
-          # 3. No "PAPERCLIP" ASCII art blocks (renamed to AOA).
-          banner_hits=$(grep -rnE '"██████╗.*PAPERCLIP|PAPERCLIP.*██████╗' \
-            --include='*.ts' --include='*.tsx' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            server/src ui/src cli/src packages/plugins/examples 2>/dev/null || true)
-          if [ -n "$banner_hits" ]; then
-            echo "::error::Found PAPERCLIP ASCII banner in source (rename to AOA):"
-            printf '%s\n' "$banner_hits"
-            failed=1
-          fi
-
-          # 4. No "Start Paperclip" or "Paperclip dashboard" user-visible strings.
-          ui_hits=$(grep -rnE '"Start Paperclip|Paperclip dashboard|Paperclip plugin API|Paperclip setup' \
-            --include='*.ts' --include='*.tsx' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            server/src ui/src cli/src packages/plugins/examples 2>/dev/null || true)
-          if [ -n "$ui_hits" ]; then
-            echo "::error::Found user-visible Paperclip strings in source (should say AoA):"
-            printf '%s\n' "$ui_hits"
-            failed=1
-          fi
-
-          # 5. No paperclip:/. localStorage keys outside the migration registry.
-          # ui/index.html FOUC bootstrap has one intentional legacy fallback read
-          # (paperclip.theme → aoa.theme) and is excluded from this guard.
-          ls_hits=$(grep -rnE 'localStorage\.(set|get|remove)Item\([^)]*paperclip|paperclip[:.][a-zA-Z]' \
-            --include='*.ts' --include='*.tsx' --include='*.html' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            ui/src ui/index.html 2>/dev/null \
-            | grep -v 'lib/storage-migrations\|__tests__/storage-migration\|ui/index\.html' || true)
-          if [ -n "$ls_hits" ]; then
-            echo "::error::Found paperclip:/. localStorage keys in ui/ outside the migration registry (use aoa: prefix; legacy reads only allowed in lib/storage-migrations.ts and ui/index.html FOUC bootstrap):"
-            printf '%s\n' "$ls_hits"
-            failed=1
-          fi
-
-          # 6. No [paperclip] log prefix outside docs (renamed to [aoa]).
-          # Three files are excluded:
-          #   - normalize-transcript.ts — matches the upstream Claude CLI
-          #     binary's stderr output, not an AoA-emitted prefix.
-          #   - stderr-classification.ts - classifies legacy/upstream stderr,
-          #     not an AoA-emitted prefix.
-          #   - find-dead-paperclip-filters.mjs — the audit script that LOOKS
-          #     FOR this exact pattern; the literal occurrences are the
-          #     script's search target and documentation, not log emissions.
-          log_hits=$(grep -rnE '\[paperclip\]' \
-            --include='*.ts' --include='*.tsx' --include='*.mjs' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            server/src ui/src cli/src packages/adapters scripts 2>/dev/null \
-            | grep -v 'normalize-transcript\|stderr-classification\|find-dead-paperclip-filters' || true)
-          if [ -n "$log_hits" ]; then
-            echo "::error::Found [paperclip] log prefix (rename to [aoa]):"
-            printf '%s\n' "$log_hits"
-            failed=1
-          fi
-
-          # 7. No paperclip-* CSS classes (renamed to aoa-*).
-          css_hits=$(grep -rnE 'paperclip-(mdxeditor|project-mention-chip)' \
-            --include='*.css' --include='*.tsx' --include='*.ts' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            ui/src 2>/dev/null || true)
-          if [ -n "$css_hits" ]; then
-            echo "::error::Found paperclip-* CSS classes (rename to aoa-*):"
-            printf '%s\n' "$css_hits"
-            failed=1
-          fi
-
-          # 8. No quoted "Paperclip <Word>" prose in shipping code (renamed to "AoA <Word>").
-          # Catches the OpenClaw onboarding prose class ("Paperclip is bound to...",
-          # "Paperclip callback requests...", "Suggested Paperclip base URLs to try",
-          # "# Paperclip OpenClaw Onboarding", etc.). Allow-listed:
-          #   - paperclipApiUrl wire-compat field references (the regex matches a
-          #     literal SPACE after "Paperclip", so identifiers like
-          #     "paperclipApiUrl" don't trip)
-          #   - test fixtures using "Paperclip" as a literal name (Hook, Test, etc.)
-          #     — those now read "AoA <Word>" after the OpenClaw prose sweep
-          #   - historical entries in cli/CHANGELOG.md (excluded by path)
-          prose_hits=$(grep -rnE '"Paperclip [A-Za-z]|`Paperclip [A-Za-z]|# Paperclip [A-Za-z]' \
-            --include='*.ts' --include='*.tsx' \
-            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
-            server/src ui/src cli/src packages/plugins/examples 2>/dev/null \
-            | grep -v 'Paperclip Hook\|Paperclip Test' || true)
-          if [ -n "$prose_hits" ]; then
-            echo "::error::Found quoted \"Paperclip <Word>\" prose in shipping code (rename to AoA):"
-            printf '%s\n' "$prose_hits"
-            failed=1
-          fi
-
-          # 9. env-var doc completeness — every AOA_* env var read by code must
-          #    appear in docs/deploy/environment-variables.md. Catches silent
-          #    drift when a feature lands a new env var without doc update.
+      - name: Check AoA environment variable documentation
+        run: |
           declared_env=$(grep -rhoE 'process\.env\.AOA_[A-Z_]+' \
             --include='*.ts' \
             --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build \
@@ -336,19 +217,10 @@ jobs:
           documented_env=$(grep -oE 'AOA_[A-Z_]+' docs/deploy/environment-variables.md 2>/dev/null | sort -u)
           missing_env=$(comm -23 <(printf '%s\n' "$declared_env") <(printf '%s\n' "$documented_env") || true)
           if [ -n "$missing_env" ]; then
-            echo "::error::AOA_* env vars read by code but not documented in docs/deploy/environment-variables.md:"
+            echo "::error::AoA environment variables used by code are missing from docs/deploy/environment-variables.md:"
             printf '%s\n' "$missing_env"
-            echo "::error::Add these to docs/deploy/environment-variables.md or remove them from code."
-            failed=1
-          fi
-
-          if [ "$failed" -eq 1 ]; then
             exit 1
           fi
-          echo "Brand check passed: no user-facing Paperclip regressions."
-
-      - name: Forbidden tokens scan (.forbidden-tokens.json)
-        run: pnpm exec node scripts/check-forbidden-tokens.mjs
 
   # verify and e2e run independently of policy. Failing policy (e.g.,
   # contributor accidentally committed pnpm-lock.yaml) should not mask
@@ -481,7 +353,7 @@ jobs:
             bash tests/e2e/scripts/install-chromium-from-google.sh
           fi
 
-      - name: Generate Paperclip config
+      - name: Generate AoA config
         run: |
           mkdir -p ~/.aoa/instances/default
           cat > ~/.aoa/instances/default/config.json << 'CONF'

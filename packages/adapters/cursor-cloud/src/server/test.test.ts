@@ -8,7 +8,7 @@ describe("cursor_cloud environment diagnostics", () => {
       companyId: "test-company",
       config: {
         env: { CURSOR_API_KEY: "" },
-        repoUrl: "https://github.com/paperclipai/paperclip.git",
+        repoUrl: "https://github.com/aoaai/aoa.git",
       },
       executionTarget: {
         type: "provider-sandbox",

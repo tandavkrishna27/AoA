@@ -935,8 +935,8 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
       const executionContext: Record<string, unknown> = {
         aoaInstruction: instruction,
         payload,
-        paperclipWorkspace: crewWorkspace.workspace,
-        paperclipWorkspaces: crewWorkspace.workspaceHints,
+        aoaWorkspace: crewWorkspace.workspace,
+        aoaWorkspaces: crewWorkspace.workspaceHints,
       };
       // Guard, not a convenience: see (1) above — `skills: []` and an absent key
       // must stay indistinguishable to the adapter.

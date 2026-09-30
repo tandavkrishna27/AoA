@@ -7,7 +7,7 @@ import type { Db } from "@armyofagents/db";
 import type {
   DeploymentExposure,
   DeploymentMode,
-  PaperclipPluginManifestV1,
+  AoAPluginManifestV1,
 } from "@armyofagents/shared";
 import type { StorageService } from "./storage/types.js";
 import { httpLogger, errorHandler } from "./middleware/index.js";
@@ -517,7 +517,7 @@ export async function createApp(
     lifecycleManager: lifecycleMgr,
     buildHostHandlers: (
       pluginId: string,
-      manifest: PaperclipPluginManifestV1
+      manifest: AoAPluginManifestV1
     ) => {
       // A manual reload may create a fresh service bundle for the same row.
       // Dispose the previous generation before replacing its disposer.
@@ -643,7 +643,7 @@ export async function createApp(
   //
   // The PluginLoaderLike adapter narrows the real loader/registry/lifecycle
   // surface to just what marketplace needs (PluginInstaller's contract), which
-  // also handles the manifest type widening (PaperclipPluginManifestV1 ->
+  // also handles the manifest type widening (AoAPluginManifestV1 ->
   // { id; [key: string]: unknown }) and the lifecycle.load return-value shrink
   // (PluginRecord -> void).
   const marketplacePluginRegistry = pluginRegistryService(db);
@@ -730,7 +730,7 @@ export async function createApp(
   app.use("/_plugins", pluginUiStaticRoutes(db, { localPluginDir: pluginDir }));
 
   // Expose tool dispatcher globally so heartbeat can inject plugin tools into agent context
-  (globalThis as any).__paperclipPluginToolDispatcher = toolDispatcherInst;
+  (globalThis as any).__aoaPluginToolDispatcher = toolDispatcherInst;
 
   // Expose plugin subsystem for startup/shutdown in index.ts
   (app as any).__pluginSubsystem = {

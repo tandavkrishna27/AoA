@@ -1076,7 +1076,7 @@ export function companyPortabilityService(db: Db) {
 
     const parsed = parseGitHubTreeUrl(source.url);
     let ref = parsed.ref;
-    const manifestRelativePath = [parsed.basePath, "paperclip.manifest.json"].filter(Boolean).join("/");
+    const manifestRelativePath = [parsed.basePath, "aoa.manifest.json"].filter(Boolean).join("/");
     let manifest: CompanyPortabilityManifest | null = null;
     const warnings: ImportWarning[] = [];
     try {

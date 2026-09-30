@@ -1,4 +1,3 @@
-import "./env-compat.js"; // side-effect: mirror PAPERCLIP_* env to AOA_* for migration
 import { readConfigFile } from "./config-file.js";
 import { existsSync } from "node:fs";
 import { config as loadDotenv } from "dotenv";
@@ -154,7 +153,7 @@ export function loadConfig(): Config {
   const companyWorkspaceBaseDir = resolveHomeAwarePath(
     process.env.AOA_COMPANY_WORKSPACE_DIR ?? resolveDefaultCompanyWorkspaceBaseDir(),
   );
-  const storageS3Bucket = process.env.AOA_STORAGE_S3_BUCKET ?? fileStorage?.s3?.bucket ?? "paperclip";
+  const storageS3Bucket = process.env.AOA_STORAGE_S3_BUCKET ?? fileStorage?.s3?.bucket ?? "aoa";
   const storageS3Region = process.env.AOA_STORAGE_S3_REGION ?? fileStorage?.s3?.region ?? "us-east-1";
   const storageS3Endpoint = process.env.AOA_STORAGE_S3_ENDPOINT ?? fileStorage?.s3?.endpoint ?? undefined;
   const storageS3Prefix = process.env.AOA_STORAGE_S3_PREFIX ?? fileStorage?.s3?.prefix ?? "";

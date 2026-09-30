@@ -1,5 +1,5 @@
 export {
-  paperclipConfigSchema,
+  aoaConfigSchema,
   configMetaSchema,
   llmConfigSchema,
   databaseBackupConfigSchema,

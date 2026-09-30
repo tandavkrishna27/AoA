@@ -329,9 +329,9 @@ POST /api/companies/{companyId}/projects
   "status": "planned",
   "goalIds": ["{goalId}"],
   "workspace": {
-    "name": "paperclip-mobile",
-    "cwd": "/Users/me/paperclip-mobile",
-    "repoUrl": "https://github.com/acme/paperclip-mobile",
+    "name": "aoa-mobile",
+    "cwd": "/Users/me/aoa-mobile",
+    "repoUrl": "https://github.com/acme/aoa-mobile",
     "repoRef": "main",
     "isPrimary": true
   }
@@ -350,8 +350,8 @@ POST /api/companies/{companyId}/projects
 
 POST /api/projects/{projectId}/workspaces
 {
-  "cwd": "/Users/me/paperclip-mobile",
-  "repoUrl": "https://github.com/acme/paperclip-mobile",
+  "cwd": "/Users/me/aoa-mobile",
+  "repoUrl": "https://github.com/acme/aoa-mobile",
   "repoRef": "main",
   "isPrimary": true
 }

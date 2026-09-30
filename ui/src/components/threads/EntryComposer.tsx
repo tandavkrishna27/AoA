@@ -19,7 +19,7 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
 } from "react";
-import { AtSign, Mic, Paperclip, SendHorizonal, X } from "lucide-react";
+import { AtSign, Mic, FilePlus2, SendHorizonal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ComposerAttachmentCard } from "../composer/ComposerAttachmentCard";
 import { ComposerIconButton } from "../composer/ComposerIconButton";
@@ -71,7 +71,7 @@ export interface EntryComposerProps {
   agents: AgentRef[];
   users: UserRef[];
   /**
-   * Uploader called per file when the user picks files via the paperclip
+   * Uploader called per file when the user picks files via the aoa
    * button. Must return an AssetRef. Defaulted by the consumer (ThreadTab)
    * to POST /companies/:cid/assets/files.
    */
@@ -567,7 +567,7 @@ export function EntryComposer({
           disabled={disabled || isSubmitting || !onUpload}
           data-testid="entry-composer-attach-button"
         >
-          <Paperclip className="h-4 w-4" />
+          <FilePlus2 className="h-4 w-4" />
         </ComposerIconButton>
         <input
           ref={fileInputRef}

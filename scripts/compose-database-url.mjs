@@ -33,15 +33,15 @@ export function databaseUrlFromEnv(env = process.env) {
   // (docker-compose.quickstart.yml or the standalone `docker run` flow, which
   // ship no `db` service). Return null so the entrypoint leaves DATABASE_URL
   // unset and the server stays on embedded postgres. Only the multi-service
-  // docker-compose.yml injects AOA_POSTGRES_* (password defaults to paperclip),
+  // docker-compose.yml injects AOA_POSTGRES_* (password defaults to aoa),
   // so only that stack assembles an external URL.
   if (!password) return null;
-  // `|| default` mirrors compose's `${AOA_POSTGRES_*:-paperclip}` — an empty
+  // `|| default` mirrors compose's `${AOA_POSTGRES_*:-aoa}` — an empty
   // value falls back to the default, same as the `:-` expansion.
   return buildDatabaseUrl({
-    user: env.AOA_POSTGRES_USER || "paperclip",
+    user: env.AOA_POSTGRES_USER || "aoa",
     password,
-    db: env.AOA_POSTGRES_DB || "paperclip",
+    db: env.AOA_POSTGRES_DB || "aoa",
   });
 }
 
