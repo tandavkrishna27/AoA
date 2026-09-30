@@ -1,5 +1,5 @@
 {
-  "id": "1e53a306-3803-4661-a91d-5a4575a3c218",
+  "id": "be76db11-f298-4f58-91f6-2411017dbe44",
   "prevId": "c9d29b49-ef2d-41dc-931b-9af2128a1e5a",
   "version": "7",
   "dialect": "postgresql",
@@ -7918,7 +7918,7 @@
           "name": "agent_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "issue_id": {
           "name": "issue_id",
