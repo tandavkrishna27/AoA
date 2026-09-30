@@ -30,10 +30,12 @@
 
 - Tracked `main` content and paths: zero target-token matches.
 - Nonignored untracked files: 499 total; 36 content matches (24 pitch-build intermediates and scripts, 12 authored product/research/strategy documents); no matching filenames.
+- Those 36 text files contain 247 target-token occurrences. Archive inspection found 27 additional matching PPTX/ZIP files with 132 embedded occurrences among 37 untracked archives checked; these need deliberate document edits or regeneration, not a plain text replace.
 - A partial no-ignore scan found 8,720 additional matching files outside `.claude/worktrees`, including 7,866 in nested `.worktrees`, about 735 under `server` runtime output, 19 under `data`, and smaller local cache/log groups. It excluded dependencies, build outputs, and archives, so it is not a whole-folder total.
 - Registered Git worktrees: 223 paths exist; 22 have tracked changes. Three checked-out branches have replatform-related names, but none is exactly `replatform`.
 - Local Git: `main` is four commits ahead and twelve behind `origin/main`; 449 local branches, 457 remote-tracking refs, 406 local tags, seven stashes, and roughly 10,586 commits reachable across refs. About 140 tag names and 1,428 commit subjects contain the target token.
 - Published GitHub `main` is protected against force pushes, and eleven pull requests are open. Public clones, forks, caches, and PR records cannot be guaranteed clean through a repository rewrite.
+- The twelve remote-only commits change 258 paths; 35 overlap the 631-path cleanup. They add roughly 80 target-token lines, so a routine merge would reintroduce the term. Integrate remote changes against current AoA contracts with full tests and the zero-match guard.
 
 ## Execution boundaries
 
