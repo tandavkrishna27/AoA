@@ -1,0 +1,249 @@
+AoA installation error and warning report
+Date: 30 September 2026 (Asia/Calcutta)
+Repository: C:\Users\Dell\Desktop\aoa\AoA
+Branch: main
+Verified remote commit: 64f403625cc0028c616b8fcf7936a601281759a2
+Node.js: v24.15.0; repository requires >=20.3. No Node update needed.
+Package manager used: pnpm 9.15.4, matching packageManager in package.json.
+
+INSTALLATION STEPS AND CURRENT RESULT
+
+1. Used the nested AoA repository, not the parent aoa folder's repository.
+2. Confirmed main and ran git pull --ff-only origin main. It was already current.
+   Rechecked GitHub at the end; local HEAD still matched remote main exactly.
+3. Read repository setup guidance and checked existing Node, pnpm, and AoA data.
+4. Reinstalled locked dependencies using Corepack pnpm 9.15.4.
+5. Built the application so the launcher could serve the static frontend.
+   Added local pnpm shims so nested scripts use the required package manager.
+   Used the existing Git for Windows utilities for build scripts requiring
+   cp/chmod. No application source or tracked lockfile was changed.
+6. Initialized the default local AoA configuration in C:\Users\Dell\.aoa,
+   including the encrypted secret key, storage paths, and embedded PostgreSQL.
+7. Created output/Start-AoA.ps1 and the Army of Agents desktop shortcut.
+8. Started the server and database, then restarted after the frontend build.
+   The nine setup doctor checks passed; API health returned ok, the page
+   returned HTTP 200, and the rendered onboarding UI loaded without JS errors.
+9. Watched the user's onboarding progress and diagnosed folder/auth blockers.
+   The user's API key saved successfully and Commander verification passed.
+10. Installed a separate, AoA-local Codex 0.145.0 for the app's narrow
+    subscription-login version gate. The launcher uses it on future starts;
+    desktop Codex installations were not replaced.
+11. Set AoA's Commander model to gpt-5.5 to prevent inheritance of gpt-6.1-sol.
+    Verified the user's subsequent Commander reply and its ChatGPT auth mode.
+12. Also ran contributor typechecks and the full test suite. These went beyond
+    the normal user install; waiting for the suite was unnecessary. The user
+    asked not to wait for developer tests. The suite had finished just before
+    that request was processed, and no further tests were started.
+
+Current result: AoA is installed and its background server remains running at
+http://127.0.0.1:3100. Closing the UI does not stop that process. Use the desktop
+shortcut to reopen it. Commander chat has returned a successful live response
+using ChatGPT subscription authentication and gpt-5.5.
+
+Remaining configuration issue: the default crew agents still have
+claude_local adapters, and Claude CLI is not installed. Commander uses Codex.
+Crew execution needs Claude setup or a change of crew provider configuration.
+
+ERRORS ENCOUNTERED AND RESOLUTION
+
+1. git pull: Failed to connect to github.com port 443.
+   Cause: restricted network access in the execution sandbox.
+   Resolution: reran the pull with network access. Pull succeeded; HEAD and
+   GitHub refs/heads/main matched exactly.
+
+2. pnpm 11.19.0 warned that pnpm.patchedDependencies and pnpm.overrides
+   in package.json were ignored.
+   Cause: the default environment pnpm was newer than the repo's pinned tool.
+   Resolution: used Corepack to invoke the pinned pnpm 9.15.4; reinstalled
+   all dependencies with --frozen-lockfile. The tracked lockfile was unchanged.
+
+3. Nested build/typecheck scripts selected pnpm 11.19.0, reported
+   ERR_PNPM_META_FETCH_FAIL, and failed with
+   ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY / ELIFECYCLE /
+   ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL.
+   Cause: invoking corepack pnpm at the top level did not replace the pnpm
+   executable found by child scripts. The wrong pnpm attempted to reinstall
+   dependencies, and its registry request was also sandbox-blocked.
+   Resolution: generated local Corepack pnpm shims in output/installation-tools
+   and put that directory first on PATH. Verified both pnpm --version and
+   corepack pnpm exec pnpm --version returned 9.15.4. Build and typecheck
+   subsequently passed. Build ran with network access for its catalog fetches.
+
+4. Vitest/esbuild: Cannot read directory ../../..: Access is denied;
+   Could not resolve vitest.config.ts; failed to load config.
+   Cause: the filesystem sandbox blocked configuration discovery by esbuild.
+   Resolution: reran the test suite with the filesystem access it needed.
+
+5. rg: patches/embedded-postgres*: invalid filename/directory syntax.
+   Cause: a wildcard was passed as a literal path to rg on Windows.
+   Resolution: read the exact patch filename. This was an inspection error,
+   not an application failure.
+
+6. Get-Content: cli/src/commands/start.ts does not exist.
+   Cause: an incorrect guessed source filename during inspection.
+   Resolution: inspected cli/src/index.ts and cli/src/commands/run.ts,
+   which implement the actual startup command.
+
+7. Get-Content: cli/src/checks/db-check.ts does not exist.
+   Cause: an incorrect guessed source filename during inspection.
+   Resolution: enumerated cli/src/checks; the actual file is database-check.ts.
+   The application's database diagnostic passed.
+
+8. Get-CimInstance Win32_OperatingSystem: Access denied.
+   Cause: sandbox restrictions on Windows system inventory.
+   Resolution: omitted this optional memory-inventory check; it was not needed
+   for installation. No Windows permissions were changed.
+
+9. Initial startup: UI dist not found; running in API-only mode.
+   Cause: the first server start happened before the frontend build finished.
+   Resolution: completed the build and restarted AoA. Verified HTTP 200,
+   frontend assets, rendered onboarding UI, and a healthy API.
+
+10. pg_ctl during restart: could not send stop signal: No such process.
+    Cause: stopping the AoA parent had already stopped its embedded database.
+    Resolution: launched AoA again normally; its database and health endpoint
+    returned successfully. No database files were removed.
+
+WARNINGS ENCOUNTERED
+
+11. Better Auth: Base URL could not be determined.
+    Resolution: set BETTER_AUTH_URL=http://127.0.0.1:3100 in the launcher.
+    This warning was absent after restart. Local auth reports ready.
+
+12. MaxListenersExceededWarning for SIGINT and SIGTERM (11 listeners).
+    Status: still emitted by the application during startup; nonblocking.
+    No listener limit or application code was changed to hide the warning.
+
+13. DEP0169: legacy url.parse() deprecation in the package manager.
+    Status: nonblocking upstream warning; dependency installation succeeded.
+
+14. DEP0190: shell=true child-process argument deprecation in tests.
+    Status: upstream warning from exercised process-launch code; not changed
+    as part of installing the application.
+
+15. Vite: AgentDetail is imported both dynamically and statically.
+    Status: nonblocking bundling warning; the production build passed.
+
+16. Vite: some minified chunks exceed 3000 kB.
+    Status: nonblocking bundle-size warning; the production build passed.
+
+17. The test suite intentionally prints error/warning messages for mocked
+    failures (for example unavailable persistence and catalog-fetch failures).
+    These must be assessed against Vitest's final pass/fail results rather
+    than treated as installation failures. The full test log is retained.
+
+VERIFICATION LOGS
+output/installation-typecheck.log
+output/installation-build.log
+output/installation-tests.log
+output/installation-onboard.log
+output/aoa-runtime.log
+output/aoa-runtime-errors.log
+
+FINAL VERIFICATION (INCLUDING EXTRA CONTRIBUTOR CHECKS)
+
+Dependency installation: completed with frozen lockfile.
+Build: passed (exit 0).
+Recursive typecheck: passed (exit 0; extra contributor check).
+Full test suite: 1,976 files passed, 108 files skipped; 18,171 tests passed,
+606 tests skipped; no failures; exit 0. Duration: 32 minutes 49 seconds.
+This full suite was extra contributor work, not a required user-install step.
+Runtime: nine doctor checks passed, health=ok, UI HTTP 200, onboarding rendered.
+Commander: user-confirmed fresh reply, live approval lookup, 36.9 seconds.
+Git: main at 64f403625cc0028c616b8fcf7936a601281759a2; matches origin/main.
+Tracked source changes: none. Installation artifacts are under output/.
+Extracted test console message index: output/installation-test-emitted-messages.txt.
+Full exact test output: output/installation-tests.log.
+Raw API-key values and auth tokens are not included in this report.
+
+ONBOARDING OBSERVATIONS (USER STARTED THE WIZARD)
+
+18. Folder browser returned HTTP 404 for C:\Users\Dell\AoA.
+    Cause: the default workspace folder did not exist yet.
+    Resolution: verified from the implementation that Verify & continue creates
+    the chosen folder and probes write access; explained this to the user.
+    The UI was awaiting verification, not stuck in a pending request.
+
+19. An automatically provisioned crew run failed with
+    Command not found in PATH: "claude".
+    Cause: Claude CLI is absent from this system's PATH.
+    Status: still unresolved for background crew agents configured with Claude.
+    The user selected Codex for Commander, which subsequently verified with
+    the user's API key. That does not reconfigure every default crew agent.
+
+20. Crew runner reported a fallback workspace before environment onboarding
+    was completed. Status: nonblocking warning from incomplete first-run setup.
+
+21. rg inspection referred to nonexistent server/src/routes/workspace-fs.ts.
+    Cause: incorrect guessed filename. Resolution: enumerated route files and
+    inspected company-workspace-fs.ts and onboarding-environment.ts instead.
+
+22. Commander verification repeatedly returned HTTP 422 for missing auth.
+    Resolution: the user entered an API key in AoA. The key-save endpoint
+    returned HTTP 200, and the final Commander verify returned HTTP 200.
+    The browser advanced to Step 8 of 8. No secret values were logged here.
+
+23. Subscription sign-in UI: installed Codex version unsupported.
+    Cause: AoA's current code only enables the built-in subscription sign-in
+    for version 0.145.x. The normal system CLI is 0.144.1; the sandbox resolves
+    another bundled CLI at 0.159.2. Neither matches that narrow version gate.
+    Resolution: installed @openai/codex@0.145.0 into output/installation-codex
+    and configured the AoA launcher to use its native binary on future starts.
+    Verified codex-cli 0.145.0. Did not replace either desktop installation.
+    No further restart was needed for the user's successful API-key verification.
+
+24. A sandbox codex login status check reported Not logged in.
+    Cause: it resolved a different binary/environment than the normal host.
+    Resolution: repeated the check outside the sandbox; normal host reported
+    Logged in using ChatGPT. This does not authenticate AoA's separate homes.
+
+25. Official Codex manual download failed to connect to developers.openai.com.
+    Cause: restricted network access. Resolution: reran with network access;
+    the manual downloaded successfully and its credential-storage guidance
+    was consulted. No Codex settings were changed for the lookup.
+
+26. Additional inspection path errors: literal wildcard paths
+    server/src/services/commander-login* and server/src/services/providers/*.ts;
+    missing docker/Dockerfile and server/src/services/internal-agent/config.ts.
+    Cause: wildcard handling on Windows and guessed filenames.
+    Resolution: used explicit existing files, directory searches with -g filters,
+    the root Dockerfile, and cli-auth-topology.ts. These were inspection errors.
+
+27. Commander chat returned HTTP 400: gpt-6.1-sol is not supported with a
+    ChatGPT account.
+    Cause: Commander model was null, so AoA inherited gpt-6.1-sol from the
+    shared C:\Users\Dell\.codex\config.toml. AoA's model-family validator
+    accepts that name without verifying account-specific support.
+    Resolution: PATCHed only AoA's Commander model to gpt-5.5, the repository's
+    safe default and a model listed in the local Codex model cache. Read back
+    the saved config successfully. Shared Codex settings were not changed.
+    End-to-end confirmation: the user sent "What needs my approval?" and
+    Commander returned a live approval-tool result (0 pending approvals) in
+    36.9 seconds. No unsupported-model error appeared in that turn.
+
+28. Commander API-key verification passed, but chat used a ChatGPT account.
+    Cause: onboarding stores the key in the Commander agent's secret-backed
+    adapter env. The separate chat path resolves provider connections and
+    falls back to the host CLI login when none is assigned; it does not read
+    that agent key in its legacy path. This was verified in commander-key.ts
+    and internal-agent/cli-mode.ts.
+    Status: identified current application behavior; chat was configured to
+    use a subscription-compatible model. API-key chat routing was not patched.
+    Live confirmation: the managed Commander chat auth.json reported
+    auth_mode=chatgpt, API-key presence=false, ChatGPT-token presence=true.
+    Only these metadata flags were displayed; credentials were not exposed.
+
+29. rg inspection referred to nonexistent ui/src/components/CommanderSection.tsx.
+    Resolution: used ui/src/components/settings/sections/CommanderSection.tsx.
+
+30. UI tests emitted React diagnostics, including an ignored onValueChange
+    property and state updates not wrapped in act(). These are test diagnostics;
+    the full log and extracted message index preserve their exact text.
+
+31. Browser console: missing Description or aria-describedby for DialogContent.
+    Status: nonblocking accessibility warning in AoA's UI. Commander still
+    returned a successful response. No application source was changed.
+
+32. Intermediate progress counts included individual passing test-case lines
+    as well as passing test files. Resolution: corrected the counter; the final
+    verification result below uses Vitest's own summary, not that estimate.
