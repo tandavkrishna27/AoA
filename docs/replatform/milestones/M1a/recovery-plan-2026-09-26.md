@@ -15,11 +15,11 @@ and results here; no additional certificate, archive, freeze or handoff is owed.
 |---|---|---|
 | Repository compiles and builds | `pnpm -r typecheck`; `pnpm build` | Both passed locally, October 5 |
 | Existing product regressions | `pnpm test:run --maxWorkers=4` | 23,499 passed; 1,831 skipped. Skips remain unproven |
-| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). D1 [37347848182](https://github.com/tandavkrishna27/AoA/actions/runs/37347848182) cancelled before bring-up after confirming its old registry namespace no longer resolves; corrected run pending |
+| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). D1 [37348530836](https://github.com/tandavkrishna27/AoA/actions/runs/37348530836) built images but all three jobs exhausted runner disk at bring-up; cache cleanup repair in progress |
 | Worker owns distributed execution | Live `m1-spine`, including the wrong-executor control | Pending current-revision run |
 | Tenant separation and usage/budget/audit | Real-Postgres suites; spine and required fault cases | Pending current-revision run |
 | Fence, cancel, recovery and redaction | Worker suites; required D1 fault cases and negative controls | Pending current-revision run |
-| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649) failed before build: redundant unauthenticated Git fetch after checkout. Repaired workflow [37348247569](https://github.com/tandavkrishna27/AoA/actions/runs/37348247569) running; keyed pending |
+| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37348247569](https://github.com/tandavkrishna27/AoA/actions/runs/37348247569) built and admitted all three application images, then exhausted runner disk during the MinIO source build; cache cleanup repair in progress. Keyed pending |
 | Cleanup and rollback | Drain tests; actual Compose/provider cleanup observations | Pending current-revision run |
 
 The existing commands and workflows are the implementation tests. Their
@@ -39,6 +39,15 @@ The workflow ancestry fix passed 59 tests; the D1 Compose suite passed 61 tests.
 MinIO's digest remains unchanged: registry metadata resolves that digest under
 `tandavkrishna27`, while its former `meteoritelabs` namespace returns
 `manifest unknown`.
+
+Run diagnostics: the first keyless attempt
+[37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649)
+failed on the redundant unauthenticated fetch (fixed). The first D1 attempt
+[37347848182](https://github.com/tandavkrishna27/AoA/actions/runs/37347848182)
+was cancelled before bring-up when the stale image namespace was confirmed.
+Neither attempt reached functional tests. The CI status reporter was refreshed
+by [37349221648 attempt 2](https://github.com/tandavkrishna27/AoA/actions/runs/37349221648/attempts/2)
+after a transient GitHub API 500; its first failure is retained in Actions.
 
 The six explicitly enabled Windows Postgres suites were `job-leasing`,
 `job-fencing`, `job-events`, `job-accepted-event-seam`, `job-distributed-drain`,

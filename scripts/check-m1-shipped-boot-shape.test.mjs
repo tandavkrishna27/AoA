@@ -10,7 +10,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -28,6 +28,105 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8");
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
+
+function reclaimFixture(t, { freeKb = 12 * 1024 * 1024, afterCleanupKb = freeKb, missingImage = false, runnerEnvironment = "github-hosted", d1Occurrence = null } = {}) {
+  const text = d1Occurrence === null ? real() : readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8");
+  const markers = [...text.matchAll(/      - name: Reclaim build cache before D1 bring-up/g)];
+  const start = d1Occurrence === null
+    ? text.indexOf("      - name: Reclaim build cache before the object-store build")
+    : markers[d1Occurrence]?.index ?? -1;
+  assert.ok(start > text.indexOf("          bash docker/images/build.sh"), "cleanup must follow source image builds");
+  if (d1Occurrence === null) assert.ok(start > text.indexOf("          bash docker/images/admit.sh"), "cleanup must follow image admission");
+  else assert.equal(markers.length, 3, "every D1 job needs disk reclaim before bring-up");
+  const end = d1Occurrence === null ? text.indexOf("      # ★ E6-F030", start) : text.indexOf("      - name:", start + 1);
+  assert.ok(end > start, "cleanup must precede the next build/bring-up step");
+  const block = text.slice(start, end);
+  const commands = block.slice(block.indexOf("          set -euo pipefail"))
+    .split(/\r?\n/).map((line) => line.replace(/^          /, "")).join("\n");
+  const root = mkdtempSync(path.join(os.tmpdir(), "aoa-cache-reclaim-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const digests = path.join(root, "digests.env");
+  writeFileSync(digests, "CONTROL-PLANE_IMAGE=cp:candidate\nWORKER_IMAGE=worker:candidate\nADAPTER-MANAGER_IMAGE=am:candidate\n");
+  const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe")
+    ? "C:/Program Files/Git/bin/bash.exe" : "bash";
+  // Replace only external operations. Execute the workflow's real shell logic;
+  // no Docker prune or hosted-tool deletion ever reaches this developer machine.
+  const stubs = `
+free_kb=$TEST_FREE_KB
+df() {
+  if [[ "$1" == "-Pk" ]]; then printf 'Filesystem 1024-blocks Used Available Capacity Mounted\\nroot 100000000 1 %s 1%% /\\n' "$free_kb";
+  else printf 'disk diagnostic\\n'; fi
+}
+docker() {
+  printf 'docker %s\\n' "$*" >&2
+  if [[ "$*" == "builder prune --all --force" ]]; then return 0; fi
+  if [[ "$1 $2" == "image inspect" ]]; then [[ "$TEST_MISSING_IMAGE" == "0" ]]; return; fi
+  return 99
+}
+sudo() {
+  printf 'sudo %s\\n' "$*" >&2
+  [[ "$*" == "rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc" ]] || return 99
+  free_kb=$TEST_AFTER_CLEANUP_KB
+}
+grep() { command grep "$1" "$2" "$TEST_DIGESTS"; }
+`;
+  return spawnSync(bash, ["--noprofile", "--norc", "-c", stubs + commands], {
+    cwd: root, encoding: "utf8", timeout: 10_000,
+    env: { ...process.env, RUNNER_ENVIRONMENT: runnerEnvironment, TEST_DIGESTS: digests.replaceAll("\\", "/"),
+      AOA_D1_CONTROL_PLANE_IMAGE: "cp:candidate", AOA_D1_WORKER_IMAGE: "worker:candidate", AOA_D1_FAKE_PROVIDER_IMAGE: "fake:candidate",
+      TEST_FREE_KB: String(freeKb), TEST_AFTER_CLEANUP_KB: String(afterCleanupKb), TEST_MISSING_IMAGE: missingImage ? "1" : "0" },
+  });
+}
+
+test("runner cache reclaim preserves all three admitted images and avoids toolkit cleanup with headroom", (t) => {
+  const result = reclaimFixture(t);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(result.stderr.trim().split(/\r?\n/), [
+    "docker builder prune --all --force", "docker image inspect cp:candidate",
+    "docker image inspect worker:candidate", "docker image inspect am:candidate",
+  ]);
+});
+
+test("runner cache reclaim removes only unused hosted toolkits when cache alone leaves too little space", (t) => {
+  const result = reclaimFixture(t, { freeKb: 1024, afterCleanupKb: 12 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stderr, /sudo rm -rf \/usr\/local\/lib\/android \/usr\/share\/dotnet \/opt\/ghc/);
+});
+
+test("runner cache reclaim refuses missing final images and insufficient disk after cleanup", (t) => {
+  const missing = reclaimFixture(t, { missingImage: true });
+  assert.notEqual(missing.status, 0);
+  const full = reclaimFixture(t, { freeKb: 1024, afterCleanupKb: 1024 });
+  assert.equal(full.status, 1);
+  assert.match(full.stdout, /at least 8 GiB free/);
+});
+
+test("runner cache reclaim refuses toolkit deletion on a self-hosted runner", (t) => {
+  const result = reclaimFixture(t, { freeKb: 1024, runnerEnvironment: "self-hosted" });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /requires a GitHub-hosted runner/);
+  assert.doesNotMatch(result.stderr, /sudo/);
+});
+
+for (const [d1Occurrence, job] of ["d1-merge-train", "m1-spine", "m1-fault-matrix"].entries()) {
+  test(`${job} reclaims cache and preserves its actual control-plane, worker and fake-provider images`, (t) => {
+    const result = reclaimFixture(t, { d1Occurrence });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.deepEqual(result.stderr.trim().split(/\r?\n/), [
+      "docker builder prune --all --force", "docker image inspect cp:candidate",
+      "docker image inspect worker:candidate", "docker image inspect fake:candidate",
+    ]);
+    const low = reclaimFixture(t, { d1Occurrence, freeKb: 1024, afterCleanupKb: 12 * 1024 * 1024 });
+    assert.equal(low.status, 0, low.stderr + low.stdout);
+    const full = reclaimFixture(t, { d1Occurrence, freeKb: 1024 });
+    assert.equal(full.status, 1);
+    const missing = reclaimFixture(t, { d1Occurrence, missingImage: true });
+    assert.notEqual(missing.status, 0);
+    const selfHosted = reclaimFixture(t, { d1Occurrence, freeKb: 1024, runnerEnvironment: "self-hosted" });
+    assert.equal(selfHosted.status, 1);
+    assert.doesNotMatch(selfHosted.stderr, /sudo/);
+  });
+}
 
 // Exercise the workflow's actual binding commands against real, local Git
 // history. An unavailable origin reproduces checkout's credential-free state.

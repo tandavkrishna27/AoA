@@ -400,6 +400,30 @@ jobs:
           # image is broken when it is not.
           AOA_DEP001_IMAGE_TEST=1 node --test docker/images/__tests__/image-contents.test.mjs
 
+      - name: Reclaim build cache before D1 bring-up
+        run: |
+          set -euo pipefail
+          # Final runtime images are loaded; remove only intermediate build cache.
+          df -h /
+          docker builder prune --all --force
+          for tag in "$AOA_D1_CONTROL_PLANE_IMAGE" "$AOA_D1_WORKER_IMAGE" "$AOA_D1_FAKE_PROVIDER_IMAGE"; do
+            docker image inspect "$tag" >/dev/null
+          done
+          available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          if (( available_kb < 8 * 1024 * 1024 )); then
+            [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]] || {
+              echo "::error::hosted toolkit cleanup requires a GitHub-hosted runner"
+              exit 1
+            }
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          fi
+          df -h /
+          (( available_kb >= 8 * 1024 * 1024 )) || {
+            echo "::error::D1 bring-up needs at least 8 GiB free; available ${available_kb} KiB"
+            exit 1
+          }
+
       - name: Bring up the D1 stack
         run: docker compose -f "$COMPOSE_FILE_PATH" up -d --wait --wait-timeout 300
 
@@ -582,6 +606,30 @@ jobs:
       # first — a value that reaches a log is a value that reaches the evidence bundle.
       - name: Generate the per-run control-plane keypair and secrets master key
         run: node scripts/generate-d1-spine-keys.mjs
+      - name: Reclaim build cache before D1 bring-up
+        run: |
+          set -euo pipefail
+          # Final runtime images are loaded; remove only intermediate build cache.
+          df -h /
+          docker builder prune --all --force
+          for tag in "$AOA_D1_CONTROL_PLANE_IMAGE" "$AOA_D1_WORKER_IMAGE" "$AOA_D1_FAKE_PROVIDER_IMAGE"; do
+            docker image inspect "$tag" >/dev/null
+          done
+          available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          if (( available_kb < 8 * 1024 * 1024 )); then
+            [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]] || {
+              echo "::error::hosted toolkit cleanup requires a GitHub-hosted runner"
+              exit 1
+            }
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          fi
+          df -h /
+          (( available_kb >= 8 * 1024 * 1024 )) || {
+            echo "::error::D1 bring-up needs at least 8 GiB free; available ${available_kb} KiB"
+            exit 1
+          }
+
       - name: Bring up the ONE-worker m1-spine topology
         run: |
           set -euo pipefail
@@ -859,6 +907,30 @@ jobs:
       # both jobs, so the two cannot drift the next time the topology gains a requirement.
       - name: Generate the per-run control-plane keypair and secrets master key
         run: node scripts/generate-d1-spine-keys.mjs
+
+      - name: Reclaim build cache before D1 bring-up
+        run: |
+          set -euo pipefail
+          # Final runtime images are loaded; remove only intermediate build cache.
+          df -h /
+          docker builder prune --all --force
+          for tag in "$AOA_D1_CONTROL_PLANE_IMAGE" "$AOA_D1_WORKER_IMAGE" "$AOA_D1_FAKE_PROVIDER_IMAGE"; do
+            docker image inspect "$tag" >/dev/null
+          done
+          available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          if (( available_kb < 8 * 1024 * 1024 )); then
+            [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]] || {
+              echo "::error::hosted toolkit cleanup requires a GitHub-hosted runner"
+              exit 1
+            }
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          fi
+          df -h /
+          (( available_kb >= 8 * 1024 * 1024 )) || {
+            echo "::error::D1 bring-up needs at least 8 GiB free; available ${available_kb} KiB"
+            exit 1
+          }
 
       - name: Bring up the ONE-worker topology
         run: |

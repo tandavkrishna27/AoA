@@ -249,6 +249,34 @@ jobs:
             echo "$key $tag revision=$label"
           done
 
+      - name: Reclaim build cache before the object-store build
+        run: |
+          set -euo pipefail
+          # The three final images are loaded and admitted. Their intermediate
+          # build cache is no longer needed; image/system prune would delete boot inputs.
+          df -h /
+          docker builder prune --all --force
+          for key in CONTROL-PLANE WORKER ADAPTER-MANAGER; do
+            tag="$(grep -E "^${key}_IMAGE=" docker/images/digests.env | cut -d= -f2-)"
+            docker image inspect "$tag" >/dev/null
+          done
+          available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          if (( available_kb < 8 * 1024 * 1024 )); then
+            [[ "${RUNNER_ENVIRONMENT:-}" == "github-hosted" ]] || {
+              echo "::error::hosted toolkit cleanup requires a GitHub-hosted runner"
+              exit 1
+            }
+            # This job needs Node, pnpm, Docker and Go inside the MinIO build;
+            # these preinstalled hosted toolkits are unused by the lane.
+            sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+            available_kb="$(df -Pk / | awk 'NR == 2 { print $4 }')"
+          fi
+          df -h /
+          (( available_kb >= 8 * 1024 * 1024 )) || {
+            echo "::error::the object-store source build needs at least 8 GiB free; available ${available_kb} KiB"
+            exit 1
+          }
+
       # ★ E6-F030 — THE OBJECT STORE IS BUILT FROM SOURCE TOO.
       #
       # The overlay's MinIO used to resolve `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z`,
