@@ -10,7 +10,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +28,162 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8");
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
+
+function reclaimFixture(t, { freeKb = 12 * 1024 * 1024, afterCleanupKb = freeKb, missingImage = false, runnerEnvironment = "github-hosted", d1Occurrence = null } = {}) {
+  const text = d1Occurrence === null ? real() : readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8");
+  const markers = [...text.matchAll(/      - name: Reclaim build cache before D1 bring-up/g)];
+  const start = d1Occurrence === null
+    ? text.indexOf("      - name: Reclaim build cache before the object-store build")
+    : markers[d1Occurrence]?.index ?? -1;
+  assert.ok(start > text.indexOf("          bash docker/images/build.sh"), "cleanup must follow source image builds");
+  if (d1Occurrence === null) assert.ok(start > text.indexOf("          bash docker/images/admit.sh"), "cleanup must follow image admission");
+  else assert.equal(markers.length, 3, "every D1 job needs disk reclaim before bring-up");
+  const end = d1Occurrence === null ? text.indexOf("      # ★ E6-F030", start) : text.indexOf("      - name:", start + 1);
+  assert.ok(end > start, "cleanup must precede the next build/bring-up step");
+  const block = text.slice(start, end);
+  const commands = block.slice(block.indexOf("          set -euo pipefail"))
+    .split(/\r?\n/).map((line) => line.replace(/^          /, "")).join("\n");
+  const root = mkdtempSync(path.join(os.tmpdir(), "aoa-cache-reclaim-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const digests = path.join(root, "digests.env");
+  writeFileSync(digests, "CONTROL-PLANE_IMAGE=cp:candidate\nWORKER_IMAGE=worker:candidate\nADAPTER-MANAGER_IMAGE=am:candidate\n");
+  const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe")
+    ? "C:/Program Files/Git/bin/bash.exe" : "bash";
+  // Replace only external operations. Execute the workflow's real shell logic;
+  // no Docker prune or hosted-tool deletion ever reaches this developer machine.
+  const stubs = `
+free_kb=$TEST_FREE_KB
+df() {
+  if [[ "$1" == "-Pk" ]]; then printf 'Filesystem 1024-blocks Used Available Capacity Mounted\\nroot 100000000 1 %s 1%% /\\n' "$free_kb";
+  else printf 'disk diagnostic\\n'; fi
+}
+docker() {
+  printf 'docker %s\\n' "$*" >&2
+  if [[ "$*" == "builder prune --all --force" ]]; then return 0; fi
+  if [[ "$1 $2" == "image inspect" ]]; then [[ "$TEST_MISSING_IMAGE" == "0" ]]; return; fi
+  return 99
+}
+sudo() {
+  printf 'sudo %s\\n' "$*" >&2
+  [[ "$*" == "rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc" ]] || return 99
+  free_kb=$TEST_AFTER_CLEANUP_KB
+}
+grep() { command grep "$1" "$2" "$TEST_DIGESTS"; }
+`;
+  return spawnSync(bash, ["--noprofile", "--norc", "-c", stubs + commands], {
+    cwd: root, encoding: "utf8", timeout: 10_000,
+    env: { ...process.env, RUNNER_ENVIRONMENT: runnerEnvironment, TEST_DIGESTS: digests.replaceAll("\\", "/"),
+      AOA_D1_CONTROL_PLANE_IMAGE: "cp:candidate", AOA_D1_WORKER_IMAGE: "worker:candidate", AOA_D1_FAKE_PROVIDER_IMAGE: "fake:candidate",
+      TEST_FREE_KB: String(freeKb), TEST_AFTER_CLEANUP_KB: String(afterCleanupKb), TEST_MISSING_IMAGE: missingImage ? "1" : "0" },
+  });
+}
+
+test("runner cache reclaim preserves all three admitted images and avoids toolkit cleanup with headroom", (t) => {
+  const result = reclaimFixture(t);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(result.stderr.trim().split(/\r?\n/), [
+    "docker builder prune --all --force", "docker image inspect cp:candidate",
+    "docker image inspect worker:candidate", "docker image inspect am:candidate",
+  ]);
+});
+
+test("runner cache reclaim removes only unused hosted toolkits when cache alone leaves too little space", (t) => {
+  const result = reclaimFixture(t, { freeKb: 1024, afterCleanupKb: 12 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stderr, /sudo rm -rf \/usr\/local\/lib\/android \/usr\/share\/dotnet \/opt\/ghc/);
+});
+
+test("runner cache reclaim refuses missing final images and insufficient disk after cleanup", (t) => {
+  const missing = reclaimFixture(t, { missingImage: true });
+  assert.notEqual(missing.status, 0);
+  const full = reclaimFixture(t, { freeKb: 1024, afterCleanupKb: 1024 });
+  assert.equal(full.status, 1);
+  assert.match(full.stdout, /at least 8 GiB free/);
+});
+
+test("runner cache reclaim refuses toolkit deletion on a self-hosted runner", (t) => {
+  const result = reclaimFixture(t, { freeKb: 1024, runnerEnvironment: "self-hosted" });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /requires a GitHub-hosted runner/);
+  assert.doesNotMatch(result.stderr, /sudo/);
+});
+
+for (const [d1Occurrence, job] of ["d1-merge-train", "m1-spine", "m1-fault-matrix"].entries()) {
+  test(`${job} reclaims cache and preserves its actual control-plane, worker and fake-provider images`, (t) => {
+    const result = reclaimFixture(t, { d1Occurrence });
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.deepEqual(result.stderr.trim().split(/\r?\n/), [
+      "docker builder prune --all --force", "docker image inspect cp:candidate",
+      "docker image inspect worker:candidate", "docker image inspect fake:candidate",
+    ]);
+    const low = reclaimFixture(t, { d1Occurrence, freeKb: 1024, afterCleanupKb: 12 * 1024 * 1024 });
+    assert.equal(low.status, 0, low.stderr + low.stdout);
+    const full = reclaimFixture(t, { d1Occurrence, freeKb: 1024 });
+    assert.equal(full.status, 1);
+    const missing = reclaimFixture(t, { d1Occurrence, missingImage: true });
+    assert.notEqual(missing.status, 0);
+    const selfHosted = reclaimFixture(t, { d1Occurrence, freeKb: 1024, runnerEnvironment: "self-hosted" });
+    assert.equal(selfHosted.status, 1);
+    assert.doesNotMatch(selfHosted.stderr, /sudo/);
+  });
+}
+
+// Exercise the workflow's actual binding commands against real, local Git
+// history. An unavailable origin reproduces checkout's credential-free state.
+function bindingFixture(t) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "aoa-candidate-binding-"));
+  assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir()) + path.sep));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  git("init", "--quiet");
+  const commit = (message) => {
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+      "commit", "--quiet", "--allow-empty", "-m", message);
+    return git("rev-parse", "HEAD");
+  };
+  const ancestor = commit("candidate");
+  const integration = commit("integration");
+  const ref = "refs/remotes/origin/docs/replatform-program";
+  git("update-ref", ref, integration);
+  git("checkout", "--quiet", "--detach", ancestor);
+  git("remote", "add", "origin", path.join(root, "unavailable-origin"));
+  const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe")
+    ? "C:/Program Files/Git/bin/bash.exe" : "bash";
+  const text = real();
+  const start = text.indexOf("      - name: Bind the run to the candidate");
+  const block = text.slice(start, text.indexOf("          # ★ E6-F030", start));
+  const commands = block.slice(block.indexOf("          set -euo pipefail"))
+    .split(/\r?\n/).map((line) => line.replace(/^          /, "")).join("\n");
+  return { git, commit, ancestor, integration, ref,
+    run: (candidate) => spawnSync(bash, ["--noprofile", "--norc", "-c", commands], {
+      cwd: root, encoding: "utf8", timeout: 10_000,
+      env: { ...process.env, CANDIDATE: candidate, GIT_TERMINAL_PROMPT: "0" },
+    }) };
+}
+
+test("candidate binding accepts a fetched integration ancestor without accessing origin", (t) => {
+  const fixture = bindingFixture(t);
+  const result = fixture.run(fixture.ancestor);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+});
+
+test("candidate binding rejects a commit outside the fetched integration ancestry", (t) => {
+  const fixture = bindingFixture(t);
+  const outsider = fixture.commit("outside integration");
+  const result = fixture.run(outsider);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /not an ancestor of docs\/replatform-program/);
+});
+
+test("candidate binding rejects an absent integration ref and a mismatched HEAD", (t) => {
+  const fixture = bindingFixture(t);
+  fixture.git("update-ref", "-d", fixture.ref);
+  const missing = fixture.run(fixture.ancestor);
+  assert.equal(missing.status, 1);
+  const mismatch = fixture.run(fixture.integration);
+  assert.equal(mismatch.status, 1);
+  assert.match(mismatch.stdout, /HEAD is not the candidate/);
+});
 
 test("REJECT: provider readback loses its keyed credential at teardown", () => {
   const text = real();
@@ -197,8 +355,23 @@ test("REJECT: the checkout not bound to the candidate", () => {
 });
 
 test("REJECT: the ancestry check removed (any sha, not a frozen candidate)", () => {
-  const text = mutate(real(), 'git merge-base --is-ancestor "$CANDIDATE" FETCH_HEAD', "true");
+  const text = mutate(real(), 'git merge-base --is-ancestor "$CANDIDATE" refs/remotes/origin/docs/replatform-program', "true");
   assert.ok(anyMatch(violationsOf(text), /ancestor of docs\/replatform-program/), violationsOf(text).join("\n"));
+});
+
+test("REJECT: candidate binding refetches after credential removal or uses the wrong ancestry ref", () => {
+  const ancestry = 'git merge-base --is-ancestor "$CANDIDATE" refs/remotes/origin/docs/replatform-program';
+  const refetch = mutate(real(), ancestry, 'git fetch origin docs/replatform-program\n          ' + ancestry);
+  assert.ok(anyMatch(violationsOf(refetch), /must not refetch/));
+  const wrongRef = mutate(real(), ancestry, 'git merge-base --is-ancestor "$CANDIDATE" HEAD');
+  assert.ok(anyMatch(violationsOf(wrongRef), /ancestor of docs\/replatform-program/));
+});
+
+test("REJECT: shallow history or persistent credentials in candidate checkout", () => {
+  const shallow = mutate(real(), "          fetch-depth: 0", "          fetch-depth: 1");
+  assert.ok(anyMatch(violationsOf(shallow), /must fetch full history/));
+  const credentials = mutate(real(), "          persist-credentials: false", "          persist-credentials: true");
+  assert.ok(anyMatch(violationsOf(credentials), /must remove persistent Git credentials/));
 });
 
 test("REJECT: a pulled image instead of a source build, or the admission step dropped", () => {

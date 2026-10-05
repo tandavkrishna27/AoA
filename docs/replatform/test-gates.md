@@ -4,6 +4,31 @@
 
 **Applies to:** D0 through D6 and private-beta promotion
 
+## M1 code-and-test acceptance — founder amendment, 2026-10-05
+
+The founder directed that M1 be completed directly through code and testing,
+without extra certifications, followed by M1b. M1a now completes on working
+implementation and executable tests; M1b follows with the same process.
+This amendment supersedes the process prerequisites in the earlier M1 plans.
+
+For these internal milestones, separate certification, E5 audit sign-off,
+production signer/root approval, protected-controller approval, RET-01 archive
+custody, a formal candidate-freeze document and a formal completion handoff are
+not acceptance prerequisites. Record the tested revision, commands, actual
+results and remaining functional limitations in the
+[current M1 checklist](milestones/M1a/recovery-plan-2026-09-26.md).
+
+Runtime correctness remains required: tenant isolation, current lease/fence
+authority, one executor, secret containment, usage/budget/audit behavior,
+cancellation/recovery and cleanup. Existing build, image-integrity and test
+controls continue to execute. A skipped or pending test is not a pass. M1a
+accepts the distributed mechanism; M1b additionally requires useful output
+retrievable by the founder and the enabled tool behavior.
+
+Historical QA and handoff records retain their original verdicts. Passing this
+direct checklist authorizes progression from M1a to M1b without rewriting those
+records. It does not assert a D0–D6/E11 production-release certification.
+
 ## Threshold classes
 
 - **HARD:** A security or correctness invariant with zero tolerance. It cannot receive a conditional pass or waiver.

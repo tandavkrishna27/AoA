@@ -20,6 +20,7 @@
 //
 // ── ORDER IS LOAD-BEARING ────────────────────────────────────────────────────
 // The campaign is serial (`--test-concurrency=1`) over ONE shared stack, so the file runs:
+//   0. the early worker hard restart, while its original enrollment code and route are live;
 //   1. the two per-tenant journeys — they are what MAKES the cost and audit rows the legacy-table
 //      cases then read;
 //   2. the cross-tenant surfaces, against a FRESH live-fenced attempt of tenant A;
@@ -28,7 +29,7 @@
 //   5. the destructive faults — cancellation, provider failure, the object-store toxic, the
 //      orphan sweep, the link cut, the control-plane restart, and LAST the control-plane →
 //      postgres cut, which severs the stack's own database link and is therefore the one case
-//      that must have nothing after it.
+//      restored before the last expired-enrollment restart control.
 //
 // ── REUSE, NOT A SECOND IMPLEMENTATION ───────────────────────────────────────
 // The per-tenant journey verdict, the control-tenant verdict and the hostile-isolation verdict
@@ -111,6 +112,7 @@ import {
   queryOfferEligibility,
   killComposeService,
   startComposeService,
+  dexecModule,
 } from "./lib/e6f-harness.mjs";
 import {
   M1_SPINE_TENANTS,
@@ -386,6 +388,239 @@ function runReferenceProvider(label, { deadlineMs } = {}) {
 const leased = new Map();
 /** The journeys' ids, used by the legacy-table cases. */
 const journeys = new Map();
+
+/** The three arms of the startup reconciler's own three-way branch
+ * (`dispatch-runtime.ts`, the `probe.state` switch). ASCII substrings only: the real lines carry
+ * an em-dash and a typographic apostrophe, and a literal with either is a needless way to make a
+ * live assertion depend on this file's encoding. */
+const STARTUP_RECONCILE_ARMS = Object.freeze({
+  fenced: "startup-reconcile: lease FENCED (F5)",
+  ended: "startup-reconcile: lease already ended at the control plane",
+  unreachable: "startup-reconcile: lease probe could not complete",
+});
+/** The INJECTION's in-flight window, in ms. Comfortably inside the 240 s op deadline
+ * (`RUN_OP_DEADLINE_CEILING_MS`) and the 300 s lease, and far longer than a kill + start + the
+ * container coming back (~30 s). */
+const RECONCILE_WINDOW_MS = 90_000;
+
+/** Occurrences of `needle` in `text`. ★ COUNTED, not merely tested for presence: this case has TWO
+ * arms against the SAME log, so "the line is there" cannot separate them. A count taken before and
+ * after each arm attributes each new line to the arm that produced it, and stays correct however
+ * many earlier boots the retained tail happens to include. */
+function countIn(text, needle) {
+  if (typeof text !== "string" || text === "" || needle === "") return 0;
+  let n = 0;
+  let i = text.indexOf(needle);
+  while (i !== -1) {
+    n += 1;
+    i = text.indexOf(needle, i + needle.length);
+  }
+  return n;
+}
+
+/** The daemon's own words when it comes back without a session (`WRK-010 §3.2`). ASCII
+ * substrings only, for the same encoding reason as the reconciler arms above. */
+const SESSION_TERMINAL_MARKERS = Object.freeze({
+  message: "worker session terminal: operator re-enrollment required",
+  idle: "session terminal at boot; running idle",
+  reason: "enroll_unauthorized",
+});
+
+// restart-observation helper BEGIN
+function workerLogRows(text) {
+  return String(text ?? "").split(/\r?\n/).flatMap((line) => {
+    try {
+      const row = JSON.parse(line.replace(/^[^{}]*\|\s*/, ""));
+      return row && typeof row === "object" ? [row] : [];
+    } catch { return []; }
+  });
+}
+
+function countTerminal401(text) {
+  return workerLogRows(text).filter((row) => row.err?.httpStatus === 401 && String(row.msg).includes("session terminal at boot; running idle")).length;
+}
+
+/** Attribute only structured records for this run, including Docker's service prefix. */
+function startupFenceFacts(before, after, { leaseId, jobId }) {
+  const counts = (text) => {
+    const own = workerLogRows(text).filter((row) => row.leaseId === leaseId && row.jobId === jobId);
+    return {
+      fence: own.filter((r) => r.reason === "lease_candidate_fenced" && String(r.msg).includes("startup-reconcile: lease FENCED (F5)")).length,
+      sibling: own.filter((r) => String(r.msg).includes("startup-reconcile: lease already ended at the control plane") || String(r.msg).includes("startup-reconcile: lease probe could not complete")).length,
+    };
+  };
+  const prior = counts(before);
+  const current = counts(after);
+  return { fenced: current.fence - prior.fence === 1 && current.sibling === prior.sibling, prior, current };
+}
+
+/** Read expiry metadata only: never the raw ticket, replay proof or session token. */
+function readEnrollmentLifetime({ dexec = dexecModule } = {}) {
+  return dexec("control-plane", `
+import postgres from "postgres";
+const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+try {
+  const [row] = await sql\`SELECT c.expires_at AS "codeExpiresAt", r.expires_at AS "routeExpiresAt",
+    c.expires_at > clock_timestamp() AS "codeLive", r.expires_at > clock_timestamp() AS "routeLive",
+    (extract(epoch from (LEAST(c.expires_at, r.expires_at) - clock_timestamp())) * 1000)::float8 AS "remainingMs",
+    clock_timestamp() AS "now"
+    FROM worker_enrollment_codes c JOIN worker_enrollment_code_routes r ON r.locator_hash = c.locator_hash
+    WHERE c.execution_target_id = \${${JSON.stringify(SPINE_DEPLOYED_TARGET_ID)}} AND c.consumed_at IS NOT NULL
+    ORDER BY c.created_at DESC LIMIT 1\`;
+  console.log("__E6F_RESULT__" + JSON.stringify({ ok: Boolean(row), ...row }));
+} finally { await sql.end({ timeout: 5 }); }
+`);
+}
+
+/** Read the actual durable store without writing or fabricating an offer. */
+function readPersistedLeaseCandidate({ leaseId, dexec = dexecModule }) {
+  return dexec("worker-b", `
+import { DatabaseSync } from "node:sqlite";
+const outbox = process.env.AOA_WORKER_EVENT_OUTBOX_PATH;
+const stem = outbox?.endsWith(".db") ? outbox.slice(0, -3) : outbox;
+const file = process.env.AOA_WORKER_LEASE_CANDIDATE_PATH || (stem && stem + ".lease-candidates.db");
+const db = new DatabaseSync(file, { readOnly: true });
+try {
+  const row = db.prepare("SELECT lease_id AS leaseId, job_id AS jobId, organization_id AS organizationId, attempt, claimed_at AS claimedAt FROM lease_candidate WHERE lease_id = ?").get(${JSON.stringify(leaseId)});
+  console.log("__E6F_RESULT__" + JSON.stringify({ ok: Boolean(row), row: row ?? null }));
+} finally { db.close(); }
+`);
+}
+
+/** This fixture permits one attempt so the natural reaper cannot start a retry behind our probe.
+ * Only its retry budget changes; lease authority, deadlines and attempt state stay production-owned. */
+function setRestartFixtureRetryBudget({ jobId, organizationId, dexec = dexecModule }) {
+  return dexec("control-plane", `
+import postgres from "postgres";
+const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+try {
+  const rows = await sql\`UPDATE jobs SET max_attempts = 1 WHERE id = \${${JSON.stringify(jobId)}} AND organization_id = \${${JSON.stringify(organizationId)}} RETURNING id\`;
+  console.log("__E6F_RESULT__" + JSON.stringify({ ok: rows.length === 1 }));
+} finally { await sql.end({ timeout: 5 }); }
+`);
+}
+// restart-observation helper END
+
+// Run before the long matrix faults: the original enrollment ticket lasts ten minutes.
+test("fault-matrix: an early hard restart fences its own live persisted lease and resumes polling", { skip: SKIP, timeout: 900_000 }, () => {
+  const caseId = "d1.reconcile.worker_startup_lease_probe";
+  const [A] = M1_SPINE_TENANTS.enabled;
+  assert.equal(step(seedSpineOrganization({ tenant: A, model: M1_SPINE_AGENT_MODEL, adapterType: M1_SPINE_AGENT_ADAPTER_TYPE }), "restart org").ok, true);
+  let parked = null;
+  let primaryError = null;
+  let hardKilled = null;
+  try {
+    const killed = parked = parkRunInFlight(A, "early-restart", { attempts: 45 });
+    assert.equal(killed.inFlight.ok, true, `a real attempt must have started: ${truncate(killed)}`);
+    assert.equal(killed.leaseWasLive, true, `the pre-kill lease must be active and live: ${truncate(killed.lease)}`);
+    assert.equal(step(setRestartFixtureRetryBudget({ jobId: killed.ids.jobId, organizationId: A.organizationId }), "restart retry budget").ok, true);
+    const persisted = step(readPersistedLeaseCandidate({ leaseId: killed.lease.id }), "restart persisted candidate");
+    assert.equal(persisted.ok, true, "the killed daemon must have a real durable candidate");
+    assert.equal(persisted.row.jobId, killed.ids.jobId);
+    assert.equal(persisted.row.organizationId, A.organizationId);
+    assert.equal(persisted.row.attempt, 1);
+    assert.equal(persisted.row.claimedAt, null, "the candidate must not already be fenced");
+    const logsBefore = composeServiceLogs("worker-b");
+    assert.equal(logsBefore.ok, true);
+    const runtimeBefore = composeServiceRuntime("worker-b");
+    assert.equal(runtimeBefore.ok && runtimeBefore.running, true, "the original worker must actually be running");
+    const lifetime = step(readEnrollmentLifetime(), "restart enrollment lifetime");
+    if (!SUPPRESS_INJECTION) assert.equal(lifetime.ok && lifetime.codeLive && lifetime.routeLive && lifetime.remainingMs >= 90_000, true, `restart needs at least 90s remaining on BOTH original expiries: ${truncate(lifetime)}`);
+    hardKilled = SUPPRESS_INJECTION ? { ok: false, suppressed: true } : killComposeService("worker-b", { signal: "KILL" });
+    const started = !SUPPRESS_INJECTION && hardKilled.ok ? startComposeService("worker-b") : null;
+    const cameBack = SUPPRESS_INJECTION ? null : waitFor(
+      () => composeServiceRuntime("worker-b"),
+      (r) => r.ok && r.running && r.startedAt !== runtimeBefore.startedAt,
+      { attempts: 45, everyMs: 1000 },
+    );
+    let fence = null;
+    let renewed = null;
+    let ended = null;
+    if (!SUPPRESS_INJECTION) {
+      assert.equal(hardKilled.ok && started?.ok && cameBack?.ok, true, `hard kill/start must actually change the start: ${truncate({ hardKilled, started, cameBack })}`);
+      fence = waitFor(
+        () => composeServiceLogs("worker-b"),
+        (l) => l.ok && startupFenceFacts(logsBefore.text, l.text, { leaseId: killed.lease.id, jobId: killed.ids.jobId }).fenced,
+        { attempts: 60, everyMs: 1000 },
+      );
+      assert.equal(fence.ok, true, "the replayed session must reach startup reconciliation and fence this exact lease once");
+      renewed = step(queryLeaseExpiries({ jobId: killed.ids.jobId }), "post-restart live probe");
+      const ownLease = renewed.leases.find((l) => l.id === killed.lease.id);
+      assert.equal(ownLease?.live && ownLease?.status === "active", true, "the startup probe must take the live arm");
+      assert.ok(Date.parse(ownLease.expiresAt) > Date.parse(killed.lease.expiresAt), "the probe must renew the live lease; the attributed log establishes who renewed it");
+      // No deadline edits: convergence/reap may only end this lease after its natural five-minute TTL.
+      ended = waitFor(
+        () => {
+          const reaped = step(reapOrganization({ organizationId: A.organizationId }), "restart production reap");
+          assert.equal(reaped.status, 200);
+          return step(queryJobAttemptsAndCommands({ jobIds: [killed.ids.jobId] }), "restart durable end");
+        },
+        (o) => o.ok && o.leases.some((l) => l.id === killed.lease.id && l.status === "expired") && o.attempts.some((a) => a.attemptId === killed.ids.attemptId && a.status === "expired"),
+        { attempts: 80, everyMs: 5000 },
+      );
+      assert.equal(ended.ok, true, `production reaper must end the fenced lease and attempt within the bounded wait: ${truncate(ended.last)}`);
+      assert.equal(ended.last.attempts.length, 1, "the restart fixture must not create a retry");
+      const oldRun = step(querySpineWorkerDriven({ jobId: killed.ids.jobId }), "restart no reattachment");
+      assert.equal(oldRun.events.filter((e) => e.eventType === "attempt_started").length, 1, "the prior attempt must never reattach");
+      assert.equal(oldRun.terminal.length, 0, "the restarted daemon must not finish the abandoned attempt");
+    } else {
+      // Positive control with the injection withheld: let the original real work finish, leaving no slot held.
+      const settled = step(awaitSpineWorkerDrivenTerminal({ jobId: killed.ids.jobId, timeoutMs: 180_000 }), "suppressed restart workload");
+      assert.equal(settled.attemptStatus, "succeeded");
+    }
+    const deployedAfter = step(queryDeployedWorker({}), "restart fresh placement");
+    assert.equal(deployedAfter.workerId, killed.placement.workerId, "this must remain the same enrolled worker");
+    const fresh = startWorkerDrivenRun(A, deployedAfter, [], "restart usable poll loop");
+    const usable = step(awaitSpineWorkerDrivenTerminal({ jobId: fresh.jobId, timeoutMs: 120_000 }), "restart new workload");
+    assert.equal(usable.attemptStatus, "succeeded", `the recovered worker must lease and execute new work: ${truncate(usable)}`);
+    assert.ok(usable.events.some((e) => e.eventType === "attempt_started" && e.workerId === killed.placement.workerId));
+    const injectionFired = !SUPPRESS_INJECTION && hardKilled.ok && started?.ok && cameBack?.ok;
+    record(caseId, {
+      injectionFired,
+      observedClassification: injectionFired && fence?.ok && ended?.ok ? "startup_reconciler_fences_its_own_prior_lease" : "restart_injection_suppressed",
+      positiveControlPassed: usable.attemptStatus === "succeeded",
+      detail: {
+        lifetime, persisted, before: killed.lease, renewed, ended: ended?.last ?? null,
+        startupFence: fence?.ok ? startupFenceFacts(logsBefore.text, fence.last.text, { leaseId: killed.lease.id, jobId: killed.ids.jobId }) : null,
+        fenceRows: fence?.ok ? workerLogRows(fence.last.text).filter((r) => r.leaseId === killed.lease.id && r.jobId === killed.ids.jobId && r.reason === "lease_candidate_fenced").map((r) => ({ leaseId: r.leaseId, jobId: r.jobId, attempt: r.attempt, organizationId: r.organizationId, reason: r.reason, msg: r.msg })) : [],
+        runtimeBefore, runtimeAfter: cameBack?.last ?? runtimeBefore, usableJobId: fresh.jobId,
+      },
+    });
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    // Fixture-only orphan cleanup follows all observations, including a failed assertion.
+    // F4 never promises worker-side destroy. Preserve the primary failure and use no auth bypass.
+    const cleanup = {};
+    if (parked) {
+      try {
+        if (primaryError) {
+          cleanup.cancel = step(requestCancellationInContainer({ organizationId: A.organizationId, companyId: A.companyId, jobId: parked.ids.jobId, reason: "restart_fixture_cleanup" }), "restart fixture cancellation");
+        }
+      } catch { cleanup.cancelFailed = true; }
+      try {
+        if (primaryError) cleanup.reap = step(reapOrganization({ organizationId: A.organizationId }), "restart fixture reap");
+      } catch { cleanup.reapFailed = true; }
+      try {
+        if (hardKilled?.ok) {
+          const worker = composeServiceRuntime("worker-b");
+          if (!worker.running) cleanup.workerStart = startComposeService("worker-b", { timeout: 60_000 });
+        }
+      } catch { cleanup.workerProbeFailed = true; }
+      try {
+        cleanup.providerRestart = restartComposeService("fake-provider", { timeout: 60_000 });
+        if (cleanup.providerRestart.ok) {
+          const healthy = waitFor(() => composeServiceRuntime("fake-provider"), (r) => r.ok && r.running && r.health === "healthy", { attempts: 30, everyMs: 1000 });
+          cleanup.providerHealthy = healthy.ok;
+          cleanup.providerRuntime = healthy.last;
+        }
+      } catch { cleanup.probeFailed = true; }
+      bundle.detail[caseId] = { ...(bundle.detail[caseId] ?? {}), fixtureCleanup: cleanup, primaryFailure: primaryError !== null };
+      if (!primaryError) assert.equal(cleanup.providerRestart?.ok && cleanup.providerHealthy, true, `fake-provider fixture cleanup must restore a healthy shared matrix: ${truncate(cleanup)}`);
+    }
+  }
+});
 
 // ═══ 1. the two per-tenant journeys (F10) ════════════════════════════════════
 
@@ -2098,86 +2333,8 @@ test("fault-matrix: the DEPLOYED worker maps a provider deadline overrun to its 
 });
 
 // ---------------------------------------------------------------------------
-// d1.reconcile.worker_startup_lease_probe
-// ---------------------------------------------------------------------------
-//
-// THE CASE. Restart the deployed worker WHILE it holds a live lease over an in-flight run, and
-// require its WRK-013 startup reconciler to FENCE its own prior lease — probe it once and stand
-// down — rather than resume it or prune it as dead.
-//
-// ★★★ WHY THIS NEEDED A PROVIDER CHANGE, and why nothing cheaper works. A harness cannot mint the
-// candidate: `SqliteLeaseCandidateStore.listEntries`
-// (`packages/worker-daemon/src/lease/lease-candidate-store.ts`) requires each row to `safeParse`
-// against `leaseOfferV1Schema` AND to decode to the lease id and Organization its own row is
-// keyed by — *"otherwise one lease could be probed under another's identity"*. A harness-minted
-// offer therefore belongs to a HARNESS worker, and `worker-b`'s probe of it is answered
-// `rejected` → `dead` (`livenessOf`, `startup-reconcile.ts`), which takes the `candidate pruned`
-// arm and never reaches the fenced one. The only real route is restarting `worker-b` mid-run, and
-// before DEP-021 the reference provider had no way to be mid-anything: its `execute` returned a
-// deterministic transcript immediately. `--aoa-fake-delay` is that window, and this case is the
-// reason it exists.
-//
-// ★ EVERY PRECONDITION IS VERIFIED AT SOURCE, because a case that cannot fire is worse than an
-// absent one:
-//   - dispatch is ON for worker-b            `docker/d1/m1-spine.override.yml:137`
-//   - the candidate store is CONFIGURED       `config.ts` leaseCandidatePath defaults from
-//     AOA_WORKER_EVENT_OUTBOX_PATH (`/worker/event-outbox.db`), which sits on the PERSISTENT
-//     volume `d1-spine-worker-state`, so the row survives the restart
-//   - the logger is COMPOSED                  `bootstrapWorkerDaemon` builds it and passes it to
-//     `composeDispatchRuntime`, which is where the fence line is written
-//   - the run's budget outlasts the restart   op deadline = 240 s
-//     (`RUN_OP_DEADLINE_CEILING_MS`), lease duration = 300 s (`job-leasing.ts`)
-//
-// ★ THE OBSERVABLE IS ATTRIBUTED, not merely present. The worker's log is read BEFORE and AFTER
-// the restart and the fence line must be ABSENT then PRESENT. Without the "before" reading, a
-// line from any earlier boot would satisfy the case — a control that passes on state it did not
-// cause. The logged `leaseId` must also be THIS run's, and the two SIBLING arms of the same
-// three-way branch (`candidate pruned` / `nothing renewed`) must NOT name this lease, which is
-// what distinguishes `fenced` from `dead` and from `unreachable`.
-//
-// ★ THE DURABLE ARM, and its honest limit. The probe is exactly one `lease_renew`, and
-// `renewLease` extends `leases.expires_at` and nothing else. So the expiry MOVES — but the
-// pre-restart renewal loop was moving it too, so movement ALONE is not attributable to the probe.
-// It is recorded as corroboration and the log line is what attributes it; what the expiry does
-// prove on its own is that the lease was still LIVE after the restart, i.e. the probe's `live`
-// arm was the reachable one and the case is not silently passing through a dead-lease prune.
-
-/** The three arms of the startup reconciler's own three-way branch
- * (`dispatch-runtime.ts`, the `probe.state` switch). ASCII substrings only: the real lines carry
- * an em-dash and a typographic apostrophe, and a literal with either is a needless way to make a
- * live assertion depend on this file's encoding. */
-const STARTUP_RECONCILE_ARMS = Object.freeze({
-  fenced: "startup-reconcile: lease FENCED (F5)",
-  ended: "startup-reconcile: lease already ended at the control plane",
-  unreachable: "startup-reconcile: lease probe could not complete",
-});
-/** `LEASE_CANDIDATE_REASONS.fenced` (`lease-candidate-store.ts`), mirrored as the structured
- * field the same line carries beside the message. Both are asserted: the message could be
- * reworded, the reason token is the machine-readable half. */
-const LEASE_CANDIDATE_FENCED_REASON = "lease_candidate_fenced";
-/** `LEASE_CANDIDATE_REASONS.empty` — what a CLEANLY stopped daemon reports, and the negative
- * control's own observable. */
-const LEASE_CANDIDATE_EMPTY_REASON = "lease_candidate_store_empty";
-
-/** The INJECTION's in-flight window, in ms. Comfortably inside the 240 s op deadline
- * (`RUN_OP_DEADLINE_CEILING_MS`) and the 300 s lease, and far longer than a kill + start + the
- * container coming back (~30 s). */
-const RECONCILE_WINDOW_MS = 90_000;
-
-/** Occurrences of `needle` in `text`. ★ COUNTED, not merely tested for presence: this case has TWO
- * arms against the SAME log, so "the line is there" cannot separate them. A count taken before and
- * after each arm attributes each new line to the arm that produced it, and stays correct however
- * many earlier boots the retained tail happens to include. */
-function countIn(text, needle) {
-  if (typeof text !== "string" || text === "" || needle === "") return 0;
-  let n = 0;
-  let i = text.indexOf(needle);
-  while (i !== -1) {
-    n += 1;
-    i = text.indexOf(needle, i + needle.length);
-  }
-  return n;
-}
+// A genuine in-flight run on the deployed worker is required by both restart controls.
+// Its candidate is written before ACK; the early control also reads the actual SQLite row.
 
 /**
  * Park one worker-driven run in flight and return what is needed to interrupt it.
@@ -2239,105 +2396,45 @@ function parkRunInFlight(tenant, label, { attempts = 75, windowMs = RECONCILE_WI
   };
 }
 
-/** The daemon's own words when it comes back without a session (`WRK-010 §3.2`). ASCII
- * substrings only, for the same encoding reason as the reconciler arms above. */
-const SESSION_TERMINAL_MARKERS = Object.freeze({
-  message: "worker session terminal: operator re-enrollment required",
-  idle: "session terminal at boot; running idle",
-  reason: "enroll_unauthorized",
-});
-
-test("fault-matrix: THE RECONCILE BLOCKER, measured live — a KILLED worker comes back without a session, so its startup reconciler never runs", { skip: SKIP }, () => {
-  // ★★★ THIS TEST IS NOT THE RECONCILE CASE. It is the live PROOF of that case's `pendingReason`,
-  // and it exists for the reason `DEP-020` built the clause-5 blocker the same way: this
-  // programme's worst failure class is a `pending` reason that is false of the lane it excuses —
-  // the defect the `M1-D1-SPINE` `a2` record graded `SPINE-MATRIX-3`. It therefore `record()`s
-  // NOTHING: `d1.reconcile.worker_startup_lease_probe` is declared `pending`, and
-  // `evaluateFaultMatrixEvidence` REFUSES a bundle that reports a row for a pending case.
-  //
-  // WHAT WAS TRIED, over seven live campaigns on this branch:
-  //   35954159711  a GRACEFUL restart — the candidate is PRUNED by the clean drain, correctly.
-  //   35956091950  slot: the abandoned attempt holds the worker; 35957846155 it is RE-RUN.
-  //   35960080927  slot free, and the injection arm's job STILL never leased.
-  //   35962071988  the placement-staleness theory FALSIFIED — identical generations at both seeds.
-  //   35964102214  THE PROBE: `failing: []`, all ELEVEN eligibility conjuncts hold, and
-  //                `workers[0].seenRecently: false` — the attempt was eligible and the worker was
-  //                not polling.
-  //   35966651671  the SINGLE-INTERRUPTION redesign: the attempt WAS leased (poll 1) and the
-  //                injection DID fire — and still no reconciler arm appeared.
-  //
-  // WHAT THAT MEASURES. On the last run the worker's log carries two boots: the lane's own
-  // (`startup: running startup-reconcile` … `dispatch COMPOSED … leasing through the poll loop`)
-  // and the post-kill one, which reads *"already enrolled; skipping control-plane enrollment"* →
-  // *"worker session terminal: operator re-enrollment required (fresh enrollment code needed)"*
-  // (`enroll_unauthorized`, HTTP 401) → *"session terminal at boot; running idle"* → *"its session
-  // lapsed past the enrolment code-route boundary — WRK-010 §3.2"*.
-  //
-  // ★ AND THAT IS WHY THE CASE CANNOT FIRE HERE, precisely: the startup reconciler runs INSIDE
-  // `composeDispatchRuntime`, and composition is only reached on the branch where a session was
-  // established. A worker that comes back WITHOUT one never composes dispatch, so it never runs the
-  // reconciler at all — no arm is logged and no `lease_renew` fires. The lane's enrolment ticket is
-  // ONE-TIME and already consumed, so nothing here can supply the fresh code the daemon asks for.
-  //
-  // ★ IT IS THE LANE, NOT THE PRODUCT. The daemon does exactly what `WRK-010 §3.2` documents and
-  // says so in plain words. This is not filed as a defect, and calling it one would be inflating a
-  // documented decision.
+test("fault-matrix: an expired enrollment code and route refuse restart with 401 and idle", { skip: SKIP, timeout: 900_000 }, () => {
+  // A separate TTL refusal control, not a structural excuse for the early required case.
+  // Wait BEFORE parking live work so its lease cannot expire while awaiting the ticket boundary.
+  const expired = waitFor(
+    () => step(readEnrollmentLifetime(), "late restart enrollment lifetime"),
+    (o) => o.ok && o.codeLive === false && o.routeLive === false,
+    { attempts: 125, everyMs: 5000 },
+  );
+  assert.equal(expired.ok, true, `both original expiries must actually pass: ${truncate(expired.last)}`);
   const [A] = M1_SPINE_TENANTS.enabled;
-  const deployed = step(queryDeployedWorker({}), "blocker: deployed worker");
-  assert.equal(deployed.ok, true, `deployed worker probe: ${truncate(deployed)}`);
-
   const logsStart = composeServiceLogs("worker-b");
+  assert.equal(logsStart.ok, true);
+  const terminalAtStart = countIn(logsStart.text, SESSION_TERMINAL_MARKERS.message);
+  const idleAtStart = countIn(logsStart.text, SESSION_TERMINAL_MARKERS.idle);
+  const unauthorizedAtStart = countIn(logsStart.text, SESSION_TERMINAL_MARKERS.reason);
+  const terminal401AtStart = countTerminal401(logsStart.text);
   const fenceAtStart = countIn(logsStart.text, STARTUP_RECONCILE_ARMS.fenced);
-
-  // A run parked in flight, so a candidate row EXISTS when the worker dies. Without this the
-  // absence of a reconciler arm would be vacuous — nothing to reconcile.
-  const killed = parkRunInFlight(A, "reconcile-blocker");
+  const killed = parkRunInFlight(A, "expired-ticket-restart");
+  assert.equal(killed.inFlight.ok && killed.leaseWasLive, true, `a real live run is required: ${truncate(killed)}`);
   const runtimeBefore = composeServiceRuntime("worker-b");
   const hardKilled = killComposeService("worker-b", { signal: "KILL" });
-  const started = hardKilled.ok === true ? startComposeService("worker-b") : { ok: false, status: null };
+  assert.equal(hardKilled.ok, true, "late worker must be hard killed");
+  assert.equal(startComposeService("worker-b").ok, true, "late worker must start again");
   const cameBack = waitFor(
     () => composeServiceRuntime("worker-b"),
-    (r) => r.ok === true && r.running === true && r.startedAt !== runtimeBefore.startedAt,
-    { attempts: 60, everyMs: 2000 },
+    (r) => r.ok && r.running && r.startedAt !== runtimeBefore.startedAt,
+    { attempts: 45, everyMs: 1000 },
   );
-
-  // Wait for the post-kill boot to say what it does, either way: the session-terminal marker, OR a
-  // reconciler arm if the blocker has lifted.
+  assert.equal(cameBack.ok, true, "late refusal must be observed on a new container start");
   const settled = waitFor(
     () => composeServiceLogs("worker-b"),
-    (l) =>
-      l.ok === true &&
-      (l.text.includes(SESSION_TERMINAL_MARKERS.message) ||
-        countIn(l.text, STARTUP_RECONCILE_ARMS.fenced) > fenceAtStart),
-    { attempts: 45, everyMs: 2000 },
+    (l) => l.ok && countIn(l.text, SESSION_TERMINAL_MARKERS.message) > terminalAtStart && countIn(l.text, SESSION_TERMINAL_MARKERS.idle) > idleAtStart && countTerminal401(l.text) > terminal401AtStart,
+    { attempts: 60, everyMs: 1000 },
   );
-  const logsAfter = settled.last ?? composeServiceLogs("worker-b");
-  const sessionTerminal = logsAfter?.ok === true && logsAfter.text.includes(SESSION_TERMINAL_MARKERS.message);
-  const ranIdle = logsAfter?.ok === true && logsAfter.text.includes(SESSION_TERMINAL_MARKERS.idle);
-  const reasonSeen = logsAfter?.ok === true && logsAfter.text.includes(SESSION_TERMINAL_MARKERS.reason);
-  const fenceAfter = countIn(logsAfter?.text, STARTUP_RECONCILE_ARMS.fenced);
-
-  // ★ NON-VACUITY FIRST, on every conjunct the blocker rests on.
-  assert.equal(killed.inFlight.ok, true, `the run must be IN FLIGHT, or there is no candidate to reconcile and the absence below proves nothing: ${truncate(killed.inFlight.last)}`);
-  assert.equal(killed.leaseWasLive, true, `the lease must be live at kill time: ${truncate(killed.lease)}`);
-  assert.equal(hardKilled.ok, true, `worker-b must be KILLED: exit status ${hardKilled.status}`);
-  assert.equal(started.ok, true, `worker-b must be started again: exit status ${started.status}`);
-  assert.equal(cameBack.ok, true, `worker-b must come back on a NEW container start: ${truncate(cameBack.last)}`);
-  assert.equal(logsAfter?.ok, true, "the worker log must be readable after the kill");
-  assert.ok((logsAfter?.bytes ?? 0) > 0, "the worker log is empty after the kill, so nothing below is a measurement");
-
-  // THE BLOCKER, asserted in BOTH directions so the declaration cannot outlive its reason.
-  assert.equal(
-    sessionTerminal && ranIdle && reasonSeen,
-    true,
-    `the killed worker must come back SESSION-TERMINAL and idle (${SESSION_TERMINAL_MARKERS.reason}); if it now re-establishes a session, this lane can drive the reconcile case and d1.reconcile.worker_startup_lease_probe's pending declaration is STALE: `
-      + `terminal=${sessionTerminal} idle=${ranIdle} reason=${reasonSeen}`,
-  );
-  assert.equal(
-    fenceAfter,
-    fenceAtStart,
-    `a startup-reconcile FENCE arm APPEARED after a kill (count ${fenceAtStart} -> ${fenceAfter}): the reconciler ran, so the blocker has LIFTED and d1.reconcile.worker_startup_lease_probe must be re-declared \`required\` and built`,
-  );
+  const logsAfter = settled.last;
+  assert.equal(settled.ok, true, "an expired code and route must leave the restarted daemon session-terminal and idle");
+  assert.ok(countIn(logsAfter.text, SESSION_TERMINAL_MARKERS.reason) > unauthorizedAtStart, "the new boot must report enroll_unauthorized (HTTP 401)");
+  assert.equal(countIn(logsAfter.text, STARTUP_RECONCILE_ARMS.fenced), fenceAtStart, "expired replay must not compose dispatch or run startup reconciliation");
+  bundle.detail.expiredEnrollmentRestart = { lifetime: expired.last, liveLeaseAtKill: killed.lease, runtimeBefore, runtimeAfter: cameBack.last };
 });
 
 // ═══ 10. the matrix's own verdict ════════════════════════════════════════════

@@ -19,6 +19,8 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
+import { spawnSync } from "node:child_process";
 
 import {
   FAULT_MATRIX_PATH,
@@ -41,6 +43,139 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 const codes = (violations) => violations.map((v) => v.code).sort();
 const has = (violations, code) => violations.some((v) => v.code === code);
+
+function startupFenceFactsFixture() {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const body = source.match(/\/\/ restart-observation helper BEGIN\r?\n([\s\S]*?)\/\/ restart-observation helper END/);
+  assert.ok(body, "the live fixture must use the tested observation helper");
+  return runInNewContext(`${body[1]}\nstartupFenceFacts`);
+}
+
+test("D1 restart: container probes render valid JavaScript and never mutate lease authority", () => {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const body = source.match(/\/\/ restart-observation helper BEGIN\r?\n([\s\S]*?)\/\/ restart-observation helper END/)[1];
+  const calls = [];
+  const dexec = (service, script) => { calls.push({ service, script }); return { result: { ok: true } }; };
+  const probes = runInNewContext(`${body}\n({ readEnrollmentLifetime, readPersistedLeaseCandidate, setRestartFixtureRetryBudget })`, {
+    SPINE_DEPLOYED_TARGET_ID: "00000000-0000-4000-8000-000000000001",
+    dexecModule: dexec,
+  });
+  probes.readEnrollmentLifetime();
+  probes.readPersistedLeaseCandidate({ leaseId: "00000000-0000-4000-8000-000000000002" });
+  probes.setRestartFixtureRetryBudget({ jobId: "00000000-0000-4000-8000-000000000003", organizationId: "00000000-0000-4000-8000-000000000004" });
+  assert.deepEqual(calls.map((c) => c.service), ["control-plane", "worker-b", "control-plane"]);
+  for (const { script } of calls) {
+    // Parse the actual rendered body inside an async module-equivalent wrapper, without execution.
+    assert.doesNotThrow(() => new Function(`return (async () => { ${script.replace(/^import .*;$/gm, "")} })`));
+    assert.ok(script.includes("__E6F_RESULT__"));
+    assert.doesNotMatch(script, /UPDATE\s+(leases|job_attempts)|SET\s+expires_at|INSERT\s+INTO\s+lease_candidate/i);
+  }
+  assert.ok(calls[0].script.includes('AS "codeLive"'));
+  assert.ok(calls[0].script.includes('AS "routeLive"'));
+  assert.ok(calls[0].script.includes('AS "remainingMs"'));
+  assert.ok(calls[1].script.includes("readOnly: true"));
+  assert.doesNotMatch(calls[1].script, /SELECT\s+\*|offer_json/);
+  assert.ok(calls[2].script.includes("UPDATE jobs SET max_attempts = 1"));
+  assert.ok(calls[2].script.includes("AND organization_id ="));
+});
+
+test("D1 restart: fence attribution requires a new structured line for this lease and job", () => {
+  const facts = startupFenceFactsFixture();
+  const row = { leaseId: "own-lease", jobId: "own-job", reason: "lease_candidate_fenced", msg: "startup-reconcile: lease FENCED (F5)" };
+  const line = JSON.stringify(row);
+  const ids = { leaseId: row.leaseId, jobId: row.jobId };
+  assert.equal(facts("", line, ids).fenced, true);
+  assert.equal(facts("", `worker-b-1 | ${line}`, ids).fenced, true, "real compose service prefixes are parsed");
+  assert.equal(facts(line, line, ids).fenced, false, "an earlier boot cannot satisfy this restart");
+  for (const change of [{ leaseId: "foreign" }, { jobId: "foreign" }, { reason: "wrong" }, { msg: "ordinary log" }]) {
+    assert.equal(facts("", JSON.stringify({ ...row, ...change }), ids).fenced, false);
+  }
+  assert.equal(facts("", `not JSON ${line}`, ids).fenced, false);
+  assert.equal(facts("", `null\n${line}`, ids).fenced, true);
+  const sibling = JSON.stringify({ ...row, msg: "startup-reconcile: lease already ended at the control plane" });
+  assert.equal(facts("", `${line}\n${sibling}`, ids).fenced, false, "dead-lease pruning is not a live fence");
+  const unavailable = JSON.stringify({ ...row, msg: "startup-reconcile: lease probe could not complete" });
+  assert.equal(facts("", `${line}\n${unavailable}`, ids).fenced, false);
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const body = source.match(/\/\/ restart-observation helper BEGIN\r?\n([\s\S]*?)\/\/ restart-observation helper END/)[1];
+  const count401 = runInNewContext(`${body}\ncountTerminal401`);
+  const idle = { msg: "worker-daemon session terminal at boot; running idle", err: { httpStatus: 401 } };
+  assert.equal(count401(JSON.stringify(idle)), 1);
+  assert.equal(count401(JSON.stringify({ ...idle, err: { httpStatus: 403 } })), 0, "reason prose alone must not stand in for the HTTP status");
+});
+
+test("D1 restart: the actual suppressed callback completes its own work, never kills, and retains an unfired injection", () => {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const callback = source.match(/test\("fault-matrix: an early hard restart[^\n]+\(\) => \{\r?\n([\s\S]*?)^\}\);/m)[1];
+  const calls = [];
+  let retained;
+  const tenant = { organizationId: "own-org", companyId: "own-company" };
+  const parked = { ids: { jobId: "old-job" }, inFlight: { ok: true }, leaseWasLive: true, lease: { id: "own-lease" }, placement: { workerId: "same-worker" } };
+  const context = {
+    assert, SUPPRESS_INJECTION: true, M1_SPINE_TENANTS: { enabled: [tenant] }, M1_SPINE_AGENT_MODEL: "model", M1_SPINE_AGENT_ADAPTER_TYPE: "adapter",
+    step: (r) => r, truncate: JSON.stringify, seedSpineOrganization: () => ({ ok: true }),
+    parkRunInFlight: () => parked, setRestartFixtureRetryBudget: () => ({ ok: true }),
+    readPersistedLeaseCandidate: () => ({ ok: true, row: { jobId: "old-job", organizationId: "own-org", attempt: 1, claimedAt: null } }),
+    composeServiceLogs: () => ({ ok: true, text: "" }),
+    composeServiceRuntime: () => ({ ok: true, running: true, health: "healthy" }),
+    readEnrollmentLifetime: () => ({ ok: true, codeLive: false, routeLive: false, remainingMs: -1 }),
+    killComposeService: () => { throw Error("suppression must never kill"); },
+    awaitSpineWorkerDrivenTerminal: ({ jobId }) => { calls.push(`terminal:${jobId}`); return { attemptStatus: "succeeded", events: [{ eventType: "attempt_started", workerId: "same-worker" }] }; },
+    queryDeployedWorker: () => ({ workerId: "same-worker" }),
+    startWorkerDrivenRun: () => { calls.push("seed:new-job"); return { jobId: "new-job" }; },
+    record: (_, evidence) => { retained = evidence; },
+    restartComposeService: () => { calls.push("provider-cleanup"); return { ok: true }; },
+    waitFor: (probe, predicate) => { const last = probe(); return { ok: predicate(last), last }; },
+    bundle: { detail: {} },
+  };
+  runInNewContext(`(function () { ${callback} })()`, context);
+  assert.deepEqual(calls, ["terminal:old-job", "seed:new-job", "terminal:new-job", "provider-cleanup"]);
+  assert.equal(retained.injectionFired, false);
+  assert.equal(retained.positiveControlPassed, true);
+  // Cleanup is still attempted on a failed precondition and must not replace the primary error.
+  const primary = Error("candidate read failed");
+  context.readPersistedLeaseCandidate = () => { throw primary; };
+  context.requestCancellationInContainer = () => ({ status: 200 });
+  context.reapOrganization = () => ({ status: 200 });
+  context.restartComposeService = () => { calls.push("failed-run-cleanup"); throw Error("secondary cleanup failure"); };
+  assert.throws(() => runInNewContext(`(function () { ${callback} })()`, context), (error) => error === primary);
+  assert.equal(calls.at(-1), "failed-run-cleanup");
+});
+
+test("D1 restart: workflow reset runs only this Compose stack and stops if teardown fails", () => {
+  const workflow = readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8");
+  const start = workflow.indexOf("name: Reset the fault-matrix stack for the suppressed campaign");
+  const end = workflow.indexOf("name: POSITIVE CONTROL — with every injection suppressed", start);
+  const commands = workflow.slice(start, end).split(/\r?\n/).filter((line) => line.startsWith("          ")).map((line) => line.slice(10)).join("\n");
+  const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe") ? "C:/Program Files/Git/bin/bash.exe" : "bash";
+  const stubs = 'docker() { printf "%s\\n" "$*"; if [[ "$*" == *"down --volumes"* && "${FAIL_DOWN:-}" == "1" ]]; then return 1; fi; };\n';
+  for (const fail of [false, true]) {
+    const run = spawnSync(bash, ["--noprofile", "--norc", "-c", stubs + commands], {
+      encoding: "utf8", env: { ...process.env, COMPOSE_FILE_PATH: "docker-compose.d1.yml", SPINE_OVERRIDE_PATH: "docker/d1/m1-spine.override.yml", FAIL_DOWN: fail ? "1" : "0" },
+    });
+    assert.equal(run.status, fail ? 1 : 0, run.stderr);
+    assert.ok(run.stdout.includes("compose -f docker-compose.d1.yml -f docker/d1/m1-spine.override.yml down --volumes --remove-orphans"));
+    assert.equal(run.stdout.includes("up -d --wait --wait-timeout 300"), !fail);
+  }
+});
+
+test("D1 restart: the required early case precedes journeys and the expired-ticket control", () => {
+  const matrix = JSON.parse(readFileSync(path.join(repoRoot, FAULT_MATRIX_PATH), "utf8"));
+  const declared = matrix.profiles.find((p) => p.profile === "M1-D1-SPINE").cases.find((c) => c.case === "d1.reconcile.worker_startup_lease_probe");
+  assert.equal(declared.evidence, "required");
+  assert.equal(declared.pendingReason, undefined);
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  assert.ok(source.indexOf('test("fault-matrix: an early hard restart') < source.indexOf("for (const tenant of M1_SPINE_TENANTS.enabled)"));
+  assert.ok(source.includes('test("fault-matrix: an expired enrollment code and route refuse restart'));
+  const workflow = readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8");
+  const passing = workflow.indexOf("name: Collect the PASSING evidence bundle");
+  const reset = workflow.indexOf("name: Reset the fault-matrix stack for the suppressed campaign");
+  const suppressed = workflow.indexOf("name: POSITIVE CONTROL — with every injection suppressed");
+  assert.ok(passing < reset && reset < suppressed, "retain observations before resetting for an independent campaign");
+  const block = workflow.slice(reset, suppressed);
+  assert.ok(block.includes('down --volumes --remove-orphans'));
+  assert.ok(block.includes('up -d --wait --wait-timeout 300'));
+});
 
 /** A minimal but COMPLETE profile: every required family, and the whole F10 tenant matrix. */
 function completeProfile(profile) {

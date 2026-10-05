@@ -85,7 +85,7 @@ services:
     # there is no public route left to the upstream image. Nine D1 dispatches over
     # ~2.5 hours died at *Bring up the D1 stack* before a single test ran.
     #
-    # WHAT THIS IS NOW. `ghcr.io/meteoritelabs/aoa-d1-minio`, built by
+    # WHAT THIS IS NOW. `ghcr.io/tandavkrishna27/aoa-d1-minio`, built by
     # `.github/workflows/d1-image-mirror.yml` from `docker/d1/minio.Dockerfile`, which
     # builds MinIO FROM UPSTREAM SOURCE at RELEASE.2025-09-07T16-13-09Z — the SAME release
     # this line used to name — onto a Debian base, so NOTHING in this service had to be
@@ -107,7 +107,9 @@ services:
     # humans and the digest is what this lane resolves, so a re-cut mirror cannot silently
     # change what the gate brings up. To refresh: dispatch d1-image-mirror.yml, then
     # replace the digest here with the one it prints.
-    image: ${AOA_D1_MINIO_IMAGE:-ghcr.io/meteoritelabs/aoa-d1-minio@sha256:187391a664f95607f5d787e89442df6535ab410bbc7910d2350189183ab92246}
+    # Repository transfer (2026-10-05): the old owner returns `manifest unknown`;
+    # this same digest resolves under the current owner, without rebuilding MinIO.
+    image: ${AOA_D1_MINIO_IMAGE:-ghcr.io/tandavkrishna27/aoa-d1-minio@sha256:187391a664f95607f5d787e89442df6535ab410bbc7910d2350189183ab92246}
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: "aoa-d1"
