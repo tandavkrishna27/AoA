@@ -8,7 +8,7 @@ import { observeComposeCleanup } from "../m1-cleanup-evidence.mjs";
 import * as cleanup from "../m1-cleanup-evidence.mjs";
 
 // Run the real phase entry point, replacing only Docker at the process boundary.
-function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus = 0, remaining = "", phase = "teardown", scan = null, mode = "keyless", inventoryWriteFails = false, stopStatus = 0, intents = [], inventoryRows = [], providerMode = "closed" } = {}) {
+function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus = 0, remaining = "", phase = "teardown", scan = null, mode = "keyless", inventoryWriteFails = false, stopStatus = 0, intents = [], inventoryRows = [], inventoryRowsSequence = null, providerMode = "closed" } = {}) {
   const out = mkdtempSync(path.join(os.tmpdir(), "m1-cleanup-"));
   const envFile = path.join(out, "compose.env");
   const secret = "cleanup-disposable-secret-123456";
@@ -34,13 +34,16 @@ function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus 
       if (${inventoryWriteFails} && String(file).endsWith('provider-resource-inventory.json')) throw new Error('disk full');
       return write(file, ...args);
     };
+    let inventoryReadCount = 0;
+    const inventorySnapshots = ${JSON.stringify(inventoryRowsSequence ?? [inventoryRows])};
     cp.spawnSync = (command, args, options) => {
       if (command !== 'docker') throw new Error('unexpected command');
       appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + '\\n');
       if (args.includes('stop')) return { status: ${JSON.stringify(stopStatus)}, stdout: '', stderr: '' };
       if (options?.input?.includes('FROM jobs j')) {
         appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(['inventory-read']) + '\\n');
-        return { status: 0, stderr: '', stdout: '__M1_RESULT__' + JSON.stringify({ ok: true, rows: ${JSON.stringify(inventoryRows)} }) };
+        const rows = inventorySnapshots[Math.min(inventoryReadCount++, inventorySnapshots.length - 1)];
+        return { status: 0, stderr: '', stdout: '__M1_RESULT__' + JSON.stringify({ ok: true, rows }) };
       }
       if (options?.input?.includes('FROM execution_targets')) return {
         status: 0, stderr: '', stdout: '__M1_RESULT__' + JSON.stringify({ ok: true, rows: [{
@@ -265,6 +268,83 @@ test("keyed teardown stops workers before the final database snapshot, then down
   assert.ok(result.calls[stop].includes("m1-worker-b"));
   assert.ok(result.calls[stop].includes("m1-worker-c"));
   assert.equal(result.calls[stop].includes("adapter-manager"), false, "adapter must remain available during graceful worker cleanup");
+});
+
+test("inventory settlement waits for the normal job and lease transition", async () => {
+  let time = 0;
+  let reads = 0;
+  const deadlines = [];
+  const result = await cleanup.awaitProviderInventory({
+    timeoutMs: 10, pollMs: 5, now: () => time, sleep: async (ms) => { time += ms; },
+    collect: ({ deadlineMs }) => {
+      deadlines.push(deadlineMs);
+      const pending = ++reads === 1;
+      return { resources: [{ ...binding, jobStatus: pending ? "running" : "succeeded", leaseStatus: pending ? "active" : "expired" }],
+        complete: !pending, violations: pending ? ["intent-1:execution_not_terminal"] : [] };
+    },
+  });
+  assert.equal(result.complete, true);
+  assert.equal(reads, 2);
+  assert.deepEqual(deadlines, [10, 5]);
+  assert.equal(result.resources[0].leaseStatus, "expired");
+});
+
+test("real teardown preserves the database until a terminal attempt's job and lease settle", () => {
+  const result = runPhase({ mode: "keyed", intents: [{ candidate, ...intent }],
+    inventoryRowsSequence: [[{ ...binding, jobStatus: "running", leaseStatus: "active" }], [binding]] });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.providerReport.pass, true);
+  const reads = result.calls.flatMap((args, index) => args[0] === "inventory-read" ? [index] : []);
+  assert.equal(reads.length, 2);
+  assert.ok(result.calls.findIndex((args) => args.includes("stop")) < reads[0]);
+  assert.ok(reads[1] < result.calls.findIndex((args) => args.includes("down")));
+});
+
+test("inventory settlement stays failed at its deadline and retains observed resources", async () => {
+  let time = 0;
+  const result = await cleanup.awaitProviderInventory({
+    timeoutMs: 10, pollMs: 5, now: () => time, sleep: async (ms) => { time += ms; },
+    collect: () => ({ resources: [binding], complete: false, violations: ["intent-1:execution_not_terminal"] }),
+  });
+  assert.equal(result.complete, false);
+  assert.equal(time, 10);
+  assert.deepEqual(result.violations, ["intent-1:execution_not_terminal", "inventory_settlement_deadline"]);
+  assert.deepEqual(result.resources, [binding]);
+});
+
+test("inventory settlement refuses other errors immediately without losing earlier bindings", async () => {
+  let reads = 0;
+  let sleeps = 0;
+  const result = await cleanup.awaitProviderInventory({
+    now: () => 0, sleep: async () => { sleeps++; },
+    collect: () => ++reads === 1
+      ? { resources: [binding], complete: false, violations: ["intent-1:execution_not_terminal"] }
+      : { resources: [], complete: false, violations: ["intent-1:inventory_read_failed"] },
+  });
+  assert.equal(sleeps, 1);
+  assert.equal(result.complete, false);
+  assert.deepEqual(result.resources, [binding]);
+  assert.deepEqual(result.violations, ["intent-1:inventory_read_failed"]);
+});
+
+test("inventory settlement cannot pass on a late response or a disappeared binding", async () => {
+  let time = 0;
+  const late = await cleanup.awaitProviderInventory({
+    timeoutMs: 10, pollMs: 5, now: () => time,
+    collect: () => { time = 11; return { resources: [binding], complete: true, violations: [] }; },
+  });
+  assert.equal(late.complete, false);
+  assert.ok(late.violations.includes("inventory_settlement_deadline"));
+  let reads = 0;
+  const missing = await cleanup.awaitProviderInventory({
+    now: () => 0, sleep: async () => {},
+    collect: () => ++reads === 1
+      ? { resources: [binding], complete: false, violations: ["intent-1:execution_not_terminal"] }
+      : { resources: [], complete: true, violations: [] },
+  });
+  assert.equal(missing.complete, false);
+  assert.deepEqual(missing.resources, [binding]);
+  assert.ok(missing.violations.includes("inventory_resource_disappeared"));
 });
 
 test("a failed worker stop cannot skip Compose down or certify a final inventory", () => {

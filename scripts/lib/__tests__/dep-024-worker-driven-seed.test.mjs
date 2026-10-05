@@ -35,6 +35,7 @@ import {
   SPINE_DEPLOYED_POLICY_HASH,
   SPINE_DEPLOYED_TARGET_ID,
   seedSpineWorkerDrivenJob,
+  seedResolvableProviderSecretHandle,
 } from "../../../tests/d1/lib/e6f-harness.mjs";
 
 /** A tenant and a ratified target, shaped exactly as both lanes pass them. */
@@ -67,6 +68,75 @@ function render(overrides = {}) {
   assert.deepEqual(res.result, { ok: true }, "the seeder must return the executor's result unchanged");
   return calls[0];
 }
+
+function renderSecretHandle() {
+  // Refuse before invoking a helper without a render seam: these tests never spawn Docker.
+  assert.match(seedResolvableProviderSecretHandle.toString(), /dexec = dexecModule/);
+  let rendered;
+  seedResolvableProviderSecretHandle({
+    organizationId: TENANT.organizationId, companyId: TENANT.companyId, jobId: IDS.jobId,
+    handleId: IDS.handleId, secretName: "provider:fixture", value: "inert-pool-test-canary",
+    dexec: (service, script, opts) => { rendered = { service, script, opts }; return { result: { ok: true } }; },
+  });
+  return rendered;
+}
+
+async function executeSeed(script, { failSecret = false } = {}) {
+  const closed = { plain: 0, service: 0 };
+  let servicePools = 0;
+  const reports = [];
+  const sql = async () => [{ id: IDS.handleId }];
+  sql.json = (value) => value;
+  sql.end = async (opts) => { assert.equal(opts.timeout, 5); closed.plain += 1; };
+  const postgres = () => sql;
+  const createDb = () => {
+    servicePools += 1;
+    return { $client: { end: async (opts) => { assert.equal(opts.timeout, 5); closed.service += 1; } } };
+  };
+  const secretService = () => ({
+    getByName: async () => null,
+    create: async () => { if (failSecret) throw Error("fixture secret write failed"); },
+  });
+  const body = script.replace(/^import postgres from "postgres";\r?\n/m, "")
+    .replace(/^\s*const \{ (?:createDb|secretService) \} = await import\([^\n]*\);\r?\n/gm, "");
+  const execute = new Function("postgres", "createDb", "secretService", "console", `return (async () => { ${body} })()`);
+  await execute(postgres, createDb, secretService, { log: (line) => reports.push(JSON.parse(line.replace("__E6F_RESULT__", ""))) });
+  return { closed, servicePools, reports };
+}
+
+test("seed pools: worker-driven seed closes both clients on success and secret-write failure", async () => {
+  for (const failSecret of [false, true]) {
+    const result = await executeSeed(render().script, { failSecret });
+    assert.equal(result.reports.at(-1).ok, !failSecret);
+    assert.equal(result.servicePools, 1);
+    assert.deepEqual(result.closed, { plain: 1, service: 1 });
+  }
+});
+
+test("seed pools: no-secret worker seed creates no service pool and closes the plain client", async () => {
+  const { script, opts } = render({ seedSecret: false });
+  const result = await executeSeed(script);
+  assert.equal(result.reports.at(-1).ok, true);
+  assert.equal(result.servicePools, 0);
+  assert.deepEqual(result.closed, { plain: 1, service: 0 });
+  assert.deepEqual(opts.secrets, []);
+});
+
+test("worker seed leaves previous lease/job reconciliation to the production lifecycle", () => {
+  assert.doesNotMatch(render().script, /UPDATE\s+leases|released_at|SET\s+expires_at/i);
+});
+
+test("seed pools: resolvable handle closes both clients on success and failure and retains scrubbing", async () => {
+  const rendered = renderSecretHandle();
+  assert.equal(rendered.service, "control-plane");
+  assert.deepEqual(rendered.opts.secrets, ["inert-pool-test-canary"]);
+  for (const failSecret of [false, true]) {
+    const result = await executeSeed(rendered.script, { failSecret });
+    assert.equal(result.reports.at(-1).ok, !failSecret);
+    assert.equal(result.servicePools, 1);
+    assert.deepEqual(result.closed, { plain: 1, service: 1 });
+  }
+});
 
 /** `node --check` the rendered module. Fails with node's own parse diagnostic. */
 function parses(script) {

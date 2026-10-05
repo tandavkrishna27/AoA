@@ -3918,10 +3918,18 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobs.organizationId, leases.organizationId),
         eq(jobs.companyId, leases.companyId),
         eq(jobs.id, leases.jobId),
+      )).innerJoin(jobAttempts, and(
+        eq(jobAttempts.organizationId, leases.organizationId),
+        eq(jobAttempts.companyId, leases.companyId),
+        eq(jobAttempts.jobId, leases.jobId),
+        eq(jobAttempts.id, leases.attemptId),
       )).where(and(
         eq(leases.workerId, input.workerId),
         eq(leases.targetId, input.targetId),
         inArray(leases.status, ["offered", "active"]),
+        // A committed terminal attempt no longer occupies a worker execution slot.
+        // Lease/fence settlement and Organization admission remain reaper-owned.
+        notInArray(jobAttempts.status, [...TERMINAL_ATTEMPT_STATUSES]),
       ));
       return {
         total: Number(row?.total ?? 0),

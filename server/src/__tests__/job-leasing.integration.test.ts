@@ -13,7 +13,9 @@ import {
 } from "@armyofagents/db";
 import {
   canonicalProviderConstraintProfileDigestInputV1,
+  canonicalEventDigestInputV1,
   canonicalizeJsonV1,
+  type EventUploadOperationRequestV1,
   type LeaseAckOperationRequestV1,
   type LeaseOfferV1,
   type PollRequestV1,
@@ -28,6 +30,8 @@ import {
 } from "../services/job-leasing.js";
 import { createJobReadyScheduler } from "../services/job-ready-scheduler.js";
 import { createJobOutboxWorker } from "../services/job-outbox-worker.js";
+import { createJobEventIngestService } from "../services/job-events.js";
+import { admitAttemptCapacity } from "../services/org-concurrency.js";
 import { sql } from "drizzle-orm";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { settleAllClaimers } from "./helpers/settle-all-claimers.js";
@@ -1745,6 +1749,86 @@ integration("JOB-003 atomic poll/offer and ready hints", () => {
     expect(browserOffer.body.job.jobId).toBe(browser.jobId);
     expect(browserOffer.body.job.workloadType).toBe("browser_session");
   });
+
+  it.each(["succeeded", "failed", "cancelled"] as const)(
+    "offers the next batch after an accepted %s terminal without releasing or aging its prior lease",
+    async (terminalStatus) => {
+      const { admin, app } = guard();
+      await resetRuntimeRows();
+      const authority = await configureMixedWorkloadAuthority();
+      const placement = { profileHash: authority.targetProfileHash, providerHash: authority.providerHash };
+      await admin`INSERT INTO companies (id, organization_id, name, issue_prefix)
+        VALUES (${ALT_COMPANY}, ${ORG}, 'JOB-003 alternate company', 'J03X') ON CONFLICT (id) DO NOTHING`;
+      const first = await seedPlacedJob({ ordinal: 22, placement });
+      const next = await seedPlacedJob({ ordinal: 23, placement, companyId: ALT_COMPANY });
+      for (const [seeded, companyId] of [[first, COMPANY], [next, ALT_COMPANY]] as const) {
+        const admitted = await runInTenant(app.db, ORG, (_, tx) => admitAttemptCapacity(tx, {
+          organizationId: ORG, companyId, attemptId: seeded.attemptId, workloadType: "batch",
+          principalId: WORKER, principalKind: "worker", cap: 2,
+        }));
+        expect(admitted.admitted).toBe(true);
+      }
+      const service = createJobLeasingService({ appDb: app.db });
+      const capacity = { ...workerHello(WORKER, TARGET, 1).capacity, browserSessionSlots: 0 };
+      let proof = 0;
+      const verified = () => auth(`terminal-capacity-${terminalStatus}-${++proof}`, WORKER, TARGET, authority.workerProfileHash);
+      const pollNext = () => service.poll({ auth: verified(), request: pollRequestWithCapacity(WORKER, TARGET, `terminal-capacity-${proof}`, capacity) });
+      const firstResult = await pollNext();
+      expect(firstResult.outcome).toBe("offer");
+      if (firstResult.outcome !== "offer") throw Error("first capacity offer missing");
+      const offer = firstResult.body;
+      expect(offer.job.jobId).toBe(first.jobId);
+      // The offered attempt consumes the only batch slot, even in a different Company.
+      expect((await pollNext()).outcome).toBe("no_work");
+      const snapshot = (workerId = WORKER, targetId = TARGET, organizationId = ORG) => runInTenant(app.db, organizationId, (repos) => repos.jobControl.snapshotLiveLeaseCapacity({ workerId, targetId }));
+      expect(await snapshot()).toEqual({ total: 1, batch: 1, browserSession: 0, service: 0 });
+      expect(await snapshot(OTHER_WORKER)).toEqual({ total: 0, batch: 0, browserSession: 0, service: 0 });
+      expect(await snapshot(WORKER, OTHER_TARGET)).toEqual({ total: 0, batch: 0, browserSession: 0, service: 0 });
+      expect(await snapshot(WORKER, TARGET, ORG_B)).toEqual({ total: 0, batch: 0, browserSession: 0, service: 0 });
+      expect((await service.ack({ auth: verified(), request: ackRequest(offer) })).outcome).toBe("acknowledged");
+      const ingest = createJobEventIngestService({ appDb: app.db });
+      const accepted = (seq: number, eventType: "attempt_started" | "terminal", payload: Record<string, unknown>, currentOffer = offer) => {
+        const event = { protocolVersion: 1, eventId: crypto.randomUUID(), organizationId: ORG, companyId: currentOffer.job.companyId,
+          workerId: WORKER, jobId: currentOffer.job.jobId, attempt: currentOffer.job.attempt, leaseId: currentOffer.leaseId,
+          fenceToken: currentOffer.fenceToken, seq, occurredAt: new Date().toISOString(), extensions: [], eventType, payload };
+        const request = { protocolVersion: 1, correlationId: crypto.randomUUID(), issuedAt: new Date().toISOString(),
+          nonce: `terminal-capacity-event-${crypto.randomUUID()}`, audience: "worker_run", idempotencyKey: crypto.randomUUID(),
+          body: { protocolVersion: 1, organizationId: ORG, companyId: currentOffer.job.companyId, workerId: WORKER,
+            jobId: currentOffer.job.jobId, attempt: currentOffer.job.attempt, leaseId: currentOffer.leaseId, fenceToken: currentOffer.fenceToken,
+            events: [{ ...event, eventDigest: sha256(canonicalEventDigestInputV1(event)) }] } } as unknown as EventUploadOperationRequestV1;
+        return ingest.ingest({ auth: verified(), request });
+      };
+      expect((await accepted(1, "attempt_started", { sandboxId: "terminal-capacity-sandbox" })).ack.status).toBe("accepted");
+      // A genuinely running attempt still consumes the slot.
+      expect((await pollNext()).outcome).toBe("no_work");
+      expect(await snapshot()).toEqual({ total: 1, batch: 1, browserSession: 0, service: 0 });
+      const [before] = await admin<{ status: string; expiresAt: Date }[]>`SELECT status, expires_at AS "expiresAt" FROM leases WHERE id = ${offer.leaseId}`;
+      expect(before?.status).toBe("active");
+      expect((await accepted(2, "terminal", { status: terminalStatus, exitCode: terminalStatus === "succeeded" ? 0 : 1, errorCode: null, errorMessage: null })).ack.status).toBe("accepted");
+      const [after] = await admin<{ status: string; expiresAt: Date; attemptStatus: string; live: boolean }[]>`SELECT l.status, l.expires_at AS "expiresAt", a.status AS "attemptStatus", l.expires_at > clock_timestamp() AS live
+        FROM leases l JOIN job_attempts a ON a.id = l.attempt_id AND a.job_id = l.job_id AND a.company_id = l.company_id AND a.organization_id = l.organization_id WHERE l.id = ${offer.leaseId}`;
+      expect(after).toEqual({ ...before, attemptStatus: terminalStatus, live: true });
+      expect(await snapshot()).toEqual({ total: 0, batch: 0, browserSession: 0, service: 0 });
+      const nextResult = await pollNext();
+      expect(nextResult.outcome).toBe("offer");
+      if (nextResult.outcome !== "offer") throw Error("terminal attempt stranded the next batch");
+      expect(nextResult.body.job.jobId).toBe(next.jobId);
+      expect(nextResult.body.job.companyId).toBe(ALT_COMPANY);
+      expect(await snapshot()).toEqual({ total: 1, batch: 1, browserSession: 0, service: 0 });
+      expect((await service.ack({ auth: verified(), request: ackRequest(nextResult.body) })).outcome).toBe("acknowledged");
+      expect((await accepted(1, "attempt_started", { sandboxId: "next-company-sandbox" }, nextResult.body)).ack.status).toBe("accepted");
+      expect(await snapshot()).toEqual({ total: 1, batch: 1, browserSession: 0, service: 0 });
+      expect((await pollNext()).outcome, "the sibling active offer still consumes the slot beside a terminal lease").toBe("no_work");
+      const claims = await admin<{ id: string; state: string; releasedAt: Date | null }[]>`SELECT id, capacity_claim_state AS state, capacity_released_at AS "releasedAt" FROM job_attempts WHERE id IN (${first.attemptId}, ${next.attemptId}) ORDER BY id`;
+      expect(claims).toEqual([
+        { id: first.attemptId, state: "held", releasedAt: null },
+        { id: next.attemptId, state: "held", releasedAt: null },
+      ]);
+      const [unchanged] = await admin<{ status: string; expiresAt: Date }[]>`SELECT status, expires_at AS "expiresAt" FROM leases WHERE id = ${offer.leaseId}`;
+      expect(unchanged).toEqual(before);
+    },
+    60_000,
+  );
 
   it("continues past zero-slot and full head candidates to later eligible work", async () => {
     const { app } = guard();

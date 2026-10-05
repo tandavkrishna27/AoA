@@ -108,6 +108,37 @@ export function collectProviderInventory({ candidate, intents, read, deadlineMs 
     complete: violations.length === 0, violations };
 }
 
+// A terminal attempt can precede normal lease expiry and job reconciliation.
+// Keep the control plane alive while observing that transition; never age leases
+// or convert a nonterminal snapshot into success merely because time elapsed.
+export async function awaitProviderInventory({ collect, timeoutMs = 420_000, pollMs = 5_000,
+  now = () => performance.now(), sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }) {
+  if (typeof collect !== "function" || !Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 420_000
+    || !Number.isInteger(pollMs) || pollMs < 1 || pollMs > timeoutMs) throw new Error("invalid inventory settlement bounds");
+  const deadline = now() + timeoutMs;
+  const observed = new Map();
+  let snapshot = { resources: [], complete: false, violations: [] };
+  const result = (extra = []) => ({ ...snapshot, resources: [...observed.values()],
+    complete: snapshot.complete && extra.length === 0, violations: [...snapshot.violations, ...extra] });
+  for (;;) {
+    const remaining = Math.ceil(deadline - now());
+    if (remaining <= 0) return result(["inventory_settlement_deadline"]);
+    try { snapshot = collect({ deadlineMs: Math.min(30_000, remaining) }); }
+    catch { snapshot = { ...snapshot, complete: false, violations: ["inventory_unavailable"] }; return result(); }
+    for (const resource of snapshot.resources) {
+      const key = JSON.stringify([resource.intentId, resource.jobId, resource.attemptId, resource.leaseId, resource.sandboxId]);
+      observed.set(key, resource);
+    }
+    if (now() > deadline) return result(["inventory_settlement_deadline"]);
+    if (snapshot.complete) return result(observed.size === snapshot.resources.length ? [] : ["inventory_resource_disappeared"]);
+    // Identity, journal and query failures are not normal settlement delays.
+    if (!snapshot.violations.length || snapshot.violations.some((v) => !v.endsWith(":execution_not_terminal"))) return result();
+    const delay = Math.min(pollMs, deadline - now());
+    if (delay <= 0) return result(["inventory_settlement_deadline"]);
+    await sleep(delay);
+  }
+}
+
 // Compose evidence only: successful removal says nothing about provider sandboxes.
 export function observeComposeCleanup({ candidate, project, down, inspect }) {
   const invoke = (operation) => {

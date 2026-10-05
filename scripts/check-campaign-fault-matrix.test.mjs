@@ -51,6 +51,116 @@ function startupFenceFactsFixture() {
   return runInNewContext(`${body[1]}\nstartupFenceFacts`);
 }
 
+function lateExpiryFixtureHelpers(context = {}) {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const match = source.match(/\/\/ late-expiry fixture helper BEGIN\r?\n([\s\S]*?)\/\/ late-expiry fixture helper END/);
+  assert.ok(match, "the late control must use an independent short-lived fixture");
+  return runInNewContext(`${match[1]}\n({ seedLateExpiryTarget, lateExpiryPaths, writeLateExpiryFiles, recreateLateExpiryWorker })`, { path, assert, ...context });
+}
+
+test("D1 late expiry: initial future 60s lifetime is scoped to a fresh target and never changes existing expiries", () => {
+  let script;
+  const helpers = lateExpiryFixtureHelpers({ SPINE_DEPLOYED_TARGET_ID: "original", dexecModule: (_, text) => { script = text; return {}; } });
+  helpers.seedLateExpiryTarget({ organizationId: "own-org", targetId: "fresh-target", code: { locatorHash: "locator-digest", secretHash: "secret-digest" } });
+  assert.doesNotThrow(() => new Function(`return (async () => { ${script.replace(/^import .*;$/gm, "")} })`));
+  assert.match(script, /interval '60 seconds'/);
+  assert.match(script, /expires_at/);
+  assert.match(script, /deviceGeneration: 1/);
+  assert.match(script, /organization_id = \$\{P\.organizationId\}/);
+  assert.doesNotMatch(script, /\bUPDATE\s+|\bDELETE\s+|SET\s+expires_at|secret:|aoa_tkt_/i);
+});
+
+test("D1 restart: nonnull locator lookup parameterizes all SQL operands", async () => {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const body = source.match(/\/\/ restart-observation helper BEGIN\r?\n([\s\S]*?)\/\/ restart-observation helper END/)[1];
+  let script;
+  const lookup = runInNewContext(`${body}\nreadEnrollmentLifetime`, { SPINE_DEPLOYED_TARGET_ID: "original", dexecModule: (_, text) => { script = text; return {}; } });
+  const hash = "a".repeat(64);
+  lookup({ targetId: "fresh-target", locatorHash: hash });
+  let observed;
+  const sql = async (strings, ...values) => { observed = { text: strings.join("?"), values }; return [{ codeLive: true, routeLive: true }]; };
+  sql.end = async () => {};
+  const exec = new Function("postgres", "console", `return (async () => { ${script.replace(/^import .*;$/gm, "")} })()`);
+  await exec(() => sql, { log: () => {} });
+  assert.deepEqual(observed.values, ["fresh-target", hash, hash, hash]);
+  assert.equal(observed.text.includes(hash), false, "digests must be SQL parameters, never quoted identifiers");
+  assert.match(observed.text, /\?::text IS NULL/);
+  assert.match(observed.text, /\?::text IS NOT NULL/);
+});
+
+test("D1 late expiry: actual control orders real expiry before parking and always restores only worker-b", () => {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
+  const callback = source.match(/test\("fault-matrix: an expired enrollment[^\n]+\(\) => \{\r?\n([\s\S]*?)^\}\);/m)[1];
+  for (const suppressed of [false, true]) {
+    const calls = [];
+    let clockRead = 0;
+    let start = "initial";
+    let log = "";
+    const targetId = "fresh-target";
+    const tenant = { organizationId: "own-org", companyId: "own-company" };
+    const context = {
+      assert, SUPPRESS_INJECTION: suppressed, randomUUID: () => targetId, newEnrollmentCode: () => ({ locatorHash: "digest" }),
+      M1_SPINE_TENANTS: { enabled: [tenant] }, step: (r) => r, truncate: JSON.stringify, bundle: { detail: {} },
+      lateExpiryPaths: () => ({ overlay: "isolated-overlay" }),
+      seedLateExpiryTarget: () => ({ ok: true, profile: { policyHash: "own-policy" } }), writeLateExpiryFiles: () => {},
+      readEnrollmentLifetime: (args) => { assert.equal(args.targetId, targetId); assert.equal(args.locatorHash, "digest"); clockRead += 1; const live = clockRead <= 2; calls.push(live ? "live-clock" : "expired-clock"); return { ok: true, codeLive: live, routeLive: live, remainingMs: live ? 50000 : -1 }; },
+      recreateLateExpiryWorker: (overlay) => { calls.push(overlay ? "activate" : "restore"); return { ok: true }; },
+      queryDeployedWorker: (args) => { assert.equal(args.targetId, targetId); calls.push("enrolled"); return { ok: true, workerCount: 1, workerId: "own-worker" }; },
+      parkRunInFlight: (_, __, options) => { assert.equal(options.seedOverrides.targetId, targetId); assert.equal(options.seedOverrides.policyHash, "own-policy"); calls.push("park"); return { ids: { jobId: "own-job" }, inFlight: { ok: true }, leaseWasLive: true, lease: { id: "own-lease" }, placement: { workerId: "own-worker" } }; },
+      awaitSpineWorkerDrivenTerminal: () => { calls.push("complete"); return { attemptStatus: "succeeded" }; },
+      composeServiceLogs: () => ({ ok: true, text: log }), countIn: (text, marker) => text.includes(marker) ? 1 : 0,
+      countTerminal401: (text) => text.includes("401") ? 1 : 0,
+      SESSION_TERMINAL_MARKERS: { message: "terminal", idle: "idle", reason: "unauthorized" }, STARTUP_RECONCILE_ARMS: { fenced: "fenced" },
+      composeServiceRuntime: () => ({ ok: true, running: true, startedAt: start }),
+      killComposeService: () => { assert.equal(suppressed, false); calls.push("kill"); return { ok: true }; },
+      startComposeService: () => { start = "restarted"; log = "terminal idle unauthorized 401"; return { ok: true }; },
+      waitFor: (probe, predicate) => { const last = probe(); return { ok: predicate(last), last }; },
+      requestCancellationInContainer: () => { calls.push("cancel-fixture"); return { status: 200 }; },
+    };
+    runInNewContext(`(function () { ${callback} })()`, context);
+    assert.equal(calls.at(-1), "restore");
+    assert.equal(calls.includes("kill"), !suppressed);
+    assert.equal(context.bundle.detail.expiredEnrollmentRestart.injectionFired, !suppressed);
+    assert.ok(calls.indexOf("enrolled") < calls.indexOf("park"));
+    if (!suppressed) assert.ok(calls.indexOf("expired-clock") < calls.indexOf("park"));
+    else { assert.equal(calls.includes("expired-clock"), false); assert.ok(calls.includes("complete")); }
+    // Even a partial activation failure restores the original configuration. A cleanup error
+    // must not replace the primary failure and no auth bypass/restart of siblings exists here.
+    const primary = Error("activation refused");
+    clockRead = 0;
+    context.recreateLateExpiryWorker = (overlay) => { calls.push(overlay ? "failed-activation" : "failed-restore"); throw overlay ? primary : Error("cleanup failure"); };
+    assert.throws(() => runInNewContext(`(function () { ${callback} })()`, context), (error) => error === primary);
+    assert.equal(calls.at(-1), "failed-restore");
+  }
+});
+
+test("D1 late expiry: isolated paths and overlay recreate only worker-b and restore the original config", () => {
+  const calls = [];
+  const writes = [];
+  const uuid = "11111111-1111-4111-8111-111111111111";
+  const helpers = lateExpiryFixtureHelpers({
+    repoRoot, mkdirSync: () => {}, realpathSync: (p) => p,
+    writeFileSync: (file, value, options) => writes.push({ file, value, options }), Buffer,
+    composeBaseArgs: () => ["compose", "-p", "own-project", "-f", "original.yml"],
+    spawnSync: (_, args) => { calls.push(args); return { status: 0 }; },
+  });
+  assert.throws(() => helpers.lateExpiryPaths("../escape"));
+  const paths = helpers.lateExpiryPaths(uuid);
+  assert.ok(paths.directory.startsWith(path.join(repoRoot, "docker", "d1", "runtime-keys") + path.sep));
+  helpers.writeLateExpiryFiles({ paths, targetId: uuid, profile: { targetId: uuid }, code: { code: "inert-fixture-code" } });
+  assert.equal(writes.length, 3);
+  assert.ok(writes.every((w) => w.file.startsWith(paths.directory + path.sep) && w.options.flag === "wx"));
+  const overlay = JSON.parse(writes.find((w) => w.file === paths.overlay).value);
+  assert.deepEqual(Object.keys(overlay.services), ["worker-b"]);
+  assert.equal(overlay.services["worker-b"].environment.AOA_WORKER_STATE_DIR, `/worker/late-expiry-${uuid}`);
+  assert.equal(overlay.services["worker-b"].environment.AOA_WORKER_EVENT_OUTBOX_PATH, `/worker/late-expiry-${uuid}/events.db`);
+  helpers.recreateLateExpiryWorker(paths.overlay);
+  helpers.recreateLateExpiryWorker();
+  assert.deepEqual(Array.from(calls[0]), ["compose", "-p", "own-project", "-f", "original.yml", "-f", paths.overlay, "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "worker-b"]);
+  assert.equal(calls[1].includes(paths.overlay), false);
+  assert.ok(calls.every((args) => args.at(-1) === "worker-b" && args.includes("--no-deps")));
+});
+
 test("D1 restart: container probes render valid JavaScript and never mutate lease authority", () => {
   const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
   const body = source.match(/\/\/ restart-observation helper BEGIN\r?\n([\s\S]*?)\/\/ restart-observation helper END/)[1];
