@@ -58,7 +58,7 @@ function usefulWorkFixture() {
       eventId: "event-a", receiptIdentity: `output:${expected.companyId}:event-a`, receiptDigest: "d".repeat(64), eventDigest: "d".repeat(64),
       receiptFence: "fence-a", eventFence: "fence-a", artifactFence: "fence-a", eventLeaseId: "lease-a", artifactLeaseId: "lease-a",
       artifactId: "artifact-a", artifactJobId: "job-a", artifactOrganizationId: A, artifactAttempt: 2, artifactStatus: "committed",
-      artifactIdentifier: "identifier-a", eventIdentifier: "identifier-a", artifactKind: "run_output", eventKind: "run_output",
+      artifactIdentifier: "identifier-a", eventIdentifier: "identifier-a", artifactKind: "other", eventKind: "other",
       artifactSha256: sha256, artifactSizeBytes: body.length },
     download: { status: 200, contentLength: body.length, body },
   };
@@ -66,6 +66,32 @@ function usefulWorkFixture() {
 
 test("M1b requires capability and exact accepted-attempt content retrieved by the founder", () => {
   assert.deepEqual(evaluateM1bUsefulWorkEvidence(usefulWorkFixture()), { pass: true, reasons: [] });
+});
+
+test("M1b output selection accepts the actual composed worker output kind", () => {
+  const worker = readFileSync(new URL("../../../packages/worker-daemon/src/lifecycle/dispatch-runtime.ts", import.meta.url), "utf8");
+  const producerKind = /const resolveExportArtifacts = createExportRequestProducer\(\{[\s\S]*?\bkind: "([^"]+)"/.exec(worker)?.[1];
+  assert.equal(producerKind, "other");
+  const driver = readFileSync(journey, "utf8");
+  const usefulWork = driver.slice(driver.indexOf("async function m1bUsefulWork(state)"), driver.indexOf("async function m1bUsefulWork(state)") + 12_000);
+  assert.ok(usefulWork.includes(`art.kind = '${producerKind}'`), "the live query must select the worker's declared kind");
+  const good = usefulWorkFixture();
+  assert.deepEqual(evaluateM1bUsefulWorkEvidence({ ...good,
+    output: { ...good.output, artifactKind: producerKind, eventKind: producerKind },
+  }), { pass: true, reasons: [] });
+});
+
+test("M1b still refuses a mismatched accepted event kind or a different matching artifact kind", () => {
+  const good = usefulWorkFixture();
+  for (const output of [
+    { ...good.output, eventKind: "run_output" },
+    { ...good.output, artifactKind: "run_output", eventKind: "run_output" },
+    { ...good.output, artifactKind: "workspace_patch", eventKind: "workspace_patch" },
+  ]) {
+    const verdict = evaluateM1bUsefulWorkEvidence({ ...good, output });
+    assert.equal(verdict.pass, false);
+    assert.ok(verdict.reasons.includes("the accepted event does not identify this produced artifact"));
+  }
 });
 
 test("M1b requires an observed successful MCP read of the exact reference, even when the output is correct", () => {

@@ -42,7 +42,7 @@ export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit
       typeof record.taskId === "string" && /^[0-9a-f]{64}$/.test(record.titleSha256 ?? "")) &&
     toolReads.records.some((record) => record.companyId === expected.companyId &&
       record.taskId === expected.referenceTaskId && record.titleSha256 === referenceTitleSha256),
-    "no complete observation proves a successful MCP list-tasks response containing the exact live reference");
+    "no complete observation proves a successful MCP get_heartbeat_context response containing the exact live reference");
   if (!output) reasons.push("no accepted output projection and committed artifact for this attempt");
   else {
     require(!!output.outputId && output.provider === "aoa_distributed_job" && output.receiptStatus === "applied" &&
@@ -55,7 +55,7 @@ export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit
       Number(output.artifactAttempt) === Number(output.attemptNumber), "the artifact is not bound to the exact job and attempt");
     require(!!output.artifactId && output.externalId === output.artifactId &&
       !!output.artifactIdentifier && output.eventIdentifier === output.artifactIdentifier &&
-      output.artifactKind === "run_output" && output.eventKind === output.artifactKind,
+      output.artifactKind === "other" && output.eventKind === output.artifactKind,
       "the accepted event does not identify this produced artifact");
     require(!!output.eventId && output.receiptIdentity === `output:${expected.companyId}:${output.eventId}` &&
       /^[0-9a-f]{64}$/.test(output.eventDigest ?? "") && output.receiptDigest === output.eventDigest &&

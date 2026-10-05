@@ -300,7 +300,11 @@ describe("Blocker A — the canary seam pushes a real workload", () => {
     const call = HEARTBEAT_SRC.slice(build, build + 40).join(" ");
     // NEVER `agent.adapterType` as the command — that is the shadow comparator's bug.
     expect(call).toContain("runtimeCommandSpec");
-    expect(call).toContain("context.currentTaskMarkdown");
+    expect(call).toContain("currentTaskMarkdown: distributedTaskContext.currentTaskMarkdown");
+    const prepare = HEARTBEAT_SRC.findIndex((l) => l.includes("const distributedTaskContext = prepareDistributedTaskRunContext({"));
+    expect(prepare, "expected the distributed preparation before the builder").toBeGreaterThan(-1);
+    expect(prepare).toBeLessThan(build);
+    expect(HEARTBEAT_SRC.slice(prepare, build).join(" ")).toContain("currentTaskMarkdown: context.currentTaskMarkdown");
     expect(call).toContain("runScopedConfig");
     // The builder runs BEFORE the placement it feeds.
     expect(build).toBeLessThan(canaryResolveIdx());

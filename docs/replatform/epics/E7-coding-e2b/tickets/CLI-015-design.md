@@ -1,6 +1,6 @@
 # CLI-015 — Unit F link 6, the judge: a verifier that counts the right things
 
-**Status:** implemented locally; integration testing pending. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
+**Status:** merged in PR #645; local checks passed, live useful-work completion pending. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
 link-scoped successor mapping) · **Filed:** 2026-09-21 (M0 unit 4, founder decisions D1 + D5)
 **Depends on:** `CLI-011` · **Milestone:** `M1b`
 **Owns:** [`E7-F016`](../findings.md#e7-f016)
@@ -18,6 +18,11 @@ The operator text describes the composed output pipeline and distinguishes
 Named empty/redacted/template values are excluded without suppressing arbitrary
 credential-shaped strings. Generic `sk-` text remains ambiguous, so E7-F033 is
 not claimed fully closed. Focused PostgreSQL and verifier tests passed locally.
+On merged `9925e8d87`, typecheck, build and the full local suite passed. Live run
+`37378134451` correctly refused useful-work acceptance with
+`capabilityProven: false` because no output was produced. The
+[direct checklist](../../../milestones/M1a/recovery-plan-2026-09-26.md) records
+the MCP staging and harness fixes required before another run.
 
 The sections below retain the historical scope discussion; its claim that the
 producer is unbuilt and its separate ruling prerequisite are superseded.

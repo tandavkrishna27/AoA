@@ -21,6 +21,19 @@ function fixture() {
     } }) } };
 }
 
+test("useful-work prompt selects the discoverable broker tool and scopes the reference query", () => {
+  const source = readFileSync(new URL("./journey.mjs", import.meta.url), "utf8");
+  const usefulWork = source.slice(source.indexOf("async function m1bUsefulWork(state)"), source.indexOf("async function m1bUsefulWork(state)") + 12_000);
+  const description = /const description = `([^`]+)`;/.exec(usefulWork)?.[1];
+  assert.ok(description);
+  assert.ok(description.includes('aoa MCP get_heartbeat_context tool with taskId="${reference.id}"'));
+  assert.ok(description.includes("unassigned reference task ${reference.id} in company ${tenant.companyId}"));
+  assert.ok(description.includes("/home/user/aoa-output/result.json"));
+  assert.equal(description.includes("list-tasks"), false);
+  assert.equal(description.includes("query_tasks"), false);
+  assert.equal(description.includes("${reference.title}"), false, "the title must be learned from the live broker response");
+});
+
 test("overlay arms tools only for A, retaining B and C rollout and crew refusal", () => {
   const state = fixture();
   const before = JSON.stringify(state);
@@ -158,16 +171,16 @@ test("proxy returns 413 for chunked overflow before upstream instead of resettin
 }, { maxBodyBytes: 64 }));
 
 const TASK = "55555555-5555-4555-8555-555555555555";
-const listRequest = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "list-tasks", arguments: {} } };
+const listRequest = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_heartbeat_context", arguments: { taskId: TASK } } };
 const taskRows = [{ id: TASK, companyId: COMPANY, title: "hidden random title: π", description: "private-response-secret" }];
-const listResponse = (rows = taskRows) => ({ jsonrpc: "2.0", id: 1, result: { isError: false, content: [{ type: "text", text: JSON.stringify(rows) }] } });
+const listResponse = (task = taskRows[0]) => ({ jsonrpc: "2.0", id: 1, result: { isError: false, content: [{ type: "text", text: JSON.stringify({ success: true, data: { task, recentComments: [] }, summary: "Task context" }) }] } });
 const expectedRead = { companyId: COMPANY, taskId: TASK, titleSha256: createHash("sha256").update(taskRows[0].title).digest("hex") };
 async function callList(url, body = listRequest) {
   return fetch(`${url}/api/companies/${COMPANY}/mcp`, { method: "POST",
     headers: { authorization: "Bearer synthetic-run-token", "content-type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) });
 }
 
-test("proxy observes only task identities and title hashes from the actual successful list-tasks response", async () => {
+test("proxy observes only task identities and title hashes from the actual successful get_heartbeat_context broker response", async () => {
   const observations = [];
   await withProxy(async (url) => {
     const response = await callList(url);
@@ -178,10 +191,14 @@ test("proxy observes only task identities and title hashes from the actual succe
   }, { responseBody: JSON.stringify(listResponse()), onObservation: (record) => observations.push(record) });
 });
 
-test("proxy never observes wrong tools, failed RPCs, mismatched responses or malformed task lists", async () => {
+test("proxy never observes wrong tools, failed RPCs, mismatched responses or malformed task contexts", async () => {
   const scenarios = [
     { body: { ...listRequest, method: "tools/list" } },
     { body: { ...listRequest, params: { name: "get-task" } } },
+    { body: { ...listRequest, params: { name: "list-tasks" } } },
+    { body: { ...listRequest, params: { name: "query_tasks" } } },
+    { body: { ...listRequest, params: { name: "get_heartbeat_context", arguments: {} } } },
+    { body: { ...listRequest, params: { name: "get_heartbeat_context", arguments: { taskId: B } } } },
     { body: "{" },
     { responseStatus: 403 },
     { responseBody: "{" },
@@ -189,13 +206,14 @@ test("proxy never observes wrong tools, failed RPCs, mismatched responses or mal
     { responseBody: JSON.stringify({ ...listResponse(), id: 2 }) },
     { responseBody: JSON.stringify({ ...listResponse(), result: { ...listResponse().result, isError: true } }) },
     { responseBody: JSON.stringify({ ...listResponse(), result: { content: [{ type: "text", text: "{" }] } }) },
-    { responseBody: JSON.stringify(listResponse({ tasks: taskRows })) },
-    { responseBody: JSON.stringify(listResponse([...taskRows, { id: B, companyId: B, title: "foreign" }])) },
-    { responseBody: JSON.stringify(listResponse([{ id: TASK, companyId: COMPANY }])) },
-    { responseBody: JSON.stringify(listResponse([{ ...taskRows[0], id: [TASK] }])) },
-    { responseBody: JSON.stringify(listResponse([...taskRows, ...taskRows])) },
-    { responseBody: JSON.stringify(listResponse([{ ...taskRows[0], title: "x".repeat(8193) }])) },
-    { responseBody: JSON.stringify(listResponse(Array.from({ length: 1025 }, () => taskRows[0]))) },
+    ...[taskRows, { data: { task: taskRows[0] } }, { success: false, data: { task: taskRows[0] } }, { success: true, data: { task: taskRows[0] }, error: "private" }].map((payload) => ({ responseBody: JSON.stringify({ ...listResponse(), result: { isError: false, content: [{ type: "text", text: JSON.stringify(payload) }] } }) })),
+    { responseBody: JSON.stringify(listResponse(taskRows)) },
+    { responseBody: JSON.stringify(listResponse({ id: B, companyId: B, title: "foreign" })) },
+    { responseBody: JSON.stringify(listResponse({ id: TASK, companyId: COMPANY })) },
+    { responseBody: JSON.stringify(listResponse({ ...taskRows[0], id: [TASK] })) },
+    { responseBody: JSON.stringify(listResponse({ ...taskRows[0], id: B })) },
+    { responseBody: JSON.stringify(listResponse({ ...taskRows[0], companyId: B })) },
+    { responseBody: JSON.stringify(listResponse({ ...taskRows[0], title: "x".repeat(8193) })) },
   ];
   for (const scenario of scenarios) {
     const observations = [];

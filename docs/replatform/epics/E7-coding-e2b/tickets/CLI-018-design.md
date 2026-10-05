@@ -1,6 +1,9 @@
 # CLI-018 — the founder-reachable artifact: make a distributed run's committed bytes retrievable
 
-**Status:** implemented locally; integration and live useful-work testing pending.
+**Status:** merged in PR #645; live useful-work completion pending.
+The merged `9925e8d87` typecheck, build and full local suite passed. Live run
+`37378134451` produced no output; the MCP staging and harness mismatches are
+being repaired in the [direct checklist](../../../milestones/M1a/recovery-plan-2026-09-26.md).
 The October 5 founder instruction replaces the separate ruling/certification
 prerequisite with direct code and tests. The implementation uses a board-only
 content stream, with the authorization contract recorded in

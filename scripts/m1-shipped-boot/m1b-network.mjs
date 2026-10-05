@@ -106,24 +106,24 @@ function successfulTaskReads(requestBody, responseBody, companyId) {
     const request = JSON.parse(requestBody.toString("utf8"));
     const response = JSON.parse(responseBody.toString("utf8"));
     const id = request?.id;
-    if (request?.jsonrpc !== "2.0" || request.method !== "tools/call" || request.params?.name !== "list-tasks" ||
+    if (request?.jsonrpc !== "2.0" || request.method !== "tools/call" || request.params?.name !== "get_heartbeat_context" ||
         !((typeof id === "number" && Number.isFinite(id)) || (typeof id === "string" && Buffer.byteLength(id) <= 128)) ||
         response?.jsonrpc !== "2.0" || response.id !== id || Object.hasOwn(response, "error") ||
         !response.result || (response.result.isError !== undefined && response.result.isError !== false) ||
         !Array.isArray(response.result.content) || response.result.content.length !== 1) return [];
     const content = response.result.content[0];
     if (content?.type !== "text" || typeof content.text !== "string") return [];
-    // handleListTasks returns ok(filtered): the serialized payload is the task array.
-    const rows = JSON.parse(content.text);
-    if (!Array.isArray(rows) || rows.length > 1024) return [];
-    const seen = new Set();
-    for (const row of rows) {
-      if (!row || typeof row.id !== "string" || !UUID.test(row.id) || row.companyId !== companyId ||
-          typeof row.title !== "string" || Buffer.byteLength(row.title) > 8192 || seen.has(row.id)) return [];
-      seen.add(row.id);
-    }
-    return rows.map((row) => ({ companyId, taskId: row.id,
-      titleSha256: createHash("sha256").update(row.title, "utf8").digest("hex") }));
+    // The discoverable org-agent broker tool returns executeAndFormat's ToolResult
+    // envelope with data.task. A denied/failed tool is not a read.
+    const result = JSON.parse(content.text);
+    if (!result || result.success !== true || Object.hasOwn(result, "error")) return [];
+    const task = result.data?.task;
+    const requestedTaskId = request.params.arguments?.taskId;
+    if (typeof requestedTaskId !== "string" || !UUID.test(requestedTaskId) || !task || Array.isArray(task) ||
+        task.companyId !== companyId || task.id !== requestedTaskId || typeof task.title !== "string" ||
+        Buffer.byteLength(task.title, "utf8") > 8192) return [];
+    return [{ companyId, taskId: task.id,
+      titleSha256: createHash("sha256").update(task.title, "utf8").digest("hex") }];
   } catch { return []; }
 }
 

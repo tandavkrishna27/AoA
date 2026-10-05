@@ -1178,7 +1178,7 @@ async function m1bUsefulWork(state) {
   }, timeout);
   state.m1bUsefulWork = { projectId: project.id, referenceTaskId: reference.id, referenceTitle: reference.title };
   saveState(state);
-  const description = `Use the aoa MCP list-tasks tool to read the unassigned backlog reference task ${reference.id} in project ${project.id}, company ${tenant.companyId}. Read its exact title from the live tool response. Create /home/user/aoa-output/result.json with exactly these three JSON keys: companyId, referenceTaskId, referenceTitle. Use the company ID ${tenant.companyId}, the reference task ID ${reference.id}, and the exact reference title returned by AoA. Do not guess the title. Write the file, then finish successfully. This is a read-only AoA task; do not modify the reference task.`;
+  const description = `Use the aoa MCP get_heartbeat_context tool with taskId="${reference.id}" to read the unassigned reference task ${reference.id} in company ${tenant.companyId}. Read its exact title from data.task in the live tool response. Create /home/user/aoa-output/result.json with exactly these three JSON keys: companyId, referenceTaskId, referenceTitle. Use the company ID ${tenant.companyId}, the reference task ID ${reference.id}, and the exact reference title returned by AoA. Do not guess the title. Write the file, then finish successfully. This is a read-only AoA task; do not modify the reference task.`;
   const { issue, run } = await dispatchTenant(state, "a", {
     title: `M1b useful-work worker ${randomUUID()}`, description, projectId: project.id, apiTimeoutMs: 60_000, timeoutMs: 20 * 60_000,
   });
@@ -1214,13 +1214,13 @@ async function m1bUsefulWork(state) {
       JOIN job_artifacts art ON art.id::text = o.external_id AND art.organization_id = j.organization_id AND art.job_id = j.id
         AND art.attempt = a.attempt_number
       WHERE o.company_id = $1 AND o.issue_id = $2 AND r.organization_id = $3 AND r.company_id = $1
-        AND r.job_id = $4 AND r.attempt_id = $5 AND art.kind = 'run_output' AND art.size_bytes BETWEEN 0 AND 65536
+        AND r.job_id = $4 AND r.attempt_id = $5 AND art.kind = 'other' AND art.size_bytes BETWEEN 0 AND 65536
       ORDER BY o.created_at LIMIT 8`, [tenant.companyId, issue.id, tenant.organizationId, run.distributed_job_id, run.distributed_attempt_id]);
     providerEvidence = await usefulWorkProviderEvidence(state, run, tenant);
   }
   const candidates = [];
   // The title in an output alone does not prove a tool call. The CI proxy records
-  // only successful, correlated list-tasks responses after the real CP authenticates them.
+  // only successful, correlated get_heartbeat_context responses after the real CP authenticates them.
   const toolReads = readMcpTaskReads(state.out);
   if (outputs.length === 0) candidates.push({ output: null, download: null,
     outcome: evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict, toolReads }) });
