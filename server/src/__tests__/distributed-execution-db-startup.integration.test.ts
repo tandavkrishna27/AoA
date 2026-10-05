@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -270,6 +271,30 @@ async function observeStartup(input: {
   });
 }
 
+/** Only a completed listening line from this child can select the health port. */
+function observedChildHealthUrl(output: string): string | null {
+  // The production pretty transport colors stdout even when it is a pipe.
+  const plain = output.replace(/\u001b\[[0-9;]*m/g, "");
+  const ports = new Set([...plain.matchAll(
+    /^(?:\[\d{2}:\d{2}:\d{2}\] )?INFO: Server listening on 127\.0\.0\.1:(\d{1,5})(?=\r?\n)/gm,
+  )].map((match) => Number(match[1])));
+  if (ports.size !== 1) return null;
+  const [port] = ports;
+  return port > 0 && port <= 65535 ? `http://127.0.0.1:${port}/api/health` : null;
+}
+
+async function probeChildHealth(url: string, signal: AbortSignal, requestTimeoutMs = 1_000): Promise<boolean> {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.any([signal, AbortSignal.timeout(requestTimeoutMs)]),
+      redirect: "error",
+    });
+    const ready = response.ok;
+    await response.body?.cancel();
+    return ready;
+  } catch { return false; }
+}
+
 async function observeServer(input: {
   databaseUrl: string;
   distributedEnabled: boolean;
@@ -277,11 +302,12 @@ async function observeServer(input: {
   operatorDatabaseUrl?: string;
   expectedFailureCode?: string;
   forbiddenFailureValues?: readonly string[];
+  requestedHttpPort?: number;
   sentinelMode?: "deny" | "record" | "identity" |
     "bootstrap-record" | "bootstrap-loader-deny" | "bootstrap-env-deny" |
     "bootstrap-allocation-deny";
 }): Promise<{ exited: boolean; code: number | null; output: string }> {
-  const httpPort = await allocateEmbeddedPgPort();
+  const httpPort = input.requestedHttpPort ?? await allocateEmbeddedPgPort();
   const serverEntry = fileURLToPath(new URL("../index.ts", import.meta.url));
   const sentinel = pathToFileURL(
     fileURLToPath(new URL("./fixtures/job-control-module-load-sentinel.mjs", import.meta.url)),
@@ -318,13 +344,12 @@ async function observeServer(input: {
     child.once("exit", (code) => resolveExit({ kind: "exit", code }));
   });
   const pollAbort = new AbortController();
+  let observedHealthUrl: string | null = null;
   const started = (async (): Promise<{ kind: "started"; code: null } | never> => {
     while (!pollAbort.signal.aborted) {
-      try {
-        const response = await fetch(`http://127.0.0.1:${httpPort}/api/health`);
-        if (response.ok) return { kind: "started", code: null };
-      } catch {
-        // Startup is still in progress or has failed; the exit promise wins on failure.
+      observedHealthUrl = observedChildHealthUrl(output);
+      if (observedHealthUrl && await probeChildHealth(observedHealthUrl, pollAbort.signal)) {
+        return { kind: "started", code: null };
       }
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
     }
@@ -341,7 +366,7 @@ async function observeServer(input: {
   if (outcome.kind === "timeout") {
     child.kill("SIGTERM");
     await Promise.race([exit, new Promise((resolveDelay) => setTimeout(resolveDelay, 5_000))]);
-    throw new Error(`server startup timed out before health or exit:\n${output}`);
+    throw new Error(`server startup timed out before health or exit (requestedPort=${httpPort}, observedHealthUrl=${observedHealthUrl ?? "none"}):\n${output}`);
   }
   if (outcome.kind === "started") {
     child.kill("SIGTERM");
@@ -5425,6 +5450,77 @@ ${drifted.output}`)
         "worker-control", "job-leasing", "job-control-metrics", "job-ready-scheduler", "job-outbox-worker",
       ]) {
         expect(flagOn.output).toContain(`JOB_CONTROL_MODULE_LOAD:${moduleName}`);
+      }
+    }, 60_000);
+
+    it("startup health observer accepts only complete, unambiguous child loopback listening lines", () => {
+      const line = "[12:34:56] INFO: Server listening on 127.0.0.1:31234\n";
+      expect(observedChildHealthUrl(line)).toBe("http://127.0.0.1:31234/api/health");
+      expect(observedChildHealthUrl(line.replace("INFO", "\u001b[32mINFO\u001b[39m").replace(
+        "Server listening on 127.0.0.1:31234", "\u001b[36mServer listening on 127.0.0.1:31234\u001b[39m",
+      ))).toBe("http://127.0.0.1:31234/api/health");
+      expect(observedChildHealthUrl(`other startup output\n${line}`)).toBe("http://127.0.0.1:31234/api/health");
+      for (const output of ["", "Requested port is busy; using next free port (requestedPort=3100, selectedPort=3101)\n",
+        line.trimEnd(), line.replace("127.0.0.1", "example.com"), line.replace("127.0.0.1", "0.0.0.0"),
+        line.replace("31234", "0"), line.replace("31234", "65536"), line.replace("INFO:", "WARN:"),
+        line.replace("31234", "31234/path"), line + line.replace("31234", "31235"),
+      ]) expect(observedChildHealthUrl(output), output).toBeNull();
+    });
+
+    it("startup health observer bounds hung requests and aborts in-flight health on teardown", async () => {
+      let requests = 0;
+      let observedRequest: (() => void) | undefined;
+      const hung = createServer(() => { requests += 1; observedRequest?.(); });
+      await new Promise<void>((resolve) => hung.listen(0, "127.0.0.1", resolve));
+      const address = hung.address();
+      if (!address || typeof address === "string") throw new Error("fixture listener missing");
+      const url = `http://127.0.0.1:${address.port}/api/health`;
+      try {
+        expect(await probeChildHealth(url, new AbortController().signal, 100)).toBe(false);
+        expect(requests).toBe(1);
+        const controller = new AbortController();
+        const reached = new Promise<void>((resolve) => { observedRequest = resolve; });
+        const inFlight = probeChildHealth(url, controller.signal, 1_000);
+        await Promise.race([reached, inFlight.then(() => { throw new Error("health fixture request did not reach listener"); })]);
+        controller.abort();
+        expect(await inFlight).toBe(false);
+        expect(requests).toBe(2);
+      } finally {
+        hung.closeAllConnections();
+        await new Promise<void>((resolve) => hung.close(() => resolve()));
+      }
+    }, 5_000);
+
+    it("observes the child's fallback port without accepting unrelated requested-port health", async () => {
+      guard();
+      let unrelatedHealthRequests = 0;
+      const unrelated = createServer((request, response) => {
+        if (request.url === "/api/health") unrelatedHealthRequests += 1;
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end('{"status":"unrelated-server"}');
+      });
+      await new Promise<void>((resolve) => unrelated.listen(0, "127.0.0.1", resolve));
+      const address = unrelated.address();
+      if (!address || typeof address === "string") throw new Error("fixture listener missing");
+      try {
+        const flagOn = await observeServer({
+          databaseUrl: adminUrl,
+          distributedEnabled: true,
+          appDatabaseUrl: appUrl,
+          operatorDatabaseUrl: operatorUrl,
+          sentinelMode: "identity",
+          requestedHttpPort: address.port,
+        });
+        expect(unrelatedHealthRequests, "an unrelated server must never satisfy child readiness").toBe(0);
+        expect(flagOn.exited, flagOn.output).toBe(false);
+        expect(flagOn.output).toContain(`requestedPort=${address.port}, selectedPort=`);
+        expect(flagOn.output).toContain("JOB_CONTROL_METRICS_IDENTITY:metrics");
+        for (const consumer of ["job-ready-scheduler", "job-outbox-worker", "worker-control", "job-leasing"]) {
+          expect(flagOn.output, consumer).toContain(`JOB_CONTROL_METRICS_IDENTITY:${consumer}:same`);
+        }
+      } finally {
+        unrelated.closeAllConnections();
+        await new Promise<void>((resolve) => unrelated.close(() => resolve()));
       }
     }, 60_000);
 
