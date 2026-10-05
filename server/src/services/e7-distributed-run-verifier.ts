@@ -143,7 +143,7 @@ export interface E7RunVerifierStore {
   listLeases(attemptId: string): Promise<readonly E7LeaseRow[]>;
   listJobEvents(attemptId: string): Promise<readonly E7JobEventRow[]>;
   getAttemptTerminalReceipt(attemptId: string): Promise<E7AttemptTerminalReceiptRow | null>;
-  /** The non-event scan surfaces (heartbeat raw fields, task_outputs, job_artifacts, issue_comments). */
+  /** Job-wide events plus heartbeat raw fields, task_outputs and job_artifacts. */
   listRunSecretScanSurfaces(run: E7RunRow): Promise<readonly E7ScanSurface[]>;
   countProducedOutputs(run: E7RunRow): Promise<E7ProducedOutputCounts>;
 }
@@ -155,9 +155,8 @@ export interface E7VerifyFailure {
    * Clauses 1-5 are the `ok` clauses — the distributed-journey corroboration.
    *
    * Clause 6 is the CAPABILITY clause and lives ONLY in `capabilityFailures`. It
-   * must never be pushed into `failures`: doing so folds capability into `ok`, and
-   * `producedArtifacts` is structurally 0 until CLI-008 Unit F ships output capture,
-   * so `ok` would be permanently false — a gate nobody can pass. (A verifier test
+   * must never be pushed into `failures`: an output-free run can corroborate the
+   * lifecycle without proving agent capability — a gate nobody can pass. (A verifier test
    * pins that: `E7-F003 blind spot`.)
    */
   readonly clause: 1 | 2 | 3 | 4 | 5 | 6;
@@ -195,30 +194,8 @@ export interface E7VerifyResult {
   readonly runId: string;
   readonly notFound?: true;
   readonly failures: readonly E7VerifyFailure[];
-  /**
-   * Did the agent DO anything that reached AoA? Independent of `ok`, deliberately.
-   * `ok` answers "was the distributed journey corroborated" — the MECHANISM. This answers
-   * "could the agent work" — the CAPABILITY. They are different questions and E7-F003 exists
-   * because one was being read as the other.
-   *
-   * FALSE ON EVERY RUN WITH NO PRODUCER OUTPUT, and that is the intended outcome of CLI-008
-   * Unit A: the verifier starts telling a truth it already had the data for. A producer for
-   * `job_artifacts` is what Unit F builds.
-   *
-   * ★ CORRECTED (W7U2). This used to read "FALSE ON EVERY REAL RUN TODAY". That was refuted by
-   * E7-F020: arm 2 counted `task_outputs` rows by `created_by_run_id` alone, and an ordinary
-   * heartbeat path already writes such a row when a run freshly starts a declared dev server,
-   * so this could read TRUE on a run with zero agent output.
-   *
-   * ★★ RE-CORRECTED (W21, re-predicated W21C, narration fixed W21D). That hole is CLOSED at the
-   * predicate: arm 2 counts only rows carrying an APPLIED `output_projection` receipt matched on
-   * this run's `distributed_job_id` AND `distributed_attempt_id` — not the job alone (E7-F031) —
-   * which only `jobOutputBridge.projectAcceptedOutput` can write, under a live lease fence. Arm 1
-   * is attempt-bound too. So "FALSE on
-   * every real run" is true again — for a REASON THAT IS NOT PROGRESS: E7-F018 measured that
-   * `projectAcceptedOutput` has zero production callers and that nothing checked in makes any
-   * run a distributed run. The bar is now correctly CLOSED where it was falsely open; it is not
-   * working. `capabilityLimitations` carries that into the operator-facing output.
+  /** Did a committed patch or receipt-backed output reach AoA for this attempt?
+   * Independent of the distributed lifecycle verdict in `ok`.
    */
   readonly capabilityProven: boolean;
   readonly capabilityFailures: readonly E7VerifyFailure[];
@@ -236,96 +213,21 @@ export interface E7VerifyResult {
   readonly observed: E7VerifyObserved;
 }
 
-/**
- * What arm 2 actually counts, and what a `capabilityProven` verdict still does NOT establish —
- * printed with every verdict.
- *
- * ★ WHAT IT USED TO SAY, AND WHY IT CHANGED. Until W21 this block disclosed E7-F020: arm 2 of
- * clause 6 was `eq(taskOutputs.createdByRunId, run.id)` and nothing else, so an ordinary
- * heartbeat path cleared it with zero agent output — `ensureRuntimeServicesForRun`
- * (`heartbeat.ts:4524`) → `startLocalRuntimeService` (`workspace-runtime.ts:2649`) →
- * `persistRuntimeServiceRecord` (`:2383`, at status "starting", BEFORE readiness) →
- * `emitRuntimeServiceTaskOutput` → `createdByRunId = run.id` (`task-output-emitters.ts:113`),
- * all of it before the handoff, with no forgery and no authenticated caller. The block was a
- * DISCLOSURE because no predicate had been changed. W21 changed the predicate, so leaving the
- * old text would have printed a false statement beside every verdict.
- *
- * ★ WHAT THE PREDICATE IS NOW. Arm 2 counts a `task_outputs` row only when an APPLIED
- * `output_projection` receipt in `job_projection_receipts` names it
- * (`aggregate_kind = 'task_outputs'`, `job_id` = this run's `distributed_job_id` AND
- * `attempt_id` = its `distributed_attempt_id` — the job alone is NOT enough, E7-F031; W21D
- * corrected this sentence, which had kept the job-only wording). That receipt
- * has exactly one writer in the tree — `jobOutputBridge.projectAcceptedOutput`, the distributed
- * output projection — and it is written in the SAME tenant transaction as the row, behind
- * `guardActiveFence`. The census that justifies the line is the callers of
- * `upsertTaskOutputForIssue`, the single INSERT into the table; see the comment on
- * `countProducedOutputs` in `e7-distributed-run-verifier-store.ts`.
- *
- * ★★ AND WHY THAT IS NOT PROGRESS. E7-F018 (HIGH, open) measured that `projectAcceptedOutput`
- * has ZERO production callers and that nothing checked in makes any run a distributed run, so
- * arm 2 now reads 0 on every real run. The bar is CLOSED where it was falsely open — strictly
- * better than a false PROVEN, and not the same thing as working. `capabilityProven` also still
- * gates nothing: `--require-capability` is off by default and no workflow or script reads it.
- *
- * ★ W21C — THE SECOND TIME THIS TEXT WOULD HAVE GONE FALSE SILENTLY. It said the receipt is
- * matched on "`job_id` = this run's `distributed_job_id`", and E7-F031 changed that to
- * `job_id` AND `attempt_id`; it also said "arm 2 ONLY … arm 1 was not touched", and E7-F031
- * bound arm 1 to the attempt too. A caveat printed beside every verdict is a claim about the
- * code, so it goes stale exactly like a comment does — the difference is that this one is read
- * by operators who cannot see the predicate.
- *
- * ★★★ AND THE CORRECTION NOTICE WAS ITSELF FALSE — corrected W21D. The sentence above used to
- * end "Both sentences are corrected above". Only the EXPORTED CONSTANT had been corrected; the
- * WHAT-THE-PREDICATE-IS-NOW paragraph fourteen lines higher still said `job_id` alone, so the
- * notice quoted as false a sentence that was still standing false in the same comment block.
- * W21C re-predicated both arms and updated two of SEVEN narration sites; W21D swept the other
- * five. The lesson is not "update the comment": it is that a claim of the form "X is corrected
- * above" is itself a checkable assertion, and nobody checked it.
- *
- * ★ SCOPE IS STILL SPLIT, deliberately. The receipt/column provenance text remains arm-2-only;
- * arm 1 keeps its own open question (E7-F019 — `kind` is the caller's declaration), which the
- * attempt binding does not touch. Only the ATTEMPT-granularity paragraph speaks for both arms,
- * and it says so. Blurring the two would make this text unfalsifiable, which is the failure mode
- * a caveat is most prone to.
- */
+/** Capability evidence is attributed to one attempt; it is not a quality verdict. */
 export const E7_CAPABILITY_LIMITATIONS: readonly string[] = [
-  "Arm 2 (task_outputs) counts ONLY rows named by an APPLIED output_projection receipt in",
-  "job_projection_receipts for THIS run's distributed ATTEMPT — matched on job_id AND attempt_id,",
-  "not job_id alone — the receipt jobOutputBridge projectAcceptedOutput writes in the same tenant",
-  "transaction as the row, behind a live lease fence (predicate in",
-  "e7-distributed-run-verifier-store.ts, W21 then W21C). E7-F020's platform writer is",
-  "EXCLUDED: heartbeat.ts:4524 ensureRuntimeServicesForRun -> task-output-emitters.ts:113 sets",
-  "created_by_run_id before the handoff and writes no receipt, and neither can any other legacy",
-  "writer of the table.",
-  "JOB-017 (E3-D-OUTPUT-MAP) adds a SECOND writer of that same receipt: the E3-D-ACC seam",
-  "registration in the worker-event ingest, which calls projectAcceptedOutputCore under the fence",
-  "acceptEvent already holds, and projects an artifact_prepared event only when it names a",
-  "COMMITTED job_artifacts row of the same attempt, in the aoa_distributed_job provider namespace.",
-  "ATTEMPT GRANULARITY (E7-F031): a job carries max_attempts (NOT NULL, default 3) and every",
-  "attempt shares its job_id, while a heartbeat run is bound to exactly ONE attempt via",
-  "heartbeat_runs.distributed_attempt_id. Both arms were job-granular, so a retry attempt's output",
-  "or committed patch printed capability PROVEN for a run that produced nothing. Both are now",
-  "attempt-bound, and a run carrying a job id with NO attempt id counts 0 on both arms rather than",
-  "widening back to job scope. The secret scanner's task_outputs and job_artifacts surfaces are",
-  "deliberately NOT attempt-bound: they want recall, so a sibling attempt's output is still",
-  "scanned. Its job_events surface IS attempt-narrow, so a sibling attempt's event payloads are",
-  "NOT scanned — a recall gap filed as E7-F032, open and NOT fixed. (Until W21D this block and",
-  "the CLI header both said flatly that the scanner is not attempt-bound, which was false of one",
-  "of its four surfaces in the very commit that filed E7-F032.)",
-  "WHAT A GREEN STILL DOES NOT ESTABLISH (E7-F018, HIGH, open): projectAcceptedOutput has ZERO",
-  "production callers and no checked-in configuration makes any run a distributed run, so arm 2",
-  "reads 0 on every real run — the bar is CLOSED rather than working. (JOB-017 gave the",
-  "projectAcceptedOutputCore half a production caller, the seam registration above; arm 2 still",
-  "reads 0 because no worker emits artifact_prepared yet, which is CLI-013.) capabilityProven gates",
-  "nothing either: --require-capability is off by default and no workflow or script reads it.",
-  "E7-F020 stays OPEN on its residual: upsertTaskOutputForIssue UPDATES in place on",
-  "(company, issue, provider, external_id), so a future producer reusing a platform external id",
-  "would get a platform-minted ROW counted. That needs a real fenced accepted-output event and is",
-  "unexercised, but it is the one way a platform row can still reach this count.",
-  "Scope: the receipt/column PROVENANCE text above is arm 2 ONLY. Arm 1 (committed",
-  "workspace_patch job_artifacts) keeps its own open question — E7-F019, `kind` is the caller's",
-  "declaration — which the attempt binding does NOT address. The ATTEMPT GRANULARITY paragraph",
-  "above is the one statement here that is not arm-2-scoped.",
+  "Arm 1 counts committed workspace_patch job_artifacts for this run's attempt; staged inputs are excluded.",
+  "Arm 2 (task_outputs) counts ONLY rows named by an APPLIED output_projection receipt matched on",
+  "this run's job_id AND attempt_id, with company consistency. Platform-created rows without a",
+  "receipt are excluded (E7-F020); created_by_run_id alone cannot prove capability.",
+  "An accepted artifact_prepared event can project a committed artifact through the production",
+  "accepted-output seam. Receipt and artifact counts remain attempt-scoped (E7-F031), while",
+  "secret scanning includes job-wide events, artifacts and projected outputs, including retries.",
+  "The worker runtime composes observation, usage and artifact export; each run still needs its",
+  "own durable evidence. Non-zero counts do not establish output quality, useful tools, or a",
+  "readable deliverable. Arm 2 can include a quarantined output or a row updated by an UPSERT.",
+  "ok and capabilityProven are separate. Use --require-capability when produced output is required.",
+  "Secret classes are shape heuristics. Ambiguous generic sk- filenames remain hard matches",
+  "(E7-F033); named placeholders are excluded, without treating arbitrary key shapes as harmless.",
 ];
 
 export interface E7DistributedRunVerifier {
@@ -366,17 +268,30 @@ const EMPTY_OBSERVED: E7VerifyObserved = {
 interface LeakClassMatcher {
   readonly matchedClass: string;
   readonly re: RegExp;
+  readonly accepts?: (match: RegExpMatchArray) => boolean;
 }
 
 const HARD_LEAK_MATCHERS: readonly LeakClassMatcher[] = [
   // Provider-key class — mirrors redaction.ts SECRET_VALUE_PATTERNS[1]. Verified to
   // cover the redeemed Company key (`sk-…` / `sk-ant-…`).
-  { matchedClass: "provider_key", re: /\bsk-(?:ant-)?[A-Za-z0-9_-]{12,}\b/g },
+  { matchedClass: "provider_key", re: /\bsk-(?:ant-)?[A-Za-z0-9_-]{12,}\b/g,
+    // Exclude named documentation placeholders only. Character case or hyphens
+    // cannot distinguish an arbitrary credential from harmless prose.
+    accepts: (m) => !/^sk-your[-_]api[-_]key(?:[-_](?:goes[-_]here|here))?$/i.test(m[0]),
+  },
   // Explicit E2B matcher — no E2B shape is fixed in the tree, so the generic pattern
   // misses infix forms. Catch the bare key …
   { matchedClass: "e2b_key", re: /\be2b_[A-Za-z0-9]{16,}\b/g },
   // … and the literal assignment, which catches an E2B key regardless of value shape.
-  { matchedClass: "e2b_api_key_assignment", re: /E2B_API_KEY\s*[=:]/g },
+  { matchedClass: "e2b_api_key_assignment", re: /\bE2B_API_KEY\b(?:\\?["'])?\s*[=:]\s*(?:\\"((?:[^\\"]|\\(?!")[^\r\n])*)\\"|"([^"]*)"|'([^']*)'|([^\s,;}]+))/g,
+    accepts: (m) => {
+      // Persisted JSON escapes quotes inside log messages. Capture those wrappers
+      // separately so an empty/redacted/template value stays clean, while real
+      // values in an escaped JSON assignment still reach this same judgment.
+      const value = (m[1] ?? m[2] ?? m[3] ?? m[4] ?? "").trim();
+      return value.length > 0 && !/^(?:\*+|\*+REDACTED\*+|\[REDACTED\]|\(unset\)|<(?:redacted|unset|your[-_]e2b[-_]api[-_]key)>|\$\{?E2B_API_KEY\}?|null|undefined|your[-_]e2b[-_]api[-_]key)$/i.test(value);
+    },
+  },
   // Connection-string URIs carrying a CREDENTIAL.
   //
   // ★★★ THIS ONE DELIBERATELY DOES **NOT** MIRROR redaction.ts SECRET_VALUE_PATTERNS[0],
@@ -427,13 +342,54 @@ const BROAD_HEURISTIC_MATCHER: LeakClassMatcher = {
   re: /\b[A-Za-z][A-Za-z0-9]{1,}_[A-Za-z0-9]{20,}\b/g,
 };
 
-function safeStringify(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value) ?? String(value);
-  } catch {
-    return String(value);
+// Fixed resource budgets. Overflow is an unevaluated refusal, never a truncated PASS.
+export const E7_EVIDENCE_LIMITS = {
+  rows: 1024, surfaceChars: 256 * 1024, totalChars: 4 * 1024 * 1024,
+  jsonDepth: 64, jsonNodes: 50_000,
+} as const;
+
+export class E7EvidenceLimitError extends Error {
+  constructor() { super("evidence limit exceeded; verification incomplete"); }
+}
+
+export function assertE7RowLimit(rows: readonly unknown[]): void {
+  if (rows.length > E7_EVIDENCE_LIMITS.rows) throw new E7EvidenceLimitError();
+}
+
+export function e7ScanText(value: unknown): string {
+  // Traverse before stringify so deep/large/cyclic payloads cannot consume an
+  // unbounded serialization pass or silently disappear on a stringify error.
+  const pending = [{ value, depth: 0 }];
+  const objects = new Set<object>();
+  let nodes = 0;
+  let chars = 0;
+  while (pending.length) {
+    const current = pending.pop()!;
+    if (++nodes > E7_EVIDENCE_LIMITS.jsonNodes || current.depth > E7_EVIDENCE_LIMITS.jsonDepth) throw new E7EvidenceLimitError();
+    if (typeof current.value === "string") chars += current.value.length;
+    else if (current.value !== null && typeof current.value === "object") {
+      if (objects.has(current.value)) throw new E7EvidenceLimitError();
+      objects.add(current.value);
+      for (const key in current.value) {
+        if (!Object.prototype.hasOwnProperty.call(current.value, key)) continue;
+        chars += key.length;
+        if (pending.length + nodes >= E7_EVIDENCE_LIMITS.jsonNodes || chars > E7_EVIDENCE_LIMITS.surfaceChars) throw new E7EvidenceLimitError();
+        pending.push({ value: (current.value as Record<string, unknown>)[key], depth: current.depth + 1 });
+      }
+    }
+    if (chars > E7_EVIDENCE_LIMITS.surfaceChars) throw new E7EvidenceLimitError();
   }
+  let text: string;
+  try { text = typeof value === "string" ? value : JSON.stringify(value) ?? ""; }
+  catch { throw new E7EvidenceLimitError(); }
+  if (text.length > E7_EVIDENCE_LIMITS.surfaceChars) throw new E7EvidenceLimitError();
+  return text;
+}
+
+function leakMatchCount(text: string, matcher: LeakClassMatcher): number {
+  let count = 0;
+  for (const match of text.matchAll(matcher.re)) if (!matcher.accepts || matcher.accepts(match)) count++;
+  return count;
 }
 
 /**
@@ -445,7 +401,8 @@ function safeStringify(value: unknown): string {
  * global regexes' `lastIndex` never carries between calls.
  */
 export function detectHardLeakClasses(text: string): string[] {
-  return HARD_LEAK_MATCHERS.filter((m) => text.match(m.re) !== null).map((m) => m.matchedClass);
+  e7ScanText(text);
+  return HARD_LEAK_MATCHERS.filter((m) => leakMatchCount(text, m) > 0).map((m) => m.matchedClass);
 }
 
 interface HardHit {
@@ -466,11 +423,16 @@ function scanSurfacesForLeaks(surfaces: readonly E7ScanSurface[]): {
 } {
   const hardHits: HardHit[] = [];
   const heuristicHits: E7SuspectedHeuristicHit[] = [];
+  assertE7RowLimit(surfaces);
+  let totalChars = 0;
   for (const s of surfaces) {
+    e7ScanText(s.text);
+    totalChars += s.text.length;
+    if (totalChars > E7_EVIDENCE_LIMITS.totalChars) throw new E7EvidenceLimitError();
     for (const m of HARD_LEAK_MATCHERS) {
-      const found = s.text.match(m.re);
-      if (found && found.length > 0) {
-        hardHits.push({ surface: s.surface, fieldOrEventId: s.fieldOrEventId, matchedClass: m.matchedClass, count: found.length });
+      const count = leakMatchCount(s.text, m);
+      if (count > 0) {
+        hardHits.push({ surface: s.surface, fieldOrEventId: s.fieldOrEventId, matchedClass: m.matchedClass, count });
       }
     }
     const broad = s.text.match(BROAD_HEURISTIC_MATCHER.re);
@@ -491,7 +453,7 @@ export function createE7DistributedRunVerifier(deps: {
 }): E7DistributedRunVerifier {
   const { store } = deps;
 
-  return {
+  const verifier: E7DistributedRunVerifier = {
     async verify({ runId, expected }) {
       const run = await store.getRun(runId);
       if (!run) {
@@ -559,6 +521,8 @@ export function createE7DistributedRunVerifier(deps: {
           store.getAttemptTerminalReceipt(attemptId),
         ]);
         attempt = attemptRow;
+        assertE7RowLimit(leases);
+        assertE7RowLimit(jobEvents);
         events = jobEvents;
 
         // Tenant-match every corroborating row on company_id. leases.company_id is
@@ -617,8 +581,10 @@ export function createE7DistributedRunVerifier(deps: {
       // leak-class matchers; hard-fail on a named class, surface the broad heuristic
       // as advisory. NEVER quotes a match (design §6 / §8 BLOCKER 3).
       const scanSurfaces = await store.listRunSecretScanSurfaces(run);
+      assertE7RowLimit(scanSurfaces);
       const allSurfaces: E7ScanSurface[] = [
-        ...events.map((e) => ({ surface: "job_events", fieldOrEventId: e.eventId, text: safeStringify(e.payload) })),
+        ...events.filter((e) => !scanSurfaces.some((s) => s.surface === "job_events" && s.fieldOrEventId === e.eventId))
+          .map((e) => ({ surface: "job_events", fieldOrEventId: e.eventId, text: e7ScanText(e.payload) })),
         ...scanSurfaces,
       ];
       const { hardHits, heuristicHits } = scanSurfacesForLeaks(allSurfaces);
@@ -650,28 +616,16 @@ export function createE7DistributedRunVerifier(deps: {
 
       // --- Clause 6 — CAPABILITY, computed beside the verdict and kept OUT of it ---
       //
-      // `failures` / `ok` are NOT touched here. Deliberately: `producedArtifacts` is
-      // structurally 0 until CLI-008 Unit F ships a producer, so a capability failure
-      // folded into `ok` would make E7-1 permanently red — a gate nobody can pass gets
-      // bypassed, argued around, or deleted (scripts/lib/gate-clause-wiring.mjs says so
-      // in its own header), and it would retroactively invalidate the D1 40/40 evidence,
-      // which is honest evidence OF THE MECHANISM and stays true.
+      // Lifecycle and produced-output evidence answer separate questions. A
+      // cancelled or output-free attempt can prove only the lifecycle.
       //
       // The CLI's `--require-capability` is where an operator opts INTO enforcing this.
       const capabilityFailures: E7VerifyFailure[] = [];
       if (produced.workspacePatchArtifacts < 1 && produced.taskOutputs < 1) {
         capabilityFailures.push({
           clause: 6,
-          reason:
-            "nothing the agent produced reached AoA: no committed workspace_patch job_artifact and no " +
-            "output_projection-receipted task_output for THIS RUN'S DISTRIBUTED ATTEMPT (W21 — arm 2's provenance " +
-            "predicate; the pre-W21 wording said 'no task_output for this run', which counted platform-written " +
-            "rows. W21C then bound BOTH arms to the run's attempt rather than its job: a job carries max_attempts " +
-            "and every attempt shares the job id, so a retry attempt's output used to prove capability for a run " +
-            "that produced nothing — E7-F031). Output capture is UNBUILT (CLI-008 Unit F) — the E2B driver passes no stream handlers, " +
-            "stdoutRef/stderrRef are fabricated literals rather than references to stored bytes, observeRun is " +
-            "uncomposed, and buildWorkspacePatch/createResultCommitter have zero production callers. So this run " +
-            "cannot be distinguished from a context-free one (E7-F003), whatever the agent actually did.",
+          reason: "nothing the agent produced reached AoA: no committed workspace_patch job_artifact " +
+            "and no output_projection-receipted task_output for this run's distributed attempt",
         });
       }
 
@@ -685,6 +639,22 @@ export function createE7DistributedRunVerifier(deps: {
         capabilityLimitations: E7_CAPABILITY_LIMITATIONS,
         observed,
       };
+    },
+  };
+
+  return {
+    async verify(input) {
+      try {
+        return await verifier.verify(input);
+      } catch (error) {
+        if (!(error instanceof E7EvidenceLimitError)) throw error;
+        return {
+          ok: false, runId: input.runId, failures: [{ clause: 4, reason: error.message }],
+          capabilityProven: false,
+          capabilityFailures: [{ clause: 6, reason: "capability not evaluated: evidence limit exceeded" }],
+          capabilityLimitations: E7_CAPABILITY_LIMITATIONS, observed: EMPTY_OBSERVED,
+        };
+      }
     },
   };
 }

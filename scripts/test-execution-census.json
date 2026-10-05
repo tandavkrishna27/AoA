@@ -6,6 +6,11 @@
     "IMPORTANT: a runs verdict means the declaration still matches the tree, NOT observed execution. See scripts/lib/execution-census.mjs."
   ],
   "files": {
+    "scripts/m1-shipped-boot/m1b-network.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "Staging manifest config contract (DEP-006) + shipped CI boot lane (DEP-015)"
+    },
     "scripts/lib/__tests__/m1-provider-cleanup.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",

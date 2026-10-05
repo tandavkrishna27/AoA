@@ -188,6 +188,10 @@ export function evaluateShippedBootWorkflowShape(text) {
       if (candidate.default !== undefined && candidate.default !== "") v.push("the `candidate` input must have no default (a default is an unnamed candidate)");
     }
     const mode = inputs?.mode;
+    const m1b = inputs?.m1b;
+    if (!m1b || m1b.type !== "boolean" || m1b.default !== false || m1b.required !== false) {
+      v.push("M1b must be an optional boolean input defaulting to false");
+    }
     if (!mode) v.push("`workflow_dispatch` must declare a `mode` input (keyless | keyed)");
     else {
       if (mode.type !== "choice") v.push("the `mode` input must be `type: choice`");
@@ -406,6 +410,21 @@ export function evaluateShippedBootWorkflowShape(text) {
   }
 
   // (9) Bounded.
+  const m1bArm = src.indexOf("m1b-network.mjs arm");
+  const m1bWork = src.indexOf("journey.mjs m1b-useful-work");
+  const m1bStop = src.indexOf("m1b-network.mjs stop");
+  const suppression = src.indexOf("journey.mjs cross-tenant --out \"$M1_OUT\" --suppress-injection");
+  for (const at of [m1bArm, m1bWork]) {
+    if (at < 0 || !/if:\s*inputs\.mode == 'keyed' && inputs\.m1b/.test(stepAt(at))) {
+      v.push("M1b arm and useful-work steps must require keyed mode and explicit opt-in");
+    }
+  }
+  if (m1bStop < 0 || !/if:\s*always\(\) && inputs\.m1b/.test(stepAt(m1bStop))) {
+    v.push("M1b must always stop its temporary connection after an opted-in run");
+  }
+  if (!(suppression < m1bArm && m1bArm < m1bWork && m1bWork < m1bStop && m1bStop < collectIdx)) {
+    v.push("M1b must run after the M1a checks and stop before collection and teardown");
+  }
   if (!/timeout-minutes:\s*\d+/.test(src)) v.push("the job must carry a `timeout-minutes` cap");
   if (!/^concurrency:/m.test(src)) v.push("the lane must declare a `concurrency` group (one boot at a time)");
 

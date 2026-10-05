@@ -124,6 +124,40 @@ JSON-RPC MCP clients should normally call `attach-artifact-version` on
 then enforces company isolation, project scope, and artifact-update permission;
 it is not a founder-only tool. See the [MCP API](mcp.md).
 
+## Download a Distributed Task Output
+
+```http
+GET /api/task-outputs/{outputId}/content
+```
+
+The task output viewer uses this route for the `aoa_distributed_job` provider.
+It returns an attachment with the committed content type, byte count and an
+opaque artifact identifier as its filename. Original filenames are not preserved
+by this protocol. The response uses `nosniff` and `Cache-Control: private, no-store`.
+
+Access requires a board session or board API key and the existing company-access
+check. Agent, Commander and MCP credentials are denied. Board members use the
+same company authority as the task-output metadata route; there is no additional
+department or founder-role restriction. In cloud mode, organization and company
+membership are both required, subject to the existing operator break-glass rule.
+
+The server resolves the company's Organization, then reads distributed records
+through the tenant application database. An applied projection receipt must bind
+the output to an accepted event, the originating task, the exact job attempt and
+a committed artifact. Editable output metadata and URLs grant no storage access.
+Foreign, incomplete, expired or quarantined artifacts return the same coarse
+`404` as a missing output. Output remains
+readable after the job finishes or the Organization's execution rollout is off.
+Disabling distributed deployment or omitting its tenant database returns `503`.
+
+There is no signed download URL or worker credential impersonation. The server
+checks the stored object size and checksum before streaming, then hashes and
+counts the response bytes. It withholds the last byte until those checks pass;
+corruption or a truncated provider stream aborts the download. Partial bytes may
+have arrived before that final check. Empty artifacts require the empty SHA-256
+digest before response headers are sent. Storage failures return `502` when
+headers have not been sent. Each authorized read records `task_output.content_read`.
+
 ## Common Errors
 
 - `400` — invalid payload, archive transition, parent version, or cross-company asset

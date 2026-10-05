@@ -22,6 +22,63 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 
+export const M1B_USEFUL_WORK_MAX_BYTES = 64 * 1024;
+
+/** Direct behavior proof: live reference data reached a committed, attempt-bound founder download. */
+export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit, verdict, toolReads, output, download } = {}) {
+  const reasons = [];
+  const require = (condition, reason) => { if (!condition) reasons.push(reason); };
+  require(["organizationId", "companyId", "issueId", "referenceTaskId", "referenceTitle"].every((key) =>
+    typeof expected[key] === "string" && expected[key].length > 0), "expected useful-work identity is incomplete");
+  require(run?.status === "succeeded" && run?.execution_owner === "distributed" &&
+    !!run.distributed_job_id && !!run.distributed_attempt_id, "the assigned task did not succeed on the distributed worker");
+  require(verifierExit === 0 && verdict?.ok === true && verdict?.capabilityProven === true,
+    "the E7 verifier did not corroborate both lifecycle and produced output");
+  const referenceTitleSha256 = typeof expected.referenceTitle === "string"
+    ? createHash("sha256").update(expected.referenceTitle).digest("hex") : null;
+  require(toolReads?.schema === "aoa.m1b.mcp-task-reads/1" && toolReads.truncated === false &&
+    Array.isArray(toolReads.records) && toolReads.records.length <= 2048 &&
+    toolReads.records.every((record) => record && typeof record.companyId === "string" &&
+      typeof record.taskId === "string" && /^[0-9a-f]{64}$/.test(record.titleSha256 ?? "")) &&
+    toolReads.records.some((record) => record.companyId === expected.companyId &&
+      record.taskId === expected.referenceTaskId && record.titleSha256 === referenceTitleSha256),
+    "no complete observation proves a successful MCP list-tasks response containing the exact live reference");
+  if (!output) reasons.push("no accepted output projection and committed artifact for this attempt");
+  else {
+    require(!!output.outputId && output.provider === "aoa_distributed_job" && output.receiptStatus === "applied" &&
+      output.aggregateKind === "task_outputs" && output.artifactStatus === "committed", "the output is not an applied committed distributed artifact");
+    require(output.organizationId === expected.organizationId && output.companyId === expected.companyId &&
+      output.issueId === expected.issueId && output.sourceIssueId === expected.issueId, "the output is not bound to this company and assigned source task");
+    require(output.jobId === run?.distributed_job_id && output.attemptId === run?.distributed_attempt_id &&
+      output.artifactJobId === output.jobId && output.artifactOrganizationId === expected.organizationId &&
+      Number.isInteger(Number(output.attemptNumber)) && Number(output.attemptNumber) > 0 &&
+      Number(output.artifactAttempt) === Number(output.attemptNumber), "the artifact is not bound to the exact job and attempt");
+    require(!!output.artifactId && output.externalId === output.artifactId &&
+      !!output.artifactIdentifier && output.eventIdentifier === output.artifactIdentifier &&
+      output.artifactKind === "run_output" && output.eventKind === output.artifactKind,
+      "the accepted event does not identify this produced artifact");
+    require(!!output.eventId && output.receiptIdentity === `output:${expected.companyId}:${output.eventId}` &&
+      /^[0-9a-f]{64}$/.test(output.eventDigest ?? "") && output.receiptDigest === output.eventDigest &&
+      !!output.eventFence && output.receiptFence === output.eventFence && output.artifactFence === output.eventFence &&
+      !!output.eventLeaseId && output.artifactLeaseId === output.eventLeaseId,
+      "the projection receipt and commit do not match the accepted event digest and fence");
+  }
+  const body = download?.body;
+  if (!Buffer.isBuffer(body) || body.length > M1B_USEFUL_WORK_MAX_BYTES) reasons.push("the founder download is missing or exceeds 64 KiB");
+  else {
+    require(download.status === 200 && Number(download.contentLength) === body.length &&
+      Number(output?.artifactSizeBytes) === body.length &&
+      createHash("sha256").update(body).digest("hex") === output?.artifactSha256,
+      "the founder download does not match the committed size and SHA256");
+    let result;
+    try { result = JSON.parse(body.toString("utf8")); } catch { result = null; }
+    require(result && Object.keys(result).sort().join(",") === "companyId,referenceTaskId,referenceTitle" &&
+      result.companyId === expected.companyId && result.referenceTaskId === expected.referenceTaskId &&
+      result.referenceTitle === expected.referenceTitle, "the downloaded JSON does not contain the exact live reference task marker");
+  }
+  return { pass: reasons.length === 0, reasons };
+}
+
 /** The per-org slug every canary Organization's `dedicated_worker` target must carry (E11-F008). */
 export const CANARY_EXECUTION_TARGET_SLUG = "aoa-canary-e2b";
 

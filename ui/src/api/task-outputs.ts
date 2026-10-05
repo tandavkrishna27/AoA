@@ -9,6 +9,7 @@ export const taskOutputsApi = {
   // with the other viewer body fetchers.
   get: (_companyId: string, id: string) =>
     api.get<TaskOutput>(`/task-outputs/${id}`),
+  contentUrl: (id: string) => `/api/task-outputs/${encodeURIComponent(id)}/content`,
   update: (id: string, patch: MutableTaskOutput) =>
     api.patch<TaskOutput>(`/task-outputs/${id}`, patch),
 };

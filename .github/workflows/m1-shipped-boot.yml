@@ -71,6 +71,11 @@ on:
         required: false
         default: aoa-base
         type: string
+      m1b:
+        description: After the M1a checks, run one useful tool-and-file job (keyed only)
+        required: false
+        default: false
+        type: boolean
   # REGISTRATION ONLY (E6-D001): the job below is skipped on every push-created run.
   push:
     branches:
@@ -102,10 +107,12 @@ jobs:
         env:
           CANDIDATE: ${{ inputs.candidate }}
           MODE: ${{ inputs.mode }}
+          M1B: ${{ inputs.m1b }}
         run: |
           set -euo pipefail
           [[ "$CANDIDATE" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::candidate must be 40 lowercase hex characters"; exit 1; }
           [[ "$MODE" == "keyless" || "$MODE" == "keyed" ]] || { echo "::error::mode must be keyless or keyed"; exit 1; }
+          [[ "$M1B" != "true" || "$MODE" == "keyed" ]] || { echo "::error::M1b requires keyed mode"; exit 1; }
           # The directory must EXIST before the first `tee` opens the job log in it: writing
           # M1_OUT to $GITHUB_ENV creates nothing, and `prepare` only mkdirs after node starts,
           # by which time the concurrently-launched tee has already failed ENOENT (Codex P1).
@@ -223,6 +230,12 @@ jobs:
         run: |
           node scripts/check-staging-manifest.mjs
           node scripts/check-m1-shipped-boot-shape.mjs
+
+      - name: Check M1b support before any provider call
+        if: inputs.m1b
+        run: |
+          test -f scripts/m1-shipped-boot/m1b-network.mjs
+          grep -q '"m1b-useful-work"' scripts/m1-shipped-boot/journey.mjs
 
       - name: Enable Docker containerd image store (attestation + --load)
         run: |
@@ -526,6 +539,23 @@ jobs:
           # absent or unparseable bundle.
           node scripts/check-cross-tenant-suppression.mjs --evidence "$M1_OUT/evidence/cross-tenant-suppressed.json"
           echo "positive control: a suppressed injection reds the cross-tenant phase, per case, as required"
+
+      - name: Arm the temporary M1b MCP connection
+        if: inputs.mode == 'keyed' && inputs.m1b
+        run: node scripts/m1-shipped-boot/m1b-network.mjs arm --out "$M1_OUT" 2>&1 | node scripts/m1-shipped-boot/log-filter.mjs "$M1_OUT/job-log.txt"
+
+      - name: Run useful work and download its committed bytes
+        if: inputs.mode == 'keyed' && inputs.m1b
+        env:
+          E2B_API_KEY: ${{ inputs.mode == 'keyed' && secrets.E2B_API_KEY || '' }}
+        run: node scripts/m1-shipped-boot/journey.mjs m1b-useful-work --out "$M1_OUT" 2>&1 | node scripts/m1-shipped-boot/log-filter.mjs "$M1_OUT/job-log.txt"
+
+      - name: Stop the temporary M1b MCP connection
+        if: always() && inputs.m1b
+        run: |
+          if [[ -f "$M1_OUT/state.json" && -f scripts/m1-shipped-boot/m1b-network.mjs ]]; then
+            node scripts/m1-shipped-boot/m1b-network.mjs stop --out "$M1_OUT" 2>&1 | node scripts/m1-shipped-boot/log-filter.mjs "$M1_OUT/job-log.txt"
+          fi
 
       - name: Collect the evidence (redacted)
         id: collect

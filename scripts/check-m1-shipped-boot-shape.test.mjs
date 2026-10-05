@@ -29,6 +29,19 @@ const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
 
+test("M1b is opt-in, keyed-only, runs after the existing checks and always stops its connection", () => {
+  assert.deepEqual(violationsOf(real()), []);
+  for (const [from, to] of [
+    ["description: After the M1a checks, run one useful tool-and-file job (keyed only)\n        required: false\n        default: false", "description: After the M1a checks, run one useful tool-and-file job (keyed only)\n        required: false\n        default: true"],
+    ["if: inputs.mode == 'keyed' && inputs.m1b", "if: inputs.m1b"],
+    ["if: always() && inputs.m1b", "if: inputs.m1b"],
+  ]) {
+    const source = real().replaceAll("\r\n", "\n");
+    assert.ok(source.includes(from));
+    assert.ok(anyMatch(violationsOf(source.replace(from, to)), /M1b/), from);
+  }
+});
+
 function reclaimFixture(t, { freeKb = 12 * 1024 * 1024, afterCleanupKb = freeKb, missingImage = false, runnerEnvironment = "github-hosted", d1Occurrence = null } = {}) {
   const text = d1Occurrence === null ? real() : readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8");
   const markers = [...text.matchAll(/      - name: Reclaim build cache before D1 bring-up/g)];

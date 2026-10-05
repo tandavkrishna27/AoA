@@ -1,6 +1,18 @@
 # CLI-018 — the founder-reachable artifact: make a distributed run's committed bytes retrievable
 
-**Status:** `filed` — **not started.** Filed 2026-09-24 by the **M1 planning session** under founder
+**Status:** implemented locally; integration and live useful-work testing pending.
+The October 5 founder instruction replaces the separate ruling/certification
+prerequisite with direct code and tests. The implementation uses a board-only
+content stream, with the authorization contract recorded in
+[`docs/api/artifacts.md`](../../../../api/artifacts.md#download-a-distributed-task-output).
+It does not mint a worker grant or a public download URL. Local PostgreSQL tests
+cover committed bytes through the real projection and board route, wrong-company
+and wrong-Organization denial, forged output references, terminal/rollout-off
+reads and storage integrity. The viewer has an explicit download action.
+
+The historical filing below describes the options before that implementation.
+
+Filed 2026-09-24 by the **M1 planning session** under founder
 delegation **F2**, on the measurement recorded in `../findings.md` `E7-F047`.
 **Epic:** E7 · **Graph node:** `docs/replatform/program-design.md` `#### CLI-018` ·
 **Plan task (the contract):** `../implementation-plan.md` `### CLI-018`
@@ -24,8 +36,7 @@ The same two mechanical reasons `CLI-017-design.md` records:
    file on disk that declaration would fail `owner_ticket_missing` — a false ownership claim the
    guard exists to refuse.
 
-★ **There is deliberately no `CLI-018-result.md`.** `findCompletedTicketIds` reads a `-result.md` as
-"this ticket shipped", and the ticket has not been built. The result belongs to whoever builds it.
+There is no completion claim yet: the live useful-work check remains outstanding.
 
 ## In one paragraph
 

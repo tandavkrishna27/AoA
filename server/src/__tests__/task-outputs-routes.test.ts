@@ -54,14 +54,14 @@ function makeApp(db: unknown, actor: Express.Request["actor"] = {
   type: "board",
   source: "local_implicit",
   userId: "board-user",
-}) {
+}, content?: { openContent: (...args: any[]) => Promise<any> }) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.actor = actor;
     next();
   });
-  app.use("/api", taskOutputRoutes(db as never));
+  app.use("/api", taskOutputRoutes(db as never, content));
   app.use((err: { status?: number; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     res.status(err.status ?? 500).json({ error: err.message ?? "Internal Server Error" });
   });
@@ -88,6 +88,142 @@ function outputRow(overrides: MockRow = {}) {
 describe("taskOutputRoutes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLogActivity.mockResolvedValue(undefined);
+  });
+
+  it("downloads distributed bytes for an authorized board actor and records access", async () => {
+    const { Readable } = await import("node:stream");
+    const { createHash } = await import("node:crypto");
+    const bytes = Buffer.from("founder artifact bytes");
+    const openContent = vi.fn(async () => ({ stream: Readable.from([bytes]), sizeBytes: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"), contentType: "text/plain",
+      filename: "result.txt", artifactId: "artifact-row", jobId: "job-row", attempt: 1 }));
+    const res = await request(makeApp(makeDb([[{ companyId }]]), undefined, { openContent }))
+      .get(`/api/task-outputs/${outputId}/content`);
+    expect(res.status).toBe(200);
+    expect(res.text).toBe(bytes.toString());
+    expect(res.headers["content-disposition"]).toContain("attachment");
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    expect(res.headers["x-content-type-options"]).toBe("nosniff");
+    expect(openContent).toHaveBeenCalledWith(outputId, companyId);
+    expect(mockLogActivity).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      companyId, actorType: "user", actorId: "board-user", action: "task_output.content_read",
+    }));
+  });
+
+  it.each(["none", "agent", "mcp", "commander"])("denies %s content access before artifact lookup", async (type) => {
+    const openContent = vi.fn();
+    const res = await request(makeApp(makeDb(), { type, companyId } as never, { openContent }))
+      .get(`/api/task-outputs/${outputId}/content`);
+    expect(res.status).toBe(type === "none" ? 401 : 403);
+    expect(openContent).not.toHaveBeenCalled();
+  });
+
+  it("returns unavailable when no tenant reader exists, with no owner fallback", async () => {
+    const res = await request(makeApp(makeDb([[{ companyId }]]))).get(`/api/task-outputs/${outputId}/content`);
+    expect(res.status).toBe(503);
+  });
+
+  it("handles a storage failure during audit without leaking provider errors", async () => {
+    const { Readable } = await import("node:stream");
+    const source = new Readable({ read() { this.destroy(new Error("private provider endpoint")); } });
+    const openContent = vi.fn(async () => ({ stream: source, sizeBytes: 4, sha256: "0".repeat(64),
+      contentType: "text/plain", filename: "result.txt", artifactId: "artifact", jobId: "job", attempt: 1 }));
+    mockLogActivity.mockImplementationOnce(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    const res = await request(makeApp(makeDb([[{ companyId }]]), undefined, { openContent }))
+      .get(`/api/task-outputs/${outputId}/content`);
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: "Artifact integrity check failed" });
+    expect(source.destroyed).toBe(true);
+  });
+
+  it("aborts mismatched body bytes instead of returning a complete download", async () => {
+    const { Readable } = await import("node:stream");
+    const bytes = Buffer.from("untrusted bytes");
+    const source = Readable.from([bytes]);
+    const openContent = vi.fn(async () => ({ stream: source, sizeBytes: bytes.length, sha256: "0".repeat(64),
+      contentType: "text/plain", filename: "result.txt", artifactId: "artifact", jobId: "job", attempt: 1 }));
+    await expect(request(makeApp(makeDb([[{ companyId }]]), undefined, { openContent }))
+      .get(`/api/task-outputs/${outputId}/content`)).rejects.toThrow(/aborted|socket hang up/);
+    expect(source.destroyed).toBe(true);
+  });
+
+  it("destroys provider streaming when the browser disconnects mid-download", async () => {
+    const { Readable } = await import("node:stream");
+    const { get } = await import("node:http");
+    const source = new Readable({ read() { this.push(Buffer.alloc(16 * 1024)); } });
+    const openContent = vi.fn(async () => ({ stream: source, sizeBytes: 5 * 1024 ** 3, sha256: "0".repeat(64),
+      contentType: "application/octet-stream", filename: "result.bin", artifactId: "artifact", jobId: "job", attempt: 1 }));
+    const server = makeApp(makeDb([[{ companyId }]]), undefined, { openContent }).listen(0, "127.0.0.1");
+    try {
+      await new Promise<void>((resolve) => server.once("listening", resolve));
+      const address = server.address() as { port: number };
+      await new Promise<void>((resolve, reject) => {
+        const client = get(`http://127.0.0.1:${address.port}/api/task-outputs/${outputId}/content`, (res) => {
+          res.on("error", () => {});
+          res.once("data", () => { res.destroy(); resolve(); });
+        });
+        client.on("error", reject);
+      });
+      await vi.waitFor(() => expect(source.destroyed).toBe(true));
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("destroys a late provider stream if the browser disconnected during content lookup", async () => {
+    const { Readable } = await import("node:stream");
+    const { get } = await import("node:http");
+    const source = new Readable({ read() {} });
+    let entered!: () => void;
+    let finish!: () => void;
+    const lookupStarted = new Promise<void>((resolve) => { entered = resolve; });
+    const openContent = vi.fn(() => {
+      entered();
+      return new Promise((resolve) => { finish = () => resolve({ stream: source, sizeBytes: 4, sha256: "0".repeat(64),
+        contentType: "text/plain", filename: "late.txt", artifactId: "artifact", jobId: "job", attempt: 1 }); });
+    });
+    const server = makeApp(makeDb([[{ companyId }]]), undefined, { openContent }).listen(0, "127.0.0.1");
+    try {
+      await new Promise<void>((resolve) => server.once("listening", resolve));
+      const responseClosed = new Promise<void>((resolve) => server.once("request", (_req, res) => res.once("close", resolve)));
+      const address = server.address() as { port: number };
+      const client = get(`http://127.0.0.1:${address.port}/api/task-outputs/${outputId}/content`);
+      client.on("error", () => {});
+      await lookupStarted;
+      client.destroy();
+      await responseClosed;
+      finish();
+      await vi.waitFor(() => expect(source.destroyed).toBe(true));
+      expect(mockLogActivity).not.toHaveBeenCalled();
+    } finally {
+      source.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it.each([true, false])("verifies an empty-content digest before headers (valid=%s)", async (valid) => {
+    const { Readable } = await import("node:stream");
+    const { createHash } = await import("node:crypto");
+    const source = Readable.from([]);
+    const openContent = vi.fn(async () => ({ stream: source, sizeBytes: 0,
+      sha256: valid ? createHash("sha256").digest("hex") : "0".repeat(64),
+      contentType: "text/plain", filename: "empty.txt", artifactId: "artifact", jobId: "job", attempt: 1 }));
+    const res = await request(makeApp(makeDb([[{ companyId }]]), undefined, { openContent }))
+      .get(`/api/task-outputs/${outputId}/content`);
+    expect(res.status).toBe(valid ? 200 : 502);
+    if (valid) expect(res.headers["content-length"]).toBe("0");
+    else expect(res.body).toEqual({ error: "Artifact integrity check failed" });
+    expect(source.destroyed).toBe(true);
+  });
+
+  it("denies a board actor outside the output company before storage", async () => {
+    const openContent = vi.fn();
+    const res = await request(makeApp(makeDb([[{ companyId }]]), {
+      type: "board", source: "session", userId: "outsider", companyIds: [],
+    } as never, { openContent })).get(`/api/task-outputs/${outputId}/content`);
+    expect(res.status).toBe(404);
+    expect(openContent).not.toHaveBeenCalled();
   });
 
   it("lists outputs for a task after checking company access", async () => {
