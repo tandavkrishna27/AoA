@@ -212,6 +212,130 @@ beforeEach(async () => {
 });
 
 describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")(
+  "CLI015 job-wide event secret scan and bounded database reads",
+  () => {
+    it("distinguishes empty/redacted assignments from real values embedded in persisted JSON logs", async () => {
+      guard();
+      const { seeded } = await fixture!.activateLease(43);
+      const eventId = randomUUID();
+      const put = async (line: string) => fixture!.admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id,
+         event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        SELECT organization_id, company_id, job_id, attempt_id, 1, id,
+          ${eventId}, 1, 'log', fence, ${DIGEST}, ${fixture!.admin.json({ payload: { message: line } })}, now()
+        FROM leases WHERE attempt_id = ${seeded.attemptId}`;
+      for (const line of ['E2B_API_KEY=""', 'E2B_API_KEY="[REDACTED]"', 'E2B_API_KEY="${E2B_API_KEY}"', 'E2B_API_KEY="synthetic-value"']) {
+        await fixture!.admin`DELETE FROM job_events WHERE event_id = ${eventId}`;
+        await put(line);
+        const { result } = await scanForJob(seeded.jobId, seeded.attemptId);
+        const hits = result.failures.filter((f) => f.clause === 4);
+        if (line.includes("synthetic-value")) {
+          expect(hits.some((f) => f.reason.includes("e2b_api_key_assignment"))).toBe(true);
+          expect(JSON.stringify(result)).not.toContain("synthetic-value");
+        } else expect(hits).toEqual([]);
+      }
+    });
+
+    it("scans sibling event payloads without crediting their lifecycle to this attempt", async () => {
+      guard();
+      const { seeded } = await fixture!.activateLease(37);
+      const sibling = await fixture!.activateSiblingLease(seeded, 2, 37);
+      const eventId = randomUUID();
+      await fixture!.admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id,
+         event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        SELECT organization_id, company_id, job_id, attempt_id, 2, id,
+          ${eventId}, 1, 'attempt_started', fence, ${DIGEST},
+          ${fixture!.admin.json({ type: "attempt_started", line: PLANTED_PROVIDER_KEY })}, now()
+        FROM leases WHERE attempt_id = ${sibling.attemptId}`;
+      await fixture!.admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id,
+         event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        SELECT organization_id, company_id, job_id, attempt_id, 2, id,
+          gen_random_uuid(), 2, 'terminal', fence, ${DIGEST}, '{"type":"terminal"}'::jsonb, now()
+        FROM leases WHERE attempt_id = ${sibling.attemptId}`;
+      const { surfaces, result } = await scanForJob(seeded.jobId, seeded.attemptId);
+      expect(surfaces.some((s) => s.surface === "job_events" && s.fieldOrEventId === eventId)).toBe(true);
+      expect(result.failures.some((f) => f.clause === 4 && f.reason.includes(eventId))).toBe(true);
+      expect(result.observed.attemptStartedEvents).toBe(0);
+      expect(result.observed.terminalEvents).toBe(0);
+      expect(result.observed.producedArtifacts).toEqual({ workspacePatchArtifacts: 0, taskOutputs: 0 });
+      expect(JSON.stringify(result)).not.toContain(PLANTED_PROVIDER_KEY);
+    });
+
+    it("refuses an oversized persisted output rather than dropping its secret-bearing tail", async () => {
+      guard();
+      const { seeded } = await fixture!.activateLease(38);
+      await writeRuntimeServiceOutput();
+      await fixture!.admin`UPDATE task_outputs SET summary = ${"x".repeat(256 * 1024) + PLANTED_PROVIDER_KEY}
+        WHERE created_by_run_id = ${RUN}`;
+      await fixture!.admin`UPDATE heartbeat_runs SET distributed_job_id = ${seeded.jobId},
+        distributed_attempt_id = ${seeded.attemptId} WHERE id = ${RUN}`;
+      const result = await runInTenantReadOnly(fixture!.app.db, ORG, (_repos, tx) =>
+        createE7DistributedRunVerifier({ store: createDrizzleE7RunVerifierStore(tx as Db) }).verify({ runId: RUN }));
+      expect(result.ok).toBe(false);
+      expect(result.capabilityProven).toBe(false);
+      expect(result.failures.some((f) => f.reason.includes("evidence limit exceeded"))).toBe(true);
+      expect(JSON.stringify(result)).not.toContain(PLANTED_PROVIDER_KEY);
+    });
+
+    it("refuses a job event query exceeding the row budget", async () => {
+      guard();
+      const { seeded } = await fixture!.activateLease(39);
+      await fixture!.admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id,
+         event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        SELECT l.organization_id, l.company_id, l.job_id, l.attempt_id, 1, l.id,
+          gen_random_uuid(), s, 'log', l.fence, ${DIGEST}, '{"type":"log","line":"clean"}'::jsonb, now()
+        FROM leases l CROSS JOIN generate_series(1, 1025) s WHERE l.attempt_id = ${seeded.attemptId}`;
+      await fixture!.admin`UPDATE heartbeat_runs SET distributed_job_id = ${seeded.jobId},
+        distributed_attempt_id = ${seeded.attemptId} WHERE id = ${RUN}`;
+      const result = await runInTenantReadOnly(fixture!.app.db, ORG, (_repos, tx) =>
+        createE7DistributedRunVerifier({ store: createDrizzleE7RunVerifierStore(tx as Db) }).verify({ runId: RUN }));
+      expect(result.ok).toBe(false);
+      expect(result.failures.some((f) => f.reason.includes("evidence limit exceeded"))).toBe(true);
+    });
+
+    it("does not scan another job's event payloads in the same tenant", async () => {
+      guard();
+      const own = await fixture!.activateLease(40);
+      const other = await fixture!.activateLease(41);
+      const eventId = randomUUID();
+      await fixture!.admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id,
+         event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        SELECT organization_id, company_id, job_id, attempt_id, 1, id,
+          ${eventId}, 1, 'log', fence, ${DIGEST}, ${fixture!.admin.json({ line: PLANTED_PROVIDER_KEY })}, now()
+        FROM leases WHERE attempt_id = ${other.seeded.attemptId}`;
+      const { surfaces, result } = await scanForJob(own.seeded.jobId, own.seeded.attemptId);
+      expect(surfaces.some((s) => s.surface === "job_events" && s.fieldOrEventId === eventId)).toBe(false);
+      expect(result.failures.filter((f) => f.clause === 4)).toEqual([]);
+      const otherResult = await scanForJob(other.seeded.jobId, other.seeded.attemptId);
+      expect(otherResult.result.failures.some((f) => f.clause === 4 && f.reason.includes(eventId))).toBe(true);
+    });
+
+    it("refuses aggregate query overflow even when every event fits the per-field limit", async () => {
+      guard();
+      const { seeded } = await fixture!.activateLease(42);
+      await fixture!.admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id,
+         event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        SELECT l.organization_id, l.company_id, l.job_id, l.attempt_id, 1, l.id,
+          gen_random_uuid(), s, 'log', l.fence, ${DIGEST},
+          jsonb_build_object('line', repeat('x', 250000)), now()
+        FROM leases l CROSS JOIN generate_series(1, 17) s WHERE l.attempt_id = ${seeded.attemptId}`;
+      await fixture!.admin`UPDATE heartbeat_runs SET distributed_job_id = ${seeded.jobId},
+        distributed_attempt_id = ${seeded.attemptId} WHERE id = ${RUN}`;
+      const result = await runInTenantReadOnly(fixture!.app.db, ORG, (_repos, tx) =>
+        createE7DistributedRunVerifier({ store: createDrizzleE7RunVerifierStore(tx as Db) }).verify({ runId: RUN }));
+      expect(result.ok).toBe(false);
+      expect(result.capabilityProven).toBe(false);
+      expect(result.failures.some((f) => f.reason.includes("evidence limit exceeded"))).toBe(true);
+    });
+  },
+);
+
+describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")(
   "E7-F020 — arm 2 counts distributed provenance only",
   () => {
     // NEGATIVE ------------------------------------------------------------

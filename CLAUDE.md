@@ -182,6 +182,7 @@ Versioned deliverables: documents, presentations, code, design, reports.
 - **Agent output capture:** workspace diff → adapter hinting → founder confirmation during review. Files copied from workspace to storage, never moved. (Decision #67)
 - **Artifact-as-input:** downstream tasks auto-receive artifacts from dependency tasks as context (spec→design→code→test pipelines). Content truncated at 2000 chars per artifact. (Decision #71)
 - **Task Outputs:** `task_outputs` is the unified product index for artifacts, detected files, preview URLs, runtime services, branches, and PRs. It does not replace `issues.artifactId`; that field remains the primary artifact pointer for artifact-as-input and existing viewer flows.
+- **Distributed output downloads:** the board viewer retrieves `aoa_distributed_job` bytes through `GET /api/task-outputs/:id/content`. Board/company authorization, tenant-scoped receipt/event/attempt provenance and committed-object integrity are required; editable metadata cannot authorize storage access. The stream remains available after job completion or Organization rollout-off. See `docs/api/artifacts.md`.
 - **Refinement loop:** review state supports adding artifact versions. Founder can refine on external LLMs and push back via MCP, upload, or paste. (Decisions #69, #70)
 
 ### Task Dependencies

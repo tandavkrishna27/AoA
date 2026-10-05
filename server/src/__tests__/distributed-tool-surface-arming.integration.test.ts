@@ -33,6 +33,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import express from "express";
+import request from "supertest";
 import { sql } from "drizzle-orm";
 import { applyPendingMigrations, createDb, type Db } from "@armyofagents/db";
 import { brokeredAoaMcpConfig } from "@armyofagents/adapter-utils";
@@ -54,6 +56,7 @@ import { resolveCompanyOrganizationId } from "../services/org-concurrency.js";
 import { buildTaskRunBatchWorkload } from "../services/task-run-batch-workload.js";
 import type { JobConvertOrchestrator } from "../services/job-convert-orchestrator.js";
 import type { JobShadowComparator } from "../services/job-shadow-comparator.js";
+import { mcpServerRoutes } from "../mcp/server.js";
 
 type EmbeddedPostgresInstance = {
   initialise(): Promise<void>;
@@ -232,6 +235,44 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       return runId;
     }
 
+    async function seedReadableTask(tenant: Tenant, title: string) {
+      const projectId = randomUUID();
+      const issueId = randomUUID();
+      await db.execute(sql`INSERT INTO projects (id, company_id, name)
+        VALUES (${projectId}, ${tenant.company}, 'M1b tool test')`);
+      await db.execute(sql`INSERT INTO agent_projects (company_id, agent_id, project_id)
+        VALUES (${tenant.company}, ${tenant.agent}, ${projectId})`);
+      await db.execute(sql`INSERT INTO issues (id, company_id, project_id, assignee_agent_id, title)
+        VALUES (${issueId}, ${tenant.company}, ${projectId}, ${tenant.agent}, ${title})`);
+      return issueId;
+    }
+
+    function toolApp(env: Record<string, string | undefined>, tenant: Tenant, signedRunId: string) {
+      const previous = process.env[DISTRIBUTED_EXECUTION_ENABLED_ENV];
+      // Production snapshots this deployment flag at route construction; use-side policy
+      // still comes from the real resolver's mutable env bag on every request.
+      process.env[DISTRIBUTED_EXECUTION_ENABLED_ENV] = "true";
+      try {
+        const app = express();
+        app.use(express.json());
+        app.use((req, _res, next) => {
+          req.actor = {
+            type: "agent", source: "agent_jwt", companyId: tenant.company,
+            agentId: tenant.agent, runId: signedRunId, signedRunId,
+          } as typeof req.actor;
+          next();
+        });
+        app.use("/api", mcpServerRoutes(db, {
+          resolveDistributedRunCurrency: createDistributedRunCurrencyResolver(db).resolve,
+          resolveDistributedToolSurfaceAtUse: createDistributedToolSurfaceUseResolver(db, { env }).resolve,
+        }));
+        return app;
+      } finally {
+        if (previous === undefined) delete process.env[DISTRIBUTED_EXECUTION_ENABLED_ENV];
+        else process.env[DISTRIBUTED_EXECUTION_ENABLED_ENV] = previous;
+      }
+    }
+
     // The two use-side gates, in the order the /mcp mount runs them (server.ts).
     async function useVerdicts(env: Record<string, string | undefined>, runId: string, at: Tenant) {
       const currency = await createDistributedRunCurrencyResolver(db).resolve({
@@ -302,6 +343,50 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect(await useVerdicts(env, a, TENANT_A)).toEqual({ currency: "admit", toolSurface: "admit" });
       // B's run is fence-current (currency admits) — only the per-Organization gate denies it.
       expect(await useVerdicts(env, b, TENANT_B)).toEqual({ currency: "admit", toolSurface: "deny" });
+    });
+
+    it("executes list-tasks through the real MCP route and handler, with live policy and lease denials", async () => {
+      assertSetupOk();
+      const env = armedEnv();
+      const ownTitle = `M1b useful own task ${randomUUID()}`;
+      const foreignTitle = `M1b private foreign task ${randomUUID()}`;
+      const ownTask = await seedReadableTask(TENANT_A, ownTitle);
+      await seedReadableTask(TENANT_B, foreignTitle);
+      const live = await seedDistributedRun(TENANT_A);
+      const disabled = await seedDistributedRun(TENANT_B);
+      const expired = await seedDistributedRun(TENANT_A, "past");
+      const app = toolApp(env, TENANT_A, live);
+      const call = (target: ReturnType<typeof toolApp>, companyId = TENANT_A.company) => request(target)
+        .post(`/api/companies/${companyId}/mcp`)
+        .send({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "list-tasks", arguments: {} } });
+      const assertUsefulControl = async () => {
+        const response = await call(app);
+        expect(response.status, JSON.stringify(response.body)).toBe(200);
+        expect(response.body.error).toBeUndefined();
+        const rows = JSON.parse(response.body.result.content[0].text) as Array<{ id: string; title: string }>;
+        expect(rows).toEqual(expect.arrayContaining([expect.objectContaining({ id: ownTask, title: ownTitle })]));
+        expect(rows.some((row) => row.title === foreignTitle)).toBe(false);
+      };
+      for (const [deniedApp, companyId] of [
+        [toolApp(env, TENANT_B, disabled), TENANT_B.company],
+        [toolApp(env, TENANT_A, expired), TENANT_A.company],
+        [app, TENANT_B.company],
+        [toolApp(env, TENANT_B, live), TENANT_B.company],
+      ] as const) {
+        await assertUsefulControl();
+        const denied = await call(deniedApp, companyId);
+        expect(denied.status).toBe(403);
+        expect(denied.body.result).toBeUndefined();
+      }
+      await assertUsefulControl();
+      env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = JSON.stringify({
+        organizations: { [TENANT_A.org]: { mode: "canary", workloads: ["*"] } },
+      });
+      expect((await call(app)).status).toBe(403);
+      env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = armedRollout();
+      await assertUsefulControl();
+      delete env[DISTRIBUTED_TOOL_SURFACE_ENABLED_ENV];
+      expect((await call(app)).status).toBe(403);
     });
 
     it("USE: an EXPIRED lease is denied by the currency gate (same tenant's live run is the control)", async () => {

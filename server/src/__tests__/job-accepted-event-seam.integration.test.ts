@@ -10,6 +10,9 @@
 // MULTI-TENANT (F10): two Organizations, each with its own Company, target, worker, agent and
 // model config, price side by side; a hard stop in one refuses only that one.
 import { randomUUID, createHash } from "node:crypto";
+import { Readable } from "node:stream";
+import express from "express";
+import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -61,6 +64,10 @@ import { createAcceptedActivityAuditProjector } from "../services/job-accepted-a
 import { resolveAcceptedOutputProjector } from "../services/job-accepted-output-projection.js";
 import { recordAcceptedActivityCore, JobAuditBridgeTenantError } from "../services/job-audit-bridge.js";
 import { projectAcceptedOutputCore, JobOutputBridgeTenantError } from "../services/job-output-bridge.js";
+import { createTaskOutputContentService } from "../services/task-output-content.js";
+import { taskOutputRoutes } from "../routes/task-outputs.js";
+import { expectedAttemptObjectPrefix } from "@armyofagents/worker-protocol";
+import type { StorageProvider } from "../storage/types.js";
 
 const ENABLED_ENV = { AOA_DISTRIBUTED_EXECUTION_ENABLED: "true" } as const;
 const KNOWN_MODEL = "claude-sonnet-4-6";
@@ -69,6 +76,7 @@ const UNKNOWN_MODEL = "totally-unknown-model-x";
 // Organization B — a SECOND tenant with its own Company, target, worker and agent.
 const ORG_B = "a6000000-0000-4000-8000-0000000000b1";
 const COMPANY_B = "a6000000-0000-4000-8000-0000000000b2";
+const COMPANY_SIBLING = "a6000000-0000-4000-8000-0000000000c2";
 const TARGET_B = "a6000000-0000-4000-8000-0000000000b3";
 const WORKER_B = "a6000000-0000-4000-8000-0000000000b5";
 
@@ -240,6 +248,7 @@ beforeAll(async () => {
     // Organization B: its own org, Company, target and worker (cloned shape, new identities).
     await f.admin`INSERT INTO organizations (id, name, slug) VALUES (${ORG_B}, 'JOB-016 org B', 'job-016-org-b')`;
     await f.admin`INSERT INTO companies (id, organization_id, name, issue_prefix) VALUES (${COMPANY_B}, ${ORG_B}, 'JOB-016 company B', 'J16B')`;
+    await f.admin`INSERT INTO companies (id, organization_id, name, issue_prefix) VALUES (${COMPANY_SIBLING}, ${ORG}, 'JOB-016 sibling company', 'J16C')`;
     await f.admin`INSERT INTO execution_targets
       (id, organization_id, slug, kind, trust_class, status, capabilities, config, scope,
        target_authority_key, device_generation, registered_profile, registered_profile_hash,
@@ -888,6 +897,132 @@ async function resetBridgeRows(): Promise<void> {
   await f.admin`DELETE FROM job_artifacts`;
   await f.admin`DELETE FROM issues`;
 }
+
+describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")(
+  "CLI-018 founder reads accepted distributed output content (embedded PG)", () => {
+    beforeEach(async () => { if (fixture) await resetBridgeRows(); });
+
+    async function projected(tenant = TENANT_A, bytes = Buffer.from("founder result bytes")) {
+      const issueId = await seedIssue(tenant.companyId);
+      const fence = await seedLeasedAttempt(tenant, taskSourceFor(tenant === TENANT_A ? AGENT_A : AGENT_B, issueId));
+      const identifier = randomUUID();
+      const objectKey = expectedAttemptObjectPrefix({ organizationId: tenant.organizationId, jobId: fence.jobId, attempt: 1 }) + "founder.txt";
+      const digest = createHash("sha256").update(bytes).digest("hex");
+      const committed = await runInTenant(guard().app.db, tenant.organizationId, (repos) => repos.jobControl.commitArtifactVersion({
+        ...fence, identifier, objectKey, contentType: "text/plain", kind: "workspace_patch", sensitivity: "sensitive",
+        retention: "standard", declaredSizeBytes: bytes.length, actualSizeBytes: bytes.length,
+        declaredSha256: digest, actualSha256: digest, prefixValid: true, tenantValid: true,
+      }));
+      const accepted = await acceptWithBridges(fence, [artifactEv(fence, 1, identifier), terminal(fence, 2)]);
+      expect(accepted.result.acceptedEventProjections?.find((p) => p.projectionKind === "output_projection")?.outcome).toBe("applied");
+      const [output] = await guard().admin`SELECT id FROM task_outputs WHERE external_id = ${committed.id}`;
+      const storage: StorageProvider = {
+        id: "s3", putObject: vi.fn(), deleteObject: vi.fn(),
+        headObject: vi.fn(async () => ({ exists: true, contentLength: bytes.length, checksumSha256: digest, etag: "pinned" })),
+        getObject: vi.fn(async () => ({ stream: Readable.from([bytes.subarray(0, 3), bytes.subarray(3)]), contentLength: bytes.length, etag: "pinned" })),
+      };
+      const reader = createTaskOutputContentService({ appDb: guard().app.db, storage });
+      return { issueId, fence, artifactId: committed.id, outputId: output!.id as string, storage, reader, bytes, objectKey };
+    }
+
+    function appFor(reader: ReturnType<typeof createTaskOutputContentService>, companyId = COMPANY) {
+      const app = express();
+      app.use((req, _res, next) => { req.actor = { type: "board", source: "session", userId: USER_A, companyIds: [companyId] }; next(); });
+      app.use("/api", taskOutputRoutes(guard().app.db, reader));
+      app.use((error: { status?: number; message?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+        res.status(error.status ?? 500).json({ error: error.message ?? "Internal Server Error" });
+      });
+      return app;
+    }
+
+    it("streams the committed bytes after terminal, expired lease and organization rollout-off, ignoring mutable metadata and URL", async () => {
+      const p = await projected();
+      await guard().admin`UPDATE leases SET status = 'expired', ack_deadline = now() - interval '2 hours', expires_at = now() - interval '1 hour' WHERE id = ${p.fence.leaseId}`;
+      await guard().admin`UPDATE task_outputs SET url = 'https://untrusted.invalid/stolen', metadata = ${guard().admin.json({ organizationId: ORG_B, objectKey: "foreign", quarantined: false })} WHERE id = ${p.outputId}`;
+      vi.stubEnv("AOA_DISTRIBUTED_EXECUTION_ROLLOUT", "{}");
+      const res = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      vi.unstubAllEnvs();
+      expect(res.status).toBe(200);
+      expect(res.text).toBe(p.bytes.toString());
+      const [artifact] = await guard().admin`SELECT identifier FROM job_artifacts WHERE id = ${p.artifactId}`;
+      expect(res.headers["content-disposition"]).toContain(`filename="${artifact!.identifier}"`);
+      expect(res.headers["cache-control"]).toBe("private, no-store");
+      expect(p.storage.getObject).toHaveBeenCalledWith({ objectKey: p.objectKey });
+      const [audit] = await guard().admin`SELECT actor_id, action, details FROM activity_log WHERE action = 'task_output.content_read'`;
+      expect(audit).toMatchObject({ actor_id: USER_A, action: "task_output.content_read", details: { artifactId: p.artifactId, jobId: p.fence.jobId, attempt: 1 } });
+      expect(await count("job_attempts", `id = '${p.fence.attemptId}' AND status = 'succeeded'`)).toBe(1);
+    });
+
+    it("cannot retrieve another company's projected output even with matching forged metadata", async () => {
+      const p = await projected(TENANT_B);
+      const res = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(res.status).toBe(404);
+      await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toMatchObject({ status: 404 });
+      expect(p.storage.headObject).not.toHaveBeenCalled();
+    });
+
+    it("enforces the company predicate within the same organization", async () => {
+      const p = await projected();
+      await expect(p.reader.openContent(p.outputId, COMPANY_SIBLING)).rejects.toMatchObject({ status: 404 });
+      expect(p.storage.headObject).not.toHaveBeenCalled();
+    });
+
+    it("reads a valid empty artifact and rejects a contradictory zero-byte committed digest before storage", async () => {
+      const p = await projected(TENANT_A, Buffer.alloc(0));
+      const res = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-length"]).toBe("0");
+      vi.mocked(p.storage.headObject).mockClear();
+      await guard().admin`UPDATE job_artifacts SET sha256 = ${"0".repeat(64)} WHERE id = ${p.artifactId}`;
+      await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toMatchObject({ status: 404 });
+      expect(p.storage.headObject).not.toHaveBeenCalled();
+    });
+
+    it("requires a real applied projection receipt, not a copied task-output row", async () => {
+      const p = await projected();
+      const forgedId = randomUUID();
+      const otherIssueId = await seedIssue(COMPANY);
+      await guard().admin`INSERT INTO task_outputs (id, company_id, issue_id, type, provider, external_id, title, metadata)
+        SELECT ${forgedId}, company_id, ${otherIssueId}, type, provider, external_id, title, metadata FROM task_outputs WHERE id = ${p.outputId}`;
+      await expect(p.reader.openContent(forgedId, COMPANY)).rejects.toMatchObject({ status: 404 });
+      expect(p.storage.headObject).not.toHaveBeenCalled();
+    });
+
+    it.each(["pending", "digest", "fence", "source_issue", "external_id", "malformed_external_id", "quarantined", "conflict_quarantined", "expired", "incomplete", "prefix"])(
+      "refuses %s provenance or artifact state before storage", async (kind) => {
+        const p = await projected();
+        const f = guard();
+        if (kind === "pending") await f.admin`UPDATE job_projection_receipts SET status = 'pending', applied_at = NULL WHERE target_aggregate_id = ${p.outputId}`;
+        if (kind === "digest") await f.admin`UPDATE job_projection_receipts SET source_digest = ${"0".repeat(64)} WHERE target_aggregate_id = ${p.outputId}`;
+        if (kind === "fence") await f.admin`UPDATE job_artifacts SET fence_token = 'foreign-fence' WHERE id = ${p.artifactId}`;
+        if (kind === "source_issue") await f.admin`UPDATE jobs SET source_intent = ${f.admin.json(taskSourceFor(AGENT_A, randomUUID()) as never)} WHERE id = ${p.fence.jobId}`;
+        if (kind === "external_id" || kind === "malformed_external_id") await f.admin`UPDATE task_outputs SET external_id = ${kind === "external_id" ? randomUUID() : "not-a-uuid"} WHERE id = ${p.outputId}`;
+        if (kind === "quarantined") await f.admin`UPDATE job_artifacts SET status = 'quarantined' WHERE id = ${p.artifactId}`;
+        if (kind === "conflict_quarantined") await f.admin`UPDATE job_artifacts SET apply_status = 'conflict_quarantined' WHERE id = ${p.artifactId}`;
+        if (kind === "expired") await f.admin`UPDATE job_artifacts SET expires_at = now() - interval '1 second' WHERE id = ${p.artifactId}`;
+        if (kind === "incomplete") await f.admin`UPDATE job_artifacts SET sha256 = NULL WHERE id = ${p.artifactId}`;
+        if (kind === "prefix") await f.admin`UPDATE job_artifacts SET object_key = 'quarantine/foreign' WHERE id = ${p.artifactId}`;
+        await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toMatchObject({ status: 404 });
+        expect(p.storage.headObject).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(["missing", "checksum", "size", "etag", "head_failure", "get_failure"])("refuses a storage %s mismatch before returning a body", async (kind) => {
+      const p = await projected();
+      if (kind === "missing") vi.mocked(p.storage.headObject).mockResolvedValue({ exists: false });
+      if (kind === "checksum") vi.mocked(p.storage.headObject).mockResolvedValue({ exists: true, contentLength: p.bytes.length });
+      if (kind === "size") vi.mocked(p.storage.headObject).mockResolvedValue({ exists: true, contentLength: p.bytes.length + 1, checksumSha256: createHash("sha256").update(p.bytes).digest("hex") });
+      const stream = Readable.from([p.bytes]);
+      if (kind === "etag") vi.mocked(p.storage.getObject).mockResolvedValue({ stream, contentLength: p.bytes.length, etag: "changed" });
+      if (kind === "head_failure") vi.mocked(p.storage.headObject).mockRejectedValue(new Error("private provider endpoint"));
+      if (kind === "get_failure") vi.mocked(p.storage.getObject).mockRejectedValue(new Error("private provider endpoint"));
+      await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toMatchObject({ status: kind === "missing" ? 404 : 502 });
+      if (kind === "head_failure" || kind === "get_failure") await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toThrow("Artifact storage unavailable");
+      if (kind === "etag") expect(stream.destroyed).toBe(true);
+      else if (kind !== "get_failure") expect(p.storage.getObject).not.toHaveBeenCalled();
+    });
+  },
+);
 
 describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")(
   "JOB-017 audit + output bridges on the E3-D-ACC seam (embedded PG)",

@@ -12,6 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 
 import {
   buildRolloutPolicy,
@@ -31,12 +32,66 @@ import {
   M1_SHIPPED_BOOT_MODEL,
   shippedBootAgentCreatePayload,
   evaluateShippedBootEvidence,
+  evaluateM1bUsefulWorkEvidence,
 } from "../m1-shipped-boot.mjs";
 
 const A = "0febb760-5562-4289-a76a-f2f63139ee2d";
 const B = "1b3c5d7e-9f01-4a23-8b45-6789abcdef01";
 const C = "2c4e6a80-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
 const tenants = { enabled: [A, B], control: C };
+
+function usefulWorkFixture() {
+  const expected = { organizationId: A, companyId: "company-a", issueId: "assigned-task", referenceTaskId: "reference-task", referenceTitle: "M1b reference unpredictable-marker" };
+  const body = Buffer.from(JSON.stringify({ companyId: expected.companyId, referenceTaskId: expected.referenceTaskId, referenceTitle: expected.referenceTitle }));
+  const sha256 = createHash("sha256").update(body).digest("hex");
+  return {
+    expected,
+    run: { status: "succeeded", execution_owner: "distributed", distributed_job_id: "job-a", distributed_attempt_id: "attempt-a" },
+    verifierExit: 0, verdict: { ok: true, capabilityProven: true },
+    output: { outputId: "output-a", organizationId: A, companyId: expected.companyId, issueId: expected.issueId,
+      provider: "aoa_distributed_job", externalId: "artifact-a", jobId: "job-a", attemptId: "attempt-a", attemptNumber: 2,
+      sourceIssueId: expected.issueId, receiptStatus: "applied", aggregateKind: "task_outputs",
+      eventId: "event-a", receiptIdentity: `output:${expected.companyId}:event-a`, receiptDigest: "d".repeat(64), eventDigest: "d".repeat(64),
+      receiptFence: "fence-a", eventFence: "fence-a", artifactFence: "fence-a", eventLeaseId: "lease-a", artifactLeaseId: "lease-a",
+      artifactId: "artifact-a", artifactJobId: "job-a", artifactOrganizationId: A, artifactAttempt: 2, artifactStatus: "committed",
+      artifactIdentifier: "identifier-a", eventIdentifier: "identifier-a", artifactKind: "run_output", eventKind: "run_output",
+      artifactSha256: sha256, artifactSizeBytes: body.length },
+    download: { status: 200, contentLength: body.length, body },
+  };
+}
+
+test("M1b requires capability and exact accepted-attempt content retrieved by the founder", () => {
+  assert.deepEqual(evaluateM1bUsefulWorkEvidence(usefulWorkFixture()), { pass: true, reasons: [] });
+});
+
+test("M1b refuses missing marker, wrong tenant/attempt/receipt, no capability and corrupt downloads", () => {
+  const good = usefulWorkFixture();
+  for (const broken of [
+    { ...good, run: { ...good.run, status: "failed" } },
+    { ...good, verifierExit: 3 },
+    { ...good, verdict: { ok: true, capabilityProven: false } },
+    { ...good, output: null },
+    ...["companyId", "organizationId", "issueId", "sourceIssueId", "jobId", "attemptId", "artifactJobId", "artifactOrganizationId", "artifactAttempt", "externalId", "receiptStatus", "receiptDigest", "receiptIdentity", "artifactFence", "artifactLeaseId", "eventIdentifier", "artifactKind"].map((field) => ({
+      ...good, output: { ...good.output, [field]: "wrong" },
+    })),
+    { ...good, download: { ...good.download, status: 403 } },
+    { ...good, download: { ...good.download, contentLength: good.download.body.length + 1 } },
+    { ...good, download: { ...good.download, body: Buffer.from("corrupt") } },
+    { ...good, download: { ...good.download, body: Buffer.alloc(65 * 1024) } },
+  ]) assert.equal(evaluateM1bUsefulWorkEvidence(broken).pass, false);
+  // Hash and length can both be right while the worker did not discover the live marker.
+  for (const result of [
+    { companyId: good.expected.companyId, referenceTaskId: good.expected.referenceTaskId },
+    { companyId: good.expected.companyId, referenceTaskId: good.expected.referenceTaskId, referenceTitle: "guessed" },
+    { companyId: "foreign", referenceTaskId: good.expected.referenceTaskId, referenceTitle: good.expected.referenceTitle },
+  ]) {
+    const body = Buffer.from(JSON.stringify(result));
+    assert.equal(evaluateM1bUsefulWorkEvidence({ ...good,
+      output: { ...good.output, artifactSizeBytes: body.length, artifactSha256: createHash("sha256").update(body).digest("hex") },
+      download: { status: 200, contentLength: body.length, body },
+    }).pass, false);
+  }
+});
 
 test("campaign agents pin the authoritative-pricing model", () => {
   const payload = shippedBootAgentCreatePayload("Tenant Agent");
@@ -1347,6 +1402,22 @@ test('NON-VACUITY: with NO refusal in play, the same planted canary still reds a
   assert.match(all, /contains job secret 'AOA_M1_TRUTH_SHARED_SECRET'/);
   for (const r of [/capture FAILED/, /TRUNCATED/, /job log is ABSENT/]) assert.ok(!r.test(all), `${r} must not fire`);
   assert.ok(gone);
+});
+
+test("M1b phase refuses keyless mode and missing explicit tools arm before Docker or dispatch", () => {
+  for (const [state, message] of [
+    [{ mode: "keyless" }, /m1b-useful-work requires keyed mode/],
+    [{ mode: "keyed" }, /explicit M1b tools overlay and HTTPS MCP base/],
+    [{ mode: "keyed", m1bOverlay: "/absolute/overlay.yml", publicMcpBaseUrl: "http://local/api" }, /explicit M1b tools overlay and HTTPS MCP base/],
+  ]) {
+    const out = mkdtempSync(path.join(tmpdir(), "m1b-refuse-"));
+    try {
+      writeFileSync(path.join(out, "state.json"), JSON.stringify({ out, redact: [], ...state }));
+      const res = spawnSync(process.execPath, [journey, "m1b-useful-work", "--out", out], { encoding: "utf8" });
+      assert.notEqual(res.status, 0);
+      assert.match(`${res.stdout}${res.stderr}`, message);
+    } finally { rmSync(out, { recursive: true, force: true }); }
+  }
 });
 
 test('the refusals themselves still fail the run with NO finding present (not merely a finding decorator)', () => {

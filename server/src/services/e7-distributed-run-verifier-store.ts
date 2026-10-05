@@ -60,7 +60,7 @@
 // | 1 | getRun                                  | heartbeat_runs.id = runId (PK)                  | exact     | RUN (= one attempt) | yes — it IS the subject |
 // | 2 | getAttempt                              | job_attempts.id = run.distributed_attempt_id    | precision | attempt | yes — the service re-checks company_id and job_id against the run (clause 5), so a dangling/mismatched id REFUSES |
 // | 3 | listLeases                              | leases.attempt_id                               | precision | attempt | yes — clause 5 counts corroboration; a sibling attempt's lease would be a false PASS ("this attempt was leased"). Tenant-filtered in the service |
-// | 4 | listJobEvents                           | job_events.attempt_id                           | BOTH      | attempt | SPLIT — right for clause 5 (precision: a sibling attempt's `attempt_started` must not corroborate THIS attempt), WRONG for clause 4 (recall: on a retried job, attempt 2's event payloads are never scanned while verifying attempt 1). Filed as E7-F032, NOT fixed here — see the note below |
+// | 4 | listJobEvents | job_events.attempt_id | precision | attempt | lifecycle only; job-wide payload scan is separate (E7-F032) |
 // | 5 | getAttemptTerminalReceipt               | job_projection_receipts.attempt_id + kind       | precision | attempt | yes |
 // | 6 | listRunSecretScanSurfaces (1) heartbeat | heartbeat_runs.id (PK)                          | exact     | RUN (= one attempt) | yes — the run's own columns are the run's own |
 // | 7 | listRunSecretScanSurfaces (2) outputs   | ★ UNION: applied output_projection receipt on   | RECALL    | JOB-wide (2a) + run (2b) | yes — and the JOB-wide half is DELIBERATE on the attempt axis too: a sibling attempt's output is still scanned. It was `created_by_run_id` alone — E7-F030 |
@@ -75,15 +75,8 @@
 // #10 is receipt-linked AND attempt-bound; #7 is union-linked AND job-wide. The divergence is
 // the correct state; what was missing was a written reason, which is now at the #7 call site.
 //
-// ★ THE ONE MISMATCH THIS CENSUS PASS FOUND AND DID NOT FIX — row 4, filed as E7-F032. Row 4's
-// old cell claimed "attempt_id is the only linkage the table has, and it is exact, so the two
-// directions do not conflict here". That is true on the row axis and FALSE on the attempt axis:
-// clause 5 wants this attempt's events and clause 4 wants the whole job's. Not fixed here
-// because separating them needs a SECOND store method and widens what can hard-fail clause 4
-// for every run, which wants its own pinning test and its own review — the same reason the
-// column-set residual was deferred out of W21B rather than smuggled in. The sentence that
-// claimed no conflict is corrected above, which is the load-bearing half: a census that
-// asserts a coverage it does not have is worse than one that admits the gap.
+// E7-F032: listRunSecretScanSurfaces also reads job-wide event payloads. Its
+// recall scope never supplies clause 5's attempt-started/terminal counts.
 //
 // ★★ W21D APPLIED THAT SENTENCE TO THIS FILE AND THE FILE FAILED IT. Row 9's call-site
 // comment warranted its attempt join by calling `commitArtifactVersion` "the sole writer" of
@@ -119,8 +112,8 @@
 // step. If you add a consumer, add its name here rather than a line number:
 //
 //   getRun / getAttempt / listLeases / listJobEvents / getAttemptTerminalReceipt
-//   listRunSecretScanSurfaces  — clause 4's non-event scan surfaces (three sources:
-//                                heartbeat_runs raw fields, the task_outputs UNION, job_artifacts)
+//   listRunSecretScanSurfaces  — clause 4's scan surfaces (four sources:
+//                                heartbeat_runs raw fields, the task_outputs UNION, job_artifacts, job_events)
 //   countProducedOutputs       — clause 6. "arm 1" = committed `workspace_patch` job_artifacts
 //                                joined to the run's attempt; "arm 2" = APPLIED
 //                                `output_projection` receipt on task_outputs, job AND attempt
@@ -132,7 +125,7 @@
 // converted to symbols; the dated records carry a note pointing here instead.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import {
   heartbeatRuns,
@@ -153,35 +146,21 @@ import type {
   E7ScanSurface,
   E7ProducedOutputCounts,
 } from "./e7-distributed-run-verifier.js";
+import { assertE7RowLimit, E7_EVIDENCE_LIMITS, E7EvidenceLimitError, e7ScanText } from "./e7-distributed-run-verifier.js";
+
+// PostgreSQL checks text length before returning agent-controlled evidence. NULL
+// is an overflow marker here; an actual SQL NULL becomes an empty scan string.
+function boundedText(column: AnyColumn | SQL, aggregate = false) {
+  const queryTooLarge = aggregate
+    ? sql`sum(length(coalesce(${column}::text, ''))) OVER () > ${E7_EVIDENCE_LIMITS.totalChars}`
+    : sql`false`;
+  return sql<string | null>`CASE WHEN ${queryTooLarge} OR length(coalesce(${column}::text, '')) > ${E7_EVIDENCE_LIMITS.surfaceChars}
+    THEN NULL ELSE coalesce(${column}::text, '') END`;
+}
 
 function textOf(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value) ?? "";
-  } catch {
-    return String(value);
-  }
-}
-
-/** The caller-authored columns of one `task_outputs` row, as clause 4 reads them. */
-interface TaskOutputScanRow {
-  readonly title: string | null;
-  readonly url: string | null;
-  readonly provider: string | null;
-  readonly externalId: string | null;
-  readonly healthStatus: string | null;
-  readonly summary: string | null;
-  readonly metadata: unknown;
-}
-
-/** One scan string per row. Space-joined so a matcher can never span two columns and
- * manufacture a hit out of two innocuous halves. */
-function taskOutputScanText(row: TaskOutputScanRow): string {
-  return [row.title, row.url, row.provider, row.externalId, row.healthStatus, row.summary, row.metadata]
-    .map(textOf)
-    .join(" ")
-    .trim();
+  if (value === null) throw new E7EvidenceLimitError();
+  return e7ScanText(value);
 }
 
 export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
@@ -196,12 +175,13 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
           distributedAttemptId: heartbeatRuns.distributedAttemptId,
           status: heartbeatRuns.status,
           errorCode: heartbeatRuns.errorCode,
-          error: heartbeatRuns.error,
+          error: boundedText(heartbeatRuns.error),
           finishedAt: heartbeatRuns.finishedAt,
         })
         .from(heartbeatRuns)
         .where(eq(heartbeatRuns.id, runId))
         .limit(1);
+      if (rows[0]) textOf(rows[0].error);
       return rows[0] ?? null;
     },
 
@@ -224,7 +204,9 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       const rows = await db
         .select({ id: leases.id, companyId: leases.companyId, status: leases.status })
         .from(leases)
-        .where(eq(leases.attemptId, attemptId));
+        .where(eq(leases.attemptId, attemptId))
+        .limit(E7_EVIDENCE_LIMITS.rows + 1);
+      assertE7RowLimit(rows);
       return rows;
     },
 
@@ -234,10 +216,13 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
           eventId: jobEvents.eventId,
           companyId: jobEvents.companyId,
           eventType: jobEvents.eventType,
-          payload: jobEvents.event,
+          payload: boundedText(jobEvents.event, true),
         })
         .from(jobEvents)
-        .where(eq(jobEvents.attemptId, attemptId));
+        .where(eq(jobEvents.attemptId, attemptId))
+        .limit(E7_EVIDENCE_LIMITS.rows + 1);
+      assertE7RowLimit(rows);
+      for (const row of rows) textOf(row.payload);
       return rows;
     },
 
@@ -256,7 +241,9 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
             eq(jobProjectionReceipts.attemptId, attemptId),
             eq(jobProjectionReceipts.projectionKind, "attempt_terminal"),
           ),
-        );
+        )
+        .limit(E7_EVIDENCE_LIMITS.rows + 1);
+      assertE7RowLimit(rows);
       if (rows.length === 0) return null;
       // Prefer an APPLIED receipt when one exists; otherwise surface a pending row so
       // the service can honestly report "receipt present but not applied".
@@ -271,14 +258,14 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       // field most likely to leak (§8 LOW 10).
       const runRows = await db
         .select({
-          stdoutExcerpt: heartbeatRuns.stdoutExcerpt,
-          stderrExcerpt: heartbeatRuns.stderrExcerpt,
-          error: heartbeatRuns.error,
-          promptSnapshot: heartbeatRuns.promptSnapshot,
-          detectedOutputs: heartbeatRuns.detectedOutputs,
-          resultJson: heartbeatRuns.resultJson,
-          contextSnapshot: heartbeatRuns.contextSnapshot,
-          usageJson: heartbeatRuns.usageJson,
+          stdoutExcerpt: boundedText(heartbeatRuns.stdoutExcerpt),
+          stderrExcerpt: boundedText(heartbeatRuns.stderrExcerpt),
+          error: boundedText(heartbeatRuns.error),
+          promptSnapshot: boundedText(heartbeatRuns.promptSnapshot),
+          detectedOutputs: boundedText(heartbeatRuns.detectedOutputs),
+          resultJson: boundedText(heartbeatRuns.resultJson),
+          contextSnapshot: boundedText(heartbeatRuns.contextSnapshot),
+          usageJson: boundedText(heartbeatRuns.usageJson),
         })
         .from(heartbeatRuns)
         .where(eq(heartbeatRuns.id, run.id))
@@ -338,7 +325,7 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       // defect one axis over: the counter must not credit another attempt's work, and the
       // scanner must not miss another attempt's leak. `[sibling-scan]` in
       // `e7-f020-arm2-provenance.integration.test.ts` reds if this is "made consistent".
-      const scanRows = new Map<string, TaskOutputScanRow>();
+      const scanRows = new Map<string, { text: string | null }>();
 
       // ★ THE SCANNED COLUMN SET IS EVERY CALLER-AUTHORED COLUMN, not just summary+metadata
       // (E7-F030's measured residual, fixed here). `BridgeOutputInput`
@@ -354,13 +341,11 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       // 'unknown'.
       const scanColumns = {
         id: taskOutputs.id,
-        title: taskOutputs.title,
-        url: taskOutputs.url,
-        provider: taskOutputs.provider,
-        externalId: taskOutputs.externalId,
-        healthStatus: taskOutputs.healthStatus,
-        summary: taskOutputs.summary,
-        metadata: taskOutputs.metadata,
+        // One bounded string per row prevents the combined column set from
+        // multiplying the transfer budget. Spaces preserve column boundaries.
+        text: boundedText(sql`concat_ws(' ', ${taskOutputs.title}, ${taskOutputs.url},
+          ${taskOutputs.provider}, ${taskOutputs.externalId}, ${taskOutputs.healthStatus},
+          ${taskOutputs.summary}, ${taskOutputs.metadata}::text)`, true),
       } as const;
 
       // (2a) RECEIPT provenance — the rows arm 2 counts. Present here so a distributed
@@ -377,7 +362,9 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
               eq(jobProjectionReceipts.aggregateKind, "task_outputs"),
               eq(jobProjectionReceipts.status, "applied"),
             ),
-          );
+          )
+          .limit(E7_EVIDENCE_LIMITS.rows + 1);
+        assertE7RowLimit(projected);
         for (const o of projected) scanRows.set(o.id, o);
       }
 
@@ -387,11 +374,13 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       const columnLinked = await db
         .select(scanColumns)
         .from(taskOutputs)
-        .where(eq(taskOutputs.createdByRunId, run.id));
+        .where(eq(taskOutputs.createdByRunId, run.id))
+        .limit(E7_EVIDENCE_LIMITS.rows + 1);
+      assertE7RowLimit(columnLinked);
       for (const o of columnLinked) scanRows.set(o.id, o);
 
       for (const [id, o] of scanRows) {
-        const text = taskOutputScanText(o);
+        const text = textOf(o.text);
         if (text) surfaces.push({ surface: "task_outputs", fieldOrEventId: id, text });
       }
 
@@ -399,13 +388,23 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       // object_key are the agent-influenced text; kind/status are enums.
       if (run.distributedJobId) {
         const artifacts = await db
-          .select({ id: jobArtifacts.id, identifier: jobArtifacts.identifier, objectKey: jobArtifacts.objectKey })
+          .select({ id: jobArtifacts.id, text: boundedText(sql`concat_ws(' ', ${jobArtifacts.identifier}, ${jobArtifacts.objectKey})`, true) })
           .from(jobArtifacts)
-          .where(eq(jobArtifacts.jobId, run.distributedJobId));
+          .where(eq(jobArtifacts.jobId, run.distributedJobId))
+          .limit(E7_EVIDENCE_LIMITS.rows + 1);
+        assertE7RowLimit(artifacts);
         for (const a of artifacts) {
-          const text = `${textOf(a.identifier)} ${textOf(a.objectKey)}`.trim();
+          const text = textOf(a.text);
           if (text) surfaces.push({ surface: "job_artifacts", fieldOrEventId: a.id, text });
         }
+        // Secret recall is job-wide, independently of the attempt-only lifecycle
+        // query. Sibling attempt_started/terminal rows never corroborate this run.
+        const jobWideEvents = await db.select({ eventId: jobEvents.eventId, text: boundedText(jobEvents.event, true) })
+          .from(jobEvents)
+          .where(and(eq(jobEvents.jobId, run.distributedJobId), eq(jobEvents.companyId, run.companyId)))
+          .limit(E7_EVIDENCE_LIMITS.rows + 1);
+        assertE7RowLimit(jobWideEvents);
+        for (const event of jobWideEvents) surfaces.push({ surface: "job_events", fieldOrEventId: event.eventId, text: textOf(event.text) });
       }
 
       // NOTE — the run-summary `issue_comments` body is deliberately NOT scanned here.
@@ -419,6 +418,13 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       // run.error), so nothing leak-relevant is lost. Scoped SHOULD-surface per design §7
       // open-Q2. Revisit if a run→summary-comment key is added.
 
+      assertE7RowLimit(surfaces);
+      let totalChars = 0;
+      for (const surface of surfaces) {
+        e7ScanText(surface.text);
+        totalChars += surface.text.length;
+        if (totalChars > E7_EVIDENCE_LIMITS.totalChars) throw new E7EvidenceLimitError();
+      }
       return surfaces;
     },
 
@@ -513,7 +519,9 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
               eq(jobAttempts.id, attemptId),
               eq(jobAttempts.companyId, run.companyId),
             ),
-          );
+          )
+          .limit(E7_EVIDENCE_LIMITS.rows + 1);
+        assertE7RowLimit(artifactRows);
         workspacePatchArtifacts = new Set(artifactRows.map((r) => r.id)).size;
       }
       // ARM 2 — task_outputs of DISTRIBUTED PROVENANCE, and nothing else (E7-F020).
@@ -579,13 +587,8 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
       // carries a receipt and is still counted: it is a real agent output that reached
       // AoA, which is exactly what this arm asks.
       //
-      // ★ WHAT THIS DOES NOT BUY, and it is most of what there is: E7-F018 measured that
-      // NO checked-in configuration makes any run a distributed run, and that
-      // `projectAcceptedOutput` has ZERO production callers. So this predicate admits a
-      // writer nothing calls, on a path nothing arms: arm 2 reads 0 on every real run
-      // today. The gate is now correctly CLOSED where it was falsely open. It is not
-      // working, and `capabilityProven` still gates nothing (no workflow or script reads
-      // it). Do not read a change here as progress toward a green campaign.
+      // The production accepted-output seam writes receipt-backed rows. The count
+      // proves provenance; quality and readable bytes require separate checks.
       let distributedTaskOutputs = 0;
       if (run.distributedJobId && attemptId) {
         const outputRows = await db
@@ -611,7 +614,9 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
               eq(jobProjectionReceipts.companyId, run.companyId),
               eq(taskOutputs.companyId, run.companyId),
             ),
-          );
+          )
+          .limit(E7_EVIDENCE_LIMITS.rows + 1);
+        assertE7RowLimit(outputRows);
         distributedTaskOutputs = new Set(outputRows.map((r) => r.id)).size;
       }
       return { workspacePatchArtifacts, taskOutputs: distributedTaskOutputs };

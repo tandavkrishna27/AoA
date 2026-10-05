@@ -13,7 +13,6 @@ import {
   createE7DistributedRunVerifier,
   e7VerifyExitCode,
   formatVerifyResult,
-  E7_CAPABILITY_LIMITATIONS,
   detectHardLeakClasses,
   type E7RunVerifierStore,
   type E7RunRow,
@@ -122,6 +121,85 @@ function goldenStore(parts: GoldenParts = {}): E7RunVerifierStore {
 function clauses(result: { failures: readonly { clause: number }[] }): Set<number> {
   return new Set(result.failures.map((f) => f.clause));
 }
+
+describe("CLI015 bounded secret verification", () => {
+  it.each([
+    ["provider placeholder", "sk-your-api-key-goes-here"],
+    ["empty assignment", "E2B_API_KEY=\"\""],
+    ["redacted assignment", "E2B_API_KEY=***REDACTED***"],
+    ["bracketed redaction", "E2B_API_KEY=[REDACTED]"],
+    ["named angle placeholder", "E2B_API_KEY=<your_e2b_api_key>"],
+    ["named unset marker", "E2B_API_KEY: (unset)"],
+    ["empty assignment in JSON payload", JSON.stringify({ payload: { message: 'E2B_API_KEY=""' } })],
+    ["redacted assignment in JSON payload", JSON.stringify({ payload: { message: 'E2B_API_KEY="[REDACTED]"' } })],
+    ["template assignment in JSON payload", JSON.stringify({ payload: { message: 'E2B_API_KEY="${E2B_API_KEY}"' } })],
+    ["empty nested JSON assignment", JSON.stringify({ payload: { message: JSON.stringify({ E2B_API_KEY: "" }) } })],
+    ["template assignment", "E2B_API_KEY=${E2B_API_KEY}"],
+  ])("does not hard-fail a clean %s", async (_name, text) => {
+    const result = await createE7DistributedRunVerifier({ store: goldenStore({
+      surfaces: [{ surface: "task_outputs", fieldOrEventId: "clean-output", text }],
+    }) }).verify({ runId: RUN_ID });
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    ["provider_key", "sk-proj-ABCDefgh0123456789abcdefghijkl"],
+    ["provider_key", "sk-ant-api03ABCDefgh0123456789"],
+    ["provider_key", "sk-ABCDefgh0123456789abcd"],
+    ["provider_key", "sk-abcdefghijklmnopqrstuvwx"],
+    ["provider_key", "sk-abcd-efghijklmnopqrstuvwx"],
+    ["provider_key", "sk-ant-abcdefghijklmnop"],
+    ["provider_key", "sk-abcd_efghijklmnopqrstuvwx"],
+    ["provider_key", "sk-workspace-patch-not-a-secret.txt"],
+    ["e2b_api_key_assignment", '{"E2B_API_KEY":"synthetic-nonstandard-value"}'],
+    ["e2b_api_key_assignment", "E2B_API_KEY='synthetic-value'"],
+    ["e2b_api_key_assignment", "E2B_API_KEY=<actual-synthetic-value>"],
+    ["e2b_api_key_assignment", JSON.stringify({ payload: { message: 'E2B_API_KEY="synthetic-value"' } })],
+    ["e2b_api_key_assignment", JSON.stringify({ payload: { message: JSON.stringify({ E2B_API_KEY: "synthetic-nonstandard-value" }) } })],
+  ])("rejects %s without printing its value", async (matchedClass, text) => {
+    const result = await createE7DistributedRunVerifier({ store: goldenStore({
+      surfaces: [{ surface: "task_outputs", fieldOrEventId: "leaky-output", text }],
+    }) }).verify({ runId: RUN_ID });
+    expect(result.ok).toBe(false);
+    expect(result.failures.some((f) => f.clause === 4 && f.reason.includes(matchedClass))).toBe(true);
+    expect(JSON.stringify(result)).not.toContain(text);
+    expect(formatVerifyResult(result)).not.toContain(text);
+  });
+
+  it.each([
+    ["surface text", [{ surface: "task_outputs", fieldOrEventId: "large", text: "x".repeat(256 * 1024 + 1) }]],
+    ["surface count", Array.from({ length: 1025 }, (_, i) => ({ surface: "task_outputs", fieldOrEventId: String(i), text: "clean" }))],
+    ["aggregate text", Array.from({ length: 17 }, (_, i) => ({ surface: "task_outputs", fieldOrEventId: String(i), text: "x".repeat(256 * 1024) }))],
+  ])("fails explicitly instead of verifying truncated %s", async (_name, surfaces) => {
+    const result = await createE7DistributedRunVerifier({ store: goldenStore({
+      surfaces, produced: { workspacePatchArtifacts: 0, taskOutputs: 1 },
+    }) }).verify({ runId: RUN_ID });
+    expect(result.ok).toBe(false);
+    expect(result.capabilityProven).toBe(false);
+    expect(result.failures.some((f) => f.reason.includes("evidence limit exceeded"))).toBe(true);
+    expect(e7VerifyExitCode(result, { requireCapability: false })).toBe(1);
+  });
+
+  it("fails closed for an excessively deep model-controlled event payload", async () => {
+    let payload: unknown = "clean";
+    for (let i = 0; i < 80; i++) payload = { nested: payload };
+    const result = await createE7DistributedRunVerifier({ store: goldenStore({
+      events: [event("attempt_started"), event("terminal"), event("log", { payload })],
+    }) }).verify({ runId: RUN_ID });
+    expect(result.ok).toBe(false);
+    expect(result.failures.some((f) => f.reason.includes("evidence limit exceeded"))).toBe(true);
+  });
+
+  it("rejects a cyclic event instead of treating failed serialization as clean text", async () => {
+    const payload: Record<string, unknown> = {};
+    payload.self = payload;
+    const result = await createE7DistributedRunVerifier({ store: goldenStore({
+      events: [event("attempt_started"), event("terminal"), event("log", { payload })],
+    }) }).verify({ runId: RUN_ID });
+    expect(result.ok).toBe(false);
+    expect(result.failures.some((f) => f.reason.includes("evidence limit exceeded"))).toBe(true);
+  });
+});
 
 describe("evidence-verifier A — fixture table (design §4, one clause per fixture)", () => {
   it("(a) golden distributed journey PASSES", async () => {
@@ -428,15 +506,8 @@ describe("evidence-verifier A — expected org/company assertion + read-only sur
 // exactly as the MIG-010 Unit 2.2 repro did: it is the record of what the verifier
 // could not see. `ok` answers "was the distributed journey corroborated" — the
 // MECHANISM — and a context-free run corroborates that journey perfectly well.
-// Making `ok` false here would be the naive fix CLI-008 Unit A explicitly rejects
-// (`producedArtifacts` is structurally 0 until Unit F ships output capture, so a
-// clause folded into `ok` is a gate nobody can pass — and a permanently-red gate
-// gets bypassed, argued around, or deleted).
-//
-// If this block reddens, someone folded capability into `ok`. Read
-// `docs/replatform/qa/2026-09-02-cli-008-unit-a-verifier-clause-plan.md` §"The
-// design decision" before changing anything.
-// ---------------------------------------------------------------------------
+// Capability is independent of lifecycle corroboration; this fixture preserves that distinction.
+
 describe("evidence-verifier A — E7-F003 blind spot (pinned: today's verifier blesses a context-free run)", () => {
   // A run whose sandbox agent had no tools, no identity, no workspace and a
   // context-free prompt, and whose CLI exited 127 — yet a worker leased it,
@@ -484,9 +555,7 @@ describe("evidence-verifier A — clause 6: capability, a dimension separate fro
     // E7-F003 pin above stays green. If nothing reds, the dimension is decorative.
     expect(result.capabilityProven).toBe(false);
     expect(result.capabilityFailures.map((f) => f.clause)).toEqual([6]);
-    // The reason must teach an operator what is UNBUILT, not restate that a count was 0.
-    expect(result.capabilityFailures[0].reason).toContain("Unit F");
-    expect(result.capabilityFailures[0].reason).toContain("observeRun");
+    expect(result.observed.producedArtifacts).toEqual({ workspacePatchArtifacts: 0, taskOutputs: 0 });
   });
 
   it("the capability failure NEVER enters failures, so ok stays true", async () => {
@@ -494,8 +563,7 @@ describe("evidence-verifier A — clause 6: capability, a dimension separate fro
     const result = await verifier.verify({ runId: RUN_ID });
     // MUTATION 2: push the capability failure into `failures` instead and BOTH this
     // and the E7-F003 pin redden. This is the guard against the exact regression the
-    // design rejects — `producedArtifacts` is structurally 0 until Unit F, so a
-    // capability clause folded into `ok` makes E7-1 permanently red.
+    // design rejects: output-free runs can still prove the lifecycle.
     expect(result.ok).toBe(true);
     expect(result.failures).toEqual([]);
     expect(result.failures.some((f) => f.clause === 6)).toBe(false);
@@ -603,7 +671,8 @@ describe("evidence-verifier A — the --require-capability exit decision", () =>
 //
 //   1. THE ASSERTION  — the rendered verdict carries the limitation. This is the one
 //      the mutation (delete the caveat from formatVerifyResult) must redden.
-//   2. SECOND CONTROL — the text NAMES arm 2 and CITES E7-F020, and does not overclaim
+//   2. Historical prose checks were replaced by real provenance tests.
+//   Previously: SECOND CONTROL — the text NAMES arm 2 and CITES E7-F020, and does not overclaim
 //      in either direction. Without this, a caveat reading "results may vary" passes
 //      block 1 while disclosing nothing, which is this programme's signature defect
 //      one level up: a check that cannot fail.
@@ -664,171 +733,6 @@ describe("W7U2 — the capability verdict states its own limit (E7-F020)", () =>
     const printed = formatVerifyResult(await verifier.verify({ runId: RUN_ID }));
     expect(printed).toContain("E7-F020"); // the general limit still prints
     expect(printed).not.toContain("THIS RUN: arm 2 is non-zero");
-  });
-});
-
-describe("W7U2 SECOND CONTROL — the caveat says something FALSIFIABLE", () => {
-  const text = E7_CAPABILITY_LIMITATIONS.join(" ");
-
-  it("names the arm and the exact column, not 'the capability check'", () => {
-    // A caveat that says "this verdict has limitations" passes a naive contains-check while
-    // disclosing nothing. These are the load-bearing nouns.
-    // ★ W21D — this used to read `toContain("arm 2")`, which could never red: "arm 2" is a
-    // substring of "arm 2 ONLY", asserted on the SAME `text` in the Scope test below, so a
-    // caveat that had lost every other mention of the arm still passed here. Pin the arm-2
-    // sentence's own opening instead — no sibling assertion supplies it.
-    // The sentence pin already carries the column name, so a separate bare
-    // `toContain("task_outputs")` would be the same vacuous-sibling defect one line down —
-    // it was removed rather than kept for appearances.
-    expect(text).toContain("Arm 2 (task_outputs) counts ONLY rows");
-    expect(text).toContain("created_by_run_id");
-    // ★ W21: the literal line range `:213-216` was dropped when the predicate moved. The FILE
-    // is still named; a line range that drifts on the next edit is a citation that rots.
-    expect(text).toContain("e7-distributed-run-verifier-store.ts");
-  });
-
-  // ★ W21 — THE NEW REQUIRED HALF. The block used to be pure disclosure; arm 2 now applies a
-  // provenance predicate, and the text has to NAME it, or a reader cannot check whether the
-  // rule described is the rule enforced. These are the load-bearing nouns of the new predicate.
-  it("names the provenance predicate arm 2 actually applies", () => {
-    expect(text).toContain("output_projection");
-    expect(text).toContain("job_projection_receipts");
-    expect(text).toContain("projectAcceptedOutput");
-  });
-
-  it("cites E7-F020 so a reader can find the measurement", () => {
-    expect(text).toContain("E7-F020");
-  });
-
-  // ★ W21C — THE SECOND TIME THIS BLOCK WOULD HAVE GONE FALSE SILENTLY. It stated the receipt
-  // match as `job_id` alone and declared arm 1 untouched; E7-F031 made both arms attempt-bound,
-  // so both sentences became false claims printed beside every verdict. These nouns pin the
-  // corrected version — a future edit that re-widens either arm to job scope, or that narrows
-  // the SCANNER to the attempt, leaves a text that no longer describes the code and reds here.
-  it("names the ATTEMPT granularity both arms now enforce, and the scanner's exemption", () => {
-    // ★★★ W21D — THE ASSERTION THAT COULD NEVER RED, AND THE PROOF THAT IT COULD NOT.
-    // This line used to read `toContain("attempt_id")`. "attempt_id" is a SUBSTRING of the
-    // "distributed_attempt_id" asserted on the very next line: measured offsets of
-    // "attempt_id" in the joined text were [170, 832], and 832 falls inside the
-    // "distributed_attempt_id" occurrence starting at 820. So while line 2 was green,
-    // line 1 was mathematically incapable of failing.
-    //
-    // MEASURED CONSEQUENCE, not a worry: reverting the arm-2 sentence to its pre-W21C
-    // job-only wording ("for THIS run's distributed job") left this ENTIRE describe block
-    // green — all of its toContain assertions, both deny-lists and the positional window —
-    // while the caveat printed beside every verdict said both "matched on job_id" and
-    // "Both are now attempt-bound", contradicting itself. This is the SECOND time an
-    // assertion satisfied by its own siblings has shipped on this branch pair; the first
-    // hid the invisible-byte defect on PR #383.
-    //
-    // The fix pins the SENTENCE. Reverting the caveat now reds here, which is the point.
-    expect(text).toContain("matched on job_id AND attempt_id");
-    expect(text).toContain("not job_id alone");
-    expect(text).toContain("distributed_attempt_id");
-    expect(text).toContain("max_attempts");
-    expect(text).toContain("E7-F031");
-    // The asymmetry is the part a "consistency" edit destroys, so it is asserted, not implied.
-    // ★ W21D made this precise. The text used to say flatly "the scanner is deliberately NOT
-    // attempt-bound", which is false of ONE of its four surfaces: `listJobEvents` is keyed on
-    // `attempt_id`, so a sibling attempt's event payloads are never scanned — the gap the same
-    // commit filed as E7-F032. The pin now covers BOTH halves, so a future edit cannot drop
-    // the disclosure and keep the reassuring half.
-    expect(text).toContain("task_outputs and job_artifacts surfaces are deliberately NOT attempt-bound");
-    expect(text).toContain("job_events surface IS attempt-narrow");
-    expect(text).toContain("E7-F032");
-  });
-
-  it("names the writer path that makes it true, so the claim can be checked", () => {
-    expect(text).toContain("heartbeat.ts:4524");
-    expect(text).toContain("task-output-emitters.ts:113");
-  });
-
-  // ★ THE TWO ANTI-DRIFT GUARDS BELOW ARE BOUNDED, AND SAYING SO IS THE POINT. They assert on
-  // PHRASES, not on meaning: a fixed deny-list of substrings ("now handled", "meaningless", …)
-  // plus one required substring. They catch the drift that reuses the obvious wording; they do
-  // NOT catch a rewrite that overclaims in a synonym this list does not carry ("this risk is
-  // addressed", "amounts to nothing"), and they cannot tell whether a sentence is TRUE. Nothing
-  // here makes the caveat semantically correct — a human reader still owes that. They are cheap
-  // regression tripwires on the exact wordings this unit reviewed, and that is their whole claim.
-  // Do not read a green here as "the caveat has been checked for honesty".
-  // ★★★ W21 REPOINTED, NOT RELAXED. The required phrase used to be "DISCLOSURE, not a control",
-  // which stopped being true the moment W21 gave arm 2 a predicate — a caveat that describes
-  // itself wrongly is the drift this guard exists to catch, so the guard had to move with the
-  // text rather than be deleted. What replaces it is STRICTLY MORE: the deny-list is kept
-  // verbatim AND extended with the overclaim this particular change invites ("the capability
-  // gate now works"), and the block must still say what a green does not establish.
-  it("states the residual and must not read as 'the gate now works'", () => {
-    expect(text).toContain("WHAT A GREEN STILL DOES NOT ESTABLISH");
-    expect(text).toContain("E7-F018");
-    expect(text).toContain("gates nothing");
-    for (const claim of ["now handled", "is fixed", "no longer", "mitigated", "prevents"]) {
-      expect(text.toLowerCase()).not.toContain(claim);
-    }
-    for (const claim of ["now works", "gate works", "capability is proven", "ready to gate"]) {
-      expect(text.toLowerCase()).not.toContain(claim);
-    }
-  });
-
-  it("does NOT overclaim in the other direction either", () => {
-    // E7-F020 does not say capabilityProven is meaningless or always false, and neither is
-    // true. Overclaiming a limit is how a real one gets dismissed as alarmism.
-    for (const overclaim of ["meaningless", "always false", "never true", "worthless"]) {
-      expect(text.toLowerCase()).not.toContain(overclaim);
-    }
-  });
-
-  it("scopes itself to arm 2 and does NOT attribute E7-F020 to arm 1", () => {
-    // Arm 1 (workspace_patch job_artifacts) has a DIFFERENT open question (E7-F019) and is
-    // short-circuited by `if (run.distributedJobId && attemptId)`. Blurring them would make the
-    // text unfalsifiable, and E7-F018/F019/F020 exist precisely because the arms differ.
-    expect(text).toContain("arm 2 ONLY");
-    expect(text).toContain("E7-F019");
-
-    // ★★★ W21C WIDENED THIS FROM A STRING BAN TO A STRUCTURAL ONE, AND THE REASON MATTERS.
-    // The check used to be a flat `not.toContain("both arms")`. E7-F031 then made a cross-arm
-    // statement TRUE — the attempt binding really does cover arm 1 and arm 2 — so the flat ban
-    // forbade an accurate sentence. The tempting move at that point is to reword around the
-    // banned string, which keeps the guard green while saying the same thing in other words:
-    // a guard defeated by a synonym is a guard that has stopped guarding.
-    //
-    // So the rule now says what it always MEANT: a cross-arm claim is allowed, but only inside
-    // the paragraph that cites the finding licensing it, and NEVER attached to the E7-F020
-    // provenance claim, which is arm-2-only and must stay that way.
-    // ★★★ W21D — THE GUARD WAS LOOSER THAN THE RULE IT STATES, AND ONLY ONE BOUND WAS PROVEN.
-    // It used `Scope:` as the upper bound, which is not where the licensing paragraph ends: the
-    // window ran [630, 2323] — 1693 characters spanning THREE paragraphs, because "WHAT A GREEN
-    // STILL DOES NOT ESTABLISH" starts at 1610 and the E7-F020 residual at 1976 both sat inside
-    // it. Measured: inserting "— this holds for both arms —" into the WHAT-A-GREEN paragraph
-    // left this test GREEN. The recorded mutation had only ever exercised the UPPER bound.
-    //
-    // The upper bound is now the START OF THE NEXT SECTION, computed rather than named, so the
-    // window tracks the text instead of a landmark two paragraphs away. Both bounds are pinned.
-    const attemptParagraph = text.indexOf("ATTEMPT GRANULARITY (E7-F031)");
-    expect(attemptParagraph).toBeGreaterThan(-1);
-    const laterSections = ["WHAT A GREEN STILL DOES NOT ESTABLISH", "E7-F020 stays OPEN", "Scope:"]
-      .map((marker) => text.indexOf(marker))
-      .filter((at) => at > attemptParagraph);
-    expect(laterSections.length).toBeGreaterThan(0);
-    const attemptParagraphEnd = Math.min(...laterSections);
-
-    // ANTI-VACUITY: with zero occurrences the loop below asserts nothing at all, and a text that
-    // had quietly lost its cross-arm sentence would pass a guard whose whole subject is that
-    // sentence. The count is asserted, so the loop is never empty.
-    const crossArm = [...text.matchAll(/both arms/gi)];
-    expect(crossArm.length).toBeGreaterThan(0);
-    for (const match of crossArm) {
-      const at = match.index ?? -1;
-      expect(at).toBeGreaterThan(attemptParagraph);
-      expect(at).toBeLessThan(attemptParagraphEnd);
-    }
-
-    // And no sentence making the E7-F020 provenance claim may reach for arm 1 — the original
-    // intent, now checked per sentence instead of over the whole blob.
-    for (const sentence of text.split(/(?<=\.)\s+/)) {
-      if (!sentence.includes("E7-F020")) continue;
-      expect(sentence.toLowerCase()).not.toContain("arm 1");
-      expect(sentence.toLowerCase()).not.toContain("both arms");
-    }
   });
 });
 

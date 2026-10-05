@@ -106,6 +106,8 @@ import {
   evaluateEnvProbeEvidence,
   shippedBootAgentCreatePayload,
   evaluateShippedBootEvidence,
+  evaluateM1bUsefulWorkEvidence,
+  M1B_USEFUL_WORK_MAX_BYTES,
 } from "../lib/m1-shipped-boot.mjs";
 import { pinnedE2bTemplateSelector, readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
 import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory } from "../lib/m1-cleanup-evidence.mjs";
@@ -213,7 +215,8 @@ function writeEvidence(state, name, value) {
 }
 
 function composeArgs(state) {
-  return ["compose", "-p", PROJECT, "--env-file", state.envFile, "-f", BASE_COMPOSE, "-f", OVERLAY];
+  return ["compose", "-p", PROJECT, "--env-file", state.envFile, "-f", BASE_COMPOSE, "-f", OVERLAY,
+    ...(state.m1bOverlay ? ["-f", state.m1bOverlay] : [])];
 }
 
 function compose(state, args, { timeout = 900_000, allowFail = false, input } = {}) {
@@ -272,11 +275,12 @@ try {
   return result.rows;
 }
 
-async function api(state, method, urlPath, body) {
+async function api(state, method, urlPath, body, { timeoutMs } = {}) {
   const res = await fetch(`${CP_URL}/api${urlPath}`, {
     method,
     headers: { authorization: `Bearer ${state.boardToken}`, "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
+    ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
   });
   const text = await res.text();
   let json = null;
@@ -810,9 +814,9 @@ finally { process.exit(0); }
   console.log("reconcile: every Organization reconciled; the canary preflight passes for ALL THREE (the control differs ONLY by the rollout)");
 }
 
-async function dispatchTenant(state, key) {
+async function dispatchTenant(state, key, options = {}) {
   const t = state.tenants[key];
-  const title = `DEP-015 shipped boot journey (${key}, ${t.role}, ${randomUUID()})`;
+  const title = options.title ?? `DEP-015 shipped boot journey (${key}, ${t.role}, ${randomUUID()})`;
   if (state.mode === "keyed") {
     recordResourceIntent({ out: state.out, candidate: state.candidate, intent: {
       id: randomUUID(), kind: "journey", tenant: key, organizationId: t.organizationId,
@@ -822,12 +826,13 @@ async function dispatchTenant(state, key) {
   }
   const issue = await api(state, "POST", `/companies/${t.companyId}/issues`, {
     title,
-    description: "Reply with the single word: done.",
+    description: options.description ?? "Reply with the single word: done.",
     status: "todo",
     assigneeAgentId: t.agentId,
-  });
+    ...(options.projectId ? { projectId: options.projectId } : {}),
+  }, { timeoutMs: options.apiTimeoutMs });
   t.issueId = issue.id;
-  const deadline = Date.now() + 20 * 60_000;
+  const deadline = Date.now() + (options.timeoutMs ?? 20 * 60_000);
   let run = null;
   while (Date.now() < deadline) {
     const rows = ownerSql(state, `
@@ -1091,6 +1096,144 @@ async function dispatch(state) {
     console.log(`dispatch: tenant ${k} (${o.role}) run=${o.run?.id ?? "none"} owner=${o.run?.execution_owner ?? "null"} verifierExit=${o.verifierExit} capabilityProven=${o.capabilityProven} → ${o.outcome.pass ? "PASS" : `FAIL: ${o.outcome.reasons.join("; ")}`}`);
   }
   if (!passed) fail("the journey did not pass for every dispatched tenant — see journey.json");
+}
+
+async function downloadUsefulWork(state, outputId) {
+  const res = await fetch(`${CP_URL}/api/task-outputs/${encodeURIComponent(outputId)}/content`, {
+    headers: { authorization: `Bearer ${state.boardToken}` }, signal: AbortSignal.timeout(60_000),
+  });
+  const length = res.headers.get("content-length");
+  if (!res.ok || !res.body || (length !== null && Number(length) > M1B_USEFUL_WORK_MAX_BYTES)) {
+    await res.body?.cancel();
+    return { status: res.status, contentLength: length, body: null };
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      bytes += value.length;
+      if (bytes > M1B_USEFUL_WORK_MAX_BYTES) throw new Error("founder download exceeds 64 KiB");
+      chunks.push(Buffer.from(value));
+    }
+    return { status: res.status, contentLength: length, body: Buffer.concat(chunks, bytes) };
+  } finally {
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
+}
+
+async function usefulWorkProviderEvidence(state, run, tenant) {
+  const leaseIds = ownerSql(state, `SELECT id FROM leases WHERE attempt_id = $1`, [run.distributed_attempt_id]).map((r) => r.id);
+  const deadline = Date.now() + SANDBOX_EVIDENCE_DEADLINE_MS;
+  let evidence;
+  do {
+    const logs = compose(state, ["logs", "--no-color", tenant.worker], { allowFail: true });
+    evidence = extractSandboxEvidence(logs.stdout, { leaseIds });
+    if (evidence.count > 0 || Date.now() >= deadline) break;
+    await sleep(SANDBOX_EVIDENCE_POLL_MS);
+  } while (true);
+  const buildBindings = [];
+  for (const sandboxId of evidence.sandboxIds.slice(0, 4)) {
+    let binding;
+    const deadline = Date.now() + SANDBOX_EVIDENCE_DEADLINE_MS;
+    do {
+      binding = await readE2bSandboxBuildBinding({ apiKey: process.env.E2B_API_KEY, sandboxId,
+        fetchFn: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(30_000) }),
+        expected: { templateId: state.providerIdentity.resolvedTemplateId, buildId: state.providerIdentity.immutableBuildId } });
+      if (binding.verdict.pass || Date.now() >= deadline) break;
+      await sleep(SANDBOX_EVIDENCE_POLL_MS);
+    } while (true);
+    buildBindings.push({ sandboxId, verdict: binding.verdict });
+  }
+  return { leaseIds, sandboxIds: evidence.sandboxIds, buildBindings,
+    pass: evidence.count > 0 && evidence.sandboxIds.length <= 4 && buildBindings.length === evidence.sandboxIds.length &&
+      buildBindings.every((b) => b.verdict.pass === true) };
+}
+
+async function m1bUsefulWork(state) {
+  if (state.mode !== "keyed") fail("m1b-useful-work requires keyed mode");
+  let publicUrl;
+  try { publicUrl = new URL(state.publicMcpBaseUrl); } catch {}
+  if (!state.m1bOverlay || !path.isAbsolute(state.m1bOverlay) || !existsSync(state.m1bOverlay) ||
+      publicUrl?.protocol !== "https:" || publicUrl.pathname !== "/api" || publicUrl.search || publicUrl.hash ||
+      publicUrl.username || publicUrl.password) fail("m1b-useful-work requires the explicit M1b tools overlay and HTTPS MCP base ending /api");
+  const priorPath = path.join(evidenceDir(state), "journey.json");
+  if (!existsSync(priorPath) || JSON.parse(readFileSync(priorPath, "utf8")).passed !== true) {
+    fail("m1b-useful-work requires the completed M1a journey before dispatch");
+  }
+  const tenant = state.tenants.a;
+  const timeout = { timeoutMs: 60_000 };
+  const project = await api(state, "POST", `/companies/${tenant.companyId}/projects`, {
+    name: `M1b useful work ${randomUUID()}`, status: "in_progress",
+  }, timeout);
+  await api(state, "POST", `/projects/${project.id}/agents`, { agentId: tenant.agentId }, timeout);
+  // Its title is deliberately absent from the assigned task's description: live AoA data is needed.
+  const reference = await api(state, "POST", `/companies/${tenant.companyId}/issues`, {
+    projectId: project.id, title: `M1b reference ${randomBytes(16).toString("hex")}`,
+    description: "Reference data for the useful-work task. Leave this task unassigned.", status: "backlog", assigneeAgentId: null,
+  }, timeout);
+  state.m1bUsefulWork = { projectId: project.id, referenceTaskId: reference.id, referenceTitle: reference.title };
+  saveState(state);
+  const description = `Use the aoa MCP list-tasks tool to read the unassigned backlog reference task ${reference.id} in project ${project.id}, company ${tenant.companyId}. Read its exact title from the live tool response. Create /home/user/aoa-output/result.json with exactly these three JSON keys: companyId, referenceTaskId, referenceTitle. Use the company ID ${tenant.companyId}, the reference task ID ${reference.id}, and the exact reference title returned by AoA. Do not guess the title. Write the file, then finish successfully. This is a read-only AoA task; do not modify the reference task.`;
+  const { issue, run } = await dispatchTenant(state, "a", {
+    title: `M1b useful-work worker ${randomUUID()}`, description, projectId: project.id, apiTimeoutMs: 60_000, timeoutMs: 20 * 60_000,
+  });
+  state.m1bUsefulWork.issueId = issue.id;
+  state.m1bUsefulWork.runId = run?.id ?? null;
+  saveState(state);
+  const expected = { organizationId: tenant.organizationId, companyId: tenant.companyId, issueId: issue.id,
+    referenceTaskId: reference.id, referenceTitle: reference.title };
+  let verifierExit = null;
+  let verdict = null;
+  let providerEvidence = null;
+  let outputs = [];
+  if (run?.distributed_job_id && run?.distributed_attempt_id) {
+    const verifier = compose(state, ["exec", "-T", "control-plane", "node", "dist/cli/verify-e7-1-distributed-run.js", run.id,
+      "--org", tenant.organizationId, "--company", tenant.companyId, "--require-capability"], { allowFail: true });
+    verifierExit = verifier.status;
+    verdict = parseVerifierVerdict(verifier.stdout);
+    writeEvidence(state, "m1b-verifier.txt", `${verifier.stdout}${verifier.stderr}`);
+    outputs = ownerSql(state, `SELECT o.id AS "outputId", o.company_id AS "companyId", o.issue_id AS "issueId", o.provider,
+      o.external_id AS "externalId", r.organization_id AS "organizationId", r.job_id AS "jobId", r.attempt_id AS "attemptId",
+      a.attempt_number AS "attemptNumber", j.source_intent->>'issueId' AS "sourceIssueId", r.status AS "receiptStatus",
+      r.aggregate_kind AS "aggregateKind", r.source_identity AS "receiptIdentity", r.source_digest AS "receiptDigest", r.source_fence AS "receiptFence",
+      e.event_id AS "eventId", e.event_digest AS "eventDigest", e.fence_token AS "eventFence", e.lease_id AS "eventLeaseId",
+      e.event->'payload'->>'artifactId' AS "eventIdentifier", e.event->'payload'->>'kind' AS "eventKind",
+      art.id AS "artifactId", art.job_id AS "artifactJobId", art.organization_id AS "artifactOrganizationId", art.attempt AS "artifactAttempt",
+      art.status AS "artifactStatus", art.identifier AS "artifactIdentifier", art.kind AS "artifactKind", art.fence_token AS "artifactFence",
+      art.lease_id AS "artifactLeaseId", art.sha256 AS "artifactSha256", art.size_bytes::text AS "artifactSizeBytes"
+      FROM task_outputs o JOIN job_projection_receipts r ON r.target_aggregate_id = o.id AND r.projection_kind = 'output_projection'
+      JOIN jobs j ON j.id = r.job_id AND j.organization_id = r.organization_id AND j.company_id = r.company_id
+      JOIN job_attempts a ON a.id = r.attempt_id AND a.job_id = j.id AND a.company_id = r.company_id AND a.organization_id = r.organization_id
+      JOIN job_events e ON e.attempt_id = a.id AND e.job_id = j.id AND e.company_id = r.company_id AND e.organization_id = r.organization_id
+        AND e.event_type = 'artifact_prepared' AND r.source_identity = 'output:' || r.company_id::text || ':' || e.event_id::text
+      JOIN job_artifacts art ON art.id::text = o.external_id AND art.organization_id = j.organization_id AND art.job_id = j.id
+        AND art.attempt = a.attempt_number
+      WHERE o.company_id = $1 AND o.issue_id = $2 AND r.organization_id = $3 AND r.company_id = $1
+        AND r.job_id = $4 AND r.attempt_id = $5 AND art.kind = 'run_output' AND art.size_bytes BETWEEN 0 AND 65536
+      ORDER BY o.created_at LIMIT 8`, [tenant.companyId, issue.id, tenant.organizationId, run.distributed_job_id, run.distributed_attempt_id]);
+    providerEvidence = await usefulWorkProviderEvidence(state, run, tenant);
+  }
+  const candidates = [];
+  if (outputs.length === 0) candidates.push({ output: null, download: null,
+    outcome: evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict }) });
+  for (const output of outputs) {
+    let download;
+    let error;
+    try { download = await downloadUsefulWork(state, output.outputId); }
+    catch (e) { error = redactSecrets(String(e?.message ?? e), state.redact).slice(0, 1000); }
+    const outcome = evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict, output, download });
+    candidates.push({ output, download: download ? { status: download.status, contentLength: download.contentLength,
+      bytes: download.body?.length ?? null, sha256: download.body ? createHash("sha256").update(download.body).digest("hex") : null } : null, error, outcome });
+  }
+  const passed = candidates.some((candidate) => candidate.outcome.pass) && providerEvidence?.pass === true;
+  writeEvidence(state, "m1b-useful-work.json", { candidate: state.candidate, mode: state.mode, expected, run,
+    verifierExit, verdict, providerEvidence, candidates, passed });
+  if (!passed) fail("m1b-useful-work did not prove live AoA retrieval, committed output, and founder download; see m1b-useful-work.json");
+  console.log(`m1b-useful-work: run=${run.id} reference=${reference.id} committed founder download PASS`);
 }
 
 /**
@@ -1695,6 +1838,7 @@ const PHASES = {
   "cross-tenant": (args) => crossTenant(loadState(args.out), { suppressInjection: args.suppressInjection === true }),
   redaction: (args) => redaction(loadState(args.out)),
   "fault-matrix": (args) => faultMatrix(loadState(args.out)),
+  "m1b-useful-work": (args) => m1bUsefulWork(loadState(args.out)),
   collect: (args) => collect(loadState(args.out)),
   "leak-scan": (args) => leakScan(loadState(args.out)),
   teardown: (args) => teardown(loadState(args.out)),

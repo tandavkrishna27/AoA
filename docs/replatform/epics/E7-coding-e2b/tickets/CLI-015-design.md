@@ -1,11 +1,26 @@
 # CLI-015 — Unit F link 6, the judge: a verifier that counts the right things
 
-**Status:** `scoping` · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
+**Status:** implemented locally; integration testing pending. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
 link-scoped successor mapping) · **Filed:** 2026-09-21 (M0 unit 4, founder decisions D1 + D5)
 **Depends on:** `CLI-011` · **Milestone:** `M1b`
 **Owns:** [`E7-F016`](../findings.md#e7-f016)
 
 ---
+
+## Current implementation — October 6
+
+The current implementation plan extends this work to the scanner repairs while
+preserving their CLI-008 finding ownership. Lifecycle and capability evidence
+remain attempt-scoped. Secret scanning now includes sibling attempts' events and
+refuses explicitly when row, text or aggregate limits prevent a complete scan.
+The operator text describes the composed output pipeline and distinguishes
+`ok` from `capabilityProven`; `--require-capability` enforces produced output.
+Named empty/redacted/template values are excluded without suppressing arbitrary
+credential-shaped strings. Generic `sk-` text remains ambiguous, so E7-F033 is
+not claimed fully closed. Focused PostgreSQL and verifier tests passed locally.
+
+The sections below retain the historical scope discussion; its claim that the
+producer is unbuilt and its separate ruling prerequisite are superseded.
 
 ## Why this ticket exists under this id
 

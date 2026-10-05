@@ -6,7 +6,7 @@
 // has NO dependency on the Commander viewer tab model — the caller maps its own
 // tab into these props.
 import { useQuery } from "@tanstack/react-query";
-import { Brain, Globe, MessageSquare, Package } from "lucide-react";
+import { Brain, Download, Globe, MessageSquare, Package } from "lucide-react";
 import type { TaskOutput } from "@armyofagents/shared";
 import { toSafeBrowserUrl } from "@armyofagents/shared";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -178,7 +178,7 @@ export function OutputLinkCard({ output }: { output: TaskOutput }) {
   );
 }
 
-export function OutputDetailCard({ output }: { output: TaskOutput }) {
+export function OutputDetailCard({ output, downloadable = false }: { output: TaskOutput; downloadable?: boolean }) {
   const meta = [output.type.replaceAll("_", " "), output.provider, output.status]
     .filter(Boolean)
     .join(" · ");
@@ -192,8 +192,20 @@ export function OutputDetailCard({ output }: { output: TaskOutput }) {
       {output.summary ? (
         <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{output.summary}</p>
       ) : (
-        <p className="mt-3 text-sm text-muted-foreground">No preview is available for this output.</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {downloadable ? "Download this file to view the output." : "No preview is available for this output."}
+        </p>
       )}
+      {downloadable ? (
+        <a
+          href={taskOutputsApi.contentUrl(output.id)}
+          download
+          className="mt-4 inline-flex items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/60"
+        >
+          <Download className="size-4" aria-hidden />
+          Download file
+        </a>
+      ) : null}
     </div>
   );
 }
@@ -219,10 +231,16 @@ export function OutputRefTabBody({
 
   if (isLoading) return <LoadingBody />;
 
-  if (isError || !output) {
+  if (isError || !output || output.companyId !== companyId) {
     return (
       <UnavailableBody message="This output is no longer available (it may have been deleted, or you may not have access)." />
     );
+  }
+
+  // The server binds these bytes to the accepted projection. Editable output links
+  // and metadata cannot substitute another artifact or object-store location.
+  if (output.provider === "aoa_distributed_job") {
+    return <OutputDetailCard output={output} downloadable />;
   }
 
   // artifact / artifact_version → render through the artifact body.

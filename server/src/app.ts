@@ -564,7 +564,19 @@ export async function createApp(
   api.use(debriefRoutes(db));
   api.use(briefRoutes(db));
   api.use(artifactRoutes(db));
-  api.use(taskOutputRoutes(db));
+  // Lazy: flag-off boot must not import or substitute owner authority for the tenant data plane.
+  let outputContent: ReturnType<typeof import("./services/task-output-content.js").createTaskOutputContentService> | undefined;
+  api.use(taskOutputRoutes(db, opts.distributedExecutionEnabled && opts.tenantAppDb ? {
+    openContent: async (outputId, companyId) => {
+      if (!outputContent) {
+        const [{ createTaskOutputContentService }, { createStorageProviderFromConfig }, { loadConfig }] = await Promise.all([
+          import("./services/task-output-content.js"), import("./storage/provider-registry.js"), import("./config.js"),
+        ]);
+        outputContent = createTaskOutputContentService({ appDb: opts.tenantAppDb!, storage: createStorageProviderFromConfig(loadConfig()) });
+      }
+      return outputContent.openContent(outputId, companyId);
+    },
+  } : undefined));
   api.use(outputDetectionRoutes(db));
   api.use(trustScoreRoutes(db));
   api.use(transcriptionRoutes(db));

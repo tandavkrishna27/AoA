@@ -19,7 +19,10 @@ const getMemory = vi.fn();
 const getArtifact = vi.fn();
 
 vi.mock("@/api/assets", () => ({ assetsApi: { getMeta: (...a: unknown[]) => getMeta(...a) } }));
-vi.mock("@/api/task-outputs", () => ({ taskOutputsApi: { get: (...a: unknown[]) => getOutput(...a) } }));
+vi.mock("@/api/task-outputs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/task-outputs")>();
+  return { ...actual, taskOutputsApi: { ...actual.taskOutputsApi, get: (...a: unknown[]) => getOutput(...a) } };
+});
 vi.mock("@/api/memory", () => ({ memoryApi: { get: (...a: unknown[]) => getMemory(...a) } }));
 vi.mock("@/api/artifacts", () => ({ artifactsApi: { get: (...a: unknown[]) => getArtifact(...a) } }));
 
@@ -116,6 +119,38 @@ describe("AssetRefTabBody", () => {
 });
 
 describe("OutputRefTabBody branches", () => {
+  it("downloads distributed output through its authenticated output endpoint, ignoring mutable links", async () => {
+    getOutput.mockResolvedValue(output({
+      type: "artifact", provider: "aoa_distributed_job", title: "Research report",
+      externalId: "committed-artifact-id", url: "https://untrusted.example/report",
+      artifactId: "mutable-artifact-reference",
+      metadata: { objectKey: "organizations/foreign/private/report.md" },
+    }));
+    renderTab(outputTab);
+    const download = await screen.findByRole("link", { name: "Download file" });
+    expect(download).toHaveAttribute("href", "/api/task-outputs/out-1/content");
+    expect(download).toHaveAttribute("download");
+    expect(screen.getByText("Research report")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open link" })).not.toBeInTheDocument();
+    expect(getArtifact).not.toHaveBeenCalled();
+  });
+
+  it("encodes the output id in the download path without using its artifact metadata", async () => {
+    getOutput.mockResolvedValue(output({
+      id: "output/one?#", type: "artifact", provider: "aoa_distributed_job", metadata: null,
+    }));
+    renderTab(outputTab);
+    expect(await screen.findByRole("link", { name: "Download file" }))
+      .toHaveAttribute("href", "/api/task-outputs/output%2Fone%3F%23/content");
+  });
+
+  it("does not expose a download when the loaded output belongs to another company", async () => {
+    getOutput.mockResolvedValue(output({ companyId: "other-company", type: "artifact", provider: "aoa_distributed_job" }));
+    renderTab(outputTab);
+    expect(await screen.findByText(/no longer available/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Download file" })).not.toBeInTheDocument();
+  });
+
   it("artifact-version output → renders the artifact viewer via artifactId", async () => {
     getOutput.mockResolvedValue(
       output({ type: "artifact_version", artifactId: "art-1", artifactVersionId: "ver-1" }),
