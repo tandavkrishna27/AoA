@@ -91,7 +91,7 @@ function validCompose() {
         networks: ["data-net"],
       },
       minio: {
-        image: "ghcr.io/meteoritelabs/aoa-d1-minio@sha256:187391a664f95607f5d787e89442df6535ab410bbc7910d2350189183ab92246",
+        image: "ghcr.io/tandavkrishna27/aoa-d1-minio@sha256:187391a664f95607f5d787e89442df6535ab410bbc7910d2350189183ab92246",
         healthcheck: { test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live"] },
         volumes: ["d1-minio-data:/data"],
         networks: ["data-net", "control-net", "worker-net"],
@@ -155,6 +155,15 @@ const clone = (o) => structuredClone(o);
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
 
 // === Layer 1: real committed artifacts =======================================
+
+test("real compose defaults to the transferred MinIO package with the proven digest", () => {
+  const compose = parseYaml(readFileSync(composePath, "utf8"));
+  // Metadata lookup after the repository transfer resolves this same OCI index
+  // under the current owner; the former namespace returns `manifest unknown`.
+  // Keep the override and proven content identity while repairing the pull target.
+  assert.equal(compose.services.minio.image,
+    "${AOA_D1_MINIO_IMAGE:-ghcr.io/tandavkrishna27/aoa-d1-minio@sha256:187391a664f95607f5d787e89442df6535ab410bbc7910d2350189183ab92246}");
+});
 
 test("real docker-compose.d1.yml parses and satisfies every DEP-002 invariant", () => {
   const compose = parseYaml(readFileSync(composePath, "utf8"));

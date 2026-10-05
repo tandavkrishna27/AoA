@@ -15,11 +15,11 @@ and results here; no additional certificate, archive, freeze or handoff is owed.
 |---|---|---|
 | Repository compiles and builds | `pnpm -r typecheck`; `pnpm build` | Both passed locally, October 5 |
 | Existing product regressions | `pnpm test:run --maxWorkers=4` | 23,499 passed; 1,831 skipped. Skips remain unproven |
-| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). Live D1 [37347848182](https://github.com/tandavkrishna27/AoA/actions/runs/37347848182) running on `b1e963aa3` |
+| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). D1 [37347848182](https://github.com/tandavkrishna27/AoA/actions/runs/37347848182) cancelled before bring-up after confirming its old registry namespace no longer resolves; corrected run pending |
 | Worker owns distributed execution | Live `m1-spine`, including the wrong-executor control | Pending current-revision run |
 | Tenant separation and usage/budget/audit | Real-Postgres suites; spine and required fault cases | Pending current-revision run |
 | Fence, cancel, recovery and redaction | Worker suites; required D1 fault cases and negative controls | Pending current-revision run |
-| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649) failed before build: redundant unauthenticated Git fetch after checkout. Workflow repair in progress; keyed pending |
+| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649) failed before build: redundant unauthenticated Git fetch after checkout. Repaired workflow [37348247569](https://github.com/tandavkrishna27/AoA/actions/runs/37348247569) running; keyed pending |
 | Cleanup and rollback | Drain tests; actual Compose/provider cleanup observations | Pending current-revision run |
 
 The existing commands and workflows are the implementation tests. Their
@@ -29,11 +29,16 @@ certification are not required. Keep runtime checks intact and fix real failures
 Declared pending cases and platform skips must be reported as such.
 
 Local checks ran in `codex/m1-code-tests`, based on integration
-`a770c1145d4cbd049fac0f75063dfaa2c660300e`. The branch changes the D1 ACK client
-and its regression tests, plus these process docs; production source is unchanged.
+`a770c1145d4cbd049fac0f75063dfaa2c660300e`. The branch changes the D1 ACK client,
+the shipped-boot ancestry check, the transferred MinIO package namespace, and
+their regression tests, plus these process docs; production source is unchanged.
 The ACK client retries protocol-declared backpressure up to four times, retaining
 its semantic payload and idempotency key, refreshing device proofs, and respecting
 the server's ACK deadline. Production locks and timeouts are unchanged.
+The workflow ancestry fix passed 59 tests; the D1 Compose suite passed 61 tests.
+MinIO's digest remains unchanged: registry metadata resolves that digest under
+`tandavkrishna27`, while its former `meteoritelabs` namespace returns
+`manifest unknown`.
 
 The six explicitly enabled Windows Postgres suites were `job-leasing`,
 `job-fencing`, `job-events`, `job-accepted-event-seam`, `job-distributed-drain`,
