@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createMetrics } from "../metrics/metrics.js";
 import { createFakeSandboxProvider } from "./support/fake-provider.js";
@@ -6,6 +6,52 @@ import { createSupervisor } from "../supervisor/supervisor.js";
 import { collectingSink, makeHandoff, SUPERVISOR_IDENTITY } from "./support/supervisor-fixtures.js";
 
 describe("supervisor-hung-create — a create past its deadline escalates to cancel/kill + records a failed create", () => {
+  it("classifies an immediate provider create rejection without executing or retaining a run", async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = createFakeSandboxProvider();
+      const create = vi.spyOn(fake, "create").mockRejectedValue(new Error("provider refused create"));
+      const list = vi.spyOn(fake, "list");
+      const sink = collectingSink();
+      const metrics = createMetrics();
+      const supervisor = createSupervisor({
+        provider: fake,
+        identity: SUPERVISOR_IDENTITY,
+        eventSink: sink,
+        metrics,
+        createDeadlineMs: 20,
+        opDeadlineMs: 25,
+        cleanupDeadlineMs: 30,
+      });
+
+      // This settles without advancing the create timeout: it is the rejection
+      // branch, not the existing hung-create/deadline branch below.
+      await supervisor.accept(makeHandoff());
+
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(sink.events).toHaveLength(1);
+      const terminal = sink.events[0];
+      expect(terminal.eventType).toBe("terminal");
+      if (terminal.eventType === "terminal") {
+        expect(terminal.payload).toMatchObject({
+          status: "failed", exitCode: null, errorCode: "create_failed", errorMessage: null,
+        });
+      }
+      expect(fake.callCount("execute")).toBe(0);
+      expect(fake.callCount("list")).toBe(1);
+      expect(list.mock.calls[0][1].deadlineMs).toBe(25);
+      expect(fake.callCount("destroy")).toBe(0); // no resource was created to destroy
+      expect(fake.all()).toHaveLength(0);
+      expect(supervisor.activeRunCount()).toBe(0);
+      expect(vi.getTimerCount()).toBe(0); // the create deadline was cancelled, not retained
+      expect(metrics.renderPrometheus()).toContain('sandbox_op{operation="create",outcome="failed"}');
+      expect(metrics.renderPrometheus()).not.toContain('outcome="timed_out"');
+    } finally {
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    }
+  });
+
   it("fires the create deadline, tears the labeled resource down, and emits a failed terminal", async () => {
     const fake = createFakeSandboxProvider({ hangCreate: true });
     const sink = collectingSink();

@@ -32,6 +32,7 @@ import { logger } from "../middleware/logger.js";
 import { errorHandler } from "../middleware/error-handler.js";
 import * as executionTargetService from "../services/execution-targets.js";
 import { createJobPlacementService } from "../services/job-placement.js";
+import { createWorkerHelloRefreshService } from "../services/worker-hello-refresh.js";
 
 type EmbeddedPostgresInstance = { initialise(): Promise<void>; start(): Promise<void>; stop(): Promise<void> };
 type EmbeddedPostgresCtor = new (opts: Record<string, unknown>) => EmbeddedPostgresInstance;
@@ -620,6 +621,123 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
         method: "POST",
         path: "/api/worker-control/enroll",
       })).rejects.toMatchObject({ code: "target_revoked" });
+    });
+
+    it("replays the original enrollment after an authorized hello refresh using the current profile", async () => {
+      const { admin, appDb, operatorDb, mod } = guard();
+      if (!sessionModule) throw new Error("worker-session-auth module unavailable");
+      const signingKey = "test-signing-key-at-least-32-bytes";
+      let at = NOW;
+      const service = mod.createWorkerEnrollmentService({
+        appDb, operatorDb, sessionSigningKey: signingKey, now: () => at,
+      });
+      const provider = placementProviderProfile();
+      const profile = placementRegisteredProfile({ targetId: TARGET_A, scope: "organization", provider });
+      await executionTargetService.ratifyTenantExecutionTargetPlacementProfile({
+        appDb, organizationId: ORG_A, executionTargetId: TARGET_A,
+        registeredProfile: profile, providerConstraintProfile: provider,
+      });
+      const issued = await service.issueTenantCode({
+        organizationId: ORG_A, executionTargetId: TARGET_A, scope: "organization",
+        ownerUserId: null, createdByPrincipalKind: "user", createdByPrincipalId: "founder-a",
+      });
+      const keys = generateKeyPairSync("ed25519");
+      const provisionedHello = enrollmentBody(WORKER_REPLAY).hello;
+      const body = {
+        ...enrollmentBody(WORKER_REPLAY),
+        hello: {
+          ...provisionedHello, reportedCapabilities: [], policyHash: "0".repeat(64),
+          capacity: {
+            batchSlots: 0, browserSessionSlots: 0, serviceSlots: 0,
+            freeCpuMillis: 0, freeMemoryMiB: 0, freeDiskMiB: 0,
+          },
+        },
+      };
+      const first = await service.enroll({
+        code: issued.code, request: body,
+        ...deviceProof(body, keys.privateKey, keys.publicKey, "proof-refresh-enroll"),
+        method: "POST", path: "/api/worker-control/enroll",
+      });
+      const authenticator = sessionModule.createWorkerSessionAuthenticator({
+        appDb, operatorDb, sessionSigningKey: signingKey, now: () => at,
+      });
+      const refreshBody = {
+        protocolVersion: 1, correlationId: "74000000-0000-4000-8000-000000000020",
+        hello: provisionedHello,
+      };
+      const refreshBytes = rawBody(refreshBody);
+      const principal = await authenticator.authenticate({
+        authorization: `Bearer ${first.session}`, rawBody: refreshBytes,
+        proof: deviceProofFor(refreshBytes, refreshBody.correlationId, keys.privateKey,
+          keys.publicKey, "proof-refresh-authority", "/api/execution-targets/self/hello"),
+        method: "POST", path: "/api/execution-targets/self/hello",
+        correlationId: refreshBody.correlationId,
+      });
+      const refreshed = await createWorkerHelloRefreshService({
+        appDb, sessionSigningKey: signingKey, now: () => at,
+      }).refresh({
+        principal, hello: provisionedHello,
+        ratified: { capabilityCeiling: profile.capabilityCeiling, policyHash: String(profile.policyHash) },
+      });
+      expect(refreshed.outcome).toBe("refreshed");
+      if (refreshed.outcome !== "refreshed") throw new Error("hello refresh did not commit");
+      const currentHash = createHash("sha256").update(JSON.stringify(provisionedHello)).digest("hex");
+      expect(refreshed.profileHash).toBe(currentHash);
+      expect(principal.profileHash).not.toBe(currentHash);
+
+      const heartbeatBytes = rawBody({ status: "active" });
+      const authenticateHeartbeat = (session: string, proofId: string) => authenticator.authenticate({
+        authorization: `Bearer ${session}`, rawBody: heartbeatBytes,
+        proof: deviceProofFor(heartbeatBytes, refreshBody.correlationId, keys.privateKey,
+          keys.publicKey, proofId, "/api/execution-targets/heartbeat"),
+        method: "POST", path: "/api/execution-targets/heartbeat",
+        correlationId: refreshBody.correlationId,
+      });
+      await expect(authenticateHeartbeat(first.session, "proof-refresh-old-session"))
+        .rejects.toMatchObject({ code: "unauthorized" });
+
+      // A restarted daemon replays its ORIGINAL semantic hello, not the later provisioned one.
+      const retry = { ...body, correlationId: "74000000-0000-4000-8000-000000000021", nonce: "refresh-retry" };
+      const retryProof = deviceProof(retry, keys.privateKey, keys.publicKey, "proof-refresh-replay");
+      const replayInput = { code: issued.code, request: retry, ...retryProof, method: "POST", path: "/api/worker-control/enroll" };
+      const replay = await service.enroll(replayInput);
+      expect(replay.auditAction).toBe("replay");
+      expect(replay.response).toMatchObject({ workerId: WORKER_REPLAY, targetId: TARGET_A, deviceGeneration: 1 });
+      expect(sessionModule.verifyWorkerSessionToken(signingKey, replay.session, at))
+        .toMatchObject({ profileHash: currentHash, organizationId: ORG_A, generation: 1 });
+      const recovered = await authenticateHeartbeat(replay.session, "proof-refresh-recovered-session");
+      await expect(sessionModule.registerProofBoundHeartbeat({
+        appDb, operatorDb, principal: recovered, status: "active", now: at,
+      })).resolves.toBe(true);
+      const [worker] = await admin`SELECT profile_hash, profile_snapshot, device_generation FROM workers WHERE id = ${WORKER_REPLAY}`;
+      expect(worker).toMatchObject({ profile_hash: currentHash, profile_snapshot: provisionedHello, device_generation: 1 });
+      const [receipt] = await admin`SELECT semantic_result FROM worker_enrollment_codes`;
+      expect(receipt.semantic_result).not.toHaveProperty("session");
+
+      await expect(service.enroll(replayInput)).rejects.toMatchObject({ code: "unauthorized" });
+      const changed = { ...retry, hello: provisionedHello };
+      await expect(service.enroll({
+        ...replayInput, request: changed,
+        ...deviceProof(changed, keys.privateKey, keys.publicKey, "proof-refresh-changed-digest"),
+      })).rejects.toMatchObject({ code: "malformed" });
+      const unrelated = generateKeyPairSync("ed25519");
+      await expect(service.enroll({
+        ...replayInput,
+        ...deviceProof(retry, unrelated.privateKey, unrelated.publicKey, "proof-refresh-unrelated-key"),
+      })).rejects.toMatchObject({ code: "unauthorized" });
+      await expect(admin`UPDATE workers SET profile_hash = NULL WHERE id = ${WORKER_REPLAY}`)
+        .rejects.toMatchObject({ code: "23514", constraint_name: "workers_device_identity_check" });
+      await admin`UPDATE execution_targets SET device_generation = 2 WHERE id = ${TARGET_A}`;
+      await expect(service.enroll({
+        ...replayInput,
+        ...deviceProof(retry, keys.privateKey, keys.publicKey, "proof-refresh-revoked-generation"),
+      })).rejects.toMatchObject({ code: "target_revoked" });
+      await admin`UPDATE execution_targets SET device_generation = 1 WHERE id = ${TARGET_A}`;
+      at = new Date(NOW.getTime() + 10 * 60_000 + 1);
+      await expect(service.enroll({
+        ...replayInput,
+        ...deviceProof(retry, keys.privateKey, keys.publicKey, "proof-refresh-expired-code", at),
+      })).rejects.toMatchObject({ code: "unauthorized" });
     });
 
     it("fails uniformly for expired, wrong-shard, unrelated-key, and changed-digest attempts", async () => {

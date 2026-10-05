@@ -14,12 +14,12 @@ and results here; no additional certificate, archive, freeze or handoff is owed.
 | Behavior | Executable check | Current result |
 |---|---|---|
 | Repository compiles and builds | `pnpm -r typecheck`; `pnpm build` | Both passed locally, October 5 |
-| Existing product regressions | `pnpm test:run --maxWorkers=4` | 23,499 passed; 1,831 skipped. Skips remain unproven |
-| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). D1 [37348530836](https://github.com/tandavkrishna27/AoA/actions/runs/37348530836) built images but all three jobs exhausted runner disk at bring-up; cache cleanup repair in progress |
-| Worker owns distributed execution | Live `m1-spine`, including the wrong-executor control | Pending current-revision run |
+| Existing product regressions | `pnpm test:run --maxWorkers=4` | Restart-fix rerun passed: 2,444 files / 23,500 tests; 222 files / 1,832 tests skipped. First run hit one 30-second app-import hook timeout during concurrent build/typecheck; that suite passed all 7 tests alone and the complete suite then passed. Skips remain unproven |
+| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). Core D1 job passed on `e43d503c7` in [37350656076](https://github.com/tandavkrishna27/AoA/actions/runs/37350656076), after the runner disk repair |
+| Worker owns distributed execution | Live `m1-spine`, including the wrong-executor control | Passed on `e43d503c7` in [37350656076](https://github.com/tandavkrishna27/AoA/actions/runs/37350656076). Artifact confirms worker-owned events, usage/cost/audit, tenant separation and rollback; wrong-executor and missing/duplicate-usage controls refuse as intended |
 | Tenant separation and usage/budget/audit | Real-Postgres suites; spine and required fault cases | Pending current-revision run |
-| Fence, cancel, recovery and redaction | Worker suites; required D1 fault cases and negative controls | Pending current-revision run |
-| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37348247569](https://github.com/tandavkrishna27/AoA/actions/runs/37348247569) built and admitted all three application images, then exhausted runner disk during the MinIO source build; cache cleanup repair in progress. Keyed pending |
+| Fence, cancel, recovery and redaction | Worker suites; required D1 fault cases and negative controls | Enrollment replay after hello refresh: 41 real-Postgres tests passed; immediate provider rejection and cancel/create regressions: 4 passed. New early live-restart case is required and awaits its D1 run |
+| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37350662244](https://github.com/tandavkrishna27/AoA/actions/runs/37350662244) passed: journey, 14 tenant/refusal cases with valid own-tenant controls, suppressed-injection refusal and Compose cleanup. Candidate is integration `a770c1145`; it does not cover the new restart fix. Keyed pending |
 | Cleanup and rollback | Drain tests; actual Compose/provider cleanup observations | Pending current-revision run |
 
 The existing commands and workflows are the implementation tests. Their
@@ -29,16 +29,32 @@ certification are not required. Keep runtime checks intact and fix real failures
 Declared pending cases and platform skips must be reported as such.
 
 Local checks ran in `codex/m1-code-tests`, based on integration
-`a770c1145d4cbd049fac0f75063dfaa2c660300e`. The branch changes the D1 ACK client,
-the shipped-boot ancestry check, the transferred MinIO package namespace, and
-their regression tests, plus these process docs; production source is unchanged.
+`a770c1145d4cbd049fac0f75063dfaa2c660300e`. The branch repairs the D1 ACK client,
+the shipped-boot ancestry check, the transferred MinIO package namespace,
+runner disk exhaustion, and worker enrollment replay after an authorized hello
+refresh. Regression tests and these process docs accompany those changes.
 The ACK client retries protocol-declared backpressure up to four times, retaining
 its semantic payload and idempotency key, refreshing device proofs, and respecting
 the server's ACK deadline. Production locks and timeouts are unchanged.
-The workflow ancestry fix passed 59 tests; the D1 Compose suite passed 61 tests.
+The workflow suite passed 66 tests; the D1 Compose suite passed 61 tests.
 MinIO's digest remains unchanged: registry metadata resolves that digest under
 `tandavkrishna27`, while its former `meteoritelabs` namespace returns
 `manifest unknown`.
+
+The production replay fix retains the original enrollment request's semantic
+digest, device proof, identity, generation, company/organization authority and
+original expiry checks. A replay signs the worker's current authorized profile
+instead of incorrectly requiring the pre-refresh profile. It does not restore
+old capabilities or extend the code's ten-minute lifetime. Cold restart after
+that original expiry still requires operator re-enrollment; the separate late
+restart test must continue to refuse with `401` and idle.
+
+The new early restart test hard-kills a genuinely running worker with a durable
+lease candidate while its original enrollment code is live, observes that exact
+lease's startup fence and natural reaping, then requires the same worker to
+execute fresh work. Live success is not yet claimed. Secret-reader company
+isolation also passed 27 explicitly enabled Postgres tests; those are direct
+service tests, not a claim that the pending real-provider variants ran.
 
 Run diagnostics: the first keyless attempt
 [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649)

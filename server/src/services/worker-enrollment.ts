@@ -337,14 +337,16 @@ export function createWorkerEnrollmentService(input: {
             workerId: receipt.response.workerId,
             executionTargetId: receipt.response.targetId,
           });
-          const requestedProfileHash = sha256(JSON.stringify(request.hello));
+          // The semantic digest above binds the ORIGINAL enrollment hello. An authorized
+          // self-hello refresh may have changed the current profile since enrollment;
+          // replay mints against that current profile below without restoring the old one.
           if (!current || current.target.status === "disabled" || current.worker.status === "revoked" ||
               current.worker.revokedAt !== null || !current.ownerMembershipActive ||
               current.worker.organizationId !== authoritativeOrganizationId ||
               current.worker.scope !== stored.scope ||
               current.worker.deviceThumbprint !== verified.deviceThumbprint ||
               current.worker.devicePublicKey !== verified.publicKey ||
-              current.worker.profileHash !== requestedProfileHash ||
+              current.worker.profileHash === null ||
               current.target.deviceGeneration !== current.worker.deviceGeneration ||
               current.target.deviceGeneration !== receipt.response.deviceGeneration ||
               receipt.response.workerId !== request.hello.workerId ||

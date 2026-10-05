@@ -959,6 +959,14 @@ jobs:
           --run-id "${{ github.run_id }}"
           --reason "m1-fault-matrix PASSING profile on ${{ github.sha }}"
 
+      # The expired-ticket control deliberately leaves worker-b idle. Each campaign needs
+      # its own live enrollment and healthy worker; retain the passing evidence before reset.
+      - name: Reset the fault-matrix stack for the suppressed campaign
+        run: |
+          set -euo pipefail
+          docker compose -f "$COMPOSE_FILE_PATH" -f "$SPINE_OVERRIDE_PATH" down --volumes --remove-orphans
+          docker compose -f "$COMPOSE_FILE_PATH" -f "$SPINE_OVERRIDE_PATH" up -d --wait --wait-timeout 300
+
       - name: POSITIVE CONTROL — with every injection suppressed, the matrix MUST go red
         env:
           AOA_D1_LIVE: "1"
