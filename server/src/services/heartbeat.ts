@@ -169,7 +169,7 @@ import {
 } from "./run-execution-owner.js";
 import { buildCutoverSelectionEvent } from "./cutover-selection-audit.js";
 import { buildTaskRunBatchWorkload } from "./task-run-batch-workload.js";
-import { applySandboxOutputRootDirective } from "./sandbox-output-root.js";
+import { prepareDistributedTaskRunContext } from "./distributed-task-run-context.js";
 import { resolveTaskRunInstructionsBundle } from "./task-run-instructions-bundle.js";
 import { SANDBOX_INVOCATION_BINARY_ARG_INDEX } from "./task-run-sandbox-invocation.js";
 import {
@@ -237,7 +237,6 @@ import {
   deregisterRuntimeHooksForRun,
 } from "./runtime-hook-registry.js";
 import {
-  brokeredAoaMcpConfig,
   RUNTIME_HOOK_BLOCK_TIMEOUT_SEC,
   RUNTIME_HOOK_PATH,
 } from "@armyofagents/adapter-utils";
@@ -5309,8 +5308,8 @@ export function heartbeatService(
         // (OFF by default → this block stays byte-identical to pre-Unit-C). When ON, a BROKERED claude
         // run stages the `aoa` MCP config so the agent reaches mcp__aoa__*, and the SAME flag threads
         // into the run_jwt (AOA_API_KEY) mint at placement (resolveExecutionOwner below), so the config
-        // and its bearer are provisioned together or not at all. The config needs a sandbox-targeted run
-        // and a resolved control-plane base URL; buildSandboxInvocation still emits it only for
+        // and its bearer are provisioned together or not at all. This workload targets the worker's
+        // sandbox, independently of legacy acquisition; buildSandboxInvocation emits the config only for
         // claude_local, and buildTaskRunBatchWorkload folds an empty/whitespace config to absent.
         //
         // CLI-016 (founder ruling F10) — PER ORGANIZATION. The deployment flag is a kill switch,
@@ -5324,10 +5323,13 @@ export function heartbeatService(
         });
         const toolSurfaceAuthorized = toolSurfaceDecision.authorized;
         const toolSurfaceApiBaseUrl = adapterEnv.AOA_API_URL ?? process.env.AOA_API_URL ?? undefined;
-        const aoaMcpConfig =
-          toolSurfaceAuthorized && runTargetsSandbox && toolSurfaceApiBaseUrl
-            ? brokeredAoaMcpConfig({ apiBaseUrl: toolSurfaceApiBaseUrl, companyId: agent.companyId })
-            : null;
+        const distributedTaskContext = prepareDistributedTaskRunContext({
+          adapterType: agent.adapterType,
+          companyId: agent.companyId,
+          apiBaseUrl: toolSurfaceApiBaseUrl,
+          toolSurfaceAuthorized,
+          currentTaskMarkdown: context.currentTaskMarkdown,
+        });
         const canaryWorkload = canaryInstructions.ok
           ? buildTaskRunBatchWorkload({
               adapterType: agent.adapterType,
@@ -5342,19 +5344,15 @@ export function heartbeatService(
               // a keyed E2B lane) and not in the workload builder (SD-1c moves 5–6 `E7-F026`
               // staged-byte pins).
               //
-              // ★ It is a FUNCTION CALL, not an inline concatenation, because `E7-D11` makes
-              // PC-12 a condition of the ruling: this exact expression is pinned by
+              // ★ The dedicated preparation helper calls the directive, because `E7-D11` makes
+              // PC-12 a condition of the ruling: this helper-to-builder chain is pinned by
               // `cli-017-output-root-directive.test.ts`, so the append cannot be deleted
-              // silently. Both gates live inside it — `claude_local` only (`E7-D04` excludes
-              // codex) and sandbox-targeted only (`R` exists only inside a sandbox, so a
-              // non-distributed run stays byte-identical).
-              currentTaskMarkdown: applySandboxOutputRootDirective({
-                adapterType: agent.adapterType,
-                runTargetsSandbox,
-                currentTaskMarkdown: context.currentTaskMarkdown,
-              }),
+              // silently. The directive remains `claude_local` only (`E7-D04` excludes
+              // codex); this distributed workload targets its own worker sandbox, so a
+              // non-distributed run stays byte-identical.
+              currentTaskMarkdown: distributedTaskContext.currentTaskMarkdown,
               instructions: canaryInstructions.configured ? canaryInstructions.content : null,
-              aoaMcpConfig,
+              aoaMcpConfig: distributedTaskContext.aoaMcpConfig,
             })
           // ★ The `reason` here is never read: the `detail` below reports the INSTRUCTIONS
           //   failure whenever `canaryInstructions.ok` is false, so this branch exists only to

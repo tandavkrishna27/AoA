@@ -199,32 +199,36 @@ describe("CLI-017-A · PC-12 — the SD-1b directive reaches the agent", () => {
   // ──────────────────────────────────────────────────────────────────────────────────────────
   describe("PC-12 call site — the distributed caller feeds the builder THROUGH the directive", () => {
     const source = readFileSync(HEARTBEAT_SOURCE, "utf8");
+    const distributedSource = readFileSync(join(HERE, "..", "services", "distributed-task-run-context.ts"), "utf8");
 
-    it("`heartbeat.ts` imports the directive helper", () => {
-      expect(source).toContain("applySandboxOutputRootDirective");
-      expect(source).toContain('from "./sandbox-output-root.js"');
+    it("heartbeat imports the distributed preparation seam, which uses the directive helper", () => {
+      expect(source).toContain('from "./distributed-task-run-context.js"');
+      expect(distributedSource).toContain('from "./sandbox-output-root.js"');
+      expect(distributedSource).toContain("currentTaskMarkdown: applySandboxOutputRootDirective({");
     });
 
     it("the canary block's `currentTaskMarkdown` is the DIRECTIVE's output, not the raw context", () => {
       // The exact property line handed to `buildTaskRunBatchWorkload`. If someone reverts it to
       // `currentTaskMarkdown: context.currentTaskMarkdown,` this reds — which is the whole point.
-      expect(source).toContain("currentTaskMarkdown: applySandboxOutputRootDirective({");
+      expect(source).toContain("currentTaskMarkdown: distributedTaskContext.currentTaskMarkdown");
       // ...and the builder's OWN argument object is the one that got it. A file-wide
       // `toContain` would stay green if someone left the helper call dead somewhere else and
       // handed the builder the raw context, so the window is anchored on the builder call.
       const call = source.indexOf("buildTaskRunBatchWorkload({");
       expect(call).toBeGreaterThan(-1);
       const builderArgs = source.slice(call, call + 1600);
-      expect(builderArgs).toContain("currentTaskMarkdown: applySandboxOutputRootDirective({");
+      expect(builderArgs).toContain("currentTaskMarkdown: distributedTaskContext.currentTaskMarkdown");
     });
 
-    it("the call site passes BOTH gates — the adapter type and the sandbox target", () => {
-      const start = source.indexOf("currentTaskMarkdown: applySandboxOutputRootDirective({");
+    it("the distributed seam receives the adapter and task; its sandbox identity is independent of legacy acquisition", () => {
+      const start = source.indexOf("const distributedTaskContext = prepareDistributedTaskRunContext({");
       expect(start).toBeGreaterThan(-1);
       const window = source.slice(start, start + 400);
       expect(window).toContain("adapterType: agent.adapterType");
-      expect(window).toContain("runTargetsSandbox");
+      expect(window).not.toContain("runTargetsSandbox");
       expect(window).toContain("currentTaskMarkdown: context.currentTaskMarkdown");
+      expect(distributedSource).toContain("adapterType: input.adapterType");
+      expect(distributedSource).toContain("runTargetsSandbox: true");
     });
   });
 });

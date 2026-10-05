@@ -235,15 +235,15 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       return runId;
     }
 
-    async function seedReadableTask(tenant: Tenant, title: string) {
-      const projectId = randomUUID();
+    async function seedReadableTask(tenant: Tenant, title: string, options: { projectId?: string; unassigned?: boolean; status?: string } = {}) {
+      const projectId = options.projectId ?? randomUUID();
       const issueId = randomUUID();
       await db.execute(sql`INSERT INTO projects (id, company_id, name)
         VALUES (${projectId}, ${tenant.company}, 'M1b tool test')`);
       await db.execute(sql`INSERT INTO agent_projects (company_id, agent_id, project_id)
         VALUES (${tenant.company}, ${tenant.agent}, ${projectId})`);
-      await db.execute(sql`INSERT INTO issues (id, company_id, project_id, assignee_agent_id, title)
-        VALUES (${issueId}, ${tenant.company}, ${projectId}, ${tenant.agent}, ${title})`);
+      await db.execute(sql`INSERT INTO issues (id, company_id, project_id, assignee_agent_id, title, status)
+        VALUES (${issueId}, ${tenant.company}, ${projectId}, ${options.unassigned ? null : tenant.agent}, ${title}, ${options.status ?? "todo"})`);
       return issueId;
     }
 
@@ -386,6 +386,60 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = armedRollout();
       await assertUsefulControl();
       delete env[DISTRIBUTED_TOOL_SURFACE_ENABLED_ENV];
+      expect((await call(app)).status).toBe(403);
+    });
+
+    it("discovers and calls get_heartbeat_context with the real org broker context to read an unassigned reference", async () => {
+      assertSetupOk();
+      const env = armedEnv();
+      const projectId = randomUUID();
+      const title = `M1b broker reference ${randomUUID()}`;
+      const taskId = await seedReadableTask(TENANT_A, title, { projectId, unassigned: true, status: "backlog" });
+      const foreignTitle = `M1b broker foreign ${randomUUID()}`;
+      const foreignTaskId = await seedReadableTask(TENANT_B, foreignTitle, { unassigned: true, status: "backlog" });
+      const live = await seedDistributedRun(TENANT_A);
+      const app = toolApp(env, TENANT_A, live);
+      const list = await request(app).post(`/api/companies/${TENANT_A.company}/mcp`)
+        .send({ jsonrpc: "2.0", id: "discover", method: "tools/list" });
+      expect(list.status, JSON.stringify(list.body)).toBe(200);
+      expect(list.body.error).toBeUndefined();
+      expect(list.body.result.tools).toEqual(expect.arrayContaining([expect.objectContaining({ name: "get_heartbeat_context" })]));
+      expect(list.body.result.tools.some((tool: { name: string }) => tool.name === "list-tasks")).toBe(false);
+      const call = (target: ReturnType<typeof toolApp>, companyId = TENANT_A.company, referenceId = taskId) => request(target)
+        .post(`/api/companies/${companyId}/mcp`).send({ jsonrpc: "2.0", id: "reference", method: "tools/call",
+          params: { name: "get_heartbeat_context", arguments: { taskId: referenceId } } });
+      const ownControl = async () => {
+        const response = await call(app);
+        expect(response.status, JSON.stringify(response.body)).toBe(200);
+        expect(response.body.id).toBe("reference");
+        expect(response.body.result.isError).toBe(false);
+        expect(response.body.result.content).toHaveLength(1);
+        const result = JSON.parse(response.body.result.content[0].text) as { success: boolean; data: { task: { id: string; companyId: string; title: string; assigneeAgentId: string | null }; recentComments: unknown[] }; summary: string };
+        expect(result.success).toBe(true);
+        expect(result.data.task).toEqual(expect.objectContaining({ id: taskId, companyId: TENANT_A.company, title, assigneeAgentId: null, status: "backlog" }));
+        expect(result.data.recentComments).toEqual([]);
+        expect(response.body.result.content[0].text).not.toContain(foreignTitle);
+      };
+      await ownControl();
+      const foreignTask = await call(app, TENANT_A.company, foreignTaskId);
+      expect(foreignTask.status).toBe(200);
+      expect(foreignTask.body.result.isError).toBe(true);
+      expect(JSON.parse(foreignTask.body.result.content[0].text)).toMatchObject({ success: false, data: null, error: "NOT_FOUND" });
+      expect(foreignTask.body.result.content[0].text).not.toContain(foreignTitle);
+      await ownControl();
+      const disabled = await seedDistributedRun(TENANT_B);
+      const expired = await seedDistributedRun(TENANT_A, "past");
+      for (const [deniedApp, companyId] of [
+        [toolApp(env, TENANT_B, disabled), TENANT_B.company],
+        [toolApp(env, TENANT_A, expired), TENANT_A.company],
+        [app, TENANT_B.company],
+      ] as const) {
+        const denied = await call(deniedApp, companyId);
+        expect(denied.status).toBe(403);
+        expect(denied.body.result).toBeUndefined();
+        await ownControl();
+      }
+      env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = JSON.stringify({ organizations: { [TENANT_A.org]: { mode: "canary", workloads: ["*"] } } });
       expect((await call(app)).status).toBe(403);
     });
 

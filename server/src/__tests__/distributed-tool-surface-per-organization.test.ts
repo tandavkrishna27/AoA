@@ -27,6 +27,12 @@ import { createHeartbeatDistributedRolloutHook } from "../services/heartbeat-dis
 import { classifyToolSurfaceAtUse } from "../mcp/distributed-tool-surface-use.js";
 import type { JobConvertOrchestrator } from "../services/job-convert-orchestrator.js";
 import type { JobShadowComparator } from "../services/job-shadow-comparator.js";
+import { acquireExecutionContext } from "../services/acquire-execution-context.js";
+import { EnvironmentRunError } from "../services/environment-run-orchestrator.js";
+import { prepareDistributedTaskRunContext } from "../services/distributed-task-run-context.js";
+import { buildTaskRunBatchWorkload } from "../services/task-run-batch-workload.js";
+import { SANDBOX_OUTPUT_ROOT_DIRECTIVE } from "../services/sandbox-output-root.js";
+import { STAGED_AOA_MCP_CONFIG_PATH, STAGED_PROMPT_PATH } from "../services/task-run-sandbox-invocation.js";
 
 const ORG_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const ORG_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -39,6 +45,56 @@ const TWO_TENANT_ROLLOUT = JSON.stringify({
     [ORG_B]: { mode: "canary", workloads: ["*"] },
     [ORG_C]: { mode: "canary", workloads: ["*"], tools: false },
   },
+});
+
+describe("distributed task context is independent of legacy sandbox acquisition", () => {
+  const rawTask = "## Current Task\n\nRead the live reference and write result.json.";
+  const base: Parameters<typeof prepareDistributedTaskRunContext>[0] = { adapterType: "claude_local", companyId: "co-a", apiBaseUrl: "https://mcp.example/api",
+    toolSurfaceAuthorized: true, currentTaskMarkdown: rawTask };
+  function build(input: typeof base) {
+    const prepared = prepareDistributedTaskRunContext(input);
+    const built = buildTaskRunBatchWorkload({ adapterType: input.adapterType,
+      runtimeCommandSpec: { command: input.adapterType === "codex_local" ? "codex" : "claude" }, adapterConfig: {}, instructions: "Agent instructions.",
+      ...prepared });
+    if (!built.ok) throw new Error(`distributed workload refused: ${built.reason}`);
+    return { ...built, prepared };
+  }
+
+  it("stages the MCP config, argv and output directive when legacy acquisition returns sandbox:null", async () => {
+    const acquired = await acquireExecutionContext({ orchestrator: {
+      acquireForRun: async () => { throw new EnvironmentRunError("environment_not_found", "No environment selected."); },
+    } as never }, { runIdentity: { companyId: base.companyId, agentId: "agent-a", runId: "run-a", adapterType: base.adapterType },
+      environmentId: null, functionType: null, warmPreference: false, worktree: null });
+    expect(acquired.sandbox).toBeNull();
+    const built = build(base);
+    const config = built.stagedFiles.find((file) => file.path === STAGED_AOA_MCP_CONFIG_PATH);
+    expect(config).toBeDefined();
+    expect(JSON.parse(new TextDecoder().decode(config!.bytes))).toEqual({ mcpServers: { aoa: {
+      type: "http", url: "https://mcp.example/api/companies/co-a/mcp", headers: { Authorization: "Bearer ${AOA_API_KEY}" },
+    } } });
+    expect(built.workload.args[1]).toContain('--mcp-config "$3" --strict-mcp-config --allowedTools mcp__aoa');
+    expect(built.workload.args).toContain(STAGED_AOA_MCP_CONFIG_PATH);
+    const prompt = built.stagedFiles.find((file) => file.path === STAGED_PROMPT_PATH)!;
+    expect(new TextDecoder().decode(prompt.bytes)).toBe(`${rawTask}\n\n${SANDBOX_OUTPUT_ROOT_DIRECTIVE}`);
+    expect(base.currentTaskMarkdown).toBe(rawTask); // fallback receives the unmodified task.
+    expect(acquired.sandbox).toBeNull(); // preparation must not redefine legacy connector delivery.
+  });
+
+  it.each([false, true])("authorized=%s keeps output preparation but stages no MCP without both prerequisites", (authorized) => {
+    const built = build({ ...base, toolSurfaceAuthorized: authorized,
+      apiBaseUrl: authorized ? undefined : base.apiBaseUrl });
+    expect(built.prepared.aoaMcpConfig).toBeNull();
+    expect(built.stagedFiles.some((file) => file.path === STAGED_AOA_MCP_CONFIG_PATH)).toBe(false);
+    expect(built.workload.args[1]).not.toContain("--mcp-config");
+    expect(built.prepared.currentTaskMarkdown).toContain(SANDBOX_OUTPUT_ROOT_DIRECTIVE);
+  });
+
+  it("keeps codex task bytes and its argv free of Claude MCP configuration", () => {
+    const built = build({ ...base, adapterType: "codex_local" });
+    expect(built.prepared.currentTaskMarkdown).toBe(rawTask);
+    expect(built.stagedFiles.some((file) => file.path === STAGED_AOA_MCP_CONFIG_PATH)).toBe(false);
+    expect(built.workload.args[1]).not.toContain("--mcp-config");
+  });
 });
 
 describe("CLI-016 — the per-Organization `tools` field on OrganizationRolloutPolicy", () => {
@@ -213,6 +269,12 @@ describe("CLI-016 — the heartbeat dispatch seam combines the flag WITH the run
     expect(source).not.toContain("const toolSurfaceAuthorized = readDistributedToolSurfaceFlag(process.env);");
   });
 
+  it("distributed MCP preparation does not require the legacy environment's sandbox acquisition", () => {
+    // The shipped canary executes in its own worker sandbox even when legacy
+    // acquisition returned sandbox:null (authenticated/private, no pinned env).
+    expect(source).not.toMatch(/toolSurfaceAuthorized\s*&&\s*runTargetsSandbox\s*&&\s*toolSurfaceApiBaseUrl/);
+  });
+
   it("the decision reads the run's Organization through the hook, and that decision gates BOTH the config and the mint", () => {
     const at = source.indexOf("resolveDistributedToolSurface({");
     expect(at).toBeGreaterThan(0);
@@ -223,7 +285,14 @@ describe("CLI-016 — the heartbeat dispatch seam combines the flag WITH the run
     );
     expect(source).toContain("const toolSurfaceAuthorized = toolSurfaceDecision.authorized;");
     // The config and the run_jwt mint still consume the ONE value.
-    expect(source).toContain("toolSurfaceAuthorized && runTargetsSandbox && toolSurfaceApiBaseUrl");
+    expect(source).toContain("const distributedTaskContext = prepareDistributedTaskRunContext({");
+    expect(source).toContain("aoaMcpConfig: distributedTaskContext.aoaMcpConfig");
     expect(source).toMatch(/\n\s+toolSurfaceAuthorized,\n/);
+  });
+
+  it("leaves legacy connector delivery tied to the actual legacy acquisition", () => {
+    expect(source).toContain('const runTargetsSandbox = orgAcquired.sandbox?.environment.driver === "sandbox";');
+    expect(source).toContain("brokered: runTargetsSandbox");
+    expect(source).toContain("sandboxTarget: runTargetsSandbox");
   });
 });
