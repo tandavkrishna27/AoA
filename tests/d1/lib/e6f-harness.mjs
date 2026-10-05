@@ -3045,31 +3045,17 @@ import postgres from "postgres";
 ${embedParams(params)}
 const report = (value) => console.log("${RESULT_MARKER}" + JSON.stringify(value));
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+let serviceDb = null;
 try {
-  // â˜… SEED HYGIENE, and it is REQUIRED rather than tidy. The deployed worker has ONE batch slot,
-  // and a lease row can remain 'active' after its attempt has already reached a terminal state â€”
-  // measured on the live stack as {status:"active", live:true, attempt_status:"succeeded"}. The
-  // lane runs this profile FOUR times against ONE stack (the profile plus three controls), so a
-  // later run's job would never be offered and its case would red on a TIMEOUT rather than on the
-  // thing it asserts. A control that reds for the wrong reason proves nothing, which is the same
-  // failure this ticket already had to fix once.
-  //
-  // SCOPED so it can never touch live work: only leases of THIS deployed worker, and only where
-  // the attempt is ALREADY terminal. A lease on a running attempt is left exactly as it is.
-  await sql\`UPDATE leases l SET status = 'released', released_at = now(), updated_at = now()
-    FROM job_attempts a
-    WHERE a.id = l.attempt_id
-      AND l.status = 'active'
-      AND a.status IN ('succeeded', 'failed', 'cancelled')
-      AND l.worker_id IN (
-        SELECT id FROM workers WHERE execution_target_id = \${P.targetId} AND revoked_at IS NULL
-      )\`;
+  // Prior leases settle through the production lifecycle/reaper. Releasing one here would
+  // hide it from the reaper and could strand its job in running after the attempt terminated.
   // The Company secret, written through the server's OWN service so the stored material is
   // encrypted with the same per-run master key the server will decrypt it with.
   if (P.seedSecret) {
     const { createDb } = await import("@armyofagents/db");
     const { secretService } = await import("${CP_DIST}/services/secrets.js");
-    const svc = secretService(createDb(process.env.DATABASE_URL));
+    serviceDb = createDb(process.env.DATABASE_URL);
+    const svc = secretService(serviceDb);
     if (!(await svc.getByName(P.companyId, P.secretName))) {
       await svc.create(P.companyId, { name: P.secretName, provider: "local_encrypted", value: P.secretValue });
     }
@@ -3110,7 +3096,7 @@ try {
 } catch (error) {
   report({ ok: false, error: String(error && error.message ? error.message : error) });
 } finally {
-  await sql.end({ timeout: 5 });
+  await Promise.all([sql.end({ timeout: 5 }), ...(serviceDb ? [serviceDb.$client.end({ timeout: 5 })] : [])]);
 }
 `;
   // Same chokepoint scrub as `seedResolvableProviderSecretHandle`: when a caller overrides
@@ -3786,6 +3772,7 @@ try {
  */
 export function seedResolvableProviderSecretHandle({
   organizationId, companyId, jobId, handleId, secretName, value, envTarget = "ANTHROPIC_API_KEY",
+  dexec = dexecModule,
 }) {
   const params = { organizationId, companyId, jobId, handleId, secretName, value, envTarget };
   const script = `
@@ -3795,8 +3782,10 @@ const report = (value) => console.log("${RESULT_MARKER}" + JSON.stringify(value)
 const { createDb } = await import("@armyofagents/db");
 const { secretService } = await import("${CP_DIST}/services/secrets.js");
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+let serviceDb = null;
 try {
-  const svc = secretService(createDb(process.env.DATABASE_URL));
+  serviceDb = createDb(process.env.DATABASE_URL);
+  const svc = secretService(serviceDb);
   // Idempotent by NAME, like the worker-driven seed: a re-run of one case must not mint a second
   // secret with a different value and leave the handle pointing at whichever won.
   if (!(await svc.getByName(P.companyId, P.secretName))) {
@@ -3813,13 +3802,13 @@ try {
 } catch (error) {
   report({ ok: false, error: String(error && error.message ? error.message : error) });
 } finally {
-  await sql.end({ timeout: 5 });
+  await Promise.all([sql.end({ timeout: 5 }), ...(serviceDb ? [serviceDb.$client.end({ timeout: 5 })] : [])]);
 }
 `;
   // The VALUE is scrubbed from both streams at the chokepoint: a postgres or secret-service error
   // could otherwise echo it, and a syntax error in this script would make node print the embedded
   // literal to stderr.
-  return dexecModule("control-plane", script, { secrets: [value] });
+  return dexec("control-plane", script, { secrets: [value] });
 }
 
 /**

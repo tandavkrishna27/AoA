@@ -41,7 +41,8 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, realpathSync, chownSync, statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 import {
@@ -113,6 +114,7 @@ import {
   killComposeService,
   startComposeService,
   dexecModule,
+  composeBaseArgs,
 } from "./lib/e6f-harness.mjs";
 import {
   M1_SPINE_TENANTS,
@@ -455,7 +457,7 @@ function startupFenceFacts(before, after, { leaseId, jobId }) {
 }
 
 /** Read expiry metadata only: never the raw ticket, replay proof or session token. */
-function readEnrollmentLifetime({ dexec = dexecModule } = {}) {
+function readEnrollmentLifetime({ targetId = SPINE_DEPLOYED_TARGET_ID, locatorHash = null, dexec = dexecModule } = {}) {
   return dexec("control-plane", `
 import postgres from "postgres";
 const sql = postgres(process.env.DATABASE_URL, { max: 1 });
@@ -465,7 +467,9 @@ try {
     (extract(epoch from (LEAST(c.expires_at, r.expires_at) - clock_timestamp())) * 1000)::float8 AS "remainingMs",
     clock_timestamp() AS "now"
     FROM worker_enrollment_codes c JOIN worker_enrollment_code_routes r ON r.locator_hash = c.locator_hash
-    WHERE c.execution_target_id = \${${JSON.stringify(SPINE_DEPLOYED_TARGET_ID)}} AND c.consumed_at IS NOT NULL
+    WHERE c.execution_target_id = \${${JSON.stringify(targetId)}}
+      AND (\${${JSON.stringify(locatorHash)}}::text IS NULL OR c.locator_hash = \${${JSON.stringify(locatorHash)}})
+      AND (\${${JSON.stringify(locatorHash)}}::text IS NOT NULL OR c.consumed_at IS NOT NULL)
     ORDER BY c.created_at DESC LIMIT 1\`;
   console.log("__E6F_RESULT__" + JSON.stringify({ ok: Boolean(row), ...row }));
 } finally { await sql.end({ timeout: 5 }); }
@@ -501,7 +505,7 @@ try {
 }
 // restart-observation helper END
 
-// Run before the long matrix faults: the original enrollment ticket lasts ten minutes.
+// Run before the long faults. This D1 lane seeds a two-hour ticket; production issuance is ten minutes.
 test("fault-matrix: an early hard restart fences its own live persisted lease and resumes polling", { skip: SKIP, timeout: 900_000 }, () => {
   const caseId = "d1.reconcile.worker_startup_lease_probe";
   const [A] = M1_SPINE_TENANTS.enabled;
@@ -2208,7 +2212,7 @@ test("fault-matrix: cutting control-plane-to-postgres severs the stack's own dat
  * (`packages/sandbox-fake-provider/src/scripted-command.ts`) — the DEPLOYED worker's own provider
  * wire, not a harness `/invoke`. That is what makes both cases below statements about the worker.
  */
-function startWorkerDrivenRun(tenant, deployed, workloadArgs, label) {
+function startWorkerDrivenRun(tenant, deployed, workloadArgs, label, seedOverrides = {}) {
   const ids = {
     jobId: randomUUID(),
     attemptId: randomUUID(),
@@ -2217,7 +2221,7 @@ function startWorkerDrivenRun(tenant, deployed, workloadArgs, label) {
     handleId: randomUUID(),
   };
   const seeded = step(
-    seedSpineWorkerDrivenJob({ tenant, ...ids, target: deployed.target, workloadArgs }),
+    seedSpineWorkerDrivenJob({ tenant, ...ids, target: deployed.target, workloadArgs, ...seedOverrides }),
     `${label} worker-driven seed`,
   );
   assert.equal(seeded.ok, true, `${label} job seed: ${truncate(seeded)}`);
@@ -2352,10 +2356,10 @@ test("fault-matrix: the DEPLOYED worker maps a provider deadline overrun to its 
  * restart — and what was read is recorded, so a cycle that still fails can be told apart from this
  * one without a second run.
  */
-function parkRunInFlight(tenant, label, { attempts = 75, windowMs = RECONCILE_WINDOW_MS } = {}) {
-  const deployed = step(queryDeployedWorker({}), `${label} deployed worker (re-read)`);
+function parkRunInFlight(tenant, label, { attempts = 75, windowMs = RECONCILE_WINDOW_MS, seedOverrides = {} } = {}) {
+  const deployed = step(queryDeployedWorker({ targetId: seedOverrides.targetId }), `${label} deployed worker (re-read)`);
   assert.equal(deployed.ok, true, `${label}: the deployed target must be readable at seed time: ${truncate(deployed)}`);
-  const ids = startWorkerDrivenRun(tenant, deployed, [`--aoa-fake-delay=${windowMs}`], label);
+  const ids = startWorkerDrivenRun(tenant, deployed, [`--aoa-fake-delay=${windowMs}`], label, seedOverrides);
   const inFlight = waitFor(
     () => step(querySpineWorkerDriven({ jobId: ids.jobId }), `${label} in-flight probe`),
     (o) =>
@@ -2396,45 +2400,220 @@ function parkRunInFlight(tenant, label, { attempts = 75, windowMs = RECONCILE_WI
   };
 }
 
+// late-expiry fixture helper BEGIN
+/** Fresh fixture authority only: clone the lane's registered provider contract, then issue
+ * a FUTURE 60-second credential at creation. Existing targets/codes/routes are untouched. */
+function seedLateExpiryTarget({ organizationId, targetId, code, dexec = dexecModule }) {
+  const params = { organizationId, targetId, originalTargetId: SPINE_DEPLOYED_TARGET_ID, locatorHash: code.locatorHash, secretHash: code.secretHash };
+  return dexec("control-plane", `
+import postgres from "postgres";
+import { createHash } from "node:crypto";
+import { canonicalizeJsonV1 } from "@armyofagents/worker-protocol";
+const P = ${JSON.stringify(params)};
+const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+try {
+  const result = await sql.begin(async (tx) => {
+    const [original] = await tx\`SELECT registered_profile AS profile, provider_constraint_profile AS provider, capabilities
+      FROM execution_targets WHERE id = \${P.originalTargetId} AND organization_id = \${P.organizationId} AND scope = 'organization'\`;
+    if (!original || original.profile.organizationId !== P.organizationId) throw Error("missing own original target");
+    const profile = { ...original.profile, targetId: P.targetId, deviceGeneration: 1, revokedAt: null };
+    const profileHash = createHash("sha256").update(canonicalizeJsonV1(profile)).digest("hex");
+    const authorityKey = "organization:" + P.organizationId;
+    await tx\`INSERT INTO execution_targets
+      (id, organization_id, scope, target_authority_key, device_generation, slug, kind, trust_class,
+       status, capabilities, registered_profile, registered_profile_hash, provider_constraint_profile, last_seen_at)
+      VALUES (\${P.targetId}, \${P.organizationId}, 'organization', \${authorityKey}, 1, \${"late-expiry-" + P.targetId},
+        'dedicated_worker', 'dedicated_tenant', 'active', \${tx.json(original.capabilities)}, \${tx.json(profile)},
+        \${profileHash}, \${tx.json(original.provider)}, now())\`;
+    const [clock] = await tx\`SELECT clock_timestamp() AS "createdAt", clock_timestamp() + interval '60 seconds' AS "expiresAt"\`;
+    await tx\`INSERT INTO worker_enrollment_code_routes (locator_hash, candidate_organization_id, expires_at)
+      VALUES (\${P.locatorHash}, \${P.organizationId}, \${clock.expiresAt})\`;
+    await tx\`INSERT INTO worker_enrollment_codes
+      (organization_id, scope, execution_target_id, target_authority_key, locator_hash, secret_hash,
+       expires_at, created_by_principal_kind, created_by_principal_id)
+      VALUES (\${P.organizationId}, 'organization', \${P.targetId}, \${authorityKey}, \${P.locatorHash}, \${P.secretHash},
+        \${clock.expiresAt}, 'user', 'd1-late-expiry-fixture')\`;
+    return { profile, createdAt: clock.createdAt, expiresAt: clock.expiresAt, initialLifetimeMs: 60_000 };
+  });
+  console.log("__E6F_RESULT__" + JSON.stringify({ ok: true, ...result }));
+} finally { await sql.end({ timeout: 5 }); }
+`);
+}
+
+function lateExpiryPaths(id) {
+  assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  const parent = path.resolve(repoRoot, "docker", "d1", "runtime-keys");
+  mkdirSync(parent, { recursive: true });
+  assert.equal(realpathSync(parent), parent, "fixture parent must not redirect outside this D1 workspace");
+  const directory = path.resolve(parent, `late-expiry-${id}`);
+  assert.ok(directory.startsWith(parent + path.sep));
+  mkdirSync(directory, { recursive: false });
+  assert.equal(realpathSync(directory), directory);
+  return { directory, profile: path.join(directory, "profile.json"), ticket: path.join(directory, "ticket"), overlay: path.join(directory, "compose.json"), state: `/worker/late-expiry-${id}` };
+}
+
+function writeLateExpiryFiles({ paths, targetId, profile, code }) {
+  const opts = { encoding: "utf8", flag: "wx", mode: 0o600 };
+  writeFileSync(paths.profile, JSON.stringify(profile), opts);
+  const ticket = "aoa_tkt_" + Buffer.from(JSON.stringify({ v: 1, targetId, code: code.code })).toString("base64url");
+  writeFileSync(paths.ticket, ticket, opts);
+  const overlay = { services: { "worker-b": {
+    environment: { AOA_WORKER_TARGET_PROFILE_ID: `late-expiry-${targetId}`, AOA_WORKER_STATE_DIR: paths.state, AOA_WORKER_EVENT_OUTBOX_PATH: `${paths.state}/events.db` },
+    volumes: [{ type: "bind", source: paths.profile, target: "/profile.json", read_only: true }, { type: "bind", source: paths.ticket, target: "/enrollment-code", read_only: true }],
+  } } };
+  writeFileSync(paths.overlay, JSON.stringify(overlay), opts);
+}
+
+function readLateExpiryWorkerIdentity({ dexec = dexecModule } = {}) {
+  return dexec("worker-b", `console.log("__E6F_RESULT__" + JSON.stringify({ ok: true, uid: process.getuid(), gid: process.getgid() }));`);
+}
+
+/** The runner and USER node need not share a UID. Keep 0600, transferring only these
+ * two verified fixture files to the live worker identity before binding them read-only. */
+function prepareLateExpiryOwnership(paths, { uid, gid }, { spawn = spawnSync } = {}) {
+  assert.equal(process.platform, "linux", "live ownership preparation requires the Linux D1 runner");
+  assert.ok(Number.isSafeInteger(uid) && uid > 0 && Number.isSafeInteger(gid) && gid >= 0, "worker must have a non-root numeric identity");
+  const parent = path.resolve(repoRoot, "docker", "d1", "runtime-keys");
+  assert.equal(realpathSync(parent), parent);
+  assert.ok(paths.directory.startsWith(parent + path.sep), "ownership is confined to this fixture");
+  assert.equal(realpathSync(paths.directory), paths.directory);
+  const files = [paths.profile, paths.ticket];
+  for (const file of files) {
+    assert.ok(file.startsWith(paths.directory + path.sep), "ownership is confined to this fixture");
+    assert.equal(realpathSync(file), file, "fixture file must not redirect");
+  }
+  try { for (const file of files) chownSync(file, uid, gid); }
+  catch (error) {
+    if (error.code !== "EPERM" && error.code !== "EACCES") throw error;
+    const run = spawn("sudo", ["-n", "chown", "--no-dereference", "--", `${uid}:${gid}`, ...files], { encoding: "utf8", timeout: 10_000 });
+    assert.equal(run.status === 0 && !run.error, true, "private fixture ownership preparation must succeed");
+  }
+  for (const file of files) {
+    const state = statSync(file);
+    assert.equal(state.uid, uid);
+    assert.equal(state.gid, gid);
+    assert.equal(state.mode & 0o777, 0o600, "private credential permissions must remain 0600");
+  }
+  return { ok: true, uid, gid, mode: "0600" };
+}
+
+function lateExpiryDiagnostics(run, scrubValues = []) {
+  const sensitiveEnvironment = Object.entries(process.env)
+    .filter(([key]) => /secret|token|password|private.?key|enrollment.?code/i.test(key))
+    .map(([, value]) => value);
+  const secrets = [...scrubValues, ...sensitiveEnvironment].filter((value) => typeof value === "string" && value.length > 0).sort((a, b) => b.length - a.length);
+  const scrub = (text) => secrets.reduce((safe, value) => safe.split(value).join("[REDACTED]"), String(text ?? "")).slice(0, 8192);
+  return { ok: run.status === 0 && !run.error, status: run.status ?? null, error: run.error ? scrub(run.error.message) : null, stdout: scrub(run.stdout), stderr: scrub(run.stderr) };
+}
+
+/** --no-deps bounds both fixture activation and restoration to worker-b only. */
+function recreateLateExpiryWorker(overlay, { spawn = spawnSync, scrubValues = [] } = {}) {
+  const args = [...composeBaseArgs()];
+  const spine = path.resolve(repoRoot, process.env.SPINE_OVERRIDE_PATH || "docker/d1/m1-spine.override.yml");
+  const alreadyIncluded = args.some((value, index) => value === "-f" && path.resolve(repoRoot, args[index + 1]) === spine);
+  if (!alreadyIncluded) args.push("-f", spine);
+  const run = spawn("docker", [...args, ...(overlay ? ["-f", overlay] : []), "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "worker-b"], { encoding: "utf8", timeout: 90_000 });
+  return lateExpiryDiagnostics(run, scrubValues);
+}
+// late-expiry fixture helper END
+
 test("fault-matrix: an expired enrollment code and route refuse restart with 401 and idle", { skip: SKIP, timeout: 900_000 }, () => {
-  // A separate TTL refusal control, not a structural excuse for the early required case.
-  // Wait BEFORE parking live work so its lease cannot expire while awaiting the ticket boundary.
-  const expired = waitFor(
-    () => step(readEnrollmentLifetime(), "late restart enrollment lifetime"),
-    (o) => o.ok && o.codeLive === false && o.routeLive === false,
-    { attempts: 125, everyMs: 5000 },
-  );
-  assert.equal(expired.ok, true, `both original expiries must actually pass: ${truncate(expired.last)}`);
+  // An independent 60s FUTURE fixture, not the lane's two-hour original credential.
   const [A] = M1_SPINE_TENANTS.enabled;
-  const logsStart = composeServiceLogs("worker-b");
-  assert.equal(logsStart.ok, true);
-  const terminalAtStart = countIn(logsStart.text, SESSION_TERMINAL_MARKERS.message);
-  const idleAtStart = countIn(logsStart.text, SESSION_TERMINAL_MARKERS.idle);
-  const unauthorizedAtStart = countIn(logsStart.text, SESSION_TERMINAL_MARKERS.reason);
-  const terminal401AtStart = countTerminal401(logsStart.text);
-  const fenceAtStart = countIn(logsStart.text, STARTUP_RECONCILE_ARMS.fenced);
-  const killed = parkRunInFlight(A, "expired-ticket-restart");
-  assert.equal(killed.inFlight.ok && killed.leaseWasLive, true, `a real live run is required: ${truncate(killed)}`);
-  const runtimeBefore = composeServiceRuntime("worker-b");
-  const hardKilled = killComposeService("worker-b", { signal: "KILL" });
-  assert.equal(hardKilled.ok, true, "late worker must be hard killed");
-  assert.equal(startComposeService("worker-b").ok, true, "late worker must start again");
-  const cameBack = waitFor(
-    () => composeServiceRuntime("worker-b"),
-    (r) => r.ok && r.running && r.startedAt !== runtimeBefore.startedAt,
-    { attempts: 45, everyMs: 1000 },
-  );
-  assert.equal(cameBack.ok, true, "late refusal must be observed on a new container start");
-  const settled = waitFor(
-    () => composeServiceLogs("worker-b"),
-    (l) => l.ok && countIn(l.text, SESSION_TERMINAL_MARKERS.message) > terminalAtStart && countIn(l.text, SESSION_TERMINAL_MARKERS.idle) > idleAtStart && countTerminal401(l.text) > terminal401AtStart,
-    { attempts: 60, everyMs: 1000 },
-  );
-  const logsAfter = settled.last;
-  assert.equal(settled.ok, true, "an expired code and route must leave the restarted daemon session-terminal and idle");
-  assert.ok(countIn(logsAfter.text, SESSION_TERMINAL_MARKERS.reason) > unauthorizedAtStart, "the new boot must report enroll_unauthorized (HTTP 401)");
-  assert.equal(countIn(logsAfter.text, STARTUP_RECONCILE_ARMS.fenced), fenceAtStart, "expired replay must not compose dispatch or run startup reconciliation");
-  bundle.detail.expiredEnrollmentRestart = { lifetime: expired.last, liveLeaseAtKill: killed.lease, runtimeBefore, runtimeAfter: cameBack.last };
+  const targetId = randomUUID();
+  const code = newEnrollmentCode();
+  const scrubValues = [code.code, "aoa_tkt_" + Buffer.from(JSON.stringify({ v: 1, targetId, code: code.code })).toString("base64url")];
+  let activated = false;
+  let parked = null;
+  let primaryError = null;
+  const detail = bundle.detail.expiredEnrollmentRestart = { targetId, initialLifetimeMs: 60_000, injectionFired: false };
+  try {
+    const workerIdentity = step(readLateExpiryWorkerIdentity(), "late fixture live worker identity");
+    assert.equal(workerIdentity.ok, true);
+    detail.workerIdentity = { uid: workerIdentity.uid, gid: workerIdentity.gid };
+    const paths = lateExpiryPaths(targetId);
+    const seeded = step(seedLateExpiryTarget({ organizationId: A.organizationId, targetId, code }), "late fixture initial issuance");
+    assert.equal(seeded.ok, true);
+    writeLateExpiryFiles({ paths, targetId, profile: seeded.profile, code });
+    detail.privateFileOwnership = prepareLateExpiryOwnership(paths, workerIdentity);
+    const fresh = step(readEnrollmentLifetime({ targetId, locatorHash: code.locatorHash }), "late fixture future clock");
+    assert.equal(fresh.ok && fresh.codeLive && fresh.routeLive && fresh.remainingMs > 0, true, "both credentials must be future before real enrollment");
+    detail.initialLifetime = fresh;
+    activated = true; // Restore original config even if activation itself fails partway.
+    detail.activation = recreateLateExpiryWorker(paths.overlay, { scrubValues });
+    if (!detail.activation.ok) {
+      const logs = composeServiceLogs("worker-b");
+      detail.activationWorkerLogs = lateExpiryDiagnostics({ status: logs.ok ? 0 : 1, stdout: logs.text }, scrubValues);
+    }
+    assert.equal(detail.activation.ok, true, "fresh worker-b fixture must become healthy");
+    const enrolled = waitFor(
+      () => step(queryDeployedWorker({ targetId }), "late fixture real enrollment"),
+      (o) => o.ok && o.workerCount === 1 && Boolean(o.workerId),
+      { attempts: 20, everyMs: 1000 },
+    );
+    assert.equal(enrolled.ok, true, "the dedicated identity must really enroll");
+    const admitted = step(readEnrollmentLifetime({ targetId, locatorHash: code.locatorHash }), "late fixture admitted clock");
+    assert.equal(admitted.codeLive && admitted.routeLive, true, "first real enrollment must precede actual clock expiry");
+    detail.enrolledWorkerId = enrolled.last.workerId;
+    detail.admittedLifetime = admitted;
+    // Wait BEFORE parking, so the held lease cannot age out while awaiting the ticket.
+    const expired = SUPPRESS_INJECTION ? null : waitFor(
+      () => step(readEnrollmentLifetime({ targetId, locatorHash: code.locatorHash }), "late fixture expiry"),
+      (o) => o.ok && o.codeLive === false && o.routeLive === false,
+      { attempts: 35, everyMs: 2000 },
+    );
+    if (!SUPPRESS_INJECTION) assert.equal(expired.ok, true, `both fixture expiries must naturally pass: ${truncate(expired.last)}`);
+    detail.expiredLifetime = expired?.last ?? null;
+    const seedOverrides = { targetId, policyHash: seeded.profile.policyHash };
+    const killed = parked = parkRunInFlight(A, "expired-ticket-restart", { attempts: 45, seedOverrides });
+    assert.equal(killed.inFlight.ok && killed.leaseWasLive, true, `own real live run required after expiry: ${truncate(killed)}`);
+    assert.equal(killed.placement.workerId, enrolled.last.workerId);
+    detail.liveLeaseAtKill = killed.lease;
+    if (SUPPRESS_INJECTION) {
+      const completed = step(awaitSpineWorkerDrivenTerminal({ jobId: killed.ids.jobId, timeoutMs: 180_000 }), "late suppressed own workload");
+      assert.equal(completed.attemptStatus, "succeeded");
+      detail.positiveControlPassed = true;
+      return; // The required early case still records injection=false and final grading rejects it.
+    }
+    const logsStart = composeServiceLogs("worker-b");
+    assert.equal(logsStart.ok, true);
+    const runtimeBefore = composeServiceRuntime("worker-b");
+    assert.equal(runtimeBefore.ok && runtimeBefore.running, true);
+    assert.equal(killComposeService("worker-b", { signal: "KILL" }).ok, true);
+    assert.equal(startComposeService("worker-b").ok, true);
+    const cameBack = waitFor(() => composeServiceRuntime("worker-b"), (r) => r.ok && r.running && r.startedAt !== runtimeBefore.startedAt, { attempts: 45, everyMs: 1000 });
+    assert.equal(cameBack.ok, true, "refusal must be observed on a new start of this same fixture");
+    const settled = waitFor(
+      () => composeServiceLogs("worker-b"),
+      (l) => l.ok && countIn(l.text, SESSION_TERMINAL_MARKERS.message) > countIn(logsStart.text, SESSION_TERMINAL_MARKERS.message) && countIn(l.text, SESSION_TERMINAL_MARKERS.idle) > countIn(logsStart.text, SESSION_TERMINAL_MARKERS.idle) && countTerminal401(l.text) > countTerminal401(logsStart.text),
+      { attempts: 60, everyMs: 1000 },
+    );
+    assert.equal(settled.ok, true, "expired code and route must cause real HTTP 401 and idle");
+    assert.ok(countIn(settled.last.text, SESSION_TERMINAL_MARKERS.reason) > countIn(logsStart.text, SESSION_TERMINAL_MARKERS.reason));
+    assert.equal(countIn(settled.last.text, STARTUP_RECONCILE_ARMS.fenced), countIn(logsStart.text, STARTUP_RECONCILE_ARMS.fenced), "expired replay must not compose dispatch or reconcile");
+    Object.assign(detail, {
+      injectionFired: true, positiveControlPassed: true, runtimeBefore, runtimeAfter: cameBack.last, terminal401: true,
+      refusalCounts: { before: countTerminal401(logsStart.text), after: countTerminal401(settled.last.text) },
+      startupFenceCounts: { before: countIn(logsStart.text, STARTUP_RECONCILE_ARMS.fenced), after: countIn(settled.last.text, STARTUP_RECONCILE_ARMS.fenced) },
+    });
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    // Post-observation fixture restoration only. No unrelated services are restarted. The
+    // workflow retains evidence then resets the stack, which reclaims the abandoned fake resource.
+    if (parked && !SUPPRESS_INJECTION) {
+      try { detail.fixtureCancellation = step(requestCancellationInContainer({ organizationId: A.organizationId, companyId: A.companyId, jobId: parked.ids.jobId, reason: "late_expiry_fixture_cleanup" }), "late fixture cancellation"); }
+      catch { detail.fixtureCancellationFailed = true; }
+    }
+    if (activated) {
+      try {
+        detail.restored = recreateLateExpiryWorker(undefined, { scrubValues });
+        if (!primaryError) assert.equal(detail.restored.ok, true, "original worker-b config must be restored");
+      } catch (error) { detail.restoreFailed = true; if (!primaryError) throw error; }
+    }
+    detail.primaryFailure = primaryError !== null;
+  }
 });
 
 // ═══ 10. the matrix's own verdict ════════════════════════════════════════════

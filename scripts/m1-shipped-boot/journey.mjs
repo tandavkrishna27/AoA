@@ -108,7 +108,7 @@ import {
   evaluateShippedBootEvidence,
 } from "../lib/m1-shipped-boot.mjs";
 import { pinnedE2bTemplateSelector, readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
-import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory } from "../lib/m1-cleanup-evidence.mjs";
+import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory, awaitProviderInventory } from "../lib/m1-cleanup-evidence.mjs";
 import { observeE2bCleanup } from "../lib/m1-provider-cleanup.mjs";
 import { evaluateUsageCardinality, formatViolations } from "../lib/m1-spine-assertions.mjs";
 
@@ -1610,11 +1610,14 @@ async function teardown(state) {
     } catch { /* Continue with inventory and down; the verdict retains the failed stop. */ }
     try {
       const journal = readResourceIntents({ out: state.out, candidate: state.candidate });
-      inventory = collectProviderInventory({ candidate: state.candidate,
-        intents: journal.intents,
-        read: (intent, options) => readCleanupBindings(state, intent, options) });
-      inventory.violations.push(...journal.violations);
-      inventory.complete = inventory.violations.length === 0;
+      inventory = await awaitProviderInventory({ collect: ({ deadlineMs }) => {
+        const snapshot = collectProviderInventory({ candidate: state.candidate,
+          intents: journal.intents, deadlineMs,
+          read: (intent, options) => readCleanupBindings(state, intent, options) });
+        snapshot.violations.push(...journal.violations);
+        snapshot.complete = snapshot.violations.length === 0;
+        return snapshot;
+      } });
     } catch {
       inventory = { candidate: state.candidate, complete: false, resources: [], violations: ["inventory_unavailable"] };
     }
