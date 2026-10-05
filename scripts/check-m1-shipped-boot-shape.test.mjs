@@ -10,7 +10,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync, existsSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,6 +28,63 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8");
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
+
+// Exercise the workflow's actual binding commands against real, local Git
+// history. An unavailable origin reproduces checkout's credential-free state.
+function bindingFixture(t) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "aoa-candidate-binding-"));
+  assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir()) + path.sep));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  git("init", "--quiet");
+  const commit = (message) => {
+    git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+      "commit", "--quiet", "--allow-empty", "-m", message);
+    return git("rev-parse", "HEAD");
+  };
+  const ancestor = commit("candidate");
+  const integration = commit("integration");
+  const ref = "refs/remotes/origin/docs/replatform-program";
+  git("update-ref", ref, integration);
+  git("checkout", "--quiet", "--detach", ancestor);
+  git("remote", "add", "origin", path.join(root, "unavailable-origin"));
+  const bash = process.platform === "win32" && existsSync("C:/Program Files/Git/bin/bash.exe")
+    ? "C:/Program Files/Git/bin/bash.exe" : "bash";
+  const text = real();
+  const start = text.indexOf("      - name: Bind the run to the candidate");
+  const block = text.slice(start, text.indexOf("          # ★ E6-F030", start));
+  const commands = block.slice(block.indexOf("          set -euo pipefail"))
+    .split(/\r?\n/).map((line) => line.replace(/^          /, "")).join("\n");
+  return { git, commit, ancestor, integration, ref,
+    run: (candidate) => spawnSync(bash, ["--noprofile", "--norc", "-c", commands], {
+      cwd: root, encoding: "utf8", timeout: 10_000,
+      env: { ...process.env, CANDIDATE: candidate, GIT_TERMINAL_PROMPT: "0" },
+    }) };
+}
+
+test("candidate binding accepts a fetched integration ancestor without accessing origin", (t) => {
+  const fixture = bindingFixture(t);
+  const result = fixture.run(fixture.ancestor);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+});
+
+test("candidate binding rejects a commit outside the fetched integration ancestry", (t) => {
+  const fixture = bindingFixture(t);
+  const outsider = fixture.commit("outside integration");
+  const result = fixture.run(outsider);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /not an ancestor of docs\/replatform-program/);
+});
+
+test("candidate binding rejects an absent integration ref and a mismatched HEAD", (t) => {
+  const fixture = bindingFixture(t);
+  fixture.git("update-ref", "-d", fixture.ref);
+  const missing = fixture.run(fixture.ancestor);
+  assert.equal(missing.status, 1);
+  const mismatch = fixture.run(fixture.integration);
+  assert.equal(mismatch.status, 1);
+  assert.match(mismatch.stdout, /HEAD is not the candidate/);
+});
 
 test("REJECT: provider readback loses its keyed credential at teardown", () => {
   const text = real();
@@ -197,8 +256,23 @@ test("REJECT: the checkout not bound to the candidate", () => {
 });
 
 test("REJECT: the ancestry check removed (any sha, not a frozen candidate)", () => {
-  const text = mutate(real(), 'git merge-base --is-ancestor "$CANDIDATE" FETCH_HEAD', "true");
+  const text = mutate(real(), 'git merge-base --is-ancestor "$CANDIDATE" refs/remotes/origin/docs/replatform-program', "true");
   assert.ok(anyMatch(violationsOf(text), /ancestor of docs\/replatform-program/), violationsOf(text).join("\n"));
+});
+
+test("REJECT: candidate binding refetches after credential removal or uses the wrong ancestry ref", () => {
+  const ancestry = 'git merge-base --is-ancestor "$CANDIDATE" refs/remotes/origin/docs/replatform-program';
+  const refetch = mutate(real(), ancestry, 'git fetch origin docs/replatform-program\n          ' + ancestry);
+  assert.ok(anyMatch(violationsOf(refetch), /must not refetch/));
+  const wrongRef = mutate(real(), ancestry, 'git merge-base --is-ancestor "$CANDIDATE" HEAD');
+  assert.ok(anyMatch(violationsOf(wrongRef), /ancestor of docs\/replatform-program/));
+});
+
+test("REJECT: shallow history or persistent credentials in candidate checkout", () => {
+  const shallow = mutate(real(), "          fetch-depth: 0", "          fetch-depth: 1");
+  assert.ok(anyMatch(violationsOf(shallow), /must fetch full history/));
+  const credentials = mutate(real(), "          persist-credentials: false", "          persist-credentials: true");
+  assert.ok(anyMatch(violationsOf(credentials), /must remove persistent Git credentials/));
 });
 
 test("REJECT: a pulled image instead of a source build, or the admission step dropped", () => {

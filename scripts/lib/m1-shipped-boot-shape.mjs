@@ -220,8 +220,11 @@ export function evaluateShippedBootWorkflowShape(text) {
   // (3) Bound to the named candidate: validated, checked out, and an ancestor of the program branch.
   if (!src.includes("^[0-9a-f]{40}$")) v.push("the candidate must be validated as a 40-hex commit sha");
   if (!/ref:\s*\$\{\{\s*inputs\.candidate\s*\}\}/.test(src)) v.push("the checkout must be `ref: ${{ inputs.candidate }}` — the run is bound to the candidate");
-  if (!/git merge-base --is-ancestor "\$CANDIDATE"/.test(src)) v.push("the candidate must be proven an ancestor of docs/replatform-program (`git merge-base --is-ancestor \"$CANDIDATE\"`)");
+  if (!/git merge-base --is-ancestor "\$CANDIDATE" refs\/remotes\/origin\/docs\/replatform-program\b/.test(src)) v.push("the candidate must be proven an ancestor of docs/replatform-program using its fetched remote ref");
   if (!/git rev-parse HEAD\)"\s*==\s*"\$CANDIDATE"/.test(src)) v.push("the job must assert HEAD is the candidate after checkout");
+  if (!/fetch-depth:\s*0\b/.test(src)) v.push("candidate checkout must fetch full history for the integration ancestry check");
+  if (!/persist-credentials:\s*false\b/.test(src)) v.push("candidate checkout must remove persistent Git credentials");
+  if (/\bgit fetch\b/.test(src.replace(/^\s*#.*$/gm, ""))) v.push("candidate binding must not refetch after checkout removes Git credentials");
 
   // (4) Built from source at the candidate, admitted, never pulled.
   if (!/AOA_IMAGE_REVISION:\s*\$\{\{\s*inputs\.candidate\s*\}\}/.test(src)) v.push("the image build must pin `AOA_IMAGE_REVISION: ${{ inputs.candidate }}`");

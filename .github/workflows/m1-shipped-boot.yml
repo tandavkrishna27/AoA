@@ -126,8 +126,9 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(git rev-parse HEAD)" == "$CANDIDATE" ]] || { echo "::error::HEAD is not the candidate"; exit 1; }
-          git fetch --no-tags origin docs/replatform-program
-          git merge-base --is-ancestor "$CANDIDATE" FETCH_HEAD || {
+          # Full checkout already fetched the integration ref. Credentials are
+          # removed after checkout, so binding must use that local snapshot.
+          git merge-base --is-ancestor "$CANDIDATE" refs/remotes/origin/docs/replatform-program || {
             echo "::error::$CANDIDATE is not an ancestor of docs/replatform-program (not a frozen candidate)"
             exit 1
           }

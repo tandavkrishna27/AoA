@@ -15,11 +15,11 @@ and results here; no additional certificate, archive, freeze or handoff is owed.
 |---|---|---|
 | Repository compiles and builds | `pnpm -r typecheck`; `pnpm build` | Both passed locally, October 5 |
 | Existing product regressions | `pnpm test:run --maxWorkers=4` | 23,499 passed; 1,831 skipped. Skips remain unproven |
-| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK retry regression tests passed. Live D1 pending |
+| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK and adjacent regression suites passed (25 tests). Live D1 [37347848182](https://github.com/tandavkrishna27/AoA/actions/runs/37347848182) running on `b1e963aa3` |
 | Worker owns distributed execution | Live `m1-spine`, including the wrong-executor control | Pending current-revision run |
 | Tenant separation and usage/budget/audit | Real-Postgres suites; spine and required fault cases | Pending current-revision run |
 | Fence, cancel, recovery and redaction | Worker suites; required D1 fault cases and negative controls | Pending current-revision run |
-| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless run [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649) in progress on integration `a770c1145d4cbd049fac0f75063dfaa2c660300e`; keyed pending |
+| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649) failed before build: redundant unauthenticated Git fetch after checkout. Workflow repair in progress; keyed pending |
 | Cleanup and rollback | Drain tests; actual Compose/provider cleanup observations | Pending current-revision run |
 
 The existing commands and workflows are the implementation tests. Their
