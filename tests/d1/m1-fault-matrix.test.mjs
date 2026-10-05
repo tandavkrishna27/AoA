@@ -41,7 +41,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync, realpathSync } from "node:fs";
+import { mkdirSync, writeFileSync, realpathSync, chownSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
@@ -2464,10 +2464,56 @@ function writeLateExpiryFiles({ paths, targetId, profile, code }) {
   writeFileSync(paths.overlay, JSON.stringify(overlay), opts);
 }
 
+function readLateExpiryWorkerIdentity({ dexec = dexecModule } = {}) {
+  return dexec("worker-b", `console.log("__E6F_RESULT__" + JSON.stringify({ ok: true, uid: process.getuid(), gid: process.getgid() }));`);
+}
+
+/** The runner and USER node need not share a UID. Keep 0600, transferring only these
+ * two verified fixture files to the live worker identity before binding them read-only. */
+function prepareLateExpiryOwnership(paths, { uid, gid }, { spawn = spawnSync } = {}) {
+  assert.equal(process.platform, "linux", "live ownership preparation requires the Linux D1 runner");
+  assert.ok(Number.isSafeInteger(uid) && uid > 0 && Number.isSafeInteger(gid) && gid >= 0, "worker must have a non-root numeric identity");
+  const parent = path.resolve(repoRoot, "docker", "d1", "runtime-keys");
+  assert.equal(realpathSync(parent), parent);
+  assert.ok(paths.directory.startsWith(parent + path.sep), "ownership is confined to this fixture");
+  assert.equal(realpathSync(paths.directory), paths.directory);
+  const files = [paths.profile, paths.ticket];
+  for (const file of files) {
+    assert.ok(file.startsWith(paths.directory + path.sep), "ownership is confined to this fixture");
+    assert.equal(realpathSync(file), file, "fixture file must not redirect");
+  }
+  try { for (const file of files) chownSync(file, uid, gid); }
+  catch (error) {
+    if (error.code !== "EPERM" && error.code !== "EACCES") throw error;
+    const run = spawn("sudo", ["-n", "chown", "--no-dereference", "--", `${uid}:${gid}`, ...files], { encoding: "utf8", timeout: 10_000 });
+    assert.equal(run.status === 0 && !run.error, true, "private fixture ownership preparation must succeed");
+  }
+  for (const file of files) {
+    const state = statSync(file);
+    assert.equal(state.uid, uid);
+    assert.equal(state.gid, gid);
+    assert.equal(state.mode & 0o777, 0o600, "private credential permissions must remain 0600");
+  }
+  return { ok: true, uid, gid, mode: "0600" };
+}
+
+function lateExpiryDiagnostics(run, scrubValues = []) {
+  const sensitiveEnvironment = Object.entries(process.env)
+    .filter(([key]) => /secret|token|password|private.?key|enrollment.?code/i.test(key))
+    .map(([, value]) => value);
+  const secrets = [...scrubValues, ...sensitiveEnvironment].filter((value) => typeof value === "string" && value.length > 0).sort((a, b) => b.length - a.length);
+  const scrub = (text) => secrets.reduce((safe, value) => safe.split(value).join("[REDACTED]"), String(text ?? "")).slice(0, 8192);
+  return { ok: run.status === 0 && !run.error, status: run.status ?? null, error: run.error ? scrub(run.error.message) : null, stdout: scrub(run.stdout), stderr: scrub(run.stderr) };
+}
+
 /** --no-deps bounds both fixture activation and restoration to worker-b only. */
-function recreateLateExpiryWorker(overlay, { spawn = spawnSync } = {}) {
-  const run = spawn("docker", [...composeBaseArgs(), ...(overlay ? ["-f", overlay] : []), "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "worker-b"], { encoding: "utf8", timeout: 90_000 });
-  return { ok: run.status === 0 && !run.error, status: run.status, error: run.error ? String(run.error.message) : null };
+function recreateLateExpiryWorker(overlay, { spawn = spawnSync, scrubValues = [] } = {}) {
+  const args = [...composeBaseArgs()];
+  const spine = path.resolve(repoRoot, process.env.SPINE_OVERRIDE_PATH || "docker/d1/m1-spine.override.yml");
+  const alreadyIncluded = args.some((value, index) => value === "-f" && path.resolve(repoRoot, args[index + 1]) === spine);
+  if (!alreadyIncluded) args.push("-f", spine);
+  const run = spawn("docker", [...args, ...(overlay ? ["-f", overlay] : []), "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "worker-b"], { encoding: "utf8", timeout: 90_000 });
+  return lateExpiryDiagnostics(run, scrubValues);
 }
 // late-expiry fixture helper END
 
@@ -2476,20 +2522,30 @@ test("fault-matrix: an expired enrollment code and route refuse restart with 401
   const [A] = M1_SPINE_TENANTS.enabled;
   const targetId = randomUUID();
   const code = newEnrollmentCode();
+  const scrubValues = [code.code, "aoa_tkt_" + Buffer.from(JSON.stringify({ v: 1, targetId, code: code.code })).toString("base64url")];
   let activated = false;
   let parked = null;
   let primaryError = null;
   const detail = bundle.detail.expiredEnrollmentRestart = { targetId, initialLifetimeMs: 60_000, injectionFired: false };
   try {
+    const workerIdentity = step(readLateExpiryWorkerIdentity(), "late fixture live worker identity");
+    assert.equal(workerIdentity.ok, true);
+    detail.workerIdentity = { uid: workerIdentity.uid, gid: workerIdentity.gid };
     const paths = lateExpiryPaths(targetId);
     const seeded = step(seedLateExpiryTarget({ organizationId: A.organizationId, targetId, code }), "late fixture initial issuance");
     assert.equal(seeded.ok, true);
     writeLateExpiryFiles({ paths, targetId, profile: seeded.profile, code });
+    detail.privateFileOwnership = prepareLateExpiryOwnership(paths, workerIdentity);
     const fresh = step(readEnrollmentLifetime({ targetId, locatorHash: code.locatorHash }), "late fixture future clock");
     assert.equal(fresh.ok && fresh.codeLive && fresh.routeLive && fresh.remainingMs > 0, true, "both credentials must be future before real enrollment");
     detail.initialLifetime = fresh;
     activated = true; // Restore original config even if activation itself fails partway.
-    assert.equal(recreateLateExpiryWorker(paths.overlay).ok, true, "fresh worker-b fixture must become healthy");
+    detail.activation = recreateLateExpiryWorker(paths.overlay, { scrubValues });
+    if (!detail.activation.ok) {
+      const logs = composeServiceLogs("worker-b");
+      detail.activationWorkerLogs = lateExpiryDiagnostics({ status: logs.ok ? 0 : 1, stdout: logs.text }, scrubValues);
+    }
+    assert.equal(detail.activation.ok, true, "fresh worker-b fixture must become healthy");
     const enrolled = waitFor(
       () => step(queryDeployedWorker({ targetId }), "late fixture real enrollment"),
       (o) => o.ok && o.workerCount === 1 && Boolean(o.workerId),
@@ -2552,7 +2608,7 @@ test("fault-matrix: an expired enrollment code and route refuse restart with 401
     }
     if (activated) {
       try {
-        detail.restored = recreateLateExpiryWorker();
+        detail.restored = recreateLateExpiryWorker(undefined, { scrubValues });
         if (!primaryError) assert.equal(detail.restored.ok, true, "original worker-b config must be restored");
       } catch (error) { detail.restoreFailed = true; if (!primaryError) throw error; }
     }

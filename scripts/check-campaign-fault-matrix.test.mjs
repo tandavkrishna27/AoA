@@ -55,7 +55,7 @@ function lateExpiryFixtureHelpers(context = {}) {
   const source = readFileSync(path.join(repoRoot, "tests/d1/m1-fault-matrix.test.mjs"), "utf8");
   const match = source.match(/\/\/ late-expiry fixture helper BEGIN\r?\n([\s\S]*?)\/\/ late-expiry fixture helper END/);
   assert.ok(match, "the late control must use an independent short-lived fixture");
-  return runInNewContext(`${match[1]}\n({ seedLateExpiryTarget, lateExpiryPaths, writeLateExpiryFiles, recreateLateExpiryWorker })`, { path, assert, ...context });
+  return runInNewContext(`${match[1]}\n({ seedLateExpiryTarget, lateExpiryPaths, writeLateExpiryFiles, prepareLateExpiryOwnership, readLateExpiryWorkerIdentity, recreateLateExpiryWorker, lateExpiryDiagnostics })`, { path, assert, process: { env: {}, platform: "linux" }, ...context });
 }
 
 test("D1 late expiry: initial future 60s lifetime is scoped to a fresh target and never changes existing expiries", () => {
@@ -99,10 +99,13 @@ test("D1 late expiry: actual control orders real expiry before parking and alway
     const targetId = "fresh-target";
     const tenant = { organizationId: "own-org", companyId: "own-company" };
     const context = {
-      assert, SUPPRESS_INJECTION: suppressed, randomUUID: () => targetId, newEnrollmentCode: () => ({ locatorHash: "digest" }),
+      assert, Buffer, SUPPRESS_INJECTION: suppressed, randomUUID: () => targetId, newEnrollmentCode: () => ({ locatorHash: "digest", code: "inert-code" }),
       M1_SPINE_TENANTS: { enabled: [tenant] }, step: (r) => r, truncate: JSON.stringify, bundle: { detail: {} },
       lateExpiryPaths: () => ({ overlay: "isolated-overlay" }),
       seedLateExpiryTarget: () => ({ ok: true, profile: { policyHash: "own-policy" } }), writeLateExpiryFiles: () => {},
+      readLateExpiryWorkerIdentity: () => ({ ok: true, uid: 1000, gid: 1000 }),
+      prepareLateExpiryOwnership: () => { calls.push("owner-prepared"); return { ok: true, uid: 1000, gid: 1000 }; },
+      lateExpiryDiagnostics: (value) => value,
       readEnrollmentLifetime: (args) => { assert.equal(args.targetId, targetId); assert.equal(args.locatorHash, "digest"); clockRead += 1; const live = clockRead <= 2; calls.push(live ? "live-clock" : "expired-clock"); return { ok: true, codeLive: live, routeLive: live, remainingMs: live ? 50000 : -1 }; },
       recreateLateExpiryWorker: (overlay) => { calls.push(overlay ? "activate" : "restore"); return { ok: true }; },
       queryDeployedWorker: (args) => { assert.equal(args.targetId, targetId); calls.push("enrolled"); return { ok: true, workerCount: 1, workerId: "own-worker" }; },
@@ -121,7 +124,9 @@ test("D1 late expiry: actual control orders real expiry before parking and alway
     assert.equal(calls.at(-1), "restore");
     assert.equal(calls.includes("kill"), !suppressed);
     assert.equal(context.bundle.detail.expiredEnrollmentRestart.injectionFired, !suppressed);
+    assert.equal(context.bundle.detail.expiredEnrollmentRestart.workerIdentity.uid, 1000);
     assert.ok(calls.indexOf("enrolled") < calls.indexOf("park"));
+    assert.ok(calls.indexOf("owner-prepared") < calls.indexOf("activate"));
     if (!suppressed) assert.ok(calls.indexOf("expired-clock") < calls.indexOf("park"));
     else { assert.equal(calls.includes("expired-clock"), false); assert.ok(calls.includes("complete")); }
     // Even a partial activation failure restores the original configuration. A cleanup error
@@ -131,6 +136,19 @@ test("D1 late expiry: actual control orders real expiry before parking and alway
     context.recreateLateExpiryWorker = (overlay) => { calls.push(overlay ? "failed-activation" : "failed-restore"); throw overlay ? primary : Error("cleanup failure"); };
     assert.throws(() => runInNewContext(`(function () { ${callback} })()`, context), (error) => error === primary);
     assert.equal(calls.at(-1), "failed-restore");
+    // A returned Compose error retains diagnostics and the replaced fixture's logs before
+    // restoration destroys that container. Restoration failure still cannot mask activation.
+    clockRead = 0;
+    calls.length = 0;
+    context.recreateLateExpiryWorker = (overlay) => { calls.push(overlay ? "activation-result" : "restore-result"); return { ok: false, status: 1, stderr: overlay ? "fixture unhealthy" : "restore unhealthy" }; };
+    context.composeServiceLogs = () => { calls.push("failure-logs"); return { ok: true, text: "fixture error" }; };
+    assert.throws(() => runInNewContext(`(function () { ${callback} })()`, context), /fresh worker-b fixture must become healthy/);
+    const detail = context.bundle.detail.expiredEnrollmentRestart;
+    assert.equal(detail.activation.stderr, "fixture unhealthy");
+    assert.equal(detail.activationWorkerLogs.stdout, "fixture error");
+    assert.equal(detail.restored.stderr, "restore unhealthy");
+    assert.equal(detail.primaryFailure, true);
+    assert.ok(calls.indexOf("failure-logs") < calls.indexOf("restore-result"));
   }
 });
 
@@ -150,15 +168,73 @@ test("D1 late expiry: isolated paths and overlay recreate only worker-b and rest
   helpers.writeLateExpiryFiles({ paths, targetId: uuid, profile: { targetId: uuid }, code: { code: "inert-fixture-code" } });
   assert.equal(writes.length, 3);
   assert.ok(writes.every((w) => w.file.startsWith(paths.directory + path.sep) && w.options.flag === "wx"));
+  assert.ok(writes.every((w) => w.options.mode === 0o600), "credentials stay private");
   const overlay = JSON.parse(writes.find((w) => w.file === paths.overlay).value);
   assert.deepEqual(Object.keys(overlay.services), ["worker-b"]);
   assert.equal(overlay.services["worker-b"].environment.AOA_WORKER_STATE_DIR, `/worker/late-expiry-${uuid}`);
   assert.equal(overlay.services["worker-b"].environment.AOA_WORKER_EVENT_OUTBOX_PATH, `/worker/late-expiry-${uuid}/events.db`);
   helpers.recreateLateExpiryWorker(paths.overlay);
   helpers.recreateLateExpiryWorker();
-  assert.deepEqual(Array.from(calls[0]), ["compose", "-p", "own-project", "-f", "original.yml", "-f", paths.overlay, "up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "worker-b"]);
+  const spine = path.join(repoRoot, "docker", "d1", "m1-spine.override.yml");
+  const base = ["compose", "-p", "own-project", "-f", "original.yml", "-f", spine];
+  const up = ["up", "-d", "--no-deps", "--force-recreate", "--wait", "--wait-timeout", "60", "worker-b"];
+  assert.deepEqual(Array.from(calls[0]), [...base, "-f", paths.overlay, ...up]);
+  assert.deepEqual(Array.from(calls[1]), [...base, ...up], "restoration must retain the networked spine host and its own original target");
   assert.equal(calls[1].includes(paths.overlay), false);
   assert.ok(calls.every((args) => args.at(-1) === "worker-b" && args.includes("--no-deps")));
+});
+
+test("D1 late expiry: runtime identity owns only the private profile and ticket before activation", () => {
+  const calls = [];
+  const uuid = "11111111-1111-4111-8111-111111111111";
+  const helpers = lateExpiryFixtureHelpers({
+    repoRoot, mkdirSync: () => {}, realpathSync: (p) => p,
+    dexecModule: (service, script) => { assert.equal(service, "worker-b"); assert.match(script, /process\.getuid\(\)/); assert.match(script, /process\.getgid\(\)/); return { result: { ok: true, uid: 1000, gid: 1000 } }; },
+    chownSync: (file, uid, gid) => { calls.push([file, uid, gid]); const error = Error("host owner differs"); error.code = "EPERM"; throw error; },
+    statSync: () => ({ uid: 1000, gid: 1000, mode: 0o100600 }),
+    spawnSync: (command, args) => { calls.push([command, ...args]); return { status: 0 }; },
+  });
+  const paths = helpers.lateExpiryPaths(uuid);
+  const identity = helpers.readLateExpiryWorkerIdentity().result;
+  const result = helpers.prepareLateExpiryOwnership(paths, identity);
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [[paths.profile, 1000, 1000], ["sudo", "-n", "chown", "--no-dereference", "--", "1000:1000", paths.profile, paths.ticket]]);
+  assert.equal(calls.flat().includes(paths.overlay), false, "host-only overlay is never transferred");
+  assert.throws(() => helpers.prepareLateExpiryOwnership(paths, { uid: 0, gid: 0 }), /non-root/);
+  assert.throws(() => helpers.prepareLateExpiryOwnership({ ...paths, ticket: path.resolve(repoRoot, "outside") }, identity), /fixture/);
+});
+
+test("D1 late expiry: ownership errors stop activation, and a same-identity owner needs no privilege helper", () => {
+  const fixture = { directory: path.join(repoRoot, "docker/d1/runtime-keys/late-expiry-owned"), profile: path.join(repoRoot, "docker/d1/runtime-keys/late-expiry-owned/profile.json"), ticket: path.join(repoRoot, "docker/d1/runtime-keys/late-expiry-owned/ticket") };
+  const identity = { uid: 1000, gid: 1000 };
+  const calls = [];
+  const context = { repoRoot, realpathSync: (p) => p, chownSync: (file, uid, gid) => { calls.push([file, uid, gid]); }, statSync: () => ({ ...identity, mode: 0o100600 }), spawnSync: () => { throw Error("must not invoke sudo for a matching owner"); } };
+  const helpers = lateExpiryFixtureHelpers(context);
+  assert.equal(helpers.prepareLateExpiryOwnership(fixture, identity).ok, true);
+  assert.deepEqual(calls, [[fixture.profile, 1000, 1000], [fixture.ticket, 1000, 1000]]);
+  assert.throws(() => lateExpiryFixtureHelpers({ ...context, statSync: () => ({ ...identity, mode: 0o100644 }) }).prepareLateExpiryOwnership(fixture, identity), /0600/);
+  assert.throws(() => lateExpiryFixtureHelpers({ ...context, statSync: () => ({ uid: 1001, gid: 1000, mode: 0o100600 }) }).prepareLateExpiryOwnership(fixture, identity));
+  const denied = () => { const error = Error("denied"); error.code = "EPERM"; throw error; };
+  assert.throws(() => lateExpiryFixtureHelpers({ ...context, chownSync: denied, spawnSync: () => ({ status: 1 }) }).prepareLateExpiryOwnership(fixture, identity), /ownership preparation must succeed/);
+  assert.throws(() => lateExpiryFixtureHelpers({ ...context, realpathSync: (p) => p === fixture.ticket ? path.join(repoRoot, "outside") : p }).prepareLateExpiryOwnership(fixture, identity), /must not redirect/);
+});
+
+test("D1 late expiry: activation failures retain bounded scrubbed diagnostics and configured override is not duplicated", () => {
+  let args;
+  const secret = "inert-master-secret";
+  const helpers = lateExpiryFixtureHelpers({
+    repoRoot, process: { env: { SPINE_OVERRIDE_PATH: "docker/d1/m1-spine.override.yml", AOA_D1_SPINE_SECRETS_MASTER_KEY: secret }, platform: "linux" },
+    composeBaseArgs: () => ["compose", "-f", "base.yml", "-f", path.join(repoRoot, "docker/d1/m1-spine.override.yml")],
+    spawnSync: (_, argv) => { args = argv; return { status: 1, stderr: `EACCES /profile.json ${secret} fixture-code aoa_tkt_example`, stdout: "x".repeat(20000), error: Error(`denied ${secret}`) }; },
+  });
+  const result = helpers.recreateLateExpiryWorker("fixture.json", { scrubValues: ["fixture-code", "aoa_tkt_example"] });
+  assert.equal(result.ok, false);
+  assert.equal(args.filter((arg) => arg === path.join(repoRoot, "docker/d1/m1-spine.override.yml")).length, 1);
+  assert.match(result.stderr, /EACCES \/profile\.json/);
+  assert.equal(JSON.stringify(result).includes(secret), false);
+  assert.equal(JSON.stringify(result).includes("fixture-code"), false);
+  assert.equal(JSON.stringify(result).includes("aoa_tkt_example"), false);
+  assert.ok(result.stdout.length <= 8192);
 });
 
 test("D1 restart: container probes render valid JavaScript and never mutate lease authority", () => {
