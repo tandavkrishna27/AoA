@@ -982,33 +982,54 @@ async function pollOnce(w) {
 
 async function ackOnce(w, offer) {
   const url = P.ackPrefix + offer.leaseId + P.ackSuffix;
-  const body = {
-    protocolVersion: 1,
-    correlationId: randomUUID(),
-    issuedAt: new Date().toISOString(),
-    nonce: randomBytes(16).toString("base64url"),
-    audience: "worker_run",
-    idempotencyKey: randomUUID(),
-    body: {
+  // A lock-timeout 503 is retryable backpressure. Replay the SAME semantic ACK
+  // with fresh single-use proof/nonce, bounded by the server's offered deadline.
+  const idempotencyKey = randomUUID();
+  const ackedAt = new Date().toISOString();
+  const deadline = Date.parse(offer.ackDeadline);
+  if (!Number.isFinite(deadline) || deadline <= Date.now()) {
+    throw new Error("E6F ACK requires an unexpired offered ackDeadline");
+  }
+  let last = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (Date.now() >= deadline) return last;
+    const body = {
       protocolVersion: 1,
-      workerId: w.workerId,
-      jobId: offer.jobId,
-      attempt: offer.attempt,
-      leaseId: offer.leaseId,
-      fenceToken: offer.fenceToken,
-      ackedAt: new Date().toISOString(),
-    },
-  };
-  const bodyString = JSON.stringify(body);
-  const headers = deviceProofHeaders({
-    method: "POST", url, bodyString, correlationId: body.correlationId,
-    privateKeyPem: w.privateKeyPem, publicKeyDer: w.publicKeyDer,
-  });
-  headers["content-type"] = "application/json";
-  headers["authorization"] = "Bearer " + w.session;
-  const res = await fetch(url, { method: "POST", headers, body: bodyString });
-  const text = await res.text();
-  return { status: res.status, body: safeJson(text) };
+      correlationId: randomUUID(),
+      issuedAt: new Date().toISOString(),
+      nonce: randomBytes(16).toString("base64url"),
+      audience: "worker_run",
+      idempotencyKey,
+      body: {
+        protocolVersion: 1,
+        workerId: w.workerId,
+        jobId: offer.jobId,
+        attempt: offer.attempt,
+        leaseId: offer.leaseId,
+        fenceToken: offer.fenceToken,
+        ackedAt,
+      },
+    };
+    const bodyString = JSON.stringify(body);
+    const headers = deviceProofHeaders({
+      method: "POST", url, bodyString, correlationId: body.correlationId,
+      privateKeyPem: w.privateKeyPem, publicKeyDer: w.publicKeyDer,
+    });
+    headers["content-type"] = "application/json";
+    headers["authorization"] = "Bearer " + w.session;
+    const res = await fetch(url, { method: "POST", headers, body: bodyString,
+      signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, deadline - Date.now()))) });
+    const text = await res.text();
+    last = { status: res.status, body: safeJson(text) };
+    const retryable = (last.status === 503 && last.body?.code === "internal_unavailable")
+      || (last.status === 429 && last.body?.code === "throttled");
+    const retryAfterMs = last.body?.retryAfterMs;
+    if (!retryable || attempt === 3 || !Number.isSafeInteger(retryAfterMs) || retryAfterMs < 0) return last;
+    const delay = Math.max(1, retryAfterMs);
+    if (delay >= deadline - Date.now()) return last;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  return last;
 }
 
 function offerOf(pollRes) {
@@ -1016,6 +1037,7 @@ function offerOf(pollRes) {
     const o = pollRes.body.body;
     return {
       leaseId: o.leaseId,
+      ackDeadline: o.ackDeadline,
       fenceToken: o.fenceToken,
       workerId: o.workerId,
       jobId: o.job && o.job.jobId,
@@ -1161,33 +1183,54 @@ async function pollOnce(spec) {
 
 async function ackOnce(spec, offer) {
   const url = spec.ackPrefix + offer.leaseId + (spec.ackSuffix || "/ack");
-  const body = {
-    protocolVersion: 1,
-    correlationId: randomUUID(),
-    issuedAt: new Date().toISOString(),
-    nonce: randomBytes(16).toString("base64url"),
-    audience: "worker_run",
-    idempotencyKey: randomUUID(),
-    body: {
+  // Match the single-replica race: idempotent ACK retries retain the semantic
+  // payload and respect the offered deadline while refreshing device proofs.
+  const idempotencyKey = randomUUID();
+  const ackedAt = new Date().toISOString();
+  const deadline = Date.parse(offer.ackDeadline);
+  if (!Number.isFinite(deadline) || deadline <= Date.now()) {
+    throw new Error("E6F ACK requires an unexpired offered ackDeadline");
+  }
+  let last = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (Date.now() >= deadline) return last;
+    const body = {
       protocolVersion: 1,
-      workerId: spec.workerId,
-      jobId: offer.jobId,
-      attempt: offer.attempt,
-      leaseId: offer.leaseId,
-      fenceToken: offer.fenceToken,
-      ackedAt: new Date().toISOString(),
-    },
-  };
-  const bodyString = JSON.stringify(body);
-  const headers = deviceProofHeaders({
-    method: "POST", url, bodyString, correlationId: body.correlationId,
-    privateKeyPem: spec.privateKeyPem, publicKeyDer: spec.publicKeyDer,
-  });
-  headers["content-type"] = "application/json";
-  headers["authorization"] = "Bearer " + spec.session;
-  const res = await fetch(url, { method: "POST", headers, body: bodyString });
-  const text = await res.text();
-  return { status: res.status, body: safeJson(text) };
+      correlationId: randomUUID(),
+      issuedAt: new Date().toISOString(),
+      nonce: randomBytes(16).toString("base64url"),
+      audience: "worker_run",
+      idempotencyKey,
+      body: {
+        protocolVersion: 1,
+        workerId: spec.workerId,
+        jobId: offer.jobId,
+        attempt: offer.attempt,
+        leaseId: offer.leaseId,
+        fenceToken: offer.fenceToken,
+        ackedAt,
+      },
+    };
+    const bodyString = JSON.stringify(body);
+    const headers = deviceProofHeaders({
+      method: "POST", url, bodyString, correlationId: body.correlationId,
+      privateKeyPem: spec.privateKeyPem, publicKeyDer: spec.publicKeyDer,
+    });
+    headers["content-type"] = "application/json";
+    headers["authorization"] = "Bearer " + spec.session;
+    const res = await fetch(url, { method: "POST", headers, body: bodyString,
+      signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, deadline - Date.now()))) });
+    const text = await res.text();
+    last = { status: res.status, body: safeJson(text) };
+    const retryable = (last.status === 503 && last.body?.code === "internal_unavailable")
+      || (last.status === 429 && last.body?.code === "throttled");
+    const retryAfterMs = last.body?.retryAfterMs;
+    if (!retryable || attempt === 3 || !Number.isSafeInteger(retryAfterMs) || retryAfterMs < 0) return last;
+    const delay = Math.max(1, retryAfterMs);
+    if (delay >= deadline - Date.now()) return last;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  return last;
 }
 
 function offerOf(pollRes) {
@@ -1195,6 +1238,7 @@ function offerOf(pollRes) {
     const o = pollRes.body.body;
     return {
       leaseId: o.leaseId,
+      ackDeadline: o.ackDeadline,
       fenceToken: o.fenceToken,
       workerId: o.workerId,
       jobId: o.job && o.job.jobId,

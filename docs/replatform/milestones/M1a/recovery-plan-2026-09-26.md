@@ -1,10 +1,75 @@
-# M1a closure recovery execution plan
+# M1a direct code-and-test checklist
 
-**Date (UTC):** `2026-09-26`
+**Updated:** `2026-10-05`
 **Integration branch:** `docs/replatform-program`
-**Status:** execution in progress; not a candidate freeze, QA result or handoff
+**Status:** implementation and testing in progress
 
-## Authority and boundaries
+## Current acceptance
+
+The [October 5 founder amendment](../../test-gates.md#m1-code-and-test-acceptance--founder-amendment-2026-10-05)
+replaces the former certification process for M1a and M1b. Complete M1a with
+working code and meaningful tests, then proceed to M1b. Record the tested SHA
+and results here; no additional certificate, archive, freeze or handoff is owed.
+
+| Behavior | Executable check | Current result |
+|---|---|---|
+| Repository compiles and builds | `pnpm -r typecheck`; `pnpm build` | Both passed locally, October 5 |
+| Existing product regressions | `pnpm test:run --maxWorkers=4` | 23,499 passed; 1,831 skipped. Skips remain unproven |
+| Concurrent leasing and ACK | Lease integration tests; live D1 lease races | Six real-Postgres suites passed (113 tests); ACK retry regression tests passed. Live D1 pending |
+| Worker owns distributed execution | Live `m1-spine`, including the wrong-executor control | Pending current-revision run |
+| Tenant separation and usage/budget/audit | Real-Postgres suites; spine and required fault cases | Pending current-revision run |
+| Fence, cancel, recovery and redaction | Worker suites; required D1 fault cases and negative controls | Pending current-revision run |
+| Source-built boot and real E2B mechanism | Existing shipped-boot keyless, then named keyed test on the tested SHA | Keyless run [37347607649](https://github.com/tandavkrishna27/AoA/actions/runs/37347607649) in progress on integration `a770c1145d4cbd049fac0f75063dfaa2c660300e`; keyed pending |
+| Cleanup and rollback | Drain tests; actual Compose/provider cleanup observations | Pending current-revision run |
+
+The existing commands and workflows are the implementation tests. Their
+test-root image-integrity checks and ordinary retained diagnostics suffice for
+this internal milestone; separate production-root approval and long-term archive
+certification are not required. Keep runtime checks intact and fix real failures.
+Declared pending cases and platform skips must be reported as such.
+
+Local checks ran in `codex/m1-code-tests`, based on integration
+`a770c1145d4cbd049fac0f75063dfaa2c660300e`. The branch changes the D1 ACK client
+and its regression tests, plus these process docs; production source is unchanged.
+The ACK client retries protocol-declared backpressure up to four times, retaining
+its semantic payload and idempotency key, refreshing device proofs, and respecting
+the server's ACK deadline. Production locks and timeouts are unchanged.
+
+The six explicitly enabled Windows Postgres suites were `job-leasing`,
+`job-fencing`, `job-events`, `job-accepted-event-seam`, `job-distributed-drain`,
+and `m1-cleanup-sql` (`AOA_RUN_WIN_INTEGRATION=1`, two workers).
+The shipped-boot workflow requires an integration-branch ancestor, so its run
+uses the integration revision named above. D1 must separately exercise the new
+ACK test client on the feature revision; these are distinct tested revisions.
+
+```sh
+pnpm -r typecheck
+pnpm test:run
+pnpm build
+gh workflow run d1-merge-train.yml --ref <tested-ref> -f lanes=all -f campaign=foundation
+gh workflow run m1-shipped-boot.yml --ref <tested-ref> -f candidate=<tested-sha> -f mode=keyless
+```
+
+Use the existing named real-E2B mechanism test and its template configuration
+after the keyless boot succeeds. Inspect each failure before another attempt.
+M1a completion means the required functional checks above passed at the recorded
+revision. The historical a2/a23 `fail` records remain accurate under their old
+criteria and are not edited or relabelled.
+
+## Next: M1b
+
+After M1a passes, finish CLI-018 founder access to produced bytes, CLI-015's
+verifier, and the remaining output/tool acceptance tests. Reuse the output,
+usage, audit and artifact-export implementations already present. M1b completes
+through tested useful behavior under the same founder amendment, without an
+additional certification process.
+
+## Historical September 26 recovery instructions
+
+The sections below preserve the former sequence for context. Their separate
+freeze, certification and handoff prerequisites were superseded on October 5.
+
+### Former authority and boundaries
 
 Execute the approved [M1 plan](../../qa/2026-09-21-m1-execution-plan.md),
 [recovery procedure](../../epic-regrooming/qa-handoff-recovery.md), and E5-D09.

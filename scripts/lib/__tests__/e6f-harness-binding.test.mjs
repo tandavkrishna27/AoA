@@ -20,6 +20,8 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import * as crypto from "node:crypto";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -104,3 +106,122 @@ test("the harness has NO remaining hardcoded compose-file argv", async () => {
   assert.equal(source.includes('dexecModule("test-runner"'), false,
     "an HTTP client still hardcodes the test-runner service instead of HTTP_SERVICE");
 });
+
+// Execute the ACK client emitted into each Docker runner. Only the external HTTP
+// boundary and clock are replaced; request construction and Ed25519 signing run.
+function ackClient(runner, replies, { remainingMs = 10_000 } = {}) {
+  const source = readFileSync(harness, "utf8");
+  const runnerSource = source.slice(source.indexOf(`export function ${runner}(`));
+  const ackSource = runnerSource.slice(runnerSource.indexOf("async function ackOnce("),
+    runnerSource.indexOf("const isNoWork ="));
+  const snippet = source.slice(source.indexOf("const DEVICE_PROOF_SNIPPET = `") +
+    "const DEVICE_PROOF_SNIPPET = `".length, source.indexOf("`;", source.indexOf("const DEVICE_PROOF_SNIPPET = `")));
+  const signer = new Function("RESULT_MARKER", `return \`${snippet}\`;`)("unused")
+    .replace(/^import .*;\r?\n/m, "");
+  let clock = Date.parse("2026-10-05T00:00:00Z");
+  const requests = [];
+  const sleeps = [];
+  const key = crypto.generateKeyPairSync("ed25519");
+  const worker = {
+    workerId: "00000000-0000-4000-8000-000000000001", session: "test-session",
+    privateKeyPem: key.privateKey.export({ type: "pkcs8", format: "pem" }),
+    publicKeyDer: key.publicKey.export({ type: "spki", format: "der" }).toString("base64url"),
+    ackPrefix: "http://control-plane/api/worker-control/leases/", ackSuffix: "/ack",
+  };
+  const offer = { leaseId: "00000000-0000-4000-8000-000000000002", jobId: "job",
+    attempt: 1, fenceToken: "fence", ackDeadline: new Date(clock + remainingMs).toISOString() };
+  const Clock = class extends Date {
+    constructor(...args) { super(...(args.length ? args : [clock])); }
+    static now() { return clock; }
+  };
+  const send = async (url, options) => {
+    requests.push({ url, ...options });
+    const reply = replies[Math.min(requests.length - 1, replies.length - 1)];
+    return { status: reply.status, text: async () => JSON.stringify(reply.body) };
+  };
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+  const invoke = new AsyncFunction("P", "createHash", "createPrivateKey", "edSign", "randomUUID",
+    "randomBytes", "Buffer", "URL", "Date", "fetch", "setTimeout", "worker", "offer",
+    `${signer}\n${ackSource}\nreturn ackOnce(worker, offerOf({ status: 200,
+      body: { outcome: "offer", body: { ...offer, job: { jobId: offer.jobId, attempt: offer.attempt } } } }));`);
+  return { requests, sleeps, offer, key, run: () => invoke(worker, crypto.createHash, crypto.createPrivateKey,
+    crypto.sign, crypto.randomUUID, crypto.randomBytes, Buffer, URL, Clock, send,
+    (done, ms) => { sleeps.push(ms); clock += ms; done(); }, worker, offer) };
+}
+
+const unavailable = { status: 503, body: { code: "internal_unavailable", retryAfterMs: 1_000 } };
+const acknowledged = { status: 200, body: { outcome: "acknowledged" } };
+
+for (const runner of ["runLeaseRace", "runReplicaRace"]) {
+  test(`${runner}: a transient ACK retries the same operation with fresh signed proof`, async () => {
+    const client = ackClient(runner, [unavailable, acknowledged]);
+    assert.equal((await client.run()).status, 200);
+    assert.equal(client.requests.length, 2);
+    assert.deepEqual(client.sleeps, [1_000]);
+    const [first, second] = client.requests.map((r) => JSON.parse(r.body));
+    assert.equal(first.idempotencyKey, second.idempotencyKey);
+    assert.deepEqual(first.body, second.body);
+    assert.notEqual(first.nonce, second.nonce);
+    assert.notEqual(first.correlationId, second.correlationId);
+    assert.notEqual(client.requests[0].headers["aoa-device-proof-id"],
+      client.requests[1].headers["aoa-device-proof-id"]);
+    for (const request of client.requests) {
+      const headers = request.headers;
+      const canonical = ["AOA-DEVICE-PROOF-V1", "POST", new URL(request.url).pathname,
+        crypto.createHash("sha256").update(request.body).digest("hex"),
+        headers["aoa-device-request-id"], headers["aoa-device-issued-at"],
+        headers["aoa-device-proof-id"]].join("\n");
+      assert.equal(crypto.verify(null, Buffer.from(canonical), client.key.publicKey,
+        Buffer.from(headers["aoa-device-signature"], "base64url")), true);
+    }
+  });
+
+  test(`${runner}: ACK backpressure exhausts a bounded number of attempts`, async () => {
+    const client = ackClient(runner, [unavailable]);
+    assert.equal((await client.run()).status, 503);
+    assert.equal(client.requests.length, 4);
+    assert.deepEqual(client.sleeps, [1_000, 1_000, 1_000]);
+  });
+
+  test(`${runner}: ACK never sleeps past its offered deadline or sends an expired retry`, async () => {
+    const client = ackClient(runner, [unavailable, acknowledged], { remainingMs: 500 });
+    assert.equal((await client.run()).status, 503);
+    assert.equal(client.requests.length, 1);
+    assert.deepEqual(client.sleeps, []);
+  });
+
+  test(`${runner}: unauthorized, stale fence and unknown failures are never retried`, async () => {
+    for (const [status, code] of [[401, "unauthorized"], [409, "stale_fence"], [503, "unknown"]]) {
+      const client = ackClient(runner, [{ status, body: { code, retryAfterMs: 1 } }, acknowledged]);
+      assert.equal((await client.run()).status, status);
+      assert.equal(client.requests.length, 1);
+      assert.deepEqual(client.sleeps, []);
+    }
+  });
+
+  test(`${runner}: throttled ACK retries and a zero hint cannot spin without waiting`, async () => {
+    const client = ackClient(runner, [{ status: 429, body: { code: "throttled", retryAfterMs: 0 } }, acknowledged]);
+    assert.equal((await client.run()).status, 200);
+    assert.equal(client.requests.length, 2);
+    assert.deepEqual(client.sleeps, [1]);
+  });
+
+  test(`${runner}: an absent or expired ACK deadline sends no request`, async () => {
+    for (const ackDeadline of [undefined, "invalid", "2026-10-04T00:00:00Z"]) {
+      const client = ackClient(runner, [acknowledged]);
+      client.offer.ackDeadline = ackDeadline;
+      await assert.rejects(client.run(), /unexpired offered ackDeadline/);
+      assert.equal(client.requests.length, 0);
+    }
+  });
+
+  test(`${runner}: malformed retry hints never trigger another ACK`, async () => {
+    for (const retryAfterMs of [undefined, null, -1, 0.5, "1000", 30_000]) {
+      const client = ackClient(runner, [{ status: 503,
+        body: { code: "internal_unavailable", retryAfterMs } }, acknowledged]);
+      assert.equal((await client.run()).status, 503);
+      assert.equal(client.requests.length, 1);
+      assert.deepEqual(client.sleeps, []);
+    }
+  });
+}

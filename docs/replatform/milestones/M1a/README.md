@@ -1,5 +1,11 @@
 # M1a — working documents (not records)
 
+**Current work, 2026-10-05:** use the
+[direct code-and-test checklist](recovery-plan-2026-09-26.md) under the
+[founder amendment](../../test-gates.md#m1-code-and-test-acceptance--founder-amendment-2026-10-05).
+Older candidate and certification instructions below are historical; they do
+not block direct M1a completion or progression to M1b.
+
 This folder holds **mutable working documents** for milestone `M1a`. It also holds `M1a`'s
 immutable records, once they exist, in `qa/` and `handoffs/`. Those two subfolders follow
 [`../README.md`](../README.md) and `EVID-04` (`../../test-gates.md`). **Nothing outside `qa/` and

@@ -1,5 +1,13 @@
 # Scope Triage and First-Milestone Baseline
 
+> **Current M1 acceptance — founder amendment, 2026-10-05:** complete M1a through
+> working code and executable tests, then proceed to M1b with the same process.
+> The [M1 amendment](../test-gates.md#m1-code-and-test-acceptance--founder-amendment-2026-10-05)
+> supersedes this document's M1 certification, archive, freeze and formal-handoff
+> prerequisites. Use the [current checklist](../milestones/M1a/recovery-plan-2026-09-26.md).
+> Functional scope and runtime safety assertions still apply; old records retain
+> their original verdicts.
+
 > **Proposal only.** This triage does not close, cancel, approve, or reprioritize a ticket by itself. It is a review map for subsequent owner-approved plan amendments.
 
 ## The 50-ticket triage
