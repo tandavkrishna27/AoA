@@ -109,9 +109,11 @@ import {
   evaluateShippedBootEvidence,
   evaluateM1bUsefulWorkEvidence,
   M1B_USEFUL_WORK_MAX_BYTES,
+  buildM1bAttemptDiagnosticsQuery,
+  formatM1bAttemptDiagnostics,
 } from "../lib/m1-shipped-boot.mjs";
 import { pinnedE2bTemplateSelector, readE2bSandboxBuildBinding, resolveE2bTemplateIdentity } from "../lib/m1-provider-identity.mjs";
-import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory, awaitProviderInventory } from "../lib/m1-cleanup-evidence.mjs";
+import { observeComposeCleanup, recordResourceIntent, readResourceIntents, collectProviderInventory, awaitProviderInventory, cancelDeclaredJobs } from "../lib/m1-cleanup-evidence.mjs";
 import { observeE2bCleanup } from "../lib/m1-provider-cleanup.mjs";
 import { evaluateUsageCardinality, formatViolations } from "../lib/m1-spine-assertions.mjs";
 
@@ -276,7 +278,7 @@ try {
   return result.rows;
 }
 
-async function api(state, method, urlPath, body, { timeoutMs } = {}) {
+async function api(state, method, urlPath, body, { timeoutMs, throwOnError = false } = {}) {
   const res = await fetch(`${CP_URL}/api${urlPath}`, {
     method,
     headers: { authorization: `Bearer ${state.boardToken}`, "content-type": "application/json" },
@@ -287,7 +289,9 @@ async function api(state, method, urlPath, body, { timeoutMs } = {}) {
   let json = null;
   try { json = JSON.parse(text); } catch { json = null; }
   if (!res.ok) {
-    fail(`${method} ${urlPath} → ${res.status}: ${redactSecrets(text, state.redact).slice(0, 1500)}`);
+    const message = `${method} ${urlPath} → ${res.status}: ${redactSecrets(text, state.redact).slice(0, 1500)}`;
+    if (throwOnError) throw new Error(message);
+    fail(message);
   }
   return json;
 }
@@ -1154,6 +1158,34 @@ async function usefulWorkProviderEvidence(state, run, tenant) {
       buildBindings.every((b) => b.verdict.pass === true) };
 }
 
+function retainM1bAttemptDiagnostics(state, identity) {
+  let diagnostics;
+  try {
+    const query = buildM1bAttemptDiagnosticsQuery(identity);
+    const read = dexec(state, "control-plane", `
+import postgres from "postgres";
+${REPORT}
+const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+try {
+  await sql.unsafe("SET statement_timeout = '10s'");
+  const rows = await sql.unsafe(${JSON.stringify(query.sql)}, ${JSON.stringify(query.params)});
+  report({ ok: true, rows });
+} catch { report({ ok: false }); }
+finally { await sql.end({ timeout: 5 }); }
+`, { timeout: 30_000 });
+    if (read.status !== 0 || !read.result?.ok) throw new Error("accepted_event_query_failed");
+    diagnostics = formatM1bAttemptDiagnostics(identity, read.result.rows, state.redact);
+  } catch {
+    // Fixed error marker: don't publish SQL/process exception text that could contain private state.
+    diagnostics = { schema: "aoa.m1b.accepted-attempt-diagnostics/1", identity,
+      collectionError: "accepted_event_diagnostics_unavailable", truncated: true,
+      truncationReasons: ["collection_failed"], events: [] };
+  }
+  writeEvidence(state, "m1b-attempt-diagnostics.json", { candidate: state.candidate, ...diagnostics });
+  return { file: "m1b-attempt-diagnostics.json", collectionError: diagnostics.collectionError,
+    truncated: diagnostics.truncated, truncationReasons: diagnostics.truncationReasons };
+}
+
 async function m1bUsefulWork(state) {
   if (state.mode !== "keyed") fail("m1b-useful-work requires keyed mode");
   let publicUrl;
@@ -1187,6 +1219,8 @@ async function m1bUsefulWork(state) {
   saveState(state);
   const expected = { organizationId: tenant.organizationId, companyId: tenant.companyId, issueId: issue.id,
     referenceTaskId: reference.id, referenceTitle: reference.title };
+  const diagnostics = retainM1bAttemptDiagnostics(state, { organizationId: tenant.organizationId, companyId: tenant.companyId,
+    jobId: run?.distributed_job_id ?? null, attemptId: run?.distributed_attempt_id ?? null });
   let verifierExit = null;
   let verdict = null;
   let providerEvidence = null;
@@ -1235,7 +1269,7 @@ async function m1bUsefulWork(state) {
   }
   const passed = candidates.some((candidate) => candidate.outcome.pass) && providerEvidence?.pass === true;
   writeEvidence(state, "m1b-useful-work.json", { candidate: state.candidate, mode: state.mode, expected, run,
-    verifierExit, verdict, toolReads, providerEvidence, candidates, passed });
+    verifierExit, verdict, toolReads, providerEvidence, diagnostics, candidates, passed });
   if (!passed) fail("m1b-useful-work did not prove live AoA retrieval, committed output, and founder download; see m1b-useful-work.json");
   console.log(`m1b-useful-work: run=${run.id} reference=${reference.id} committed founder download PASS`);
 }
@@ -1718,7 +1752,11 @@ function readCleanupBindings(state, intent, { timeoutMs }) {
   // a sandbox mentioned by another lease must never satisfy this resource's inventory.
   const sqlText = `SELECT j.id AS "jobId", j.organization_id AS "organizationId", j.company_id AS "companyId",
     j.source_identity AS "sourceIdentity", j.source_intent->>'runId' AS "sourceRunId",
-    j.status AS "jobStatus", a.id AS "attemptId", a.status AS "attemptStatus",
+    j.status AS "jobStatus", a.id AS "attemptId", a.status AS "attemptStatus", a.attempt_number AS "attemptNumber",
+    (SELECT count(*)::int FROM leases nl WHERE nl.organization_id = j.organization_id AND nl.company_id = j.company_id
+      AND nl.job_id = j.id AND nl.attempt_id = a.id) AS "attemptLeaseCount",
+    (SELECT count(*)::int FROM job_events ne WHERE ne.organization_id = j.organization_id AND ne.company_id = j.company_id
+      AND ne.job_id = j.id AND ne.attempt_id = a.id AND ne.event_type = 'attempt_started') AS "attemptStartedEventCount",
     l.id AS "leaseId", l.status AS "leaseStatus", l.target_id AS "targetId", l.created_at AS "leaseCreatedAt",
     e.event->'payload'->>'sandboxId' AS "sandboxId"
     FROM jobs j
@@ -1748,6 +1786,24 @@ finally { await sql.end({ timeout: 5 }); }
 async function teardown(state) {
   let inventory = null;
   if (state.mode === "keyed") {
+    let journal;
+    let cancellation;
+    try {
+      journal = readResourceIntents({ out: state.out, candidate: state.candidate });
+      if (journal.violations.length > 0) throw new Error("declared intent journal is invalid");
+      cancellation = await cancelDeclaredJobs({ candidate: state.candidate, intents: journal.intents,
+        read: (intent, options) => readCleanupBindings(state, intent, options),
+        cancel: (job, { timeoutMs }) => api(state, "POST",
+          `/organizations/${job.organizationId}/companies/${job.companyId}/jobs/${job.jobId}/cancel`,
+          { reason: "shipped-boot teardown", graceful: true }, { timeoutMs, throwOnError: true }) });
+    } catch {
+      cancellation = { candidate: state.candidate, pass: false, requests: [], violations: ["declared_job_cancellation_unavailable"] };
+    }
+    try { writeEvidence(state, "provider-cancellation.json", cancellation); }
+    catch {
+      cancellation.pass = false;
+      cancellation.violations.push("cancellation_evidence_write_failed");
+    }
     let stopped = false;
     try {
       // Keep the adapter and database alive while workers drain/destroy their runs.
@@ -1756,7 +1812,7 @@ async function teardown(state) {
       stopped = stop.status === 0 && !stop.error && !stop.signal;
     } catch { /* Continue with inventory and down; the verdict retains the failed stop. */ }
     try {
-      const journal = readResourceIntents({ out: state.out, candidate: state.candidate });
+      journal ??= readResourceIntents({ out: state.out, candidate: state.candidate });
       inventory = await awaitProviderInventory({ collect: ({ deadlineMs }) => {
         const snapshot = collectProviderInventory({ candidate: state.candidate,
           intents: journal.intents, deadlineMs,
@@ -1768,6 +1824,9 @@ async function teardown(state) {
     } catch {
       inventory = { candidate: state.candidate, complete: false, resources: [], violations: ["inventory_unavailable"] };
     }
+    inventory.violations.push(...cancellation.violations);
+    if (!cancellation.pass && cancellation.violations.length === 0) inventory.violations.push("declared_job_cancellation_failed");
+    inventory.complete = inventory.violations.length === 0;
     if (!stopped) {
       inventory.complete = false;
       inventory.violations.push("worker_stop_failed");

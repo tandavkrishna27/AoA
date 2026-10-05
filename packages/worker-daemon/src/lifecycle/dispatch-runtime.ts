@@ -321,8 +321,9 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
   // WRK-018 — `observeRun` is COMPOSED: the usage producer. (Superseded text: "observeRun stays
   // absent (no sandbox stdout/stderr rides the stream yet)".) Its presence is what opens the
   // optional stdout stream channel on `execute`; the supervisor scrubs every byte with the run's
-  // own canaries before the observer sees it (H-04), and the observer emits usage ONLY — four
-  // integers, never text. Rollback = drop this one line: the channel is inert without a consumer.
+  // own canaries before the observer sees it (H-04). The observer emits usage and a bounded,
+  // failure-only final-result summary through accepted log events, never a full transcript.
+  // Rollback = drop this one line: the channel is inert without a consumer.
   // DEP-011 Slice 2a — pass EXACTLY the injected provider path through to the supervisor: the
   // DESKTOP `provider` OR the container `makeRunProvider` (the supervisor fail-fasts if both, and
   // the boot gate refuses if neither). `materializeRunSecrets` is always present here, so the

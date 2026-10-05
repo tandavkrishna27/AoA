@@ -13,6 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import * as shippedBootDiagnostics from "../m1-shipped-boot.mjs";
 
 import {
   buildRolloutPolicy,
@@ -39,6 +40,96 @@ const A = "0febb760-5562-4289-a76a-f2f63139ee2d";
 const B = "1b3c5d7e-9f01-4a23-8b45-6789abcdef01";
 const C = "2c4e6a80-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
 const tenants = { enabled: [A, B], control: C };
+
+const diagnosticIdentity = { organizationId: A, companyId: B, jobId: C, attemptId: "3d5f7a91-2b4c-4d6e-8f01-23456789abcd" };
+const diagnosticRow = (overrides = {}) => ({ ...diagnosticIdentity,
+  eventId: "4e6a8b02-3c5d-4e7f-9012-3456789abcde", sequence: 4,
+  eventType: "terminal", occurredAt: "2026-10-05T22:58:47Z", acceptedAt: "2026-10-05T22:58:48Z",
+  payloadBytes: 80, payload: { status: "failed", exitCode: 1, errorCode: null, errorMessage: "CLI refused startup" }, ...overrides });
+
+test("M1b diagnostics query bounds exact accepted attempt rows and payload bytes before transport", () => {
+  const query = shippedBootDiagnostics.buildM1bAttemptDiagnosticsQuery(diagnosticIdentity);
+  assert.deepEqual(query.params, [A, B, C, diagnosticIdentity.attemptId, 32 * 1024, 65]);
+  for (const [column, parameter] of [["organization_id", 1], ["company_id", 2], ["job_id", 3], ["attempt_id", 4]]) {
+    assert.ok(query.sql.includes(`e.${column} = $${parameter}`));
+  }
+  assert.ok(query.sql.includes("FROM job_events e"));
+  assert.ok(query.sql.includes("'terminal'"));
+  assert.ok(query.sql.includes("'stdout', 'stderr'"));
+  assert.ok(query.sql.includes("octet_length"));
+  assert.ok(query.sql.includes("ELSE NULL END"), "oversized payloads must be omitted whole, not partly disclosed");
+  assert.ok(query.sql.includes("LIMIT $6"));
+  assert.equal(query.sql.includes(A), false);
+  assert.throws(() => shippedBootDiagnostics.buildM1bAttemptDiagnosticsQuery({ ...diagnosticIdentity, companyId: "unsafe'" }));
+});
+
+test("M1b diagnostics retain accepted terminal and stderr payloads with complete-string redaction", () => {
+  const secret = "private-key-12345678";
+  const stderr = diagnosticRow({ sequence: 3, eventType: "log", payloadBytes: 120,
+    payload: { stream: "stderr", level: "error", message: `Bad configuration ${secret}\n${Buffer.from(secret).toString("base64")}` } });
+  const result = shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity, [diagnosticRow(), stderr], [secret]);
+  assert.equal(result.truncated, false);
+  assert.deepEqual(result.identity, diagnosticIdentity);
+  assert.equal(result.events[0].payload.exitCode, 1);
+  assert.equal(result.events[0].payload.errorMessage, "CLI refused startup");
+  assert.equal(result.events[1].payload.message, "Bad configuration [REDACTED]\n[REDACTED]");
+  assert.equal(JSON.stringify(result).includes(secret), false);
+});
+
+test("M1b diagnostics refuse foreign attempt rows and irrelevant log streams", () => {
+  assert.equal(typeof shippedBootDiagnostics.formatM1bAttemptDiagnostics, "function");
+  for (const key of Object.keys(diagnosticIdentity)) {
+    assert.throws(() => shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity, [diagnosticRow({ [key]: "foreign" })]));
+  }
+  assert.throws(() => shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity,
+    [diagnosticRow({ eventType: "log", payload: { stream: "system", message: "unrelated state" } })]));
+});
+
+test("M1b diagnostics explicitly mark omitted oversized payloads and excess rows", () => {
+  const omitted = shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity,
+    [diagnosticRow({ payloadBytes: 32 * 1024 + 1, payload: null })]);
+  assert.equal(omitted.truncated, true);
+  assert.ok(omitted.truncationReasons.includes("payload_bytes"));
+  assert.equal(omitted.events[0].payload, null);
+  assert.equal(omitted.events[0].payloadOmitted, true);
+  const many = shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity,
+    Array.from({ length: 65 }, (_, index) => diagnosticRow({ sequence: index + 1 })));
+  assert.equal(many.events.length, 64);
+  assert.equal(many.truncated, true);
+  assert.ok(many.truncationReasons.includes("rows"));
+  assert.throws(() => shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity,
+    Array.from({ length: 66 }, () => diagnosticRow())));
+});
+
+test("M1b diagnostics bound final UTF-8 evidence while preserving terminal evidence", () => {
+  const rows = [diagnosticRow(), ...Array.from({ length: 63 }, (_, index) => diagnosticRow({ sequence: index + 5,
+    eventType: "log", payloadBytes: 31 * 1024, payload: { stream: "stdout", message: "π".repeat(15 * 1024) } }))];
+  const result = shippedBootDiagnostics.formatM1bAttemptDiagnostics(diagnosticIdentity, rows);
+  assert.ok(Buffer.byteLength(JSON.stringify(result, null, 2) + "\n") <= 256 * 1024);
+  assert.equal(result.events[0].eventType, "terminal");
+  assert.equal(result.events[0].payload.exitCode, 1);
+  assert.equal(result.truncated, true);
+  assert.ok(result.truncationReasons.includes("evidence_bytes"));
+});
+
+test("M1b driver retains redacted attempt diagnostics before verifier and cleanup", () => {
+  const source = readFileSync(journey, "utf8");
+  const usefulWork = source.slice(source.indexOf("async function m1bUsefulWork(state)"), source.indexOf("async function m1bUsefulWork(state)") + 12_000);
+  const diagnostics = usefulWork.indexOf("retainM1bAttemptDiagnostics(state,");
+  assert.ok(diagnostics >= 0 && diagnostics < usefulWork.indexOf("verify-e7-1-distributed-run.js"));
+  assert.ok(source.includes('writeEvidence(state, "m1b-attempt-diagnostics.json",'));
+});
+
+test("keyed teardown cancels only declared jobs through the board API before stopping workers", () => {
+  const source = readFileSync(journey, "utf8");
+  const teardown = source.slice(source.indexOf("async function teardown(state)"));
+  assert.ok(teardown.indexOf("cancelDeclaredJobs(") >= 0);
+  assert.ok(teardown.indexOf("cancelDeclaredJobs(") < teardown.indexOf('["stop",'));
+  assert.ok(teardown.includes('writeEvidence(state, "provider-cancellation.json",'));
+  assert.ok(teardown.includes('/organizations/${job.organizationId}/companies/${job.companyId}/jobs/${job.jobId}/cancel'));
+  assert.ok(teardown.includes('graceful: true'));
+  assert.ok(teardown.includes('...cancellation.violations'));
+});
 
 function usefulWorkFixture() {
   const expected = { organizationId: A, companyId: "company-a", issueId: "assigned-task", referenceTaskId: "reference-task", referenceTitle: "M1b reference unpredictable-marker" };

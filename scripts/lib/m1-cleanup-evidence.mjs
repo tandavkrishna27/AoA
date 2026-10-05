@@ -55,9 +55,80 @@ export function readResourceIntents({ out, candidate }) {
   return { intents, violations };
 }
 
+// Stop declared work through the board cancellation API before stopping workers.
+// A failed attempt is retryable until its JOB is cancelled; observing lease expiry
+// alone would allow the reaper to allocate new work during teardown.
+export async function cancelDeclaredJobs({ candidate, intents, read, cancel, timeoutMs = 60_000,
+  now = () => performance.now() }) {
+  if (typeof read !== "function" || typeof cancel !== "function" || !Number.isInteger(timeoutMs)
+    || timeoutMs < 1 || timeoutMs > 60_000) throw new Error("invalid cancellation bounds");
+  const deadline = now() + timeoutMs;
+  const violations = [];
+  const requests = [];
+  const jobs = new Map();
+  const seen = new Set();
+  const result = () => ({ candidate, pass: violations.length === 0, requests, violations });
+  if (!Array.isArray(intents) || intents.length === 0 || intents.length > 128) {
+    violations.push("cancellation_intents_invalid");
+    return result();
+  }
+  for (const intent of intents) {
+    if (!validIntent(intent, candidate) || seen.has(intent.id)) {
+      violations.push("cancellation_intent_invalid");
+      continue;
+    }
+    seen.add(intent.id);
+    const remaining = Math.ceil(deadline - now());
+    if (remaining <= 0) { violations.push("cancellation_deadline"); break; }
+    let rows;
+    try { rows = read(intent, { timeoutMs: Math.min(30_000, remaining) }); }
+    catch { violations.push("cancellation_read_failed"); continue; }
+    if (now() >= deadline) { violations.push("cancellation_deadline"); break; }
+    if (!Array.isArray(rows) || rows.length > 512) { violations.push("cancellation_read_invalid"); continue; }
+    if (!rows.length && intent.expectedDistributedJobs !== "none") violations.push("cancellation_job_unresolved");
+    if (rows.length && intent.expectedDistributedJobs === "none") violations.push("cancellation_unexpected_control_job");
+    for (const row of rows) {
+      if (!row || !nonempty(row.jobId) || row.organizationId !== intent.organizationId
+        || row.companyId !== intent.companyId || (intent.jobId && row.jobId !== intent.jobId)
+        || (intent.kind === "journey" && (!nonempty(row.sourceIdentity) || row.sourceIdentity !== row.sourceRunId))
+        || !["queued", "running", "cancel_requested", "succeeded", "failed", "cancelled", "dead_letter"].includes(row.jobStatus)) {
+        violations.push("cancellation_binding_invalid");
+        continue;
+      }
+      const key = JSON.stringify([row.organizationId, row.companyId, row.jobId]);
+      if (jobs.has(key) && jobs.get(key).status !== row.jobStatus) violations.push("cancellation_binding_inconsistent");
+      jobs.set(key, { organizationId: row.organizationId, companyId: row.companyId, jobId: row.jobId, status: row.jobStatus });
+      if (jobs.size > 128) { violations.push("cancellation_jobs_exceeded"); return result(); }
+    }
+  }
+  // Validate all declared identities before issuing any mutation.
+  if (violations.length) return result();
+  for (const { status, ...job } of jobs.values()) {
+    if (["succeeded", "failed", "cancelled", "dead_letter"].includes(status)) continue;
+    const remaining = Math.ceil(deadline - now());
+    if (remaining <= 0) { violations.push("cancellation_deadline"); break; }
+    const bound = Math.min(30_000, remaining);
+    const controller = new AbortController();
+    let timer;
+    try {
+      const outcome = await Promise.race([
+        Promise.resolve().then(() => cancel(job, { timeoutMs: bound, signal: controller.signal })),
+        new Promise((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("deadline")); }, bound); }),
+      ]);
+      if (now() >= deadline) { violations.push("cancellation_deadline"); break; }
+      if (!["queued", "already_requested", "cancelled", "job_terminal"].includes(outcome?.status)) {
+        violations.push("cancellation_rejected");
+      } else requests.push({ ...job, outcome: outcome.status });
+    } catch { violations.push("cancellation_request_failed"); }
+    finally { clearTimeout(timer); }
+  }
+  return result();
+}
+
 export function collectProviderInventory({ candidate, intents, read, deadlineMs = 180_000, now = Date.now }) {
   const violations = [];
   const resources = [];
+  const unleasedRetries = [];
   const seen = new Set();
   const sandboxOwners = new Map();
   if (!Number.isInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 180_000) throw new Error("invalid inventory deadline");
@@ -83,6 +154,28 @@ export function collectProviderInventory({ candidate, intents, read, deadlineMs 
     for (const row of rows) {
       if (intent.kind === "journey" && (!nonempty(row?.sourceIdentity) || row.sourceIdentity !== row.sourceRunId))
         violations.push(`${intent.id}:source_identity_inconsistent`);
+      // Cancellation may race a normal reap: attempt N+1 was allocated but never
+      // leased. Retain its terminal disposition only with database proof of no
+      // lease/start and a fully resolved prior resource on this exact job.
+      if (intent.kind === "journey" && row?.organizationId === intent.organizationId && row.companyId === intent.companyId
+        && nonempty(row.jobId) && nonempty(row.attemptId) && row.jobStatus === "cancelled" && row.attemptStatus === "cancelled"
+        && Number.isInteger(row.attemptNumber) && row.attemptNumber > 1
+        && row.attemptLeaseCount === 0 && row.attemptStartedEventCount === 0
+        && ["leaseId", "leaseStatus", "targetId", "leaseCreatedAt", "sandboxId"].every((key) => row[key] === null)
+        && rows.some((prior) => bindingFields.every((key) => nonempty(prior?.[key]))
+          && prior.organizationId === intent.organizationId && prior.companyId === intent.companyId
+          && prior.targetId === intent.targetId && prior.jobId === row.jobId && prior.attemptId !== row.attemptId
+          && Number.isInteger(prior.attemptNumber) && prior.attemptNumber < row.attemptNumber
+          && ["succeeded", "failed", "cancelled", "expired"].includes(prior.attemptStatus)
+          && ["released", "expired", "revoked"].includes(prior.leaseStatus)
+          && prior.jobStatus === "cancelled" && prior.sourceIdentity === row.sourceIdentity
+          && E2B_SANDBOX_ID_SHAPE.test(prior.sandboxId)
+          && Number.isFinite(Date.parse(prior.leaseCreatedAt)) && Date.parse(prior.leaseCreatedAt) <= now())) {
+        unleasedRetries.push({ intentId: intent.id, organizationId: row.organizationId, companyId: row.companyId,
+          jobId: row.jobId, attemptId: row.attemptId, attemptNumber: row.attemptNumber,
+          disposition: "cancelled_without_lease_or_start" });
+        continue;
+      }
       if (!row || !bindingFields.every((key) => nonempty(row[key]))
         || row.organizationId !== intent.organizationId || row.companyId !== intent.companyId
         || row.targetId !== intent.targetId || (intent.jobId && row.jobId !== intent.jobId)
@@ -105,7 +198,7 @@ export function collectProviderInventory({ candidate, intents, read, deadlineMs 
     }
   }
   return { candidate, scope: "declared-journey-and-redaction-intents", observedAt: new Date(now()).toISOString(), resources,
-    complete: violations.length === 0, violations };
+    ...(unleasedRetries.length ? { unleasedRetries } : {}), complete: violations.length === 0, violations };
 }
 
 // A terminal attempt can precede normal lease expiry and job reconciliation.
