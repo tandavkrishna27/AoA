@@ -2,18 +2,20 @@
 
 **Updated:** `2026-10-06`
 **Integration branch:** `docs/replatform-program`
-**Status:** M1a passed; M1b fixes pass locally and await the next live useful-work run
+**Status:** M1a passed; M1b remains in progress after live CLI startup failure
 
 PRs [#646](https://github.com/tandavkrishna27/AoA/pull/646) and
 [#645](https://github.com/tandavkrishna27/AoA/pull/645) are merged. The current
-integration revision is `9925e8d877dfb3587211f0197cd69c5b5ec3302e`.
+integration revision after follow-up
+[#647](https://github.com/tandavkrishna27/AoA/pull/647) is
+`f72a59649dfd375c66814e6c10dc3e223f8642f8`.
 Required CI passed for #646 at `232d15298db0e459e147b0062110f3457b7ec46f` in
 [37372575453](https://github.com/tandavkrishna27/AoA/actions/runs/37372575453),
 and for #645 at `94f9542cddf08fa66fbd64286eab44287b65b1c8` in
 [37365938714 attempt 4](https://github.com/tandavkrishna27/AoA/actions/runs/37365938714/attempts/4).
-Combined keyed shipped-boot run
+The earlier combined keyed shipped-boot run
 [37378134451](https://github.com/tandavkrishna27/AoA/actions/runs/37378134451)
-used the exact merged revision with `m1b=true`. M1a's real-E2B mechanism,
+used `9925e8d877dfb3587211f0197cd69c5b5ec3302e` with `m1b=true`. M1a's real-E2B mechanism,
 required controls and shared cleanup passed. M1b's useful-work check failed:
 the agent completed without an observed MCP read or exported output. M1a is
 complete under the founder amendment; M1b remains in progress.
@@ -243,8 +245,41 @@ suite passed 2,444 files / 23,549 tests, with 222 files / 1,868 tests skipped.
 Separately, the explicitly enabled PostgreSQL MCP suite passed all nine tests,
 including actual discovery, a useful read and denial controls. The focused
 context/legacy suites passed 204 tests and the Node workflow/driver/network suites
-passed 190. Live useful-work success is still required.
-The agent transcript was not retained, so its precise
+passed 190. Required CI then passed at fix head
+`16a81bcf8338e614c2e05f66f9d43c37975b2d4e` in
+[37382350000](https://github.com/tandavkrishna27/AoA/actions/runs/37382350000):
+four Linux shards passed 2,657 files / 25,340 tests, with nine files / 77 tests
+skipped. The actual Linux startup suite passed 77 tests, and the real PostgreSQL
+MCP suite passed nine. PR #647 merged as
+`f72a59649dfd375c66814e6c10dc3e223f8642f8`, with the same tested file tree
+`efc40c037aa5cb474d898d800a096d07719b012a`.
+
+Named keyed run
+[37384420324](https://github.com/tandavkrishna27/AoA/actions/runs/37384420324)
+tested that merged revision with `m1b=true`. M1a runtime checks passed again.
+The distributed prompt, instructions and MCP configuration were staged, and the
+MCP server accepted four requests. The M1b attempt then failed after 7.3 seconds
+with zero reported tokens, no observed useful tool read and no exported output.
+The retained bundle omitted CLI stdout/stderr, so the actual startup error is
+unknown. A local reproduction with the exact pinned Claude version, `2.1.251`,
+successfully initialized all eight allowed tools; a synthetic loopback API error
+reproduced the zero-token failure shape. That does not establish the live cause.
+
+All five E2B sandbox IDs were independently absent, the complete provider list
+was empty, and Compose cleanup passed. The shared cleanup verdict nevertheless
+failed: teardown stopped workers without cancelling unfinished jobs, allowing
+normal lease recovery to queue a retry of the failed M1b job. The follow-up uses
+the existing authenticated job cancellation API before stopping workers and
+retains bounded, redacted accepted-attempt diagnostics before verification. The
+worker now forwards selected failure fields from Claude's final result through
+the accepted log stream, scrubbing decoded strings with the run's own secrets
+before serialization. It retains neither the full transcript nor successful
+model answers. Focused checks passed 195 Node tests, 51 worker tests, ten actual
+PostgreSQL diagnostics/tool tests and eight PostgreSQL cleanup tests. Cleanup
+tests exercise normal cancellation both before expiry and after a retry has
+already been allocated. Independent code review found no remaining blocker.
+Neither fix counts as a passing live useful-work result; that remains required.
+The failed run `37378134451` did not retain the agent transcript, so its precise
 reason for finishing without a file remains unknown.
 
 ## Historical September 26 recovery instructions

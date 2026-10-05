@@ -389,6 +389,47 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect((await call(app)).status).toBe(403);
     });
 
+    it("executes the bounded M1b diagnostics query against actual accepted event schema and postgres-js decoding", async () => {
+      assertSetupOk();
+      const helperUrl = new URL("../../../scripts/lib/m1-shipped-boot.mjs", import.meta.url).href;
+      const { buildM1bAttemptDiagnosticsQuery, formatM1bAttemptDiagnostics } = await import(helperUrl);
+      const runId = await seedDistributedRun(TENANT_A);
+      const [binding] = await db.execute(sql`SELECT r.distributed_job_id AS "jobId", r.distributed_attempt_id AS "attemptId",
+        l.id AS "leaseId", l.fence FROM heartbeat_runs r JOIN leases l ON l.attempt_id = r.distributed_attempt_id
+        WHERE r.id = ${runId} AND r.company_id = ${TENANT_A.company}`);
+      const identity = { organizationId: TENANT_A.org, companyId: TENANT_A.company, jobId: binding.jobId, attemptId: binding.attemptId };
+      const payloads = [
+        { type: "log", payload: { stream: "stdout", level: "info", message: "stdout diagnostic" } },
+        { type: "log", payload: { stream: "stderr", level: "error", message: "stderr diagnostic" } },
+        { type: "log", payload: { stream: "system", level: "info", message: "exclude this probe" } },
+        { type: "terminal", payload: { status: "failed", exitCode: 1, errorCode: null, errorMessage: null } },
+        { type: "log", payload: { stream: "stdout", level: "error", message: "x".repeat(32 * 1024) } },
+      ];
+      for (const [index, value] of payloads.entries()) {
+        const eventId = randomUUID();
+        await db.execute(sql`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number,
+          lease_id, event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+          VALUES (${TENANT_A.org}, ${TENANT_A.company}, ${binding.jobId}, ${binding.attemptId}, 1,
+            ${binding.leaseId}, ${eventId}, ${index + 1}, ${value.type}, ${binding.fence}, ${HEX64},
+            ${JSON.stringify({ payload: value.payload })}::jsonb, clock_timestamp())`);
+      }
+      const raw = (db as unknown as { $client: { unsafe(query: string, params: unknown[]): Promise<Record<string, unknown>[]> } }).$client;
+      const query = buildM1bAttemptDiagnosticsQuery(identity);
+      const rows = await raw.unsafe(query.sql, query.params);
+      expect(rows).toHaveLength(4);
+      expect(rows.every((row) => typeof row.sequence === "number" && typeof row.payloadBytes === "number")).toBe(true);
+      expect(rows[0]).toMatchObject({ ...identity, eventType: "terminal", sequence: 4,
+        payload: { status: "failed", exitCode: 1 } });
+      expect(rows[1]).toMatchObject({ eventType: "log", sequence: 5, payload: null });
+      const result = formatM1bAttemptDiagnostics(identity, rows);
+      expect(result.truncated).toBe(true);
+      expect(result.truncationReasons).toContain("payload_bytes");
+      expect(result.events.map((event: { sequence: number }) => event.sequence)).toEqual([4, 5, 2, 1]);
+      expect(JSON.stringify(result)).not.toContain("exclude this probe");
+      const foreignQuery = buildM1bAttemptDiagnosticsQuery({ ...identity, companyId: TENANT_B.company });
+      expect(await raw.unsafe(foreignQuery.sql, foreignQuery.params)).toHaveLength(0);
+    });
+
     it("discovers and calls get_heartbeat_context with the real org broker context to read an unassigned reference", async () => {
       assertSetupOk();
       const env = armedEnv();

@@ -39,6 +39,48 @@ import { REDACTION_MARKER } from "./redaction.js";
 import { RUN_OUTPUT_PROBE_LOG_MESSAGE, selectRunOutputProbeLines } from "./run-output-probe.js";
 import type { RunObservation, SupervisorDeps } from "./supervisor.js";
 
+/** Failure-only CLI metadata from the already-scrubbed final result; never a transcript. */
+function failureResultLog(input: Parameters<NonNullable<SupervisorDeps["observeRun"]>>[0]): RunObservation["logs"] {
+  let result: Record<string, unknown> | null = null;
+  try {
+    const last = input.output?.stdoutTail.trimEnd().split(/\r?\n/).at(-1)?.trim();
+    const parsed: unknown = last ? JSON.parse(last) : null;
+    if (isRecord(parsed) && parsed.type === "result") result = parsed;
+  } catch { /* No arbitrary-text fallback: structural redaction or noise is unavailable evidence. */ }
+  const failed = (typeof input.exec.exitCode === "number" && input.exec.exitCode !== 0) || input.exec.timedOut === true ||
+    typeof input.exec.signal === "string" || result?.is_error === true;
+  if (!failed) return [];
+  const diagnostic = { type: "aoa_cli_failure", exitCode: input.exec.exitCode, signal: input.exec.signal,
+    timedOut: input.exec.timedOut, resultAvailable: result !== null, summary: {} as Record<string, unknown>,
+    truncated: false, omittedFields: [] as string[] };
+  for (const key of ["is_error", "api_error_status", "subtype", "terminal_reason", "result", "errors"]) {
+    let value = result?.[key];
+    if (value === undefined) continue;
+    // A failed process with a successful result must not retain an ordinary model answer.
+    if ((key === "result" || key === "errors") && result?.is_error !== true) continue;
+    if (typeof value === "string" || key === "errors") {
+      const scrub = input.output?.scrubText;
+      try {
+        value = !scrub ? null : typeof value === "string" ? scrub(value)
+          : Array.isArray(value) && value.every((entry) => typeof entry === "string") ? value.map((entry) => scrub(entry)) : null;
+      } catch { value = null; }
+    }
+    const allowed = key === "is_error" ? typeof value === "boolean"
+      : key === "api_error_status" ? value === null || (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 599)
+      : key === "errors" ? Array.isArray(value) && value.length <= 4 && value.every((error) => typeof error === "string" && Buffer.byteLength(error) <= 512)
+      : typeof value === "string" && Buffer.byteLength(value) <= 1024;
+    if (allowed) diagnostic.summary[key] = value;
+    if (!allowed || Buffer.byteLength(JSON.stringify(diagnostic)) > 4096 - 256) {
+      delete diagnostic.summary[key];
+      diagnostic.truncated = true;
+      diagnostic.omittedFields.push(key);
+    }
+  }
+  // The supervisor sends this through events.log, which applies the run's canaries again.
+  // Container logger output is deliberately absent; only the accepted attempt ledger retains it.
+  return [{ stream: "stdout", level: "error", message: JSON.stringify(diagnostic) }];
+}
+
 /** Counter: runs whose output carried no parseable usage (no labels — no content, no id). */
 export const RUN_USAGE_MISSING_METRIC = "run_usage_missing_total";
 
@@ -118,8 +160,8 @@ export interface UsageObserverDeps {
    * `AOA_WORKER_RUN_OUTPUT_PROBE=1`. When on, a single `AOA-RUN-OUTPUT-PROBE`-tagged line of the
    * run's ALREADY-SCRUBBED stdout tail is forwarded to BOTH streams the E5 clause-5 case asserts
    * on: the run's event stream (as `obs.logs`, which the supervisor turns into a `log` event) and
-   * the worker's container log (through `logger`). Off, this observer is byte-identical to the
-   * usage-only one — no selection, no log entry, no log line.
+   * the worker's container log (through `logger`). Off, there is no probe selection or probe
+   * log entry; the failure-only result diagnostic remains independent of this opt-in probe.
    */
   readonly runOutputProbe?: boolean;
   /** The worker logger, used ONLY for the probe line. Safe because the daemon's logger scrubs the
@@ -128,7 +170,7 @@ export interface UsageObserverDeps {
   readonly logger?: Pick<Logger, "info">;
 }
 
-/** The composed `observeRun`: usage, plus (opt-in) the bounded run-output redaction probe. */
+/** The composed `observeRun`: usage, a failure-only result summary, plus the opt-in redaction probe. */
 export function createUsageObserver(deps: UsageObserverDeps = {}): NonNullable<SupervisorDeps["observeRun"]> {
   return (input): RunObservation => {
     // ★ The probe runs on the SAME already-scrubbed tail the parser reads, and it runs BEFORE the
@@ -147,7 +189,8 @@ export function createUsageObserver(deps: UsageObserverDeps = {}): NonNullable<S
         // event half below must still be produced if the LOG half fails).
       }
     }
-    const logs = probeLines.map((message) => ({ stream: "system", level: "info", message }) as const);
+    const logs = [...probeLines.map((message) => ({ stream: "system", level: "info", message }) as const),
+      ...(failureResultLog(input) ?? [])];
     const parsed = input.output ? parseClaudeStreamJsonUsage(input.output.stdoutTail) : null;
     if (parsed === null || input.output === undefined) {
       deps.metrics?.inc(RUN_USAGE_MISSING_METRIC);

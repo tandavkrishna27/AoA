@@ -49,7 +49,7 @@ import {
   type StagedFileRequest,
 } from "./provider.js";
 import type { RunCanaryCoordinator } from "./run-canaries.js";
-import { RUN_OUTPUT_DROPPED_METRIC, createRunOutputCapture } from "./run-output.js";
+import { RUN_OUTPUT_DROPPED_METRIC, createRunOutputCapture, scrubOutputText } from "./run-output.js";
 import { ENV_PROBE_DEFAULT_DEADLINE_MS, ENV_PROBE_ERROR_CODES, envProbeLogMessage, runEnvProbe } from "./env-probe.js";
 import { PROVIDER_AUTH_ENV_TARGETS } from "../lease/secret-redemption.js";
 import {
@@ -106,6 +106,8 @@ export interface RunObservation {
 export interface RunOutputObservation {
   readonly stdoutTail: string;
   readonly runtimeMillis: number;
+  /** Scrub strings decoded from JSON before an observer serializes them into a diagnostic. */
+  readonly scrubText?: (text: string) => string | null;
 }
 
 /** The max number of captured `log` events a single run may emit, leaving headroom
@@ -1030,7 +1032,8 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         const obs = await deps.observeRun({
           handoff,
           exec,
-          output: { stdoutTail: captured?.stdoutTail ?? "", runtimeMillis: execRuntimeMillis },
+          output: { stdoutTail: captured?.stdoutTail ?? "", runtimeMillis: execRuntimeMillis,
+            scrubText: (text) => scrubOutputText(text, runCanaries) },
         });
         for (const entry of (obs.logs ?? []).slice(0, MAX_LOG_EVENTS)) {
           await events.log({ stream: entry.stream, level: entry.level ?? "info", message: entry.message });

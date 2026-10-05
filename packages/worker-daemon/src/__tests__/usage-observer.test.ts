@@ -12,6 +12,7 @@ import {
   parseClaudeStreamJsonUsage,
 } from "../supervisor/usage-observer.js";
 import { makeHandoff } from "./support/supervisor-fixtures.js";
+import { scrubOutputText } from "../supervisor/run-output.js";
 
 // -----------------------------------------------------------------------------
 // WRK-018 slice A — the daemon-local `claude_local` usage parser (E4-D13) and the
@@ -108,6 +109,58 @@ describe("WRK-018 — parseClaudeStreamJsonUsage (daemon-local port, E4-D13)", (
 });
 
 describe("WRK-018 — createUsageObserver (the composed observeRun)", () => {
+  it("emits only a bounded whitelisted failure result summary through the existing log pipeline", async () => {
+    const obs = await createUsageObserver()({ handoff: makeHandoff(), exec: { ...EXEC, exitCode: 1 },
+      output: { stdoutTail: resultLine(undefined, { subtype: "error_during_execution", is_error: true,
+        api_error_status: 400, terminal_reason: "api_error", result: "API Error: invalid tool schema", errors: ["request rejected"],
+        session_id: "private-session", transcript: "private conversation" }), runtimeMillis: 8, scrubText: (text) => scrubOutputText(text, []) } });
+    expect(obs.logs).toHaveLength(1);
+    expect(obs.logs![0]).toMatchObject({ stream: "stdout", level: "error" });
+    expect(JSON.parse(obs.logs![0].message)).toMatchObject({ type: "aoa_cli_failure", exitCode: 1,
+      resultAvailable: true, summary: { is_error: true, api_error_status: 400,
+        result: "API Error: invalid tool schema", errors: ["request rejected"] }, truncated: false });
+    expect(obs.logs![0].message).not.toContain("private-session");
+    expect(obs.logs![0].message).not.toContain("private conversation");
+    expect(obs.usage).toBeNull();
+  });
+
+  it("omits oversized failure fields explicitly instead of retaining a full result or transcript", async () => {
+    const obs = await createUsageObserver()({ handoff: makeHandoff(), exec: { ...EXEC, exitCode: 1 },
+      output: { stdoutTail: resultLine(undefined, { is_error: true, result: "π".repeat(20_000) }), runtimeMillis: 8, scrubText: (text) => scrubOutputText(text, []) } });
+    const diagnostic = JSON.parse(obs.logs![0].message);
+    expect(diagnostic.truncated).toBe(true);
+    expect(diagnostic.omittedFields).toContain("result");
+    expect(diagnostic.summary.result).toBeUndefined();
+    expect(Buffer.byteLength(obs.logs![0].message)).toBeLessThanOrEqual(4096);
+  });
+
+  it("reports unavailable failure result without falling back to arbitrary stdout text", async () => {
+    const obs = await createUsageObserver()({ handoff: makeHandoff(), exec: { ...EXEC, exitCode: 1 },
+      output: { stdoutTail: "private raw output\nnot-json", runtimeMillis: 8 } });
+    expect(JSON.parse(obs.logs![0].message)).toMatchObject({ exitCode: 1, resultAvailable: false, summary: {} });
+    expect(obs.logs![0].message).not.toContain("private raw output");
+  });
+
+  it("fails closed for decoded free text if the run scrubber is absent or throws", async () => {
+    for (const scrubText of [undefined, () => { throw new Error("private scrub error"); }]) {
+      const obs = await createUsageObserver()({ handoff: makeHandoff(), exec: { ...EXEC, exitCode: 1 },
+        output: { stdoutTail: resultLine(undefined, { is_error: true, api_error_status: 401, result: "private error text" }), runtimeMillis: 8, scrubText } });
+      const result = JSON.parse(obs.logs![0].message);
+      expect(result.summary).toMatchObject({ is_error: true, api_error_status: 401 });
+      expect(result.summary.result).toBeUndefined();
+      expect(result.omittedFields).toContain("result");
+      expect(obs.logs![0].message).not.toContain("private error text");
+    }
+  });
+
+  it("does not publish a successful model answer when the process later exits nonzero", async () => {
+    const obs = await createUsageObserver()({ handoff: makeHandoff(), exec: { ...EXEC, exitCode: 1 },
+      output: { stdoutTail: resultLine(undefined, { result: "ordinary private model answer" }), runtimeMillis: 8,
+        scrubText: (text) => scrubOutputText(text, []) } });
+    expect(JSON.parse(obs.logs![0].message).summary.is_error).toBe(false);
+    expect(obs.logs![0].message).not.toContain("ordinary private model answer");
+  });
+
   it("builds a schema-valid UsagePayloadV1 with runtimeMillis from the SUPERVISOR's clock", async () => {
     const observe = createUsageObserver();
     const obs = await observe({

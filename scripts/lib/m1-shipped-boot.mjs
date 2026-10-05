@@ -23,6 +23,74 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
 export const M1B_USEFUL_WORK_MAX_BYTES = 64 * 1024;
+export const M1B_DIAGNOSTIC_LIMITS = Object.freeze({ rows: 64, payloadBytes: 32 * 1024, evidenceBytes: 256 * 1024 });
+
+function assertM1bDiagnosticIdentity(identity) {
+  if (!["organizationId", "companyId", "jobId", "attemptId"].every((key) => UUID_RE.test(identity?.[key] ?? ""))) {
+    throw new Error("M1b diagnostic identity is incomplete or invalid");
+  }
+}
+
+/** Only immutable ACCEPTED events of this attempt; never private state or rejected wire input. */
+export function buildM1bAttemptDiagnosticsQuery(identity) {
+  assertM1bDiagnosticIdentity(identity);
+  return {
+    sql: `SELECT e.organization_id AS "organizationId", e.company_id AS "companyId",
+      e.job_id AS "jobId", e.attempt_id AS "attemptId", e.event_id AS "eventId",
+      e.sequence, e.event_type AS "eventType", e.occurred_at AS "occurredAt", e.created_at AS "acceptedAt",
+      octet_length((e.event->'payload')::text) AS "payloadBytes",
+      CASE WHEN octet_length((e.event->'payload')::text) <= $5 THEN e.event->'payload' ELSE NULL END AS payload
+      FROM job_events e
+      WHERE e.organization_id = $1 AND e.company_id = $2 AND e.job_id = $3 AND e.attempt_id = $4
+        AND (e.event_type = 'terminal' OR
+          (e.event_type = 'log' AND e.event->'payload'->>'stream' IN ('stdout', 'stderr')))
+      ORDER BY CASE WHEN e.event_type = 'terminal' THEN 0 ELSE 1 END, e.sequence DESC LIMIT $6`,
+    params: [identity.organizationId, identity.companyId, identity.jobId, identity.attemptId,
+      M1B_DIAGNOSTIC_LIMITS.payloadBytes, M1B_DIAGNOSTIC_LIMITS.rows + 1],
+  };
+}
+
+/** Redact whole strings before any evidence limit; omit large payloads whole rather than splitting secrets. */
+export function formatM1bAttemptDiagnostics(identity, rows, secrets = []) {
+  assertM1bDiagnosticIdentity(identity);
+  if (!Array.isArray(rows) || rows.length > M1B_DIAGNOSTIC_LIMITS.rows + 1) throw new Error("M1b diagnostics query exceeded its row bound");
+  const redact = [...new Set(secrets.filter((secret) => typeof secret === "string" && secret.length >= 8)
+    .flatMap((secret) => [secret, Buffer.from(secret).toString("base64"), Buffer.from(secret).toString("base64url")]))];
+  const reasons = new Set(rows.length > M1B_DIAGNOSTIC_LIMITS.rows ? ["rows"] : []);
+  const result = { schema: "aoa.m1b.accepted-attempt-diagnostics/1", identity: { ...identity },
+    limits: M1B_DIAGNOSTIC_LIMITS, queryRowsReturned: rows.length, retainedRows: 0,
+    truncated: reasons.size > 0, truncationReasons: [...reasons], collectionError: null, events: [] };
+  for (const row of rows.slice(0, M1B_DIAGNOSTIC_LIMITS.rows)) {
+    if (!row || !Object.keys(identity).every((key) => row[key] === identity[key]) ||
+        !UUID_RE.test(row.eventId ?? "") || !Number.isInteger(row.sequence) || row.sequence <= 0 ||
+        !Number.isInteger(row.payloadBytes) || row.payloadBytes < 0 ||
+        !["terminal", "log"].includes(row.eventType)) throw new Error("M1b diagnostics returned an invalid or foreign accepted event");
+    const omitted = row.payloadBytes > M1B_DIAGNOSTIC_LIMITS.payloadBytes;
+    if ((!omitted && (!row.payload || Array.isArray(row.payload) || typeof row.payload !== "object" ||
+        Buffer.byteLength(JSON.stringify(row.payload)) > M1B_DIAGNOSTIC_LIMITS.payloadBytes)) ||
+        (row.eventType === "log" && !omitted && !["stdout", "stderr"].includes(row.payload.stream))) {
+      throw new Error("M1b diagnostics returned an invalid payload or irrelevant log stream");
+    }
+    if (omitted) reasons.add("payload_bytes");
+    const event = { eventId: row.eventId, sequence: row.sequence, eventType: row.eventType,
+      occurredAt: row.occurredAt, acceptedAt: row.acceptedAt, payloadBytes: row.payloadBytes,
+      payloadOmitted: omitted, payload: omitted ? null : JSON.parse(JSON.stringify(row.payload,
+        (_key, value) => typeof value === "string" ? redactSecrets(value, redact) : value)) };
+    result.events.push(event);
+    result.retainedRows = result.events.length;
+    result.truncated = reasons.size > 0;
+    result.truncationReasons = [...reasons];
+    // Reserve room for explicit omission metadata even when the next payload fills the byte budget.
+    if (Buffer.byteLength(JSON.stringify(result, null, 2) + "\n") > M1B_DIAGNOSTIC_LIMITS.evidenceBytes - 256) {
+      result.events.pop();
+      reasons.add("evidence_bytes");
+    }
+  }
+  result.retainedRows = result.events.length;
+  result.truncated = reasons.size > 0;
+  result.truncationReasons = [...reasons];
+  return result;
+}
 
 /** Direct behavior proof: live reference data reached a committed, attempt-bound founder download. */
 export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit, verdict, toolReads, output, download } = {}) {

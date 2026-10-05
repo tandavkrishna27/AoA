@@ -6,6 +6,10 @@ import vm from "node:vm";
 import ts from "typescript";
 import postgres from "postgres";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
+import { setupJobControlFixture, auth, pollRequest, ackRequest, ORG, COMPANY, TARGET, type JobControlFixture } from "./helpers/job-control-fixture.js";
+import { createJobLeasingService } from "../services/job-leasing.js";
+import { createJobReconciliationService } from "../services/job-reconciliation.js";
+import { runInTenant } from "../db/tenant-context.js";
 
 const integration = describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1");
 const id = (n: number) => `a6000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -13,7 +17,7 @@ const org = id(1), company = id(2), target = id(3), issue = id(4);
 type Row = Record<string, unknown>;
 const tables = {
   jobs: "id uuid, organization_id uuid, company_id uuid, status text, source_kind text, source_identity text, source_intent jsonb",
-  job_attempts: "id uuid, job_id uuid, organization_id uuid, company_id uuid, status text",
+  job_attempts: "id uuid, job_id uuid, organization_id uuid, company_id uuid, status text, attempt_number int",
   leases: "id uuid, attempt_id uuid, job_id uuid, organization_id uuid, company_id uuid, status text, target_id uuid, created_at timestamptz",
   job_events: "job_id uuid, attempt_id uuid, lease_id uuid, organization_id uuid, company_id uuid, event_type text, event jsonb",
   issues: "id uuid, company_id uuid, title text",
@@ -29,7 +33,7 @@ function fixture(): Record<string, Row[]> {
   for (const n of [10, 20]) {
     rows.jobs.push({ id: id(n), organization_id: org, company_id: company, status: "succeeded", source_kind: "task_run",
       source_identity: id(n + 3), source_intent: { issueId: issue, runId: id(n + 3) } });
-    rows.job_attempts.push({ id: id(n + 1), job_id: id(n), organization_id: org, company_id: company, status: "succeeded" });
+    rows.job_attempts.push({ id: id(n + 1), job_id: id(n), organization_id: org, company_id: company, status: "succeeded", attempt_number: 1 });
     rows.leases.push({ id: id(n + 2), attempt_id: id(n + 1), job_id: id(n), organization_id: org, company_id: company,
       status: "released", target_id: target, created_at: "2026-09-29T00:00:00Z" });
     rows.job_events.push({ job_id: id(n), attempt_id: id(n + 1), lease_id: id(n + 2), organization_id: org,
@@ -120,4 +124,108 @@ integration("M1 cleanup inventory SQL", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].jobId).toBe(id(10));
   });
+  it("proves a cancelled retry has no lease or started event without hiding the original resource", async () => {
+    const data = fixture();
+    data.jobs.forEach((job) => { job.status = "cancelled"; });
+    data.job_attempts.push({ id: id(30), job_id: id(10), organization_id: org, company_id: company,
+      status: "cancelled", attempt_number: 2 });
+    const rows: Row[] = JSON.parse(JSON.stringify(await run(data)));
+    const retry = rows.find((row) => row.attemptId === id(30));
+    expect(retry).toMatchObject({ attemptNumber: 2, attemptLeaseCount: 0, attemptStartedEventCount: 0,
+      jobStatus: "cancelled", attemptStatus: "cancelled", leaseId: null, sandboxId: null });
+    expect(rows.find((row) => row.attemptId === id(11))?.sandboxId).toBe("sandbox10abcdefghijklmnop");
+    const helperUrl = new URL("../../../scripts/lib/m1-cleanup-evidence.mjs", import.meta.url);
+    const { collectProviderInventory } = await import(/* @vite-ignore */ helperUrl.href);
+    const inventory = () => collectProviderInventory({ candidate: "a".repeat(40), intents: [{ candidate: "a".repeat(40),
+      id: "intent", kind: "journey", tenant: "a", worker: "worker", organizationId: org, companyId: company,
+      targetId: target, issueTitle: "proof" }], read: () => rows });
+    expect(inventory().complete).toBe(true);
+    expect(inventory().resources).toHaveLength(2);
+    expect(inventory().unleasedRetries).toHaveLength(1);
+    data.job_events.push({ job_id: id(10), attempt_id: id(30), lease_id: id(99), organization_id: org,
+      company_id: company, event_type: "attempt_started", event: { payload: { sandboxId: "orphanabcdefghijklmnop" } } });
+    const withStart: Row[] = JSON.parse(JSON.stringify(await run(data)));
+    expect(withStart.find((row) => row.attemptId === id(30))?.attemptStartedEventCount).toBe(1);
+    expect(collectProviderInventory({ candidate: "a".repeat(40), intents: [{ candidate: "a".repeat(40),
+      id: "intent", kind: "journey", tenant: "a", worker: "worker", organizationId: org, companyId: company,
+      targetId: target, issueTitle: "proof" }], read: () => withStart }).complete).toBe(false);
+  });
+});
+
+integration("M1 cleanup production cancellation", () => {
+  let fx: JobControlFixture;
+  beforeAll(async () => { fx = await setupJobControlFixture("m1-cleanup-cancel"); }, 180_000);
+  afterAll(async () => { await fx?.teardown(); }, 60_000);
+
+  async function failedAttempt(ordinal: number) {
+    await fx.resetRuntimeRows();
+    const seeded = await fx.seedPlacedJob(ordinal);
+    // Configure a short lease at creation; never age its deadline or write status.
+    const leasing = createJobLeasingService({ appDb: fx.app.db, ackTimeoutMs: 1_000, leaseDurationMs: 2_000 });
+    const polled = await leasing.poll({ auth: auth(`cleanup-poll-${ordinal}`), request: pollRequest(`cleanup-poll-${ordinal}`) });
+    if (polled.outcome !== "offer") throw new Error("cleanup test offer missing");
+    const offer = polled.body;
+    const ack = await leasing.ack({ auth: auth(`cleanup-ack-${ordinal}`), request: ackRequest(offer) });
+    expect(ack.outcome).toBe("acknowledged");
+    await runInTenant(fx.app.db, ORG, (repos) => repos.jobControl.completeAttempt({
+      ...fx.fenceIdentity(seeded, offer), terminalStatus: "failed" }));
+    return { seeded, offer };
+  }
+  async function waitForExpiry(expiresAt: string) {
+    const remaining = Date.parse(expiresAt) - Date.now() + 50;
+    expect(remaining).toBeLessThanOrEqual(2_100);
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+  }
+  async function statuses(jobId: string) {
+    return fx.admin`SELECT j.status AS "jobStatus", a.status AS "attemptStatus", a.attempt_number AS "attemptNumber",
+      l.status AS "leaseStatus" FROM jobs j JOIN job_attempts a ON a.job_id=j.id
+      LEFT JOIN leases l ON l.attempt_id=a.id WHERE j.id=${jobId} ORDER BY a.attempt_number`;
+  }
+  async function cancelDeclared(jobId: string, attemptId: string) {
+    const rows = await fx.admin`SELECT id AS "jobId", organization_id AS "organizationId", company_id AS "companyId",
+      status AS "jobStatus" FROM jobs WHERE id=${jobId} AND organization_id=${ORG} AND company_id=${COMPANY}`;
+    const helperUrl = new URL("../../../scripts/lib/m1-cleanup-evidence.mjs", import.meta.url);
+    const { cancelDeclaredJobs } = await import(/* @vite-ignore */ helperUrl.href);
+    const reconciliation = createJobReconciliationService({ appDb: fx.app.db });
+    return cancelDeclaredJobs({ candidate: "a".repeat(40), intents: [{ candidate: "a".repeat(40), id: "intent",
+      kind: "redaction", tenant: "a", worker: "worker", organizationId: ORG, companyId: COMPANY,
+      targetId: TARGET, jobId, attemptId }], read: () => rows,
+      cancel: (job: { organizationId: string; companyId: string; jobId: string }) => reconciliation.requestCancellation({
+        ...job, reason: "shipped-boot teardown", graceful: true }) });
+  }
+
+  it("cancels a failed-but-leased job before natural expiry, preserves its failure, and prevents retry", async () => {
+    const { seeded, offer } = await failedAttempt(7_701);
+    const cancelled = await cancelDeclared(seeded.jobId, seeded.attemptId);
+    expect(cancelled.pass).toBe(true);
+    expect(cancelled.requests[0].outcome).toBe("queued");
+    expect(await statuses(seeded.jobId)).toMatchObject([{ jobStatus: "cancel_requested", attemptStatus: "failed", leaseStatus: "active" }]);
+    await waitForExpiry(offer.expiresAt);
+    const reaped = await createJobReconciliationService({ appDb: fx.app.db }).reapOrganization(ORG);
+    expect(reaped.cancelled).toBe(1);
+    expect(reaped.retried).toBe(0);
+    expect(await statuses(seeded.jobId)).toMatchObject([{ jobStatus: "cancelled", attemptStatus: "failed", leaseStatus: "revoked" }]);
+    expect(await statuses(seeded.jobId)).toHaveLength(1);
+  }, 60_000);
+
+  it("settles a retry when the normal reaper won first without changing the failed original attempt", async () => {
+    const { seeded, offer } = await failedAttempt(7_702);
+    await waitForExpiry(offer.expiresAt);
+    const reconciliation = createJobReconciliationService({ appDb: fx.app.db });
+    expect((await reconciliation.reapOrganization(ORG)).retried).toBe(1);
+    expect(await statuses(seeded.jobId)).toMatchObject([
+      { jobStatus: "queued", attemptStatus: "failed", leaseStatus: "expired" },
+      { jobStatus: "queued", attemptStatus: "pending", leaseStatus: null },
+    ]);
+    const cancelled = await cancelDeclared(seeded.jobId, seeded.attemptId);
+    expect(cancelled.pass).toBe(true);
+    expect(cancelled.requests[0].outcome).toBe("cancelled");
+    expect(await statuses(seeded.jobId)).toMatchObject([
+      { jobStatus: "cancelled", attemptStatus: "failed", leaseStatus: "expired" },
+      { jobStatus: "cancelled", attemptStatus: "cancelled", leaseStatus: null },
+    ]);
+    const poll = await fx.leasing.poll({ auth: auth("cleanup-after-cancel"), request: pollRequest("cleanup-after-cancel") });
+    expect(poll.outcome).toBe("no_work");
+    expect((await reconciliation.reapOrganization(ORG)).retried).toBe(0);
+  }, 60_000);
 });

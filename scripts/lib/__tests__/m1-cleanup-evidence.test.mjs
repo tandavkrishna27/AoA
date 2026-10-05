@@ -7,8 +7,79 @@ import { spawnSync } from "node:child_process";
 import { observeComposeCleanup } from "../m1-cleanup-evidence.mjs";
 import * as cleanup from "../m1-cleanup-evidence.mjs";
 
+test("declared cleanup cancels each unfinished job once and preserves terminal jobs", async () => {
+  assert.equal(typeof cleanup.cancelDeclaredJobs, "function");
+  const calls = [];
+  const result = await cleanup.cancelDeclaredJobs({ candidate, intents: [{ candidate, ...intent }],
+    read: () => [{ ...binding, jobStatus: "running", attemptStatus: "failed" },
+      { ...binding, jobStatus: "running", attemptId: "retry" }],
+    cancel: async (job, options) => { calls.push({ job, options }); return { status: "queued" }; },
+  });
+  assert.equal(result.pass, true);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].job, { organizationId: intent.organizationId, companyId: intent.companyId, jobId: binding.jobId });
+  assert.ok(calls[0].options.timeoutMs > 0 && calls[0].options.timeoutMs <= 30_000);
+  const terminal = await cleanup.cancelDeclaredJobs({ candidate, intents: [{ candidate, ...intent }],
+    read: () => [binding], cancel: async () => { throw new Error("terminal job must not change"); } });
+  assert.equal(terminal.pass, true);
+  assert.equal(terminal.requests.length, 0);
+});
+
+test("declared cleanup refuses foreign/missing bindings before any cancellation", async () => {
+  assert.equal(typeof cleanup.cancelDeclaredJobs, "function");
+  for (const rows of [[], [{ ...binding, companyId: "foreign", jobStatus: "queued" }],
+    [{ ...binding, jobId: "foreign", jobStatus: "queued" }]]) {
+    let calls = 0;
+    const result = await cleanup.cancelDeclaredJobs({ candidate, intents: [{ candidate, ...intent }],
+      read: () => rows, cancel: async () => { calls++; return { status: "cancelled" }; } });
+    assert.equal(result.pass, false);
+    assert.equal(calls, 0);
+  }
+});
+
+test("declared cleanup fails closed on transport, rejected outcome, and exhausted deadline", async () => {
+  assert.equal(typeof cleanup.cancelDeclaredJobs, "function");
+  for (const cancel of [async () => { throw new Error("private credential"); },
+    async () => ({ status: "not_found" }), async () => null]) {
+    const result = await cleanup.cancelDeclaredJobs({ candidate, intents: [{ candidate, ...intent }],
+      read: () => [{ ...binding, jobStatus: "queued" }], cancel });
+    assert.equal(result.pass, false);
+    assert.equal(JSON.stringify(result).includes("private credential"), false);
+  }
+  let time = 0;
+  let calls = 0;
+  const result = await cleanup.cancelDeclaredJobs({ candidate, intents: [{ candidate, ...intent }], timeoutMs: 100,
+    now: () => time, read: () => { time = 101; return [{ ...binding, jobStatus: "queued" }]; },
+    cancel: async () => { calls++; return { status: "cancelled" }; } });
+  assert.equal(result.pass, false);
+  assert.equal(calls, 0);
+});
+
+test("declared cleanup aborts a stalled request at its finite deadline", async () => {
+  let signal;
+  const result = await cleanup.cancelDeclaredJobs({ candidate, intents: [{ candidate, ...intent }], timeoutMs: 20,
+    read: () => [{ ...binding, jobStatus: "queued" }], cancel: (_job, options) => {
+      signal = options.signal;
+      return new Promise(() => {});
+    } });
+  assert.equal(result.pass, false);
+  assert.equal(signal.aborted, true);
+  assert.ok(result.violations.includes("cancellation_request_failed"));
+});
+
+test("declared cleanup bounds inventory cardinality and checks task-run identity", async () => {
+  let called = false;
+  const journey = { candidate, ...intent, kind: "journey", issueTitle: "unique task" };
+  for (const rows of [Array(513).fill(binding), [{ ...binding, jobStatus: "queued", sourceIdentity: "run-a", sourceRunId: "run-b" }]]) {
+    const result = await cleanup.cancelDeclaredJobs({ candidate, intents: [journey], read: () => rows,
+      cancel: async () => { called = true; return { status: "cancelled" }; } });
+    assert.equal(result.pass, false);
+  }
+  assert.equal(called, false);
+});
+
 // Run the real phase entry point, replacing only Docker at the process boundary.
-function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus = 0, remaining = "", phase = "teardown", scan = null, mode = "keyless", inventoryWriteFails = false, stopStatus = 0, intents = [], inventoryRows = [], inventoryRowsSequence = null, providerMode = "closed" } = {}) {
+function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus = 0, remaining = "", phase = "teardown", scan = null, mode = "keyless", inventoryWriteFails = false, stopStatus = 0, intents = [], inventoryRows = [], inventoryRowsSequence = null, providerMode = "closed", cancellationStatus = 202 } = {}) {
   const out = mkdtempSync(path.join(os.tmpdir(), "m1-cleanup-"));
   const envFile = path.join(out, "compose.env");
   const secret = "cleanup-disposable-secret-123456";
@@ -35,14 +106,15 @@ function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus 
       return write(file, ...args);
     };
     let inventoryReadCount = 0;
+    let workersStopped = false;
     const inventorySnapshots = ${JSON.stringify(inventoryRowsSequence ?? [inventoryRows])};
     cp.spawnSync = (command, args, options) => {
       if (command !== 'docker') throw new Error('unexpected command');
       appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(args) + '\\n');
-      if (args.includes('stop')) return { status: ${JSON.stringify(stopStatus)}, stdout: '', stderr: '' };
+      if (args.includes('stop')) { workersStopped = true; return { status: ${JSON.stringify(stopStatus)}, stdout: '', stderr: '' }; }
       if (options?.input?.includes('FROM jobs j')) {
-        appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(['inventory-read']) + '\\n');
-        const rows = inventorySnapshots[Math.min(inventoryReadCount++, inventorySnapshots.length - 1)];
+        appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify([workersStopped ? 'inventory-read' : 'cancellation-preflight-read']) + '\\n');
+        const rows = inventorySnapshots[workersStopped ? Math.min(inventoryReadCount++, inventorySnapshots.length - 1) : 0];
         return { status: 0, stderr: '', stdout: '__M1_RESULT__' + JSON.stringify({ ok: true, rows }) };
       }
       if (options?.input?.includes('FROM execution_targets')) return {
@@ -77,6 +149,10 @@ function runPhase({ downStatus = 0, downThrows = false, kind = null, listStatus 
           sandboxTeamId: 'team-a', sandboxExecutionId: 'execution-a', sandboxTemplateId: 'template-a', sandboxBuildId: 'build-a',
         })));
         return response({}, 404);
+      }
+      if (parsed.pathname.endsWith('/cancel')) {
+        appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(['cancel-job', parsed.pathname, JSON.parse(options.body)]) + '\\n');
+        return new Response(JSON.stringify({ status: 'queued' }), { status: ${cancellationStatus} });
       }
       const records = readFileSync(${JSON.stringify(path.join(out, "resource-intents.jsonl"))}, 'utf8').trim().split('\\n').map(JSON.parse);
       appendFileSync(${JSON.stringify(callsPath)}, JSON.stringify(['intent-at-dispatch', records.length]) + '\\n');
@@ -172,6 +248,28 @@ test("cleanup inventories all declared jobs with their tenant and lease, not jus
   assert.deepEqual(result.resources, [{ ...binding, intentId: "intent-1", tenant: "a", worker: "m1-worker-a" }]);
 });
 
+test("inventory accounts for a proven cancelled unleased retry without fabricating a sandbox", () => {
+  const declared = { candidate, ...intent, kind: "journey", issueTitle: "unique useful work", jobId: undefined, attemptId: undefined };
+  const prior = { ...binding, sourceIdentity: "run-1", sourceRunId: "run-1", jobStatus: "cancelled",
+    attemptStatus: "failed", leaseStatus: "expired", attemptNumber: 1 };
+  const retry = { ...prior, attemptId: "attempt-2", attemptNumber: 2, attemptStatus: "cancelled",
+    leaseId: null, leaseStatus: null, targetId: null, leaseCreatedAt: null, sandboxId: null,
+    attemptLeaseCount: 0, attemptStartedEventCount: 0 };
+  const result = cleanup.collectProviderInventory({ candidate, intents: [declared], read: () => [prior, retry] });
+  assert.equal(result.complete, true);
+  assert.equal(result.resources.length, 1);
+  assert.equal(result.resources[0].sandboxId, binding.sandboxId);
+  assert.deepEqual(result.unleasedRetries, [{ intentId: intent.id, organizationId: binding.organizationId,
+    companyId: binding.companyId, jobId: binding.jobId, attemptId: "attempt-2", attemptNumber: 2,
+    disposition: "cancelled_without_lease_or_start" }]);
+  for (const bad of [{ attemptLeaseCount: undefined }, { attemptLeaseCount: 1 }, { attemptStartedEventCount: 1 },
+    { attemptStatus: "pending" }, { jobStatus: "queued" }, { attemptNumber: 1 }, { sandboxId: "abcdefghijklmnop" }]) {
+    const negative = cleanup.collectProviderInventory({ candidate, intents: [declared], read: () => [prior, { ...retry, ...bad }] });
+    assert.equal(negative.complete, false, JSON.stringify(bad));
+  }
+  assert.equal(cleanup.collectProviderInventory({ candidate, intents: [declared], read: () => [retry] }).complete, false);
+});
+
 for (const [name, rows] of [
   ["no job after an uncertain seed", []],
   ["missing sandbox after lease activation", [{ ...binding, sandboxId: null }]],
@@ -264,10 +362,25 @@ test("keyed teardown stops workers before the final database snapshot, then down
   const read = result.calls.findIndex((args) => args[0] === "inventory-read");
   const down = result.calls.findIndex((args) => args.includes("down"));
   assert.ok(stop >= 0 && stop < read && read < down, JSON.stringify(result.calls));
+  assert.ok(result.calls.findIndex((args) => args[0] === "cancellation-preflight-read") < stop);
   assert.ok(result.calls[stop].includes("m1-worker-a"));
   assert.ok(result.calls[stop].includes("m1-worker-b"));
   assert.ok(result.calls[stop].includes("m1-worker-c"));
   assert.equal(result.calls[stop].includes("adapter-manager"), false, "adapter must remain available during graceful worker cleanup");
+});
+
+test("real teardown cancels declared unfinished jobs before stop and preserves failed cancellation", () => {
+  for (const cancellationStatus of [202, 503]) {
+    const result = runPhase({ mode: "keyed", intents: [{ candidate, ...intent }], cancellationStatus,
+      inventoryRowsSequence: [[{ ...binding, jobStatus: "running", attemptStatus: "failed" }], [binding]] });
+    const cancel = result.calls.findIndex((args) => args[0] === "cancel-job");
+    const stop = result.calls.findIndex((args) => args.includes("stop"));
+    const down = result.calls.findIndex((args) => args.includes("down"));
+    assert.ok(cancel >= 0 && cancel < stop && stop < down);
+    assert.deepEqual(result.calls[cancel][2], { reason: "shipped-boot teardown", graceful: true });
+    assert.equal(result.providerReport.pass, cancellationStatus === 202);
+    assert.equal(result.status, cancellationStatus === 202 ? 0 : 1, result.stderr);
+  }
 });
 
 test("inventory settlement waits for the normal job and lease transition", async () => {

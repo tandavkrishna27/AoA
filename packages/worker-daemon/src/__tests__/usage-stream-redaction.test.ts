@@ -180,6 +180,33 @@ describe("WRK-018 — createRunOutputCapture (the per-run scrubber)", () => {
 });
 
 describe("WRK-018 — the supervisor channel (fake provider lane)", () => {
+  it("scrubs JSON-decoded failure text with this run's canaries before serializing its accepted log", async () => {
+    for (const secret of ['private-"quote-canary-12345', "private-newline\ncanary-12345", "private-π-canary-12345"]) {
+      const result = JSON.stringify({ type: "result", is_error: true, api_error_status: 400, result: secret,
+        errors: [secret], usage: { input_tokens: 0, output_tokens: 0 } }).replaceAll("π", "\\u03c0") + "\n";
+      expect(JSON.parse(result).result).toBe(secret); // own control: the wire really contains the encoded secret.
+      const sink = collectingSink();
+      const supervisor = createSupervisor({ provider: createFakeSandboxProvider({ exitCode: 1,
+        stdoutChunks: () => [result.slice(0, 31), result.slice(31)] }), identity: SUPERVISOR_IDENTITY,
+        eventSink: sink, redactionCanaries: [], canaryCoordinator: createRunCanaryCoordinator(),
+        materializeRunSecrets: async () => ({ env: { ANTHROPIC_API_KEY: secret }, canaries: [secret] }),
+        observeRun: createUsageObserver() });
+      await supervisor.accept(makeHandoff());
+      const logs = sink.events.filter((event) => event.eventType === "log");
+      expect(logs).toHaveLength(1);
+      const message = (logs[0]!.payload as { message: string }).message;
+      const summary = JSON.parse(message).summary;
+      expect(summary).toMatchObject({ is_error: true, api_error_status: 400 });
+      for (const field of [summary.result, ...summary.errors]) {
+        expect(field).toContain(REDACTION_MARKER);
+        expect(field.split(REDACTION_MARKER).join("").trim()).toBe("");
+        for (const segment of secret.split("\n")) expect(field).not.toContain(segment);
+      }
+      expect(sink.events.filter((event) => event.eventType === "usage")).toHaveLength(1);
+      expect(sink.events.find((event) => event.eventType === "terminal")?.payload).toMatchObject({ status: "failed", exitCode: 1 });
+    }
+  });
+
   function spyObserver(): { observeRun: NonNullable<SupervisorDeps["observeRun"]>; seen: string[] } {
     const real = createUsageObserver();
     const seen: string[] = [];
