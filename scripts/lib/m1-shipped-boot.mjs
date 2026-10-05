@@ -25,7 +25,7 @@ const require = createRequire(import.meta.url);
 export const M1B_USEFUL_WORK_MAX_BYTES = 64 * 1024;
 
 /** Direct behavior proof: live reference data reached a committed, attempt-bound founder download. */
-export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit, verdict, output, download } = {}) {
+export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit, verdict, toolReads, output, download } = {}) {
   const reasons = [];
   const require = (condition, reason) => { if (!condition) reasons.push(reason); };
   require(["organizationId", "companyId", "issueId", "referenceTaskId", "referenceTitle"].every((key) =>
@@ -34,6 +34,15 @@ export function evaluateM1bUsefulWorkEvidence({ expected = {}, run, verifierExit
     !!run.distributed_job_id && !!run.distributed_attempt_id, "the assigned task did not succeed on the distributed worker");
   require(verifierExit === 0 && verdict?.ok === true && verdict?.capabilityProven === true,
     "the E7 verifier did not corroborate both lifecycle and produced output");
+  const referenceTitleSha256 = typeof expected.referenceTitle === "string"
+    ? createHash("sha256").update(expected.referenceTitle).digest("hex") : null;
+  require(toolReads?.schema === "aoa.m1b.mcp-task-reads/1" && toolReads.truncated === false &&
+    Array.isArray(toolReads.records) && toolReads.records.length <= 2048 &&
+    toolReads.records.every((record) => record && typeof record.companyId === "string" &&
+      typeof record.taskId === "string" && /^[0-9a-f]{64}$/.test(record.titleSha256 ?? "")) &&
+    toolReads.records.some((record) => record.companyId === expected.companyId &&
+      record.taskId === expected.referenceTaskId && record.titleSha256 === referenceTitleSha256),
+    "no complete observation proves a successful MCP list-tasks response containing the exact live reference");
   if (!output) reasons.push("no accepted output projection and committed artifact for this attempt");
   else {
     require(!!output.outputId && output.provider === "aoa_distributed_job" && output.receiptStatus === "applied" &&

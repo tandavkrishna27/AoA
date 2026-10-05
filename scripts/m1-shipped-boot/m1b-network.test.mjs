@@ -3,7 +3,12 @@ import { createServer, request } from "node:http";
 import { once } from "node:events";
 import { test } from "node:test";
 import { spawn } from "node:child_process";
-import { createMcpProxy, buildNetworkOverlay, verifyReplicaEnv, ownsNetworkProcess, ownsTunnelProcess, stopTunnelProcess } from "./m1b-network.mjs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import * as network from "./m1b-network.mjs";
+const { createMcpProxy, buildNetworkOverlay, verifyReplicaEnv, ownsNetworkProcess, ownsTunnelProcess, stopTunnelProcess } = network;
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -94,8 +99,8 @@ async function withProxy(fn, options = {}) {
       res.writeHead(401, { "content-type": "application/json" }); res.end('{"error":"unauthorized"}'); return;
     }
     if (options.slow) await new Promise((resolve) => setTimeout(resolve, 120));
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end('{"jsonrpc":"2.0","id":1,"result":{"value":"private-tool-result"}}');
+    res.writeHead(options.responseStatus ?? 200, { "content-type": "application/json" });
+    res.end(options.responseBody ?? '{"jsonrpc":"2.0","id":1,"result":{"value":"private-tool-result"}}');
   });
   upstream.listen(0, "127.0.0.1"); await once(upstream, "listening");
   const proxy = createMcpProxy({ companyIds: [COMPANY], upstreamPort: upstream.address().port, ...options });
@@ -151,3 +156,101 @@ test("proxy returns 413 for chunked overflow before upstream instead of resettin
   assert.equal(status, 413);
   assert.equal(received.length, 0);
 }, { maxBodyBytes: 64 }));
+
+const TASK = "55555555-5555-4555-8555-555555555555";
+const listRequest = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "list-tasks", arguments: {} } };
+const taskRows = [{ id: TASK, companyId: COMPANY, title: "hidden random title: π", description: "private-response-secret" }];
+const listResponse = (rows = taskRows) => ({ jsonrpc: "2.0", id: 1, result: { isError: false, content: [{ type: "text", text: JSON.stringify(rows) }] } });
+const expectedRead = { companyId: COMPANY, taskId: TASK, titleSha256: createHash("sha256").update(taskRows[0].title).digest("hex") };
+async function callList(url, body = listRequest) {
+  return fetch(`${url}/api/companies/${COMPANY}/mcp`, { method: "POST",
+    headers: { authorization: "Bearer synthetic-run-token", "content-type": "application/json" }, body: typeof body === "string" ? body : JSON.stringify(body) });
+}
+
+test("proxy observes only task identities and title hashes from the actual successful list-tasks response", async () => {
+  const observations = [];
+  await withProxy(async (url) => {
+    const response = await callList(url);
+    assert.deepEqual(await response.json(), listResponse());
+    assert.deepEqual(observations, [expectedRead]);
+    const audit = JSON.stringify(observations);
+    for (const secret of ["synthetic-run-token", taskRows[0].title, "private-response-secret"]) assert.equal(audit.includes(secret), false);
+  }, { responseBody: JSON.stringify(listResponse()), onObservation: (record) => observations.push(record) });
+});
+
+test("proxy never observes wrong tools, failed RPCs, mismatched responses or malformed task lists", async () => {
+  const scenarios = [
+    { body: { ...listRequest, method: "tools/list" } },
+    { body: { ...listRequest, params: { name: "get-task" } } },
+    { body: "{" },
+    { responseStatus: 403 },
+    { responseBody: "{" },
+    { responseBody: JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "private" } }) },
+    { responseBody: JSON.stringify({ ...listResponse(), id: 2 }) },
+    { responseBody: JSON.stringify({ ...listResponse(), result: { ...listResponse().result, isError: true } }) },
+    { responseBody: JSON.stringify({ ...listResponse(), result: { content: [{ type: "text", text: "{" }] } }) },
+    { responseBody: JSON.stringify(listResponse({ tasks: taskRows })) },
+    { responseBody: JSON.stringify(listResponse([...taskRows, { id: B, companyId: B, title: "foreign" }])) },
+    { responseBody: JSON.stringify(listResponse([{ id: TASK, companyId: COMPANY }])) },
+    { responseBody: JSON.stringify(listResponse([{ ...taskRows[0], id: [TASK] }])) },
+    { responseBody: JSON.stringify(listResponse([...taskRows, ...taskRows])) },
+    { responseBody: JSON.stringify(listResponse([{ ...taskRows[0], title: "x".repeat(8193) }])) },
+    { responseBody: JSON.stringify(listResponse(Array.from({ length: 1025 }, () => taskRows[0]))) },
+  ];
+  for (const scenario of scenarios) {
+    const observations = [];
+    await withProxy(async (url) => { await (await callList(url, scenario.body)).arrayBuffer(); },
+      { responseBody: JSON.stringify(listResponse()), ...scenario, onObservation: (record) => observations.push(record) });
+    assert.deepEqual(observations, []);
+  }
+});
+
+test("the daemon audit writer deduplicates successful reads, stays private and fails closed at record/byte bounds", async () => {
+  assert.equal(typeof network.createMcpTaskReadObserver, "function");
+  assert.equal(typeof network.readMcpTaskReads, "function");
+  const out = mkdtempSync(path.join(tmpdir(), "aoa-mcp-reads-"));
+  try {
+    mkdirSync(path.join(out, "m1b-network"));
+    const observer = network.createMcpTaskReadObserver(out, { maxRecords: 1 });
+    await withProxy(async (url) => {
+      await (await callList(url)).arrayBuffer(); await (await callList(url)).arrayBuffer();
+    }, { responseBody: JSON.stringify(listResponse()), onObservation: observer });
+    assert.deepEqual(network.readMcpTaskReads(out), { schema: "aoa.m1b.mcp-task-reads/1", truncated: false, records: [expectedRead] });
+    const file = path.join(out, "m1b-network", "mcp-task-reads.json");
+    const raw = readFileSync(file, "utf8");
+    assert.equal(raw.includes("synthetic-run-token"), false); assert.equal(raw.includes(taskRows[0].title), false);
+    assert.equal(raw.includes("private-response-secret"), false);
+    if (process.platform !== "win32") assert.equal(statSync(file).mode & 0o777, 0o600);
+    observer({ ...expectedRead, taskId: B });
+    assert.equal(JSON.parse(readFileSync(file, "utf8")).truncated, true);
+    assert.equal(network.readMcpTaskReads(out), null);
+    const byteBound = network.createMcpTaskReadObserver(out, { maxBytes: 128 });
+    byteBound(expectedRead);
+    assert.ok(readFileSync(file).length <= 128);
+    assert.equal(network.readMcpTaskReads(out), null);
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test("task read reader refuses missing, oversized, malformed, truncated and foreign-shaped records", () => {
+  assert.equal(typeof network.readMcpTaskReads, "function");
+  const out = mkdtempSync(path.join(tmpdir(), "aoa-mcp-reads-"));
+  try {
+    assert.equal(network.readMcpTaskReads(out), null);
+    mkdirSync(path.join(out, "m1b-network"));
+    const file = path.join(out, "m1b-network", "mcp-task-reads.json");
+    const valid = { schema: "aoa.m1b.mcp-task-reads/1", truncated: false, records: [expectedRead] };
+    for (const value of ["{", "x".repeat(262145), JSON.stringify({ ...valid, truncated: true }),
+      JSON.stringify({ ...valid, schema: "other" }), JSON.stringify({ ...valid, records: [{ ...expectedRead, bearer: "private" }] }),
+      JSON.stringify({ ...valid, records: [{ ...expectedRead, taskId: [TASK] }] }),
+      JSON.stringify({ ...valid, records: [{ ...expectedRead, titleSha256: "not-a-digest" }] })]) {
+      writeFileSync(file, value); assert.equal(network.readMcpTaskReads(out), null);
+    }
+    writeFileSync(file, JSON.stringify(valid)); assert.deepEqual(network.readMcpTaskReads(out), valid);
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test("an audit persistence error refuses the response without returning its private exception", () => withProxy(async (url) => {
+  const response = await callList(url);
+  assert.equal(response.status, 502);
+  assert.equal((await response.text()).includes("private-filesystem-secret"), false);
+}, { responseBody: JSON.stringify(listResponse()), onObservation: () => { throw new Error("private-filesystem-secret"); } }));

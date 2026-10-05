@@ -69,6 +69,7 @@ import { fileURLToPath } from "node:url";
 
 import { CROSS_TENANT_EVIDENCE_MARKER, runCrossTenantCases } from "./cross-tenant.mjs";
 import { REDACTION_PROBE_EVIDENCE_MARKER, runRedactionProbeCases } from "./redaction.mjs";
+import { readMcpTaskReads } from "./m1b-network.mjs";
 import { REDACTION_PROBE_CASE } from "../lib/m1a-redaction-probe.mjs";
 import {
   evaluateFaultMatrixDeclaration,
@@ -1218,20 +1219,23 @@ async function m1bUsefulWork(state) {
     providerEvidence = await usefulWorkProviderEvidence(state, run, tenant);
   }
   const candidates = [];
+  // The title in an output alone does not prove a tool call. The CI proxy records
+  // only successful, correlated list-tasks responses after the real CP authenticates them.
+  const toolReads = readMcpTaskReads(state.out);
   if (outputs.length === 0) candidates.push({ output: null, download: null,
-    outcome: evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict }) });
+    outcome: evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict, toolReads }) });
   for (const output of outputs) {
     let download;
     let error;
     try { download = await downloadUsefulWork(state, output.outputId); }
     catch (e) { error = redactSecrets(String(e?.message ?? e), state.redact).slice(0, 1000); }
-    const outcome = evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict, output, download });
+    const outcome = evaluateM1bUsefulWorkEvidence({ expected, run, verifierExit, verdict, toolReads, output, download });
     candidates.push({ output, download: download ? { status: download.status, contentLength: download.contentLength,
       bytes: download.body?.length ?? null, sha256: download.body ? createHash("sha256").update(download.body).digest("hex") : null } : null, error, outcome });
   }
   const passed = candidates.some((candidate) => candidate.outcome.pass) && providerEvidence?.pass === true;
   writeEvidence(state, "m1b-useful-work.json", { candidate: state.candidate, mode: state.mode, expected, run,
-    verifierExit, verdict, providerEvidence, candidates, passed });
+    verifierExit, verdict, toolReads, providerEvidence, candidates, passed });
   if (!passed) fail("m1b-useful-work did not prove live AoA retrieval, committed output, and founder download; see m1b-useful-work.json");
   console.log(`m1b-useful-work: run=${run.id} reference=${reference.id} committed founder download PASS`);
 }

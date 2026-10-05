@@ -48,6 +48,10 @@ function usefulWorkFixture() {
     expected,
     run: { status: "succeeded", execution_owner: "distributed", distributed_job_id: "job-a", distributed_attempt_id: "attempt-a" },
     verifierExit: 0, verdict: { ok: true, capabilityProven: true },
+    toolReads: { schema: "aoa.m1b.mcp-task-reads/1", truncated: false, records: [{
+      companyId: expected.companyId, taskId: expected.referenceTaskId,
+      titleSha256: createHash("sha256").update(expected.referenceTitle).digest("hex"),
+    }] },
     output: { outputId: "output-a", organizationId: A, companyId: expected.companyId, issueId: expected.issueId,
       provider: "aoa_distributed_job", externalId: "artifact-a", jobId: "job-a", attemptId: "attempt-a", attemptNumber: 2,
       sourceIssueId: expected.issueId, receiptStatus: "applied", aggregateKind: "task_outputs",
@@ -62,6 +66,24 @@ function usefulWorkFixture() {
 
 test("M1b requires capability and exact accepted-attempt content retrieved by the founder", () => {
   assert.deepEqual(evaluateM1bUsefulWorkEvidence(usefulWorkFixture()), { pass: true, reasons: [] });
+});
+
+test("M1b requires an observed successful MCP read of the exact reference, even when the output is correct", () => {
+  const good = usefulWorkFixture();
+  for (const toolReads of [undefined, null, {},
+    { ...good.toolReads, schema: "other" },
+    { ...good.toolReads, truncated: true },
+    { ...good.toolReads, records: [] },
+    { ...good.toolReads, records: [null] },
+    ...["companyId", "taskId", "titleSha256"].map((field) => ({
+      ...good.toolReads, records: [{ ...good.toolReads.records[0], [field]: "wrong" }],
+    })),
+    { ...good.toolReads, records: Array(2049).fill(good.toolReads.records[0]) },
+  ]) {
+    const verdict = evaluateM1bUsefulWorkEvidence({ ...good, toolReads });
+    assert.equal(verdict.pass, false);
+    assert.ok(verdict.reasons.some((reason) => reason.includes("MCP")));
+  }
 });
 
 test("M1b refuses missing marker, wrong tenant/attempt/receipt, no capability and corrupt downloads", () => {

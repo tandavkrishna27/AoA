@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { once } from "node:events";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readlinkSync, readSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -28,12 +28,103 @@ const networkDir = (out) => path.join(out, "m1b-network");
 const binaryPath = (out) => path.join(networkDir(out), `cloudflared-${RELEASE}`);
 const statusPath = (out) => path.join(networkDir(out), "status.json");
 const statePath = (out) => path.join(out, "state.json");
+const taskReadPath = (out) => path.join(networkDir(out), "mcp-task-reads.json");
+const TASK_READ_SCHEMA = "aoa.m1b.mcp-task-reads/1";
+const MAX_TASK_READ_BYTES = 256 * 1024;
+const MAX_TASK_READ_RECORDS = 2048;
 
 function privateJson(file, value) {
   const temp = `${file}.${process.pid}.tmp`;
   writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600 });
   chmodSync(temp, 0o600);
   renameSync(temp, file);
+}
+
+function exactKeys(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) &&
+    Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function validTaskRead(record) {
+  return exactKeys(record, ["companyId", "taskId", "titleSha256"]) &&
+    typeof record.companyId === "string" && UUID.test(record.companyId) &&
+    typeof record.taskId === "string" && UUID.test(record.taskId) &&
+    typeof record.titleSha256 === "string" && /^[a-f0-9]{64}$/.test(record.titleSha256);
+}
+
+/** Nonsecret response observations only. Dedupe also bounds repeated-call disk work. */
+export function createMcpTaskReadObserver(out, { maxRecords = MAX_TASK_READ_RECORDS, maxBytes = MAX_TASK_READ_BYTES } = {}) {
+  if (!Number.isInteger(maxRecords) || maxRecords < 1 || maxRecords > MAX_TASK_READ_RECORDS ||
+      !Number.isInteger(maxBytes) || maxBytes < 128 || maxBytes > MAX_TASK_READ_BYTES) throw new Error("invalid task read bounds");
+  mkdirSync(networkDir(out), { recursive: true, mode: 0o700 });
+  const audit = { schema: TASK_READ_SCHEMA, truncated: false, records: [] };
+  const seen = new Set();
+  privateJson(taskReadPath(out), audit);
+  return (record) => {
+    if (!validTaskRead(record)) throw new Error("invalid task read observation");
+    if (audit.truncated) return;
+    const key = `${record.companyId}/${record.taskId}/${record.titleSha256}`;
+    if (seen.has(key)) return;
+    const candidate = { ...audit, records: [...audit.records, record] };
+    if (candidate.records.length > maxRecords || Buffer.byteLength(JSON.stringify(candidate, null, 2)) > maxBytes) {
+      audit.truncated = true;
+    } else {
+      // Copy only the allowlisted scalar fields; callers cannot mutate retained evidence.
+      audit.records.push({ companyId: record.companyId, taskId: record.taskId, titleSha256: record.titleSha256 });
+      seen.add(key);
+    }
+    privateJson(taskReadPath(out), audit);
+  };
+}
+
+/** Missing, invalid and truncated observations never establish a tool read. */
+export function readMcpTaskReads(out) {
+  let fd;
+  try {
+    fd = openSync(taskReadPath(out), "r");
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_TASK_READ_BYTES) return null;
+    const buffer = Buffer.alloc(MAX_TASK_READ_BYTES + 1);
+    let size = 0;
+    while (size < buffer.length) {
+      const read = readSync(fd, buffer, size, buffer.length - size, null);
+      if (read === 0) break;
+      size += read;
+    }
+    if (size > MAX_TASK_READ_BYTES) return null;
+    const audit = JSON.parse(buffer.subarray(0, size).toString("utf8"));
+    if (!exactKeys(audit, ["schema", "truncated", "records"]) || audit.schema !== TASK_READ_SCHEMA ||
+        audit.truncated !== false || !Array.isArray(audit.records) || audit.records.length > MAX_TASK_READ_RECORDS ||
+        !audit.records.every(validTaskRead)) return null;
+    return audit;
+  } catch { return null; }
+  finally { if (fd !== undefined) closeSync(fd); }
+}
+
+function successfulTaskReads(requestBody, responseBody, companyId) {
+  try {
+    const request = JSON.parse(requestBody.toString("utf8"));
+    const response = JSON.parse(responseBody.toString("utf8"));
+    const id = request?.id;
+    if (request?.jsonrpc !== "2.0" || request.method !== "tools/call" || request.params?.name !== "list-tasks" ||
+        !((typeof id === "number" && Number.isFinite(id)) || (typeof id === "string" && Buffer.byteLength(id) <= 128)) ||
+        response?.jsonrpc !== "2.0" || response.id !== id || Object.hasOwn(response, "error") ||
+        !response.result || (response.result.isError !== undefined && response.result.isError !== false) ||
+        !Array.isArray(response.result.content) || response.result.content.length !== 1) return [];
+    const content = response.result.content[0];
+    if (content?.type !== "text" || typeof content.text !== "string") return [];
+    // handleListTasks returns ok(filtered): the serialized payload is the task array.
+    const rows = JSON.parse(content.text);
+    if (!Array.isArray(rows) || rows.length > 1024) return [];
+    const seen = new Set();
+    for (const row of rows) {
+      if (!row || typeof row.id !== "string" || !UUID.test(row.id) || row.companyId !== companyId ||
+          typeof row.title !== "string" || Buffer.byteLength(row.title) > 8192 || seen.has(row.id)) return [];
+      seen.add(row.id);
+    }
+    return rows.map((row) => ({ companyId, taskId: row.id,
+      titleSha256: createHash("sha256").update(row.title, "utf8").digest("hex") }));
+  } catch { return []; }
 }
 
 export function buildNetworkOverlay(state, publicBase) {
@@ -82,9 +173,10 @@ async function boundedBody(stream, maxBytes, signal) {
 }
 
 /** Local tests may substitute a loopback port; CLI always targets localhost:3100. */
-export function createMcpProxy({ companyIds, upstreamPort = 3100, maxBodyBytes = 1_048_576, timeoutMs = 30_000 }) {
+export function createMcpProxy({ companyIds, upstreamPort = 3100, maxBodyBytes = 1_048_576, timeoutMs = 30_000, onObservation }) {
   if (!Number.isInteger(upstreamPort) || upstreamPort < 1 || upstreamPort > 65535 ||
-      !companyIds.length || companyIds.some((id) => !UUID.test(id))) throw new Error("invalid proxy scope");
+      !companyIds.length || companyIds.some((id) => !UUID.test(id)) ||
+      (onObservation !== undefined && typeof onObservation !== "function")) throw new Error("invalid proxy scope");
   const routes = new Set(companyIds.map((id) => `/api/companies/${id}/mcp`));
   const server = createServer({ maxHeaderSize: 16_384 }, async (req, res) => {
     if (req.method !== "POST" || !routes.has(req.url)) { reply(res, 404); req.resume(); return; }
@@ -106,6 +198,11 @@ export function createMcpProxy({ companyIds, upstreamPort = 3100, maxBodyBytes =
       const response = await fetch(`http://localhost:${upstreamPort}${req.url}`, { method: "POST", headers, body, signal: controller.signal, redirect: "manual" });
       const responseBody = response.body ? await boundedBody(response.body, 4 * 1_048_576, controller.signal) : Buffer.alloc(0);
       if (response.status >= 300 && response.status < 400) { reply(res, 502); return; }
+      if (onObservation && response.ok && !controller.signal.aborted && !res.destroyed &&
+          /^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
+        const companyId = req.url.split("/")[3];
+        for (const record of successfulTaskReads(body, responseBody, companyId)) onObservation(record);
+      }
       res.writeHead(response.status, { "content-type": "application/json", "cache-control": "no-store" });
       res.end(responseBody);
     } catch (error) {
@@ -217,7 +314,8 @@ async function daemon(out, binary) {
   if (binary !== binaryPath(out)) throw new Error("invalid pinned tunnel path");
   const state = JSON.parse(readFileSync(statePath(out), "utf8"));
   if (state.mode !== "keyed") throw new Error("keyed network only");
-  const proxy = createMcpProxy({ companyIds: Object.values(state.tenants).map((tenant) => tenant.companyId) });
+  const proxy = createMcpProxy({ companyIds: Object.values(state.tenants).map((tenant) => tenant.companyId),
+    onObservation: createMcpTaskReadObserver(out) });
   proxy.listen(0, "127.0.0.1"); await once(proxy, "listening");
   const status = { pid: process.pid, startTime: procInfo(process.pid)?.startTime, proxyPort: proxy.address().port, tunnelUrl: null };
   privateJson(statusPath(out), status);
