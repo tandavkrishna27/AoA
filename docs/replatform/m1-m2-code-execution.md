@@ -181,3 +181,16 @@ suite passed 23,789 tests with 1,916 skipped across 2,463 passing files. The foc
 PostgreSQL, policy and response-privacy group passed 89 tests; its strengthened
 predecessor-expiry and membership case also passed. Citation integrity and test
 inventory checks passed. Warm dispatch remains unactivated and incomplete.
+
+## Warm provider effects at use
+
+A retained-resource grant and its primary capability are revalidated after the
+resource lock is acquired and again after provider inspection, immediately before
+dispatch. A grant that expires in the queue or during inspection cannot resume the
+VM. Four tests exercise both timing windows and both authorities without a live
+provider call. The warm worker and issuer still require integration.
+
+At-use expiry verification: repository typecheck and build passed; the full suite
+passed 23,790 tests with 1,915 skipped across 2,462 passing files. The wire
+checkpoint group passed 20 tests, including the four expiry cases. Citation
+integrity and inventory checks passed. Rollout flags remain off.

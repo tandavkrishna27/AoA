@@ -7,6 +7,8 @@ import { NetworkedProviderDriver, signOwnedLabelsCapability, signWarmResourceCap
 import { E2bSandboxProvider } from "@armyofagents/sandbox-e2b-provider/e2b-provider.js";
 import { MockE2bTransport } from "@armyofagents/sandbox-e2b-provider/mock-transport.js";
 import { createProviderServer } from "../server.js";
+import { gateOwnedOp } from "../owned-op-gate.js";
+import { KeyedMutex } from "../keyed-mutex.js";
 
 const NOW = 1_700_000_000_000;
 const keys = generateKeyPairSync("ed25519");
@@ -129,5 +131,40 @@ describe("ownership checked checkpoint and restore wire", () => {
     await expect(driver[op](sandboxId, ctx)).rejects.toBeInstanceOf(UnsupportedProviderOperation);
     expect(pause).not.toHaveBeenCalled();
     expect(resume).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("retained resource capability at-use expiry", () => {
+  it.each([
+    ["queue", "warm"], ["inspect", "warm"], ["queue", "primary"], ["inspect", "primary"],
+  ] as const)("refuses expiry during %s of %s authority before any restore effect", async (phase, authority) => {
+    const { provider, sandboxId, resume } = await setup();
+    const current = { ...labels, jobId: "new-job", leaseId: "new-lease", attempt: 2 };
+    const capability = signOwnedLabelsCapability({ v: 1, audience: "adapter-manager", ownedLabels: current, expiresAt: NOW + (authority === "primary" ? 1_000 : 60_000) }, keys.privateKey);
+    const warmResourceCapability = signWarmResourceCapability({ v: 1, audience: "adapter-manager-warm-resource", sessionId: "session", generation: 2,
+      resourceId: sandboxId, physicalLabels: labels, ownedLabels: current, previousCapabilityExpiresAt: NOW,
+      issuedAt: NOW, expiresAt: NOW + 1_000 }, keys.privateKey);
+    let clock = NOW;
+    const lock = new KeyedMutex();
+    let release!: () => void;
+    const blocker = phase === "queue" ? lock.runExclusive(sandboxId, () => new Promise<void>((resolve) => { release = resolve; })) : null;
+    await Promise.resolve();
+    const originalInspect = provider.inspect.bind(provider);
+    const inspect = vi.spyOn(provider, "inspect").mockImplementation(async (...args) => {
+      const detail = await originalInspect(...args);
+      if (phase === "inspect") clock = NOW + 1_000;
+      return detail;
+    });
+    const dispatch = vi.fn(() => provider.restore(sandboxId, ctx));
+    const work = gateOwnedOp({ provider, controlPlanePublicKey: keys.publicKey, now: () => clock,
+      sandboxLock: lock, warmResourceCapability }, sandboxId, ctx, capability, dispatch);
+    const denied = expect(work).rejects.toBeInstanceOf(ResourceNotAvailableError);
+    if (phase === "queue") { clock = NOW + 1_000; release(); await blocker; }
+    await denied;
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(resume).not.toHaveBeenCalled();
+    if (phase === "queue") expect(inspect).not.toHaveBeenCalled();
+    expect(lock.size).toBe(0);
   });
 });

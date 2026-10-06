@@ -155,6 +155,19 @@ export async function gateOwnedOp<R>(
   );
   if (deps.warmResourceCapability !== undefined && !warm) throw new ResourceNotAvailableError();
 
+  // A retained-resource grant must remain valid at use, after queueing and
+  // inspection. Recheck its primary fence at the same instant; the additional
+  // grant never supplies a replacement for an expired primary capability.
+  const requireWarmAuthorityAtUse = () => {
+    if (deps.warmResourceCapability === undefined) return;
+    const atUse = now();
+    const currentLabels = verifyOrUniform(capability, controlPlanePublicKey, atUse);
+    if (!labelsEqual(currentLabels, ownedLabels) || !verifyWarmResourceCapability(
+      deps.warmResourceCapability, controlPlanePublicKey,
+      { nowMs: atUse, resourceId: sandboxId, ownedLabels: currentLabels, primaryExpiresAt: capability!.expiresAt },
+    )) throw new ResourceNotAvailableError();
+  };
+
   // 2. The TOCTOU lock spans inspect -> owned-check -> dispatch so THIS instance can't
   //    interleave the check-to-use gap on one sandbox. Released in runExclusive's finally
   //    (on resolve OR throw); the key evicts on drain. PARTIAL: no cross-replica / E2B
@@ -164,6 +177,7 @@ export async function gateOwnedOp<R>(
   //    dispatcher that re-entered this lock on the same key would self-deadlock — keep
   //    dispatchers non-re-entrant, or key any inner gate on a different id.
   return sandboxLock.runExclusive(sandboxId, async () => {
+    requireWarmAuthorityAtUse();
     // ★ The budget LATCH (Codex P2, PR #557). When the bound fires, the locked section is
     // detached but still running: without this, an inspection that resolves afterwards would go
     // on to dispatch, so an export could start reading and PUTting after the caller was told it
@@ -191,6 +205,7 @@ export async function gateOwnedOp<R>(
       }
 
       if (budgetFired) throw new WireProtocolError("gated operation abandoned: its budget fired before dispatch");
+      requireWarmAuthorityAtUse();
 
       // Allow — dispatch OUTSIDE the inspect-collapse try. A dispatch fault is ITS OWN class.
       // ★ The dispatch's budget is RE-MEASURED here (Codex P1, seventh round): the inspection above
