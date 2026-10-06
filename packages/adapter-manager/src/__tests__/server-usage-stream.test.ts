@@ -297,3 +297,78 @@ describe("WRK-018 — the networked LANE end to end: real supervisor -> makeRunP
     for (const body of executeBodies) expect(body).not.toMatch(/AM-LANE-CANARY/);
   });
 });
+
+ describe("live execute stdout over the actual gated HTTP path", () => {
+  beforeEach(async () => start(true));
+  it("scrubs both fresh and historical credentials from raw live HTTP frames", async () => {
+    const labels = labelsFor("live-history-org", "live-history-lease");
+    let rawBody: Promise<string> | undefined;
+    const liveFetch: typeof fetch = (async (url: string | URL, init?: RequestInit) => {
+      const response = await fetch(url, init);
+      if (String(url).endsWith("/op/execute")) rawBody = response.clone().text();
+      return response;
+    }) as typeof fetch;
+    const driver = new NetworkedProviderDriver({ baseUrl, capability: mint(labels), enableLiveStdout: true, fetch: liveFetch });
+    const { sandboxId } = await driver.create({ resourceLabels: labels, command: "claude", args: [], env: {}, workloadType: "batch" }, ctx("live-history-create"));
+    const original = transport.runCommand.bind(transport);
+    transport.runCommand = async (request, handlers) => {
+      handlers?.onStdout?.("old " + CANARY_B.slice(0, 7));
+      handlers?.onStdout?.(CANARY_B.slice(7) + " fresh " + CANARY_A + "\n");
+      return original(request, handlers);
+    };
+    const chunks: string[] = [];
+    await driver.execute({ sandboxId, command: "claude", args: [], env: { ANTHROPIC_API_KEY: CANARY_A,
+      AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify([CANARY_B]), AOA_COMMANDER_WARM_TURN: "live-history-turn" },
+      onStdout: (chunk) => chunks.push(chunk) }, ctx("live-history-execute"));
+    const raw = await rawBody!;
+    expect(raw).toContain('"stdout"'); expect(raw).not.toContain(CANARY_A); expect(raw).not.toContain(CANARY_B);
+    expect(chunks.join("")).toContain(MARKER); expect(chunks.join("")).not.toContain(CANARY_B);
+  });
+  it("returns a fixed error frame after early output when the provider fails", async () => {
+    const labels = labelsFor("live-error-org", "live-error-lease");
+    const driver = new NetworkedProviderDriver({ baseUrl, capability: mint(labels), enableLiveStdout: true });
+    const { sandboxId } = await driver.create({ resourceLabels: labels, command: "claude", args: [],
+      env: { ANTHROPIC_API_KEY: CANARY_A }, workloadType: "batch" }, ctx("live-error-create"));
+    transport.runCommand = async (_request, handlers) => {
+      handlers?.onStdout?.("early " + CANARY_A + "\n");
+      throw new Error("raw provider secret " + CANARY_A);
+    };
+    const chunks: string[] = [];
+    await expect(driver.execute({ sandboxId, command: "claude", args: [], env: { ANTHROPIC_API_KEY: CANARY_A },
+      onStdout: (chunk) => chunks.push(chunk) }, ctx("live-error-execute"))).rejects.toThrow("adapter-manager provider operation failed");
+    expect(chunks.join("")).toContain(MARKER); expect(chunks.join("")).not.toContain(CANARY_A);
+  });
+  it("refuses unsigned live execute before provider output or command execution", async () => {
+    const labels = labelsFor("live-denied-org", "live-denied-lease");
+    const owner = new NetworkedProviderDriver({ baseUrl, capability: mint(labels) });
+    const { sandboxId } = await owner.create({ resourceLabels: labels, command: "claude", args: [], env: {}, workloadType: "batch" }, ctx("live-denied-create"));
+    const unsigned = new NetworkedProviderDriver({ baseUrl, enableLiveStdout: true });
+    const chunks: string[] = [];
+    await expect(unsigned.execute({ sandboxId, command: "claude", args: [], env: {},
+      onStdout: (chunk) => chunks.push(chunk) }, ctx("live-denied-execute"))).rejects.toThrow();
+    expect(chunks).toEqual([]); expect(transport.handlerArgs).toHaveLength(0);
+  });
+  it("delivers scrubbed output before the provider command completes", async () => {
+    const labels = labelsFor("live-org", "live-lease");
+    const driver = new NetworkedProviderDriver({ baseUrl, capability: mint(labels), enableLiveStdout: true });
+    const { sandboxId } = await driver.create({ resourceLabels: labels, command: "claude", args: [],
+      env: { ANTHROPIC_API_KEY: CANARY_A }, workloadType: "batch" }, ctx("live-create"));
+    let release!: () => void; const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const original = transport.runCommand.bind(transport);
+    transport.runCommand = async (request, handlers) => {
+      handlers?.onStdout?.("before " + CANARY_A.slice(0, 8));
+      handlers?.onStdout?.(CANARY_A.slice(8) + "\n");
+      await blocked; return original(request, handlers);
+    };
+    let sawOutput!: () => void; const delivered = new Promise<void>((resolve) => { sawOutput = resolve; });
+    const chunks: string[] = []; let finished = false;
+    const execution = driver.execute({ sandboxId, command: "claude", args: [], env: { ANTHROPIC_API_KEY: CANARY_A },
+      onStdout: (chunk) => { chunks.push(chunk); sawOutput(); } }, ctx("live-execute")).finally(() => { finished = true; });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([delivered, new Promise<void>((resolve) => { timer = setTimeout(resolve, 500); })]);
+      expect(chunks.length).toBeGreaterThan(0); expect(finished).toBe(false);
+      expect(chunks.join("")).not.toContain(CANARY_A); expect(chunks.join("")).toContain(MARKER);
+    } finally { if (timer) clearTimeout(timer); release(); await execution; }
+  });
+});

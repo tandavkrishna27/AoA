@@ -30,7 +30,7 @@ import {
   type ProviderModule,
 } from "../bin/adapter-manager.js";
 import { REAPER_ENABLED_ENV, REAPER_INTERVAL_MS_ENV, type ReaperScheduler, type ReaperTimer } from "../reaper-loop.js";
-import { CONTROL_PLANE_URL_ENV } from "../reaper-truth-client.js";
+import { CONTROL_PLANE_URL_ENV, TRUTH_SHARED_SECRET_ENV } from "../reaper-truth-client.js";
 
 // ── Locally-generated key material (no real control-plane key, no real E2B key) ──
 const ed25519 = generateKeyPairSync("ed25519");
@@ -48,7 +48,7 @@ function fakeProviderModule() {
   const record: {
     transportCreated: number;
     scannersCreated: number;
-    ctorOptions?: { transport: unknown; templateId?: string; scanExportBytes?: unknown };
+    ctorOptions?: { transport: unknown; templateId?: string; scanExportBytes?: unknown; enablePauseResume?: boolean };
   } = {
     transportCreated: 0,
     scannersCreated: 0,
@@ -263,6 +263,7 @@ describe("bootAdapterManager — fail-closed: createProviderServer is NEVER call
 });
 
 describe("bootAdapterManager — DEP-011 reaper wiring (Slice C, INERT until flagged)", () => {
+  const warmFlag = "AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED";
   function fakeScheduler() {
     const scheduled: Array<() => void> = [];
     const scheduler: ReaperScheduler = {
@@ -273,6 +274,27 @@ describe("bootAdapterManager — DEP-011 reaper wiring (Slice C, INERT until fla
     };
     return { scheduler, scheduled };
   }
+  it.each([REAPER_ENABLED_ENV, CONTROL_PLANE_URL_ENV, IDEMPOTENCY_LEDGER_DIR_ENV, TRUTH_SHARED_SECRET_ENV])(
+    "refuses warm boot before provider construction when %s is absent", async (missing) => {
+      const { deps, record, createProviderServer } = makeDeps();
+      const env = { ...deps.env, [warmFlag]: "1", [REAPER_ENABLED_ENV]: "1", [CONTROL_PLANE_URL_ENV]: "http://cp",
+        [TRUTH_SHARED_SECRET_ENV]: "fake-peer", [missing]: undefined };
+      expect((await bootAdapterManager({ ...deps, env })).kind).toBe("refused");
+      expect(record.transportCreated).toBe(0); expect(createProviderServer).not.toHaveBeenCalled();
+    });
+  it("opts into pause support and durable recovery only for fully configured warm boot", async () => {
+    const { scheduler, scheduled } = fakeScheduler();
+    const { deps, record, provider, createProviderServer } = makeDeps({ reaperScheduler: scheduler });
+    Object.assign(provider, { checkpointMode: "snapshot", advertisedOperations: new Set(["checkpoint", "restore"]) });
+    const env = { ...deps.env, [warmFlag]: "1", [REAPER_ENABLED_ENV]: "1", [CONTROL_PLANE_URL_ENV]: "http://cp",
+      [TRUTH_SHARED_SECRET_ENV]: "fake-peer" };
+    expect((await bootAdapterManager({ ...deps, env })).kind).toBe("listening");
+    expect(record.ctorOptions?.enablePauseResume).toBe(true);
+    expect(createProviderServer.mock.calls[0][0].warmCleanupJournal).toBeDefined();
+    const guard = createProviderServer.mock.calls[0][0].isWarmEnabled!;
+    expect(guard()).toBe(true); env[warmFlag] = "0"; expect(guard()).toBe(false);
+    expect(scheduled).toHaveLength(1);
+  });
 
   it("flag OFF (default) — boots listening, /metrics counter is wired, the loop is NOT armed", async () => {
     const { scheduler, scheduled } = fakeScheduler();
