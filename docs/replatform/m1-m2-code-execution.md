@@ -160,3 +160,24 @@ Verification: 393 focused tests passed with one skipped; repository typecheck,
 23,786 full-suite tests (1,915 skipped, 2,462 passing files), build, citation
 integrity and test inventory checks passed. No live provider call, activation,
 deployment or main merge was performed.
+
+## Warm Commander durable reservation
+
+Warm ownership is reserved transactionally on an actual Commander turn. Separate
+private columns preserve the turn's task context and are omitted from run-history
+responses. A conversation lock and unique index allow one owner; replay does not
+increment the generation or duplicate the audit. Failed transactions leave no
+reservation. The existing app role needs no additional grants.
+
+Resume requires the exact accepted checkpoint log, a later accepted successful
+terminal, the original retired lease and an expired previous capability. A mutable
+paused marker alone is insufficient. Real PostgreSQL tests also cover competing
+claims, target mismatch, rollback, inactive membership and a future predecessor
+capability deadline. These helpers do not yet activate warm dispatch: the at-use
+issuer, worker lifecycle and retained-resource cleanup remain pending.
+
+Durable-reservation verification: repository typecheck and build passed. The full
+suite passed 23,789 tests with 1,916 skipped across 2,463 passing files. The focused
+PostgreSQL, policy and response-privacy group passed 89 tests; its strengthened
+predecessor-expiry and membership case also passed. Citation integrity and test
+inventory checks passed. Warm dispatch remains unactivated and incomplete.

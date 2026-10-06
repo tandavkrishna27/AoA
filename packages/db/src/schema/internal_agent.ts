@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   jsonb,
   boolean,
+  check,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { companies } from "./companies.js";
@@ -370,6 +371,10 @@ export const internalAgentRuns = pgTable(
     // Plain uuid, not a FK — mutual reference with messages.runId would create
     // insert ordering issues (message references run, run references message)
     conversationMessageId: uuid("conversation_message_id"),
+    // Current retained Commander resource claim, on an actual turn. Moving it
+    // to the successor is part of placement; no synthetic run or wider grant.
+    distributedWarmConversationId: uuid("distributed_warm_conversation_id"),
+    distributedWarmState: jsonb("distributed_warm_state").$type<Record<string, unknown>>(),
 
     // Related entity
     relatedEntityType: text("related_entity_type"), // 'discussion' | 'task' | 'agent' | 'goal' | 'memory' | null
@@ -430,6 +435,13 @@ export const internalAgentRuns = pgTable(
       table.relatedEntityId,
     ),
     agentIdx: index("ia_runs_agent_idx").on(table.companyId, table.agentId),
+    distributedWarmConversationUq: uniqueIndex("ia_runs_distributed_warm_conversation_uq")
+      .on(table.companyId, table.userId, table.distributedWarmConversationId)
+      .where(sql`distributed_warm_state IS NOT NULL`),
+    distributedWarmTurnValid: check("ia_runs_distributed_warm_turn_check", sql`distributed_warm_state IS NULL OR (
+      trigger_type = 'conversation' AND user_id IS NOT NULL AND
+      distributed_warm_conversation_id IS NOT NULL
+    )`),
     continuationIdempotencyUq: uniqueIndex("ia_runs_continuation_idempotency_uq")
       .on(table.companyId, table.continuationIdempotencyKey)
       .where(sql`continuation_idempotency_key IS NOT NULL`),

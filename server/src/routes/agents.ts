@@ -1,4 +1,5 @@
 import { Router, type Request } from "express";
+import { commanderPublicRun } from "../services/commander-public-run.js";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Db } from "@armyofagents/db";
@@ -845,7 +846,7 @@ export function agentRoutes(db: Db) {
       .where(where)
       .orderBy(desc(internalAgentRuns.createdAt))
       .limit(limit);
-    res.json({ runs, total, limit });
+    res.json({ runs: runs.map(commanderPublicRun), total, limit });
   });
 
   router.get("/companies/:companyId/agents/:id/triggers", async (req, res) => {
