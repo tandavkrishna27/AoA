@@ -16,9 +16,9 @@ function handoff() {
       args: ["/home/user/aoa-commander-warm-v1.cjs", "codex", "/home/user/aoa-commander-input.json", "/home/user/aoa-output/aoa-one-shot-result.json"],
       stdinArtifactId: null, maxRuntimeSeconds: 240 } } });
 }
-function setup(options: { failed?: boolean; checkpointError?: boolean; control?: CommanderWarmControl | undefined; restoreRefused?: boolean; failCheckpointLog?: boolean; capability?: typeof capability } = {}) {
+function setup(options: { failed?: boolean; signal?: string; checkpointError?: boolean; control?: CommanderWarmControl | undefined; restoreRefused?: boolean; failCheckpointLog?: boolean; capability?: typeof capability } = {}) {
   const fake = createFakeSandboxProvider({ optionalOperations: ["checkpoint", "restore"], checkpointMode: "snapshot", exitCode: options.failed ? 1 : 0,
-    restoreResumed: !options.restoreRefused, seededResources: options.control?.mode === "resume" ? [{ sandboxId: options.control.resourceId!,
+    execSignal: options.signal, restoreResumed: !options.restoreRefused, seededResources: options.control?.mode === "resume" ? [{ sandboxId: options.control.resourceId!,
       labels: options.control.warmResourceCapability!.physicalLabels, hasLiveLease: false, state: "stopped" }] : [] });
   const create = vi.spyOn(fake, "create"); const execute = vi.spyOn(fake, "execute");
   const checkpoint = vi.spyOn(fake, "checkpoint");
@@ -59,6 +59,13 @@ describe("Commander retained VM lifecycle through the actual supervisor", () => 
   it("destroys failed execution and does not checkpoint or retain it", async () => {
     const run = setup({ failed: true }); await run.supervisor.accept(handoff());
     expect(run.checkpoint).not.toHaveBeenCalled(); expect(run.fake.callCount("destroy")).toBe(1);
+  });
+  it("does not retain a signalled execution even when its exit code is zero", async () => {
+    const run = setup({ signal: "SIGTERM" });
+    await run.supervisor.accept(handoff());
+    expect(run.checkpoint).not.toHaveBeenCalled();
+    expect(run.sink.events.at(-1)?.payload).toMatchObject({ status: "failed", errorCode: "exec_signalled" });
+    expect(run.fake.callCount("destroy")).toBe(1);
   });
   it("fails and destroys when checkpoint is unavailable", async () => {
     const run = setup({ checkpointError: true }); await run.supervisor.accept(handoff());

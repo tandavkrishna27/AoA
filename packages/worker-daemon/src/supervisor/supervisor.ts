@@ -1128,7 +1128,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     // 4. terminal event — ENRICHED with exec.signal/timedOut (CLI-003/D3). The frozen
     // terminal payload has no signal/timedOut field, so they fold into the free
     // errorCode/errorMessage strings; a timed-out or signalled exec is `failed`.
-    const status = exec.exitCode === 0 && !exec.timedOut ? "succeeded" : "failed";
+    const status = exec.exitCode === 0 && !exec.timedOut && (!warmControl || exec.signal === null) ? "succeeded" : "failed";
     const errorCode = exec.timedOut ? "exec_timeout" : exec.signal !== null ? "exec_signalled" : null;
     const errorMessage = exec.signal !== null ? `signal:${exec.signal}` : null;
     if (warmControl && status === "succeeded") {

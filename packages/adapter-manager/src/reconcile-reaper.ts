@@ -66,6 +66,10 @@ export interface ReaperLogger {
 }
 
 export interface ReconcileReaperDeps {
+  /** Durable warm cleanup must be planned before effects and confirmed after
+   * success. Failure leaves the resource pending instead of reporting reclaimed. */
+  readonly beforeCleanup?: (summary: ResourceSummary) => void | Promise<void>;
+  readonly afterCleanup?: (summary: ResourceSummary, providerOpId: string) => void | Promise<void>;
   /** The raw, in-process provider. The reaper touches ONLY `list` + `reconcileCleanup`
    * — the exact subset that makes it a server-local reconcile and nothing more. */
   readonly provider: Pick<SandboxProvider, "list" | "reconcileCleanup">;
@@ -189,11 +193,13 @@ export async function reconcileReaper(deps: ReconcileReaperDeps): Promise<Reconc
     // id can never be the live new-gen run.
     const labelsHash = hashResourceLabels(summary.resourceLabels);
     try {
+      await deps.beforeCleanup?.(summary);
       const result = await deps.provider.reconcileCleanup(summary.sandboxId, deps.makeCtx());
       // Read cleanupStatus: `success` (incl. already-gone, an idempotent success) → reaped;
       // a transient `failed` → the failed bucket, NEVER reaped (the LIVE sandbox survives,
       // retried next pass). Copying `teardownLoser`'s swallow-and-succeed would MASK it.
       if (result.cleanupStatus === "success") {
+        await deps.afterCleanup?.(summary, result.providerOpId);
         reaped += 1;
       } else {
         failed += 1;

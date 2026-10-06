@@ -18,12 +18,13 @@ const servers: ReturnType<typeof createProviderServer>[] = [];
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))));
 });
-async function setup(gated = true, supported = true) {
+async function setup(gated = true, supported = true, warmEnabled = false) {
   const transport = new MockE2bTransport({ supportsPauseResume: true });
   const pause = vi.spyOn(transport, "pause");
   const resume = vi.spyOn(transport, "resume");
   const provider = new E2bSandboxProvider({ transport, advertisedOptionalOps: supported ? ["checkpoint", "restore"] : [] });
-  const server = createProviderServer({ provider, controlPlanePublicKey: gated ? keys.publicKey : undefined, now: () => NOW });
+  const server = createProviderServer({ provider, controlPlanePublicKey: gated ? keys.publicKey : undefined, now: () => NOW,
+    isWarmEnabled: () => warmEnabled });
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -99,7 +100,7 @@ describe("ownership checked checkpoint and restore wire", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
   it("only a signed exact-resource handoff allows a fresh lease to resume an old labelled VM", async () => {
-    const { baseUrl, capability, sandboxId, driver, pause, resume, provider } = await setup();
+    const { baseUrl, capability, sandboxId, driver, pause, resume, provider } = await setup(true, true, true);
     await driver.checkpoint(sandboxId, ctx);
     const current = { ...labels, jobId: "next-job", leaseId: "next-lease", attempt: 2 };
     const currentCapability = signOwnedLabelsCapability({ v: 1, audience: "adapter-manager", ownedLabels: current, expiresAt: NOW + 60_000 }, keys.privateKey);
