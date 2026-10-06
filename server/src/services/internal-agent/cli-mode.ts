@@ -42,6 +42,7 @@ import { getServerAdapter } from "../../adapters/registry.js";
 import { instanceSettingsService } from "../instance-settings.js";
 import { resolveCommanderSandboxContext, runCommanderAdapterTurn } from "./commander-sandbox.js";
 import { getCommanderDistributedPort } from "../commander-distributed-port.js";
+import { createCommanderStreamQueue, removeDeliveredCommanderChunks } from "../commander-stream-queue.js";
 import { parseCommanderDistributedOutput } from "../commander-distributed-output.js";
 import type { CommanderSandboxContext } from "./commander-sandbox.js";
 import { recordDistributedShadow, type ShadowSinkInput } from "../distributed-shadow-port.js";
@@ -964,16 +965,21 @@ export function cliModeService(db: Db) {
       if (distributedCommander && params.runId && params.userMessageId) {
         const model = config.cliTool === "codex" ? resolveCodexChatModel(config.model, null) : config.model ?? "claude-sonnet-4-6";
         const experimental = await instanceSettingsService(db).getExperimental().catch(() => null);
-        const result = await distributedCommander.execute({ companyId: params.companyId, userId: params.userId,
-          userRole: params.userRole, conversationId, messageId: params.userMessageId, turnId: params.runId,
-          cliTool: config.cliTool, content: params.rawContent ?? params.content, systemContext: params.systemContext,
+        const commanderTurnId = params.runId; const commanderMessageId = params.userMessageId; const commanderCliTool = config.cliTool;
+        const live = createCommanderStreamQueue((emit) => distributedCommander.execute({ companyId: params.companyId, userId: params.userId,
+          userRole: params.userRole, conversationId, messageId: commanderMessageId, turnId: commanderTurnId,
+          cliTool: commanderCliTool, content: params.rawContent ?? params.content, systemContext: params.systemContext,
           model, vendorCliBypassEnabled: config.vendorCliBypassEnabled ?? true,
           warmConversation: experimental?.warmCommanderConversations !== false,
-          apiBaseUrl: resolveCommanderApiBaseUrl(), timeoutMs: 240000 });
+          apiBaseUrl: resolveCommanderApiBaseUrl(), timeoutMs: 240000 }, emit));
+        const delivered: AgentStreamChunk[] = [];
+        for await (const chunk of live.chunks()) { delivered.push(chunk); yield chunk; }
+        const result = await live.result;
         if (result) {
           if (result.replyPersisted) yield { type: "reply_persisted" };
           if (result.operationId !== params.runId) yield { type: "run_rejoined", runId: result.operationId };
-          for (const chunk of await parseCommanderDistributedOutput({ result, cliTool: config.cliTool, turnId: result.operationId, model })) yield chunk;
+          const final = await parseCommanderDistributedOutput({ result, cliTool: config.cliTool, turnId: result.operationId, model });
+          for (const chunk of removeDeliveredCommanderChunks(final, delivered)) yield chunk;
           return;
         }
       }

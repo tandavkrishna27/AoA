@@ -29,6 +29,7 @@ export function createCommanderResultRecovery(deps: {
   read(scope: OneShotResultScope, signal?: AbortSignal): Promise<OneShotResultObservation>;
   project(candidate: CommanderRecoveryCandidate, result: CapturedOneShotResult): Promise<void>;
   fail?(candidate: CommanderRecoveryCandidate): Promise<void>;
+  retire?(candidate: CommanderRecoveryCandidate): Promise<void>;
   onError(error: unknown, candidate: CommanderRecoveryCandidate): void;
 }) {
   let cursor: string | null = null; let running: Promise<void> | null = null;
@@ -47,7 +48,10 @@ export function createCommanderResultRecovery(deps: {
         })(), new Promise<never>((_resolve, reject) => {
           timer = setTimeout(() => { controller.abort(); reject(new Error("Commander recovery deadline")); }, 15000);
         })]);
-      } catch (error) { deps.onError(error, candidate); }
+      } catch (error) {
+        try { await deps.retire?.(candidate); } catch (retirementError) { deps.onError(retirementError, candidate); }
+        deps.onError(error, candidate);
+      }
       finally { if (timer) clearTimeout(timer); }
     }
     cursor = processed < rows.length || rows.length === 32 ? rows[Math.max(0, processed - 1)]?.operationId ?? cursor : null;

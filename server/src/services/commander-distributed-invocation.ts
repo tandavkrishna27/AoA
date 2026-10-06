@@ -1,5 +1,5 @@
 import { batchWorkloadV1Schema, type BatchWorkloadV1 } from "@armyofagents/worker-protocol";
-import { ONE_SHOT_CAPTURE_SCRIPT, ONE_SHOT_RESULT_PATH } from "./one-shot-distributed-invocation.js";
+import { ONE_SHOT_RESULT_PATH } from "./one-shot-distributed-invocation.js";
 import { MAX_STAGED_FILE_BYTES } from "./task-run-batch-workload.js";
 import type { SandboxStagedFile } from "./task-run-sandbox-invocation.js";
 export const COMMANDER_RUNNER_PATH = "/home/user/aoa-commander-runner.cjs";
@@ -9,7 +9,47 @@ const MCP_PATH = "/home/user/.aoa-commander-mcp.json";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MODEL = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$/;
 // Capture artifacts must redact the tool bearer as well as the provider key.
-export const COMMANDER_CAPTURE_SCRIPT = ONE_SHOT_CAPTURE_SCRIPT.replace('"ANTHROPIC_AUTH_TOKEN"]', '"ANTHROPIC_AUTH_TOKEN", "AOA_API_KEY"]');
+export const COMMANDER_CAPTURE_SCRIPT = String.raw`
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
+const [command, inputPath, outputPath] = process.argv.slice(2);
+const input = JSON.parse(fs.readFileSync(inputPath, "utf8"));
+const startedAt = Date.now();
+const needles = [...new Set(["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "AOA_API_KEY"]
+  .flatMap((name) => { const value = process.env[name]; return value ? [value, ...value.split(/\r?\n|\r/)] : []; })
+  .filter(Boolean))].sort((a, b) => b.length - a.length);
+const scrub = (value) => { let text = value; for (const secret of needles) text = text.split(secret).join("[REDACTED]"); return text; };
+let stdout = ""; let stderr = ""; let stdoutLine = ""; let captureError = null; let timedOut = false; let size = 0;
+const child = spawn(command, input.args, { shell: false, env: process.env, stdio: ["pipe", "pipe", "pipe"] });
+child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
+const timeout = setTimeout(() => { timedOut = true; captureError = "ETIMEDOUT"; child.kill("SIGKILL"); }, input.timeoutMs);
+const capture = (chunk, stream) => {
+  size += Buffer.byteLength(chunk);
+  if (size > 1048576) { captureError = "ENOBUFS"; child.kill("SIGKILL"); return; }
+  if (stream === "stderr") { stderr += chunk; return; }
+  stdout += chunk; stdoutLine += chunk;
+  let newline;
+  while ((newline = stdoutLine.indexOf("\n")) >= 0) {
+    process.stdout.write(scrub(stdoutLine.slice(0, newline + 1)));
+    stdoutLine = stdoutLine.slice(newline + 1);
+  }
+};
+child.stdout.on("data", (chunk) => capture(chunk, "stdout"));
+child.stderr.on("data", (chunk) => capture(chunk, "stderr"));
+child.stdin.on("error", () => {});
+child.on("error", (error) => { captureError = error.code || "capture_failed"; });
+child.on("close", (code) => {
+  clearTimeout(timeout);
+  if (stdoutLine) process.stdout.write(scrub(stdoutLine));
+  const payload = { version: 1, operationId: input.operationId, stdout: scrub(stdout), stderr: scrub(stderr),
+    exitCode: typeof code === "number" ? code : 1, timedOut, durationMs: Date.now() - startedAt, captureError };
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, JSON.stringify(payload), { encoding: "utf8", mode: 0o600 });
+  process.stderr.write(payload.stderr); process.exitCode = payload.exitCode;
+});
+child.stdin.end(input.stdinContent);
+`.trim();
 export interface CommanderDistributedInvocationInput {
   companyId: string; turnId: string; cliTool: string; content: string;
   vendorCliBypassEnabled?: boolean;

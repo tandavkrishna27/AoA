@@ -94,4 +94,23 @@ live Anthropic M1b remains deferred.
 Commander consumer PR #659 code head `25dad8e16f83a06312b1dc30ecddef42134439a5`
 passed repository typecheck, 148 focused tests (including real PostgreSQL),
 the full suite (23,703 passed, 1,907 skipped) and build. Required CI runs after
-marking the PR ready. Warm continuity and streaming remain subsequent code work.
+marking the PR ready. All required CI passed before its merge.
+
+## Commander streaming and retirement
+
+PR #659 passed all 16 required CI checks and merged into the replatform branch.
+Claude Commander output now streams through accepted, fenced log events before
+its final accepted result. Worker redaction, bounded queues and prefix checks
+preserve delivery order; disconnects do not restart paid work. Codex retains its
+buffered result behavior. Delivery errors cannot overwrite a completed run.
+Owner-only recovery retires cancelled/failed attempts after membership revocation,
+without granting access to credentials, logs or replies. Semantic invalid results
+retire explicitly; transient storage failures remain retryable.
+
+Warm continuity and personal/device execution remain open M2 work. No rollout,
+live Anthropic validation, deployment or main merge was performed.
+
+Streaming checkpoint verification: 134 focused tests passed, including 33 real
+PostgreSQL placement/result/retirement tests. Repository typecheck passed; the
+full suite passed 23,721 tests with 1,907 skipped across 2,459 passing files.
+Build and citation integrity checks passed. Flags remain off.

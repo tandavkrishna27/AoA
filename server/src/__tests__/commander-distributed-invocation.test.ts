@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -42,6 +42,24 @@ describe("Commander distributed invocation", () => {
         AOA_API_KEY: "test-commander-bearer", OPENAI_API_KEY: "test-provider-key" }, encoding: "utf8" });
       expect(stdout).toBe("[REDACTED]:[REDACTED]");
       expect(JSON.parse(await readFile(result, "utf8"))).toMatchObject({ operationId: base.turnId, stdout: "[REDACTED]:[REDACTED]", exitCode: 0 });
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+  it("streams scrubbed output before the child finishes and still commits a complete result", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "aoa-commander-live-"));
+    try {
+      const script = join(dir, "runner.cjs"); const payload = join(dir, "input.json"); const result = join(dir, "result.json");
+      const finished = join(dir, "finished");
+      await writeFile(script, COMMANDER_CAPTURE_SCRIPT);
+      const childCode = String.raw`process.stdout.write(process.env.AOA_API_KEY + '\n'); setTimeout(() => {
+        require('node:fs').writeFileSync(${JSON.stringify(finished)}, 'done'); process.stdout.write('last\n'); }, 400);`;
+      await writeFile(payload, JSON.stringify({ operationId: base.turnId, args: ["-e", childCode], stdinContent: "", timeoutMs: 5000 }));
+      const proc = spawn(process.execPath, [script, process.execPath, payload, result], { env: { ...process.env, AOA_API_KEY: "split-live-bearer" } });
+      const exit = new Promise((resolve, reject) => { proc.once("error", reject); proc.once("close", resolve); });
+      const first = await new Promise<string>((resolve) => proc.stdout.once("data", (bytes) => resolve(bytes.toString())));
+      expect(first).not.toContain("split-live-bearer");
+      expect(await readFile(finished, "utf8").catch(() => null)).toBeNull();
+      await exit;
+      expect(JSON.parse(await readFile(result, "utf8"))).toMatchObject({ stdout: "[REDACTED]\nlast\n", exitCode: 0 });
     } finally { await rm(dir, { recursive: true, force: true }); }
   });
   it.each([{ cliTool: "opencode" }, { apiBaseUrl: "https://user:password@aoa.example/api" }, { apiBaseUrl: "file:///tmp" }, { timeoutMs: 0 }, { timeoutMs: 240001 }, { turnId: "fake" }, { model: "bad\nmodel" }, { content: "x".repeat(1048577) }])("declines unsupported or unsafe input before ownership transfer", (change) => {

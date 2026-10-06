@@ -229,13 +229,14 @@ async function callChatRoute(opts: {
   db: any;
   companyId?: string;
   message?: string;
+  failDoneWrite?: boolean;
   /** DB mock response sequence for insert+select */
   dbResponses?: {
     insert?: { returning: () => Promise<any[]> };
     select?: () => any;
     update?: () => any;
   };
-}): Promise<{ sseEvents: SseEvent[]; persistedRun: Record<string, unknown> | null; runDeleted: boolean }> {
+}): Promise<{ sseEvents: SseEvent[]; persistedRun: Record<string, unknown> | null; runDeleted: boolean; runUpdatePredicates: any[] }> {
   const companyId = opts.companyId ?? "cmp-sse-test";
   const message = opts.message ?? "What tasks do I have?";
 
@@ -243,6 +244,7 @@ async function callChatRoute(opts: {
   const sseWrites: string[] = [];
   let persistedRun: Record<string, unknown> | null = null;
   let runDeleted = false;
+  const runUpdatePredicates: any[] = [];
 
   // Build a db mock that:
   // 1. insert(internalAgentRuns) → returning() = [{id:"run-123", ...}]
@@ -267,9 +269,10 @@ async function callChatRoute(opts: {
         // model/provider/tokenUsage/costCents — the F1/F2 assertions read from here).
         persistedRun = { ...values };
         return {
-          where: vi.fn(() => ({
-            catch: vi.fn(),
-          })),
+          where: vi.fn((predicate) => {
+            runUpdatePredicates.push(predicate);
+            return { catch: vi.fn() };
+          }),
         };
       }),
     })),
@@ -291,7 +294,10 @@ async function callChatRoute(opts: {
 
   const res: any = {
     setHeader: vi.fn(),
-    write: vi.fn((chunk: string) => { sseWrites.push(chunk); }),
+    write: vi.fn((chunk: string) => {
+      if (opts.failDoneWrite && chunk.startsWith("event: done")) throw new Error("client disconnected");
+      sseWrites.push(chunk);
+    }),
     end: vi.fn(),
   };
 
@@ -343,7 +349,7 @@ async function callChatRoute(opts: {
     }
   }
 
-  return { sseEvents, persistedRun, runDeleted };
+  return { sseEvents, persistedRun, runDeleted, runUpdatePredicates };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -386,6 +392,13 @@ describe("internal-agent chat route SSE-contract + run persistence (Task 3)", ()
     expect(sseEvents.some((event) => event.event === "run_rejoined")).toBe(false);
   });
 
+  it("does not overwrite an accepted completion when done delivery fails", async () => {
+    const { runUpdatePredicates, sseEvents } = await callChatRoute({ db: {}, failDoneWrite: true });
+    expect(sseEvents.some((event) => event.event === "error")).toBe(true);
+    expect(runUpdatePredicates.at(-1)).toEqual({ and: [
+      { eq: ["run_id", "run-sse-123"] }, { eq: ["run_company_id", "cmp-sse-test"] }, { eq: ["run_status", "running"] },
+    ] });
+  });
   it("emits exactly one event:reasoning SSE line", async () => {
     const { sseEvents } = await callChatRoute({ db: {} });
     const reasoning = sseEvents.filter((e) => e.event === "reasoning");

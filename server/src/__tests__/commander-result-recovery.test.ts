@@ -20,6 +20,13 @@ describe("Commander durable result recovery", () => {
     const recovery = createCommanderResultRecovery(d as never); await recovery.tick(); await recovery.tick();
     expect(d.project).toHaveBeenCalledTimes(2); expect(d.onError).toHaveBeenCalledOnce();
   });
+  it("retires stopped owned work after an authority read fails", async () => {
+    const d = dependencies(); d.read.mockRejectedValue(new Error("membership revoked"));
+    const retire = vi.fn(async () => undefined);
+    await createCommanderResultRecovery({ ...d, retire } as never).tick();
+    expect(retire).toHaveBeenCalledWith(candidate); expect(d.project).not.toHaveBeenCalled();
+    expect(d.onError).toHaveBeenCalledOnce();
+  });
   it("joins concurrent ticks to one sweep", async () => {
     const d = dependencies(); const recovery = createCommanderResultRecovery(d as never);
     await Promise.all([recovery.tick(), recovery.tick()]); expect(d.list).toHaveBeenCalledOnce(); expect(d.project).toHaveBeenCalledOnce();

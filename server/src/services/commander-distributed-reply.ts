@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { internalAgentConversations, internalAgentMessages, internalAgentRuns, jobAttempts, type Db } from "@armyofagents/db";
 import type { AgentStreamChunk } from "./internal-agent/agent-loop.js";
 import type { OneShotResultScope } from "./one-shot-distributed-result.js";
-import { loadCommanderJobAuthority } from "./commander-job-authority.js";
+import { loadCommanderJobAuthority, loadCommanderJobRetirementAuthority } from "./commander-job-authority.js";
 import { collectChunkRefs, mergeOutputRefs } from "./internal-agent/output-refs.js";
 import type { ShowRef } from "@armyofagents/shared";
 import { runInTenant } from "../db/tenant-context.js";
@@ -65,17 +65,18 @@ export async function persistCommanderDistributedReply(db: Db, input: OneShotRes
 
 /** A failed accepted attempt cannot be replaced by an HTTP retry. */
 export async function persistCommanderDistributedFailure(db: Db, input: OneShotResultScope & {
-  userId: string; conversationId: string; messageId: string;
+  userId: string; conversationId: string; messageId: string; acceptedReplyUnavailable?: boolean;
 }): Promise<void> {
   await runInTenant(db, input.organizationId, async (_repos, tx) => {
-    const authority = await loadCommanderJobAuthority(tx, input);
+    const authority = await loadCommanderJobRetirementAuthority(tx, input);
     if (!authority || authority.userId !== input.userId || authority.turnId !== input.operationId ||
       authority.conversationId !== input.conversationId || authority.distributedJobId !== input.jobId ||
       authority.distributedAttemptId !== input.attemptId) throw new Error("Commander failure authority mismatch");
     const [attempt] = await tx.select({ status: jobAttempts.status }).from(jobAttempts).where(and(
       eq(jobAttempts.organizationId, input.organizationId), eq(jobAttempts.companyId, input.companyId),
       eq(jobAttempts.id, input.attemptId), eq(jobAttempts.jobId, input.jobId))).limit(1);
-    if (!attempt || !["failed", "cancelled", "canceled", "expired"].includes(attempt.status)) return;
+    if (!attempt || (!["failed", "cancelled", "canceled", "expired"].includes(attempt.status) &&
+      !(attempt.status === "succeeded" && (!authority.activeMembership || input.acceptedReplyUnavailable)))) return;
     const status = ["cancelled", "canceled"].includes(attempt.status) ? "cancelled" : "failed";
     const [updated] = await tx.update(internalAgentRuns).set({ status, completedAt: new Date(),
       errorMessage: "Distributed Commander attempt did not produce an accepted reply" }).where(and(
