@@ -1408,6 +1408,8 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     log: logger,
     telemetry: createPinoAcceptedUsageTelemetry(logger),
   });
+  const { createCrewResultRecovery } = await import("./services/crew-result-recovery.js");
+  const crewResultRecovery = createCrewResultRecovery({ ownerDb: db as any, appDb });
   const convergenceSweeper = createJobControlSweeper({
     reconciliation: jobReconciliationForCancel,
     listAdmittedOrganizationIds: (page) =>
@@ -1441,6 +1443,8 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
       }
       // DE-18 — converge target revocations on the same tick/timer; drains durable rows.
       await revocationFanout.tick();
+      // Recovery continues when crew rollout is off, finishing already durable runs.
+      await crewResultRecovery.tick();
     } catch (err) {
       logger.warn({ err }, "[mig-002] lease reaper tick failed");
     }

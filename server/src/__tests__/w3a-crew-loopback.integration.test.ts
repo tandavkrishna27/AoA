@@ -26,12 +26,8 @@
  * Each case runs in an isolated company / thread / issue triple so they are fully
  * independent despite sharing one embedded-postgres instance.
  *
- * Skipped on Windows (CI's `runneradmin` account can't start embedded-postgres —
- * Issue #114); Linux CI is the authoritative gate. Modeled on
- * w2-extract-then-scope.integration.test.ts. To run locally on Windows, temporarily
- * flip `describe.skipIf(process.platform === "win32")` → `describe.skipIf(false)`,
- * run, then ALWAYS restore before commit — the UTF-8 initdbFlags make the cluster
- * locale-safe.
+ * Windows CI skips embedded Postgres (Issue #114). Local Windows runs opt in
+ * with AOA_RUN_WIN_INTEGRATION=1; UTF-8 initdbFlags keep the cluster locale-safe.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -44,6 +40,8 @@ import {
   createDb,
   type Db,
 } from "@armyofagents/db";
+import { synthesizeThreadDeliveryRefs } from "../services/viewer-ref-synthesis.js";
+import { deliverCrewRunResult } from "../services/crew-result-relay.js";
 import { companyService } from "../services/companies.js";
 import {
   postCrewRunSuccess,
@@ -241,10 +239,55 @@ afterAll(async () => {
 
 // ── test suite ────────────────────────────────────────────────────────────────
 
-// Windows-skip: CI's `runneradmin` account can't start embedded-postgres (Issue #114).
-// To run locally on Windows, temporarily flip this to `describe.skipIf(false)` — the
-// UTF-8 initdbFlags above make the cluster locale-safe. ALWAYS restore before commit.
-describe.skipIf(process.platform === "win32")("W3a integration: crew loopback + run summary", () => {
+// Windows CI cannot start embedded Postgres; local runs opt in explicitly.
+describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")("W3a integration: crew loopback + run summary", () => {
+  it("refreshes late task output on the same run-result entry without completing the task", async () => {
+    if (setupError) throw setupError;
+    const { companyId, engineerId } = await seedCompanyAndEngineer("Late result");
+    const threadId = await seedThread(companyId);
+    const issueId = await seedIssue({ companyId, title: "Late file", originKind: "crew_thread", sourceDiscussionId: threadId, assigneeAgentId: engineerId });
+    const input = { db, companyId, issueId, runId: randomUUID(), agentId: engineerId };
+    await deliverCrewRunResult(input);
+    await db.execute(sql`INSERT INTO task_outputs (company_id, issue_id, type, title, url)
+      VALUES (${companyId}, ${issueId}, 'link', 'Late result', 'https://example.test/result')`);
+    await deliverCrewRunResult({ ...input, refreshExisting: true } as never);
+    await deliverCrewRunResult({ ...input, refreshExisting: true } as never);
+    const entries = await entriesFor(threadId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].outputRefs).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "url", id: "https://example.test/result" })]));
+    expect(await threadCounts(threadId)).toEqual({ entrySeq: 1, entryCount: 1 });
+    const [task] = rowsOf(await db.execute(sql`SELECT status FROM issues WHERE id = ${issueId}`));
+    expect(task.status).toBe("in_progress");
+  });
+
+  it("refuses a poisoned cross-company origin thread without changing its counters", async () => {
+    if (setupError) throw setupError;
+    const a = await seedCompanyAndEngineer("Poisoned origin A");
+    const b = await seedCompanyAndEngineer("Poisoned origin B");
+    const threadId = await seedThread(b.companyId);
+    const issueId = await seedIssue({ companyId: a.companyId, title: "Poisoned origin", originKind: "crew_thread", sourceDiscussionId: threadId, assigneeAgentId: a.engineerId });
+    expect(await deliverCrewRunResult({ db, companyId: a.companyId, issueId, runId: randomUUID(), agentId: a.engineerId, refreshExisting: true })).toEqual({ delivered: false });
+    expect(await entriesFor(threadId)).toHaveLength(0);
+    expect(await threadCounts(threadId)).toEqual({ entrySeq: 0, entryCount: 0 });
+  });
+
+  it("serializes concurrent run-result delivery without duplicate entries", async () => {
+    if (setupError) throw setupError;
+    const { companyId, engineerId } = await seedCompanyAndEngineer("Concurrent result");
+    const threadId = await seedThread(companyId);
+    const issueId = await seedIssue({ companyId, title: "Concurrent delivery", originKind: "crew_thread", sourceDiscussionId: threadId, assigneeAgentId: engineerId });
+    const input = { db, companyId, issueId, runId: randomUUID(), agentId: engineerId };
+    await Promise.all(Array.from({ length: 5 }, () => deliverCrewRunResult(input, {
+      synthesize: async (value) => {
+        // Slow synthesis exposes the historical unlocked check/insert race.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return synthesizeThreadDeliveryRefs(value);
+      },
+    })));
+    expect(await entriesFor(threadId)).toHaveLength(1);
+    expect(await threadCounts(threadId)).toEqual({ entrySeq: 1, entryCount: 1 });
+  });
+
   // ── Case 1: success loopback + summary ─────────────────────────────────────
   it("success: a crew_thread task relays a Completed entry AND writes a run-summary comment", async () => {
     if (setupError) throw new Error(String(setupError));

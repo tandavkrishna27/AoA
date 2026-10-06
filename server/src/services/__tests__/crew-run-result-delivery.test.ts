@@ -26,6 +26,8 @@ import { describe, expect, it, vi } from "vitest";
 
 // ── Mocks (hoisted before any imports) ───────────────────────────────────────
 
+vi.mock("../activity-log.js", () => ({ insertActivityLog: vi.fn() }));
+
 vi.mock("../live-events.js", () => ({
   publishLiveEvent: vi.fn(),
 }));
@@ -147,6 +149,7 @@ function makeMockDb(opts: {
 
   const selectQueue: Array<unknown[]> = [
     issueRow ? [issueRow] : [],
+    [{ id: "thread-1" }],
     priorEntryRows,
   ];
   let selectIdx = 0;
@@ -174,7 +177,7 @@ function makeMockDb(opts: {
     const p = Promise.resolve(rows) as Promise<unknown[]> & {
       limit: (n?: number) => Promise<unknown[]>;
     };
-    p.limit = () => Promise.resolve(rows);
+    p.limit = () => Object.assign(Promise.resolve(rows), { for: () => Promise.resolve(rows) });
     return p;
   }
 
@@ -187,6 +190,7 @@ function makeMockDb(opts: {
     transaction: vi.fn(async (cb: (tx: typeof txStub) => Promise<unknown>) => cb(txStub)),
   };
 
+  Object.assign(txStub, { select: db.select });
   return { db, txStub, insertValues };
 }
 
@@ -247,6 +251,20 @@ describe("deliverCrewRunResult", () => {
     expect(txStub.insert).not.toHaveBeenCalled();
     expect(synth).not.toHaveBeenCalled();
     expect(publishLiveEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh unchanged refs after jsonb key reordering and a new timestamp", async () => {
+    const refs = [ref("task", "issue-1", "thread-1")];
+    const stored = JSON.parse(JSON.stringify(refs, (key, value) => {
+      if (key === "emittedAt") return "2020-01-01T00:00:00Z";
+      return value && typeof value === "object" && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value).reverse()) : value;
+    }));
+    const { db, txStub } = makeMockDb({ priorEntryRows: [{ id: "entry-1", seq: 1, outputRefs: stored, rawContent: "Run finished" }] });
+    const synth = vi.fn().mockResolvedValue(refs);
+    expect(await deliverCrewRunResult({ db: db as any, ...baseInput, refreshExisting: true }, { synthesize: synth })).toEqual({ delivered: false });
+    expect(txStub.update).not.toHaveBeenCalled();
+    expect(txStub.insert).not.toHaveBeenCalled();
   });
 
   it("no source thread (sourceDiscussionId null) → no delivery, no throw", async () => {

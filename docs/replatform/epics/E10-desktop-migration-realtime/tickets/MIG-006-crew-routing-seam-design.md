@@ -1,7 +1,7 @@
 # MIG-006 — Crew distributed routing seam — design
 
 **Epic:** E10 · **Plan node:** the crew sink cutover (E10-F001 shared prerequisite #1, crew slice)
-**Status:** lifecycle routing shipped; task output delivery implemented locally. Crew activation and discussion enrichment remain pending.
+**Status:** lifecycle routing shipped; task output delivery and MCP authorization merged. Discussion recovery is implemented on the companion code branch; crew activation remains pending.
 **Authored:** 2026-09-18 (post-E7-1), by terrain re-verification against source on `docs/replatform-program`.
 **Owner:** unowned — this authors the previously-missing MIG-006 ticket (E10-F001 named it as unwritten).
 
@@ -20,13 +20,19 @@ attempt's committed output remains readable after a retry. A missing handoff bin
 failed projection leaves a pending receipt; the existing bounded re-drive recovers it
 after terminal without inserting duplicate outputs.
 
-This slice delivers files on the **task**. Discussion entry enrichment remains a separate
-follow-up: the restricted `aoa_app` role has no access to `discussions`; no role grant or
-privileged projection bypass was added. Existing terminal run summaries are unchanged.
-Crew MCP authorization is implemented on the companion code branch: staged
-configuration and token mint are bound to the durable crew run, with organization
-tool policy and live lease checks at every use. Real PostgreSQL and JWT-authenticated
-HTTP tests cover read, comment, review transition, revocation and stale-lease refusal.
+This slice delivers files on the **task**. Discussion result recovery is implemented
+on the companion code branch. Run-result delivery serializes on the company-scoped
+Discussion parent; retries refresh the same entry with current task products. A
+bounded sweep revisits durable completed crew runs after restart, validates the
+frozen job and task binding through the tenant pool, and uses the existing owner
+pool for Discussion delivery. The application role receives no broader privileges.
+Unchanged references cause no write or audit event; technical run completion never
+changes task status. Tests cover late committed output, restart, concurrent delivery,
+poisoned cross-company origin, paging, retry and actual founder download.
+Crew MCP authorization merged in PR #653: staged configuration and token mint
+are bound to the durable crew run, with organization tool policy and live lease
+checks at every use. Real PostgreSQL and JWT-authenticated HTTP tests cover read,
+comment, review transition, revocation and stale-lease refusal.
 Crew rollout stays off. Live Anthropic M1b
 validation is deferred by the user's explicit choice to skip the API key; no paid model
 calls or provider substitution are part of these tests. This is M2 preparation, not an
