@@ -3772,6 +3772,21 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         return { candidates: [], certificateMetrics: emptyMetrics };
       }
 
+      // A resumed physical VM stays on its original worker. This predicate is
+      // applied before the bounded head, and also to its telemetry population.
+      // First claims have no worker yet; retired/quarantined ownership refuses
+      // every worker until the control plane settles that private reservation.
+      const warmWorkerAffinity = notExists(tx.select({ value: sql<number>`1` })
+        .from(internalAgentRuns).where(and(
+          eq(internalAgentRuns.companyId, jobAttempts.companyId),
+          eq(internalAgentRuns.distributedJobId, jobAttempts.jobId),
+          eq(internalAgentRuns.distributedAttemptId, jobAttempts.id),
+          isNotNull(internalAgentRuns.distributedWarmState),
+          sql`(COALESCE(${internalAgentRuns.distributedWarmState}->>'status', '') <> 'claimed'
+            OR (${internalAgentRuns.distributedWarmState}->>'workerId' IS NOT NULL
+              AND ${internalAgentRuns.distributedWarmState}->>'workerId' <> ${input.workerId}))`,
+        )));
+
       // Global-head candidate claim: exact static-certificate anti-join (notExists), one immutable
       // ordered head, FOR UPDATE SKIP LOCKED. Written inline (no extracted where builder) so the
       // frozen anti-join contract can read the exact conjunct set from this one .where(and(...)).
@@ -3803,6 +3818,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
           eq(jobs.status, "queued"),
           inArray(jobs.workloadType, input.admissibleWorkloadTypes),
           lte(jobs.availableAt, sql`statement_timestamp()`),
+          warmWorkerAffinity,
           notExists(tx.select({ value: sql<number>`1` })
             .from(workerLeaseRejections)
             .where(and(
@@ -3879,6 +3895,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
           eq(jobs.status, "queued"),
           inArray(jobs.workloadType, input.admissibleWorkloadTypes),
           lte(jobs.availableAt, sql`statement_timestamp()`),
+          warmWorkerAffinity,
         ))
         .limit(4097);
       const hitsRaw = probeRows.reduce((total, row) => total + (row.suppressed === true ? 1 : 0), 0);

@@ -7813,6 +7813,7 @@ describe("JOB-003 frozen worker-operation HTTP contract", () => {
       'inArray(jobs.workloadType,input.admissibleWorkloadTypes)',
       'lte(jobs.availableAt,sql`statement_timestamp()`)',
       'notExists(workerLeaseRejections)',
+      'warmWorkerAffinity',
     ].sort());
     expect.soft(candidateQuery).toContain("workerLeaseRejections");
     expect.soft(candidateQuery).toMatch(/notExists\s*\(|NOT EXISTS/i);

@@ -352,6 +352,25 @@ describe("JOB-009 slice B deterministic placement policy", () => {
       expect(result).toMatchObject({ success: false, reason: "unmapped_execution_target" });
     }
   });
+  it("requires snapshot operations, idle retention and runtime for warm Commander placement", () => {
+    const normalize = placementModule!.normalizeSubmittedJobPlacementFacts as (input: unknown) => Record<string, unknown>;
+    const target = candidate("organization_dedicated", 1).registry;
+    const facts = { sourceKind: "commander_turn", inputHash: INPUT_DIGEST, policyHash: POLICY_HASH,
+      requirements: { workloadType: "batch", requiredCapabilities: ["sandbox.process_isolated"] },
+      placementRequest: { policyId: "job-submission-default", policyVersion: 1, requestedTarget: null },
+      rollout: { enabled: true, mode: "active", reason: "enabled" },
+      credentialBinding: { credentialId: null, credentialKind: null, executionTargetSlug: null, pinnedTargetId: null },
+      resolvedTarget: target, commanderWarm: { maxRuntimeSeconds: 240 } };
+    expect(normalize(facts)).toMatchObject({ success: false });
+    const warmProvider = providerProfile({ checkpointMode: "snapshot", maxIdleSeconds: 1800,
+      supportedOperations: [...target.providerConstraintProfile.supportedOperations, "checkpoint", "restore"] });
+    const ready = { ...target, providerConstraintProfile: warmProvider };
+    expect(normalize({ ...facts, resolvedTarget: ready })).toMatchObject({ success: true,
+      requirements: { capabilities: ["workload.batch", "sandbox.process_isolated", "provider.checkpoint_v1"] },
+      providerDemand: { maxRuntimeSeconds: 2040, maxIdleSeconds: 1800, operations: ["create", "execute", "checkpoint", "restore"] },
+      targetIdentityPolicy: { disposition: "required", targetId: target.targetId } });
+    expect(normalize({ ...facts, resolvedTarget: { ...ready, providerConstraintProfile: { ...warmProvider, maxContinuousRuntimeSeconds: 1800 } } })).toMatchObject({ success: false });
+  });
 
   it("[I-03] honors exact Decision #117 target identity instead of re-routing lexicographically", () => {
     const first = candidate("owner_desktop", 1);
