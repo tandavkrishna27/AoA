@@ -1,13 +1,15 @@
 # CLI-018 — the founder-reachable artifact: make a distributed run's committed bytes retrievable
 
-**Status:** merged in PR #645; live useful-work completion pending with a provider-credit blocker.
+**Status:** merged in PR #645; Anthropic-dependent live useful-work testing deferred by founder choice.
 The merged `9925e8d87` typecheck, build and full local suite passed. MCP staging
 and harness corrections merged in #647/#648. Direct template probe
 [37392553802](https://github.com/tandavkrishna27/AoA/actions/runs/37392553802)
 is inconclusive because the provider reported `billing_error` / `Credit balance
 is too low`; it does not establish produced-output or founder-download acceptance.
 The [direct checklist](../../../milestones/M1a/recovery-plan-2026-09-26.md) records
-the tested revisions and the next live check after API funding is restored.
+the tested revisions and the October 6 instruction to continue without the
+Anthropic API key. Continue local/keyless checks; do not request funding or
+replacement credentials. Live useful-work acceptance remains deferred.
 The October 5 founder instruction replaces the separate ruling/certification
 prerequisite with direct code and tests. The implementation uses a board-only
 content stream, with the authorization contract recorded in

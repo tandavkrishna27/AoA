@@ -2,7 +2,12 @@
 
 **Updated:** `2026-10-06`
 **Integration branch:** `docs/replatform-program`
-**Status:** M1a passed at its recorded revision; M1b live acceptance is pending, with a current provider-credit blocker
+**Status:** M1a passed at its recorded revision; M1b code/tests continue with Anthropic-dependent live testing deferred by founder choice
+
+**Current instruction — October 6:** Skip the Anthropic API key. Continue work
+that does not require it; do not request a replacement key or top-up, call
+Anthropic, or substitute another paid provider. The live M1b result stays
+deferred, not passed. See the [testing amendment](../../test-gates.md#anthropic-dependent-testing-deferred--founder-instruction-2026-10-06).
 
 PRs [#646](https://github.com/tandavkrishna27/AoA/pull/646) and
 [#645](https://github.com/tandavkrishna27/AoA/pull/645) are merged. The current
@@ -171,8 +176,9 @@ gh workflow run d1-merge-train.yml --ref <tested-ref> -f lanes=all -f campaign=f
 gh workflow run m1-shipped-boot.yml --ref <tested-ref> -f candidate=<tested-sha> -f mode=keyless
 ```
 
-Use the existing named real-E2B mechanism test and its template configuration
-after the keyless boot succeeds. Inspect each failure before another attempt.
+The October 6 instruction defers the Anthropic-dependent named real-E2B run.
+Continue keyless and deterministic checks, inspecting each failure before
+another attempt. Resume the keyed run only if the founder changes that instruction.
 M1a completion means the required functional checks above passed at the recorded
 revision. The historical a2/a23 `fail` records remain accurate under their old
 criteria and are not edited or relabelled.
@@ -332,13 +338,28 @@ A-dir, A-cwd and A-decl were not run. This establishes the current billing
 blocker for the GitHub `ANTHROPIC_API_KEY`; it does not establish the unretained
 failure messages from earlier journeys or useful M1b acceptance.
 
-The next action is to fund that Anthropic API account or update the repository
-secret to a funded key. After that, run the existing combined keyed workflow
-once with `m1b=true` on the tested merge above. It must pass
-the existing runtime checks, observe the useful MCP read, commit the expected
-output, download and verify its bytes, and clean up. Record the actual revision
-and results here. No further keyed run is needed while the billing blocker
-remains; full D2 remains later qualification work.
+The founder subsequently chose to skip the Anthropic API key and continue the
+rest. Funding and key replacement are no longer the next action. Continue
+deterministic MCP/output/download checks and the existing keyless boot lane.
+The live useful-work read, model-produced output and downloaded bytes remain
+unproven until that deferred test is explicitly resumed and passes; preserve
+the existing checks. Full D2 remains later qualification work.
+
+Keyless follow-up
+[37406729984](https://github.com/tandavkrishna27/AoA/actions/runs/37406729984)
+was dispatched on `b12f4583632545140617ae113ab425c2255780d9`, with `mode=keyless`
+and `m1b=false`. Both provider-key environment expressions resolve to empty
+strings in this mode. Its result is available at the linked run; it is not a live M1b test.
+
+The October 6 local follow-up adds the actual `other` / `application/json`
+artifact variant to the real PostgreSQL accepted-event projection and board
+content-route test. It checks attempt provenance, exact UTF-8 bytes (including
+Unicode and a trailing newline), size, content type and SHA256. This uses
+synthetic JSON and in-memory storage, not a live model or provider. The five
+focused server files passed 101 tests with Windows PostgreSQL checks enabled;
+three worker/export files passed 71 tests, and the driver/network/cleanup Node
+tests passed 197 tests. All had zero skips. Existing negative cases and runtime
+checks remain unchanged.
 
 ## Historical September 26 recovery instructions
 
