@@ -666,7 +666,11 @@ These are read by tests and dev scripts; you should not need to set them in prod
 `AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED` defaults off. Warm Adapter Manager boot
 requires checkpoint/restore support, the authenticated reaper and a configured
 durable ledger directory. Credential issuance and provider effects recheck this
-flag at use. Keep it off while the remaining M2 integration is incomplete.
+flag at use, including after asynchronous encryption. Turning it off retires
+retained resources through the authenticated resource-truth peer channel; physical
+cleanup acknowledgement and capability expiry precede releasing conversation
+ownership. It also requires distributed execution and the independent authenticated
+truth route. Keep it off while the remaining M2 integration is incomplete.
 
 These values are injected per execution by the worker after protected credential
 redemption. They are not deployment settings and must not be configured globally.

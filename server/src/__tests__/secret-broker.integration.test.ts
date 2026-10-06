@@ -457,7 +457,7 @@ integration("DAT-004 lease-scoped secret broker", () => {
     await mintHandle(seeded.jobId, "h-warm-provider", { ownerPrincipalKind: "sandbox", ownerPrincipalId: turnId });
     const keys = generateKeyPairSync("ed25519");
     let finalizeError: unknown;
-    const finalize = createCommanderWarmSecretIssuer({ appDb: app.db, controlPlaneSigningKey: keys.privateKey });
+    const finalize = createCommanderWarmSecretIssuer({ appDb: app.db, controlPlaneSigningKey: keys.privateKey, isWarmEnabled: () => true });
     const svc = createSecretBrokerService({ appDb: app.db, brokers: recordingBrokers(), controlPlaneSigningKey: keys.privateKey,
       finalizeSandboxResolution: async (outcome, ctx) => { try { return await finalize(outcome, ctx); }
         catch (error) { finalizeError = error; throw error; } } });

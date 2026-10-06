@@ -65,6 +65,7 @@ import { createJobReconciliationService } from "../services/job-reconciliation.j
 import type { JobReadyScheduler } from "../services/job-ready-scheduler.js";
 import type { JobControlMetrics } from "../services/job-control-metrics.js";
 import { readDistributedExecutionDeploymentFlag } from "../config/distributed-execution.js";
+import { COMMANDER_WARM_ENABLED_ENV } from "../services/commander-warm-resource-truth.js";
 import { createWorkerAdmissionRateLimiter } from "../services/worker-admission-rate-limit.js";
 import { deviceProofHeaders } from "./worker-proof-headers.js";
 import { createWorkerSessionAuthenticator } from "../middleware/worker-session-auth.js";
@@ -176,7 +177,8 @@ export function workerControlRoutes(opts: {
   const executionSecrets = createSecretBrokerService({
     appDb: opts.appDb,
     brokers: createExecutionSecretBrokers(opts.db),
-    finalizeSandboxResolution: createCommanderWarmSecretIssuer({ appDb: opts.appDb, controlPlaneSigningKey: opts.controlPlaneSigningKey }),
+    finalizeSandboxResolution: createCommanderWarmSecretIssuer({ appDb: opts.appDb, controlPlaneSigningKey: opts.controlPlaneSigningKey,
+      isWarmEnabled: () => readDistributedExecutionDeploymentFlag(process.env) && process.env[COMMANDER_WARM_ENABLED_ENV]?.trim() === "1" }),
     metrics: opts.jobControlMetrics,
     // DEP-011 Slice 1 — inject the mint key (undefined today ⇒ inert; no capability minted).
     controlPlaneSigningKey: opts.controlPlaneSigningKey,

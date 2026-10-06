@@ -695,12 +695,52 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.claimed'
       AND details->>'conversationId' = ${conversationId}`).toHaveLength(3);
 
+    const { createCommanderWarmResourceTruth } = await import("../services/commander-warm-resource-truth.js");
+    const originalProvider = providerProfile();
+    const { digest: _digest, ...providerFields } = originalProvider;
+    const warmProviderFields = { ...providerFields, checkpointMode: "snapshot" as const, maxIdleSeconds: 1800,
+      supportedOperations: [...providerFields.supportedOperations, "checkpoint", "restore"] };
+    const warmProvider = { ...warmProviderFields,
+      digest: sha256(canonicalProviderConstraintProfileDigestInputV1(warmProviderFields)) } as ProviderConstraintProfileV1;
+    const warmProfile = organizationProfile(warmProvider);
+    const warmHash = sha256(canonicalizeJsonV1(warmProfile));
+    await admin`UPDATE execution_targets SET registered_profile = ${warmProfile}, registered_profile_hash = ${warmHash},
+      provider_constraint_profile = ${warmProvider} WHERE id = ${TARGET_A}`;
+    await admin`UPDATE job_attempts SET placement_profile_hash = ${warmHash} WHERE id = ${thirdAttemptId}`;
+    const resourceRequest = { resourceId: forged.resource.id, physicalLabels: forged.resource.labels };
+    const resourceTruth = createCommanderWarmResourceTruth({ appDb: app.db, isWarmEnabled: () => true });
+    expect(await resourceTruth.truth(resourceRequest)).toBe("retained");
+    expect(await resourceTruth.truth({ ...resourceRequest, resourceId: "sibling-vm" })).toBe("orphan");
+    expect(await resourceTruth.truth({ ...resourceRequest, physicalLabels: { ...resourceRequest.physicalLabels, organizationId: ORG_B } })).toBe("unknown");
+    const rolledBack = createCommanderWarmResourceTruth({ appDb: app.db, isWarmEnabled: () => false });
+    expect(await rolledBack.truth(resourceRequest)).toBe("orphan");
+    // Re-enabling the flag does not resurrect an already retired owner.
+    expect(await resourceTruth.truth(resourceRequest)).toBe("orphan");
+
     // Revoked membership cannot retain even an accepted successful checkpoint.
     await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${boundThird} WHERE id = ${thirdTurnId}`;
     await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("quarantined");
     expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("ignored");
     await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+    expect(await resourceTruth.truth(resourceRequest)).toBe("orphan");
+    const confirmation = { ...resourceRequest, providerOpId: "confirmed-physical-destroy" };
+    // Physical cleanup does not release the owner while its latest capability can live.
+    expect(await resourceTruth.reclaimed(confirmation)).toBe(false);
+    const [pendingCleanup] = await admin`SELECT distributed_warm_state FROM internal_agent_runs WHERE id = ${thirdTurnId}`;
+    expect(pendingCleanup.distributed_warm_state).toMatchObject({ status: "retired", reclaimedResource: {
+      id: forged.resource.id, labels: forged.resource.labels, providerOpId: confirmation.providerOpId } });
+    await admin`UPDATE leases SET status = 'released', activated_at = ${new Date(Date.now() - 10000)},
+      ack_deadline = ${new Date(Date.now() - 5000)}, expires_at = ${new Date(Date.now() - 1000)} WHERE id = ${thirdLeaseId}`;
+    expect(await resourceTruth.reclaimed(confirmation)).toBe(true);
+    expect(await resourceTruth.reclaimed(confirmation)).toBe(true);
+    const [reclaimed] = await admin`SELECT distributed_warm_state, distributed_warm_conversation_id FROM internal_agent_runs WHERE id = ${thirdTurnId}`;
+    expect(reclaimed).toMatchObject({ distributed_warm_state: null, distributed_warm_conversation_id: null });
+    expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.reclaimed'
+      AND details->>'sessionId' = ${third.id}`).toHaveLength(1);
+    const originalProfile = organizationProfile(originalProvider);
+    await admin`UPDATE execution_targets SET registered_profile = ${originalProfile},
+      registered_profile_hash = ${sha256(canonicalizeJsonV1(originalProfile))}, provider_constraint_profile = ${originalProvider} WHERE id = ${TARGET_A}`;
 
 
   });
