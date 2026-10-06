@@ -46,7 +46,7 @@ export class WarmCleanupJournal {
       return value;
     } catch { return fail(); }
   }
-  #require(resourceId: string, labels: ResourceLabels, status: Status) {
+  #readRequired(resourceId: string, labels: ResourceLabels, status: Status) {
     if (!validLabels(labels)) fail();
     const value = this.#read(this.#path(resourceId, status));
     if (!value || !labelsEqual(value.physicalLabels, labels)) return fail();
@@ -67,7 +67,7 @@ export class WarmCleanupJournal {
       let parent: number | undefined;
       try { parent = openSync(this.dir, "r"); fsyncSync(parent); } catch { /* platform limitation */ }
       finally { if (parent !== undefined) closeSync(parent); }
-      const stored = this.#require(resourceId, labels, status);
+      const stored = this.#readRequired(resourceId, labels, status);
       // A confirmed retry preserves the first successful provider receipt.
       if (stored.status !== status) fail();
     } catch { fail(); }
@@ -79,13 +79,13 @@ export class WarmCleanupJournal {
     return value !== null && validLabels(labels) && labelsEqual(value.physicalLabels, labels);
   }
   plan(resourceId: string, labels: ResourceLabels): void {
-    this.#require(resourceId, labels, "owned"); this.#write(resourceId, labels, "planned");
+    this.#readRequired(resourceId, labels, "owned"); this.#write(resourceId, labels, "planned");
   }
   confirm(resourceId: string, labels: ResourceLabels, providerOpId: string): void {
-    this.#require(resourceId, labels, "planned"); this.#write(resourceId, labels, "confirmed", providerOpId);
+    this.#readRequired(resourceId, labels, "planned"); this.#write(resourceId, labels, "confirmed", providerOpId);
   }
   acknowledge(resourceId: string, labels: ResourceLabels): void {
-    this.#require(resourceId, labels, "confirmed"); this.#write(resourceId, labels, "acknowledged");
+    this.#readRequired(resourceId, labels, "confirmed"); this.#write(resourceId, labels, "acknowledged");
   }
   pending(limit = 128): PendingWarmCleanup[] {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 128) fail();
@@ -103,11 +103,11 @@ export class WarmCleanupJournal {
       if (!/^[a-f0-9]{64}\.json$/.test(file)) continue;
       const value = this.#read(join(this.dir, file));
       if (!value || value.status !== "planned") continue;
-      this.#require(value.resourceId, value.physicalLabels, "owned");
+      this.#readRequired(value.resourceId, value.physicalLabels, "owned");
       const ack = this.#read(this.#path(value.resourceId, "acknowledged"));
-      if (ack) { this.#require(value.resourceId, value.physicalLabels, "acknowledged"); continue; }
+      if (ack) { this.#readRequired(value.resourceId, value.physicalLabels, "acknowledged"); continue; }
       const confirmed = this.#read(this.#path(value.resourceId, "confirmed"));
-      if (confirmed) this.#require(value.resourceId, value.physicalLabels, "confirmed");
+      if (confirmed) this.#readRequired(value.resourceId, value.physicalLabels, "confirmed");
       result.push({ resourceId: value.resourceId, physicalLabels: value.physicalLabels,
         status: confirmed ? "confirmed" : "planned", ...(confirmed ? { providerOpId: confirmed.providerOpId } : {}) });
       this.#cursor = file;
