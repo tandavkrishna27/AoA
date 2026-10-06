@@ -1698,6 +1698,9 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
 
   setCommanderDistributedPort(createCommanderDistributedPort({
     rollout: commanderRolloutHook,
+    isWarmEnabled: () => process.env.AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED?.trim() === "1" && config.distributedExecutionEnabled === true,
+    hasWarmOwner: (input) => import("./services/commander-warm-owner.js").then(({ hasCommanderWarmOwner }) => hasCommanderWarmOwner(db, input)),
+    hasLegacyWarmOwner: (input) => import("./services/commander-warm-owner.js").then(({ hasLegacyCommanderWarmOwner }) => hasLegacyCommanderWarmOwner(db, input)),
     toolsAuthorized: (organizationId) => resolveDistributedToolSurface({ deploymentArmed: readDistributedToolSurfaceFlag(process.env),
       organizationToolsEnabled: commanderRolloutHook.resolveOrganizationToolSurface(organizationId) }).authorized,
     existing: createCommanderExistingTurnReader(db), prepare: createCommanderSourcePreparer(db),

@@ -61,7 +61,7 @@ beforeEach(() => {
     providerConstraintHash: "b".repeat(64), providerConstraintProfile: { checkpointMode: "snapshot",
       supportedOperations: ["checkpoint", "restore"], maxIdleSeconds: 1800 } });
   seam.proof.mockResolvedValue({ previousCapabilityExpiresAtMs: now - 1000 });
-  issuer = createCommanderWarmSecretIssuer({ appDb: {} as Db, controlPlaneSigningKey: keys.privateKey, vault });
+  issuer = createCommanderWarmSecretIssuer({ appDb: {} as Db, controlPlaneSigningKey: keys.privateKey, vault, isWarmEnabled: () => true });
 });
 describe("Commander warm protected issuer", () => {
   it("binds the real first lease and signs a fresh primary without serializing the fence", async () => {
@@ -119,8 +119,20 @@ describe("Commander warm protected issuer", () => {
     expect(await issuer(outcome, context)).toBe(outcome); expect(lock).not.toHaveBeenCalled(); expect(vault.seal).not.toHaveBeenCalled();
   });
   it("requires a signing key for a warm command", async () => {
-    const unsigned = createCommanderWarmSecretIssuer({ appDb: {} as Db, vault });
+    const unsigned = createCommanderWarmSecretIssuer({ appDb: {} as Db, vault, isWarmEnabled: () => true });
     await expect(unsigned(material("fake"), context)).rejects.toThrow("unavailable"); expect(update).not.toHaveBeenCalled();
+  });
+  it("defaults warm issuance off and refuses before encryption", async () => {
+    const dormant = createCommanderWarmSecretIssuer({ appDb: {} as Db, vault, controlPlaneSigningKey: keys.privateKey });
+    await expect(dormant(material("fake"), context)).rejects.toThrow("unavailable");
+    expect(vault.seal).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled();
+  });
+  it("rechecks rollback after encryption before signing or persisting", async () => {
+    const enabled = vi.fn().mockReturnValueOnce(true).mockReturnValue(false);
+    const guarded = createCommanderWarmSecretIssuer({ appDb: {} as Db, vault,
+      controlPlaneSigningKey: keys.privateKey, isWarmEnabled: enabled });
+    await expect(guarded(material("fake"), context)).rejects.toThrow("unavailable");
+    expect(vault.seal).toHaveBeenCalledTimes(1); expect(update).not.toHaveBeenCalled();
   });
   it("derives the marker from the exact command and paths", () => {
     expect(isCommanderWarmWorkload(workload)).toBe(true);

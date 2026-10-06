@@ -514,6 +514,35 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     if (dataDir) await rm(dataDir, { recursive: true, force: true }).catch(() => {});
   });
 
+  it("preserves legacy warm ownership until successful physical cleanup, scoped to the conversation user", async () => {
+    const { admin } = guard();
+    const client = postgres(adminUrl, { max: 1 }); const ownerDb = drizzle(client) as unknown as Db;
+    const { hasLegacyCommanderWarmOwner } = await import('../services/commander-warm-owner.js');
+    const conversationId = randomUUID(); const environmentId = randomUUID(); const leaseId = randomUUID();
+    const input = { companyId: COMPANY_A, userId: OWNER_A, conversationId };
+    try {
+      await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id) VALUES (${conversationId}, ${COMPANY_A}, ${OWNER_A})`;
+      await admin`INSERT INTO environments (id, company_id, name) VALUES (${environmentId}, ${COMPANY_A}, ${'warm-owner-' + environmentId})`;
+      await admin`INSERT INTO environment_leases (id, company_id, environment_id, commander_conversation_id, status, lease_policy, provider_lease_id)
+        VALUES (${leaseId}, ${COMPANY_A}, ${environmentId}, ${conversationId}, 'paused', 'reuse_by_agent', 'retained-vm')`;
+      expect(await hasLegacyCommanderWarmOwner(ownerDb, input)).toBe(true);
+      expect(await hasLegacyCommanderWarmOwner(ownerDb, { ...input, userId: 'another-user' })).toBe(false);
+      expect(await hasLegacyCommanderWarmOwner(ownerDb, { ...input, companyId: COMPANY_B })).toBe(false);
+      for (const cleanup of [null, 'pending', 'failed']) {
+        await admin`UPDATE environment_leases SET status = 'expired', cleanup_status = ${cleanup} WHERE id = ${leaseId}`;
+        expect(await hasLegacyCommanderWarmOwner(ownerDb, input)).toBe(true);
+      }
+      await admin`UPDATE environment_leases SET cleanup_status = 'success' WHERE id = ${leaseId}`;
+      expect(await hasLegacyCommanderWarmOwner(ownerDb, input)).toBe(false);
+      await admin`UPDATE environment_leases SET status = 'paused', provider_lease_id = NULL WHERE id = ${leaseId}`;
+      expect(await hasLegacyCommanderWarmOwner(ownerDb, input)).toBe(true);
+    } finally {
+      await client.end({ timeout: 5 });
+      await admin`DELETE FROM environments WHERE id = ${environmentId}`;
+      await admin`DELETE FROM internal_agent_conversations WHERE id = ${conversationId}`;
+    }
+  });
+
   it("atomically reserves warm ownership on an actual Commander turn under the existing app role", async () => {
     const { admin, app } = guard();
     const { claimCommanderWarmTurn } = await import("../services/commander-warm-store.js");
@@ -559,6 +588,11 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ related_entity_type: "task", related_entity_id: contextTaskId });
     expect(rows[0].distributed_warm_state.currentJobId).toBe(requests[winner].jobId);
+    const { hasCommanderWarmOwner } = await import('../services/commander-warm-owner.js');
+    const ownerInput = { companyId: COMPANY_A, userId: OWNER_A, conversationId };
+    expect(await runInTenant(app.db, ORG_A, (_repos, tx) => hasCommanderWarmOwner(tx as Db, ownerInput))).toBe(true);
+    expect(await runInTenant(app.db, ORG_A, (_repos, tx) => hasCommanderWarmOwner(tx as Db, { ...ownerInput, companyId: COMPANY_B }))).toBe(false);
+    expect(await runInTenant(app.db, ORG_A, (_repos, tx) => hasCommanderWarmOwner(tx as Db, { ...ownerInput, userId: 'another-user' }))).toBe(false);
     // A forged paused marker does not establish an accepted checkpoint or a
     // retired predecessor fence. The helper must reload the ledger and lease.
     const forged = { ...(first as Record<string, unknown>), status: "paused", workerId: WORKER_A,
@@ -695,12 +729,52 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.claimed'
       AND details->>'conversationId' = ${conversationId}`).toHaveLength(3);
 
+    const { createCommanderWarmResourceTruth } = await import("../services/commander-warm-resource-truth.js");
+    const originalProvider = providerProfile();
+    const { digest: _digest, ...providerFields } = originalProvider;
+    const warmProviderFields = { ...providerFields, checkpointMode: "snapshot" as const, maxIdleSeconds: 1800,
+      supportedOperations: [...providerFields.supportedOperations, "checkpoint", "restore"] };
+    const warmProvider = { ...warmProviderFields,
+      digest: sha256(canonicalProviderConstraintProfileDigestInputV1(warmProviderFields)) } as ProviderConstraintProfileV1;
+    const warmProfile = organizationProfile(warmProvider);
+    const warmHash = sha256(canonicalizeJsonV1(warmProfile));
+    await admin`UPDATE execution_targets SET registered_profile = ${warmProfile}, registered_profile_hash = ${warmHash},
+      provider_constraint_profile = ${warmProvider} WHERE id = ${TARGET_A}`;
+    await admin`UPDATE job_attempts SET placement_profile_hash = ${warmHash} WHERE id = ${thirdAttemptId}`;
+    const resourceRequest = { resourceId: forged.resource.id, physicalLabels: forged.resource.labels };
+    const resourceTruth = createCommanderWarmResourceTruth({ appDb: app.db, isWarmEnabled: () => true });
+    expect(await resourceTruth.truth(resourceRequest)).toBe("retained");
+    expect(await resourceTruth.truth({ ...resourceRequest, resourceId: "sibling-vm" })).toBe("orphan");
+    expect(await resourceTruth.truth({ ...resourceRequest, physicalLabels: { ...resourceRequest.physicalLabels, organizationId: ORG_B } })).toBe("unknown");
+    const rolledBack = createCommanderWarmResourceTruth({ appDb: app.db, isWarmEnabled: () => false });
+    expect(await rolledBack.truth(resourceRequest)).toBe("orphan");
+    // Re-enabling the flag does not resurrect an already retired owner.
+    expect(await resourceTruth.truth(resourceRequest)).toBe("orphan");
+
     // Revoked membership cannot retain even an accepted successful checkpoint.
     await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${boundThird} WHERE id = ${thirdTurnId}`;
     await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("quarantined");
     expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("ignored");
     await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+    expect(await resourceTruth.truth(resourceRequest)).toBe("orphan");
+    const confirmation = { ...resourceRequest, providerOpId: "confirmed-physical-destroy" };
+    // Physical cleanup does not release the owner while its latest capability can live.
+    expect(await resourceTruth.reclaimed(confirmation)).toBe(false);
+    const [pendingCleanup] = await admin`SELECT distributed_warm_state FROM internal_agent_runs WHERE id = ${thirdTurnId}`;
+    expect(pendingCleanup.distributed_warm_state).toMatchObject({ status: "retired", reclaimedResource: {
+      id: forged.resource.id, labels: forged.resource.labels, providerOpId: confirmation.providerOpId } });
+    await admin`UPDATE leases SET status = 'released', activated_at = ${new Date(Date.now() - 10000)},
+      ack_deadline = ${new Date(Date.now() - 5000)}, expires_at = ${new Date(Date.now() - 1000)} WHERE id = ${thirdLeaseId}`;
+    expect(await resourceTruth.reclaimed(confirmation)).toBe(true);
+    expect(await resourceTruth.reclaimed(confirmation)).toBe(true);
+    const [reclaimed] = await admin`SELECT distributed_warm_state, distributed_warm_conversation_id FROM internal_agent_runs WHERE id = ${thirdTurnId}`;
+    expect(reclaimed).toMatchObject({ distributed_warm_state: null, distributed_warm_conversation_id: null });
+    expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.reclaimed'
+      AND details->>'sessionId' = ${third.id}`).toHaveLength(1);
+    const originalProfile = organizationProfile(originalProvider);
+    await admin`UPDATE execution_targets SET registered_profile = ${originalProfile},
+      registered_profile_hash = ${sha256(canonicalizeJsonV1(originalProfile))}, provider_constraint_profile = ${originalProvider} WHERE id = ${TARGET_A}`;
 
 
   });
@@ -1021,6 +1095,16 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active') ON CONFLICT (company_id, principal_type, principal_id) DO UPDATE SET status = 'active'`;
     // A stopped paid owner remains owned; retry never creates another job.
     expect(await existing(replay)).toMatchObject({ jobId, attemptId, operationId: newer });
+    const warmInvocation = buildCommanderDistributedInvocation({ ...request, turnId: newer, distributedWarm: true })!;
+    await admin`UPDATE jobs SET input = ${warmInvocation.workload} WHERE id = ${jobId}`;
+    for (const file of warmInvocation.stagedFiles) {
+      await admin`INSERT INTO job_artifacts (organization_id, job_id, identifier, attempt, kind, status, content_type, size_bytes, sha256, object_key)
+        VALUES (${ORG_A}, ${jobId}, ${randomUUID()}, 1, 'staged_input', 'committed', ${`application/vnd.aoa.staged-input; path=${file.path}`},
+          ${file.bytes.byteLength}, ${sha256(file.bytes)}, 'control-plane-input')`;
+    }
+    await expect(existing(replay)).rejects.toThrow('staged input');
+    expect(await existing({ ...replay, warmStagedFiles: warmInvocation.stagedFiles })).toMatchObject({ jobId, attemptId, operationId: newer });
+    await expect(existing({ ...replay, warmStagedFiles: [{ ...warmInvocation.stagedFiles[0], bytes: new TextEncoder().encode('changed') }] })).rejects.toThrow('staged input');
 
     } finally { await ownerClient.end({ timeout: 5 }); }
   });

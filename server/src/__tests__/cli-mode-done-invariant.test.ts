@@ -23,6 +23,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "node:events";
 
 // ── child_process mock ───────────────────────────────────────────────────────
+vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: vi.fn(async () => false) }));
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),

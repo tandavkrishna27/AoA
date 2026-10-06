@@ -24,7 +24,7 @@ export function createCommanderDistributedResultReader(appDb: Db, storage: Stora
   });
 }
 export function createCommanderExistingTurnReader(db: Db) {
-  return async (input: CommanderDistributedInput & { stagedFiles: SandboxStagedFile[] }) => {
+  return async (input: CommanderDistributedInput & { stagedFiles: SandboxStagedFile[]; warmStagedFiles?: SandboxStagedFile[] }) => {
     let [run] = await db.select().from(internalAgentRuns).where(and(eq(internalAgentRuns.id, input.turnId),
       eq(internalAgentRuns.companyId, input.companyId), eq(internalAgentRuns.userId, input.userId))).limit(1);
     if (run?.executionOwner !== "distributed") {
@@ -54,7 +54,15 @@ export function createCommanderExistingTurnReader(db: Db) {
       const staged = await tx.select().from(jobArtifacts).where(and(eq(jobArtifacts.organizationId, organizationId),
         eq(jobArtifacts.jobId, run.distributedJobId!), eq(jobArtifacts.attempt, attempt.attemptNumber),
         eq(jobArtifacts.kind, "staged_input"), eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.leaseId), isNull(jobArtifacts.fenceToken)));
-      const expectedFiles = run.id === input.turnId ? input.stagedFiles : buildCommanderDistributedInvocation({ ...input, turnId: run.id })?.stagedFiles;
+      const [job] = await tx.select({ input: jobs.input }).from(jobs).where(and(eq(jobs.organizationId, organizationId),
+        eq(jobs.companyId, input.companyId), eq(jobs.id, run.distributedJobId!))).limit(1);
+      const distributedWarm = job?.input.command === "node" && Array.isArray(job.input.args) &&
+        job.input.args.length === 4 && job.input.args[0] === "/home/user/aoa-commander-warm-v1.cjs" &&
+        ["claude", "codex"].includes(job.input.args[1]) && job.input.args[2] === "/home/user/aoa-commander-input.json" &&
+        job.input.args[3] === "/home/user/aoa-output/aoa-one-shot-result.json";
+      const expectedFiles = run.id === input.turnId
+        ? distributedWarm ? input.warmStagedFiles : input.stagedFiles
+        : buildCommanderDistributedInvocation({ ...input, turnId: run.id, distributedWarm })?.stagedFiles;
       if (!expectedFiles || expectedFiles.some((file) => !staged.some((row) => row.contentType === stagedPathMarker(file.path) &&
         row.sizeBytes === file.bytes.byteLength && row.sha256 === createHash("sha256").update(file.bytes).digest("hex")))) {
         throw new Error("Existing Commander staged input mismatch");
