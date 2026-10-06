@@ -652,8 +652,55 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       WHERE id = ${thirdJobId}`;
     const third = await claim({ ...requests[0], jobId: thirdJobId, attemptId: thirdAttemptId });
     expect(third).toMatchObject({ generation: 3, resource: { labels: forged.resource.labels, checkpointLabels }, currentJobId: thirdJobId });
+    const { projectCommanderWarmCheckpoint } = await import("../services/commander-warm-projection.js");
+    const thirdLeaseId = randomUUID(), thirdCheckpointId = randomUUID(), thirdDeadline = new Date(Date.now() + 60000);
+    const boundThird = { ...third, currentLeaseId: thirdLeaseId };
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${boundThird} WHERE id = ${thirdTurnId}`;
+    await admin`INSERT INTO leases (id, organization_id, company_id, job_id, attempt_id, attempt_number, worker_id, target_id,
+      target_authority_key, target_generation, profile_hash, provider_constraint_hash, ack_deadline, expires_at, status, fence, activated_at)
+      VALUES (${thirdLeaseId}, ${ORG_A}, ${COMPANY_A}, ${thirdJobId}, ${thirdAttemptId}, 1, ${WORKER_A}, ${TARGET_A},
+        ${`organization:${ORG_A}`}, 1, ${"a".repeat(64)}, ${"b".repeat(64)}, ${new Date()}, ${thirdDeadline}, 'active', 'warm-fence-third', now())`;
+    await admin`UPDATE job_attempts SET status = 'succeeded' WHERE id = ${thirdAttemptId}`;
+    const thirdReceipt = { ...receipt, generation: 3 };
+    const thirdLog = { eventType: "log", payload: { stream: "stdout", level: "info", message: "aoa-commander-checkpoint-v1:" + JSON.stringify(thirdReceipt) } };
+    await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+      sequence, event_type, fence_token, event_digest, event, occurred_at)
+      VALUES (${ORG_A}, ${COMPANY_A}, ${thirdJobId}, ${thirdAttemptId}, 1, ${thirdLeaseId},
+        ${thirdCheckpointId}, 1, 'log', 'warm-fence-third', ${"a".repeat(64)}, ${thirdLog}, now())`;
+    const projectionScope = { organizationId: ORG_A, companyId: COMPANY_A, jobId: thirdJobId, attemptId: thirdAttemptId };
+    // A checkpoint without the accepted success terminal is never projected.
+    expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("ignored");
+    await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+      sequence, event_type, fence_token, event_digest, event, occurred_at)
+      VALUES (${ORG_A}, ${COMPANY_A}, ${thirdJobId}, ${thirdAttemptId}, 1, ${thirdLeaseId},
+        ${randomUUID()}, 2, 'terminal', 'warm-fence-third', ${"a".repeat(64)}, ${terminal}, now())`;
+    // Restart recovery includes completed runs whose projection was interrupted.
+    await admin`UPDATE internal_agent_runs SET status = 'completed' WHERE id = ${thirdTurnId}`;
+    const { createCommanderWarmRecoveryReader } = await import("../services/commander-warm-recovery.js");
+    const candidates = await createCommanderWarmRecoveryReader(app.db)(null);
+    expect(candidates).toContainEqual({ ...projectionScope, operationId: thirdTurnId });
+    expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("paused");
+    const [projected] = await admin`SELECT distributed_warm_state FROM internal_agent_runs WHERE id = ${thirdTurnId}`;
+    expect(projected.distributed_warm_state).toMatchObject({ status: "paused", generation: 3,
+      currentJobId: null, currentAttemptId: null, currentLeaseId: null, resource: { labels: forged.resource.labels,
+        checkpointLabels: { ...checkpointLabels, jobId: thirdJobId, leaseId: thirdLeaseId }, checkpointEventId: thirdCheckpointId,
+        attemptId: thirdAttemptId, previousCapabilityExpiresAtMs: thirdDeadline.getTime() } });
+    // Retention may converge before the lease reaper, but grants cannot.
+    await expect(claim(requests[winner])).rejects.toMatchObject({ reason: "checkpoint_unaccepted" });
+    expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("ignored");
+    expect(await projectCommanderWarmCheckpoint(app.db, requests[winner])).toBe("ignored");
+    expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.paused'
+      AND details->>'sessionId' = ${third.id}`).toHaveLength(1);
+
     expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.claimed'
       AND details->>'conversationId' = ${conversationId}`).toHaveLength(3);
+
+    // Revoked membership cannot retain even an accepted successful checkpoint.
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${boundThird} WHERE id = ${thirdTurnId}`;
+    await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+    expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("quarantined");
+    expect(await projectCommanderWarmCheckpoint(app.db, projectionScope)).toBe("ignored");
+    await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
 
 
   });

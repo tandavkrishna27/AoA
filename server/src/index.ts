@@ -1415,6 +1415,11 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   const { createCrewResultRecovery } = await import("./services/crew-result-recovery.js");
   const crewResultRecovery = createCrewResultRecovery({ ownerDb: db as any, appDb });
   let commanderResultRecovery: { tick(): Promise<void> } | undefined;
+  const { createCommanderWarmRecovery, createCommanderWarmRecoveryReader } = await import("./services/commander-warm-recovery.js");
+  const { projectCommanderWarmCheckpoint } = await import("./services/commander-warm-projection.js");
+  const commanderWarmRecovery = createCommanderWarmRecovery({ list: createCommanderWarmRecoveryReader(db),
+    project: (scope) => projectCommanderWarmCheckpoint(appDb, scope),
+    onError: (err, scope) => logger.warn({ err, companyId: scope.companyId, jobId: scope.jobId }, "Commander warm recovery will retry") });
   const convergenceSweeper = createJobControlSweeper({
     reconciliation: jobReconciliationForCancel,
     listAdmittedOrganizationIds: (page) =>
@@ -1451,6 +1456,7 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
       // Recovery continues when crew rollout is off, finishing already durable runs.
       await crewResultRecovery.tick();
       await commanderResultRecovery?.tick();
+      await commanderWarmRecovery.tick();
     } catch (err) {
       logger.warn({ err }, "[mig-002] lease reaper tick failed");
     }
