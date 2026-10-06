@@ -118,3 +118,13 @@ describe("admitSandboxLocalResolution — fence denials pass through verbatim", 
     },
   );
 });
+
+ describe("Commander warm protected reply", () => {
+  it("carries warm control only when present on an admitted env resolution", () => {
+    const outcome = resolved(); if (outcome.outcome !== "resolved") throw new Error();
+    const warmControl = { version: 1 as const, sessionId: "session", generation: 1, mode: "create" as const,
+      resourceId: null, idleTtlMs: 1800000, historicalCanaries: ["fake-prior-secret"] };
+    expect(admitSandboxLocalResolution({ ...outcome, warmControl })).toMatchObject({ warmControl });
+    expect(admitSandboxLocalResolution(outcome)).not.toHaveProperty("warmControl");
+  });
+});

@@ -45,6 +45,9 @@ import { createSweepTrigger } from "../services/artifact-sweep-trigger.js";
 import { runArtifactOrphanSweep } from "../services/artifact-orphan-sweeper.js";
 import { createQuarantineGrantService } from "../services/quarantine-grant.js";
 import { createQuarantineFinalizeService } from "../services/quarantine-finalize.js";
+import { projectCommanderWarmCheckpoint } from "../services/commander-warm-projection.js";
+import { createCommanderWarmTerminalHook } from "../services/commander-warm-recovery.js";
+import { createCommanderWarmSecretIssuer } from "../services/commander-warm-secret-issuer.js";
 import { createSecretBrokerService } from "../services/secret-broker.js";
 import { createExecutionSecretBrokers } from "../services/execution-secret-brokers.js";
 import {
@@ -125,7 +128,11 @@ export function workerControlRoutes(opts: {
     // today ⇒ no capability re-minted on renewal (byte-identical), exactly like the resolve mint.
     controlPlaneSigningKey: opts.controlPlaneSigningKey,
   });
-  const events = createJobEventIngestService({ appDb: opts.appDb, onAttemptTerminal: opts.onAttemptTerminal });
+  const events = createJobEventIngestService({ appDb: opts.appDb, onAttemptTerminal: createCommanderWarmTerminalHook({
+    project: (scope) => projectCommanderWarmCheckpoint(opts.appDb, scope), downstream: opts.onAttemptTerminal,
+    onError: (err, scope) => logger.warn({ ...internalErrorLogFields(err), companyId: scope.companyId,
+      jobId: scope.jobId }, "Commander warm projection will recover"),
+  }) });
   // DAT-002 — the raw storage provider (full-object-key, no company prefixing) used
   // to presign worker grants and headObject-verify commits.
   const storage = createStorageProviderFromConfig(loadConfig());
@@ -169,6 +176,7 @@ export function workerControlRoutes(opts: {
   const executionSecrets = createSecretBrokerService({
     appDb: opts.appDb,
     brokers: createExecutionSecretBrokers(opts.db),
+    finalizeSandboxResolution: createCommanderWarmSecretIssuer({ appDb: opts.appDb, controlPlaneSigningKey: opts.controlPlaneSigningKey }),
     metrics: opts.jobControlMetrics,
     // DEP-011 Slice 1 — inject the mint key (undefined today ⇒ inert; no capability minted).
     controlPlaneSigningKey: opts.controlPlaneSigningKey,
