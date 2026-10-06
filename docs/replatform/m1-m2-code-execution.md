@@ -42,11 +42,20 @@ remaining M1 code and tests, and M2. This checklist adds no certification gate.
 ## Observed progress
 
 - Task output delivery and recovery merged in PR #652.
-- Crew tool access implemented; 48 focused tests passed, including PostgreSQL and
-  actual JWT-authenticated HTTP tool calls. Repository typecheck passed.
-- Crew tool access merged in PR #653 after all required CI checks passed.
-- Crew Discussion recovery is implemented on its scoped branch; full verification
-  and CI are pending. M2 Commander/extraction remain to implement.
+- Crew tool access merged in PR #653 after focused PostgreSQL/JWT/HTTP tests,
+  repository typecheck/build and required CI passed.
+- Crew Discussion recovery merged in PR #654. Exact candidate typecheck/build,
+  full local suite (23,567 passed), focused PostgreSQL/recovery group (121 passed)
+  and all required CI passed. Late products refresh the same entry after restart.
+- M1 drain, cancellation, budget hard-stop and authoritative cost parity checks
+  passed 95 focused tests, including real PostgreSQL. Worker cleanup and diagnostic
+  tests remain covered by the full required suite; live M1b is still deferred.
+- M2 independent owner routing and trusted Commander metadata resolution are
+  implemented on the credential-routing branch; validation and integration continue.
+- Commander signed-turn fencing and organization tool policy are implemented
+  locally with focused tests. Execution ownership, source-specific secret minting,
+  Commander results and agentless extraction remain to implement.
+- Live Anthropic M1b validation remains deferred. Rollout stays off.
 
 Historical milestone designs contain obsolete starting-state observations; read
 current code before carrying any of those observations forward.

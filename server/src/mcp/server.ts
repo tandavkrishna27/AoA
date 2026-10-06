@@ -473,15 +473,21 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
 
       // DAT-007 item #1 — fence-bound run-JWT currency gate (Option B, per-call). Runs at the
       // request-authorization seam so it dominates BOTH tool-dispatch paths plus tools/list and
-      // resources/*. Inert behind the flag; scoped to a distributed run-JWT agent actor; keyed on
+      // resources/*. Inert behind the flag; scoped to agent and Commander run-JWT actors; keyed on
       // the SIGNED run id (req.actor.signedRunId — immune to the x-aoa-run-id header override). A
       // stale/replaced sandbox is denied with the SAME coarse forbidden as wrong-tenant (no
       // oracle). A resolver throw propagates to the route catch (fail-CLOSED = 500 = deny).
-      if (distributedExecutionEnabled && protocolActor.source === "agent" && req.actor.signedRunId) {
+      if (distributedExecutionEnabled && protocolActor.source === "commander" && !req.actor.signedRunId) {
+        throw forbidden(MCP_CROSS_COMPANY_FORBIDDEN_MSG);
+      }
+      if (distributedExecutionEnabled && (protocolActor.source === "agent" || protocolActor.source === "commander") && req.actor.signedRunId) {
         const verdict = await resolveDistributedRunCurrency({
           signedRunId: req.actor.signedRunId,
           companyId,
           agentId: protocolActor.agentId,
+          ...(protocolActor.source === "commander" ? { commander: {
+            userId: req.actor.userId ?? "", conversationId: req.actor.conversationId ?? "",
+          } } : {}),
         });
         if (verdict === "deny") {
           throw forbidden(MCP_CROSS_COMPANY_FORBIDDEN_MSG);

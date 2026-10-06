@@ -1,3 +1,22 @@
+## Code progress, 2026-10-06
+
+The user authorized completion of M2 code and tests, with live Anthropic calls
+skipped and rollout off. The historical starting-state analysis below remains a
+record, not an instruction to stop implementation.
+
+Commander tool authorization now binds the signed `turn_id` to the actual
+company, user, conversation, durable frozen Commander job and active membership.
+Distributed calls require a current lease and current organization tool policy.
+Local turns retain their existing access when their durable identity matches.
+The agent JWT shape is unchanged; Commander keeps its distinct user-scoped JWT.
+
+This closes the at-use authorization gap only. Source-specific secret minting,
+ownership transfer, asynchronous result/streaming, cancellation, approval, cost,
+audit and drain/rollback still need implementation and testing before Commander
+execution cutover is complete. No rollout is enabled by this change.
+
+---
+
 > ★★★ **REFRAMED BY ADVERSARIAL REVIEW (2026-08-27) — do not execute as a "Commander cutover."**
 > A 3-reviewer pass confirmed this design's *physics* (Commander is credential-blocked; the drain fix
 > is sound) but refuted its *framing*: (1) Sprint 6 must lead with **extraction (MIG-007)**, not
