@@ -32,7 +32,7 @@ export const commanderWarmCheckpointSchema = z.object({ version: z.literal(1), s
   checkpointRef: z.string().min(1).max(512), resourceLabels: labels }).strict();
 /** Accepted log + later success terminal + exact retired database lease. A
  * mutable warm marker alone is never evidence of a checkpoint or fence expiry. */
-export async function loadAcceptedCommanderWarmCheckpoint(tx: Db, state: CommanderWarmState, nowMs: number, options: { requirePreviousCapabilityExpired?: boolean } = {}) {
+export async function loadAcceptedCommanderWarmCheckpoint(tx: Db, state: CommanderWarmState, nowMs: number, options: { requirePreviousCapabilityExpired?: boolean; allowTerminalActiveLease?: boolean } = {}) {
   if (!state.resource || !Number.isFinite(nowMs)) return null;
   const physical = state.resource.labels;
   // Physical labels never change. The accepted checkpoint and prior capability
@@ -46,7 +46,8 @@ export async function loadAcceptedCommanderWarmCheckpoint(tx: Db, state: Command
     eq(leases.organizationId, state.organizationId), eq(leases.companyId, state.companyId), eq(leases.jobId, checkpointOwner.jobId),
     eq(leases.attemptId, state.resource.attemptId), eq(leases.attemptNumber, checkpointOwner.attempt),
     eq(leases.workerId, checkpointOwner.workerId), eq(leases.targetId, checkpointOwner.targetId), eq(leases.targetGeneration, checkpointOwner.deviceGeneration))).limit(1);
-  if (!lease || !["released", "expired", "revoked"].includes(lease.status) || !lease.expiresAt) return null;
+  if (!lease || (!['released', 'expired', 'revoked'].includes(lease.status) &&
+      !(options.allowTerminalActiveLease === true && lease.status === 'active')) || !lease.expiresAt) return null;
   const previousCapabilityExpiresAtMs = lease.expiresAt.getTime();
   if (!Number.isFinite(previousCapabilityExpiresAtMs) || state.resource.previousCapabilityExpiresAtMs !== previousCapabilityExpiresAtMs) return null;
   const [attempt] = await tx.select({ status: jobAttempts.status }).from(jobAttempts).where(and(
