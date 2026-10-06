@@ -2,14 +2,15 @@
 
 **Updated:** `2026-10-06`
 **Integration branch:** `docs/replatform-program`
-**Status:** M1a previously passed; latest runtime follow-up failed before M1b
+**Status:** M1a passed at its recorded revision; M1b live acceptance is pending, with a current provider-credit blocker
 
 PRs [#646](https://github.com/tandavkrishna27/AoA/pull/646) and
 [#645](https://github.com/tandavkrishna27/AoA/pull/645) are merged. The current
 integration revision after follow-ups
 [#647](https://github.com/tandavkrishna27/AoA/pull/647) and
-[#648](https://github.com/tandavkrishna27/AoA/pull/648) is
-`b673b25dce932150a5562797ec21770554ff432e`.
+[#648](https://github.com/tandavkrishna27/AoA/pull/648), followed by
+[#649](https://github.com/tandavkrishna27/AoA/pull/649), is
+`e8d85927d85db234c7b8fcff23a3adca55b7afd3` (latest code/test merge).
 Required CI passed for #646 at `232d15298db0e459e147b0062110f3457b7ec46f` in
 [37372575453](https://github.com/tandavkrishna27/AoA/actions/runs/37372575453),
 and for #645 at `94f9542cddf08fa66fbd64286eab44287b65b1c8` in
@@ -158,8 +159,8 @@ after a transient GitHub API 500; its first failure is retained in Actions.
 The six explicitly enabled Windows Postgres suites were `job-leasing`,
 `job-fencing`, `job-events`, `job-accepted-event-seam`, `job-distributed-drain`,
 and `m1-cleanup-sql` (`AOA_RUN_WIN_INTEGRATION=1`, two workers).
-The shipped-boot workflow requires an integration-branch ancestor. Its current
-combined run uses `9925e8d87`; the successful corrected D1 matrix used
+The shipped-boot workflow requires an integration-branch ancestor. The earlier
+combined run `37378134451` used `9925e8d87`; the successful corrected D1 matrix used
 `f29e51e50`. Keep these tested revisions distinct.
 
 ```sh
@@ -308,6 +309,37 @@ and an empty live provider list. Compose resources were independently empty, and
 the leak scan passed. The earlier M1a passing record remains evidence for its
 named revision; this latest run is not a pass. Useful M1b output remains unproven.
 
+PR [#649](https://github.com/tandavkrishna27/AoA/pull/649) retains the initial
+journey's accepted CLI failure, usage/cost observations and verifier result
+before the positive-cost assertion exits. It also scrubs decoded string values
+before JSON escaping. At head `3ea265b4689d079e69f5e7116340b3a9abf1980f`, local
+typecheck and build passed; the full suite passed 2,444 files / 23,555 tests,
+with 222 files / 1,872 tests skipped (292.41 seconds). All 646 M1 Node harness
+tests passed with zero skips.
+[CI 37392323713](https://github.com/tandavkrishna27/AoA/actions/runs/37392323713)
+passed 2,657 files / 25,350 tests, with 77 tests skipped; E2E passed 169 tests,
+with 18 skipped. The integration merge is
+`e8d85927d85db234c7b8fcff23a3adca55b7afd3`, with the same file tree as that
+tested head. These checks do not establish a passing live M1b result.
+
+Direct template probe
+[37392553802](https://github.com/tandavkrishna27/AoA/actions/runs/37392553802)
+tested `b673b25dce932150a5562797ec21770554ff432e` with Claude `2.1.251`. The A-neg
+model turn exited 1 with `billing_error`, HTTP 400, `Credit balance is too low`,
+and zero model tokens/cost. The probe is inconclusive for output behavior.
+PC-1, PC-2 and C-census all held; both sandbox termination calls were acknowledged.
+A-dir, A-cwd and A-decl were not run. This establishes the current billing
+blocker for the GitHub `ANTHROPIC_API_KEY`; it does not establish the unretained
+failure messages from earlier journeys or useful M1b acceptance.
+
+The next action is to fund that Anthropic API account or update the repository
+secret to a funded key. After that, run the existing combined keyed workflow
+once with `m1b=true` on the tested merge above. It must pass
+the existing runtime checks, observe the useful MCP read, commit the expected
+output, download and verify its bytes, and clean up. Record the actual revision
+and results here. No further keyed run is needed while the billing blocker
+remains; full D2 remains later qualification work.
+
 ## Historical September 26 recovery instructions
 
 The sections below preserve the former sequence for context. Their separate
@@ -327,7 +359,7 @@ PR #620 repaired the D1 redaction evidence at implementation head
 findings; all 16 exact-head CI checks passed. That establishes source repair, not
 milestone closure.
 
-## Ordered work and acceptance
+### Ordered work and acceptance
 
 1. Commit the distinct review disposition for DEP-027. Its result must be
    `complete` before it is pinned as accepted successor evidence.
@@ -355,7 +387,7 @@ milestone closure.
    attempt 2. Pin all thirteen required results plus DEP-027, both new campaigns and
    the certified audit. This remains non-promoting. Then audit M1b gaps.
 
-## Roles
+### Roles
 
 | Role | Session |
 |---|---|
@@ -368,7 +400,7 @@ The certifier must take no relied-on decision, implement no repair, dispatch no
 campaign, author no campaign QA record/audit, and prepare no milestone handoff.
 Reservation is not certification; actual evidence review is still required.
 
-## Automatic-run timing
+### Automatic-run timing
 
 Push-triggered D1 run `36253363996` started on merge `583b5fc8...` before this
 replacement freeze was recorded. It is diagnostic evidence, not a conforming
@@ -378,7 +410,7 @@ the free D1 campaign after the conforming freeze. A later code/configuration cha
 requires a new candidate; documentation-only disposition carry-forward requires
 explicit byte-identity proof.
 
-## Verification
+### Verification
 
 Before dispatch: clean candidate, integration ancestry, independent disposition,
 complete blob/configuration inventory, declaration/finding/citation/ticket guards,
