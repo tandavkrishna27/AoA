@@ -1,7 +1,7 @@
 # MIG-006 — Crew distributed routing seam — design
 
 **Epic:** E10 · **Plan node:** the crew sink cutover (E10-F001 shared prerequisite #1, crew slice)
-**Status:** lifecycle routing shipped; task output delivery and MCP authorization merged. Discussion recovery is implemented on the companion code branch; crew activation remains pending.
+**Status:** lifecycle routing, task output delivery, MCP authorization and Discussion recovery merged into the replatform program branch. Crew activation remains off at the user's request.
 **Authored:** 2026-09-18 (post-E7-1), by terrain re-verification against source on `docs/replatform-program`.
 **Owner:** unowned — this authors the previously-missing MIG-006 ticket (E10-F001 named it as unwritten).
 

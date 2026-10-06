@@ -1,7 +1,54 @@
 # M1 and M2 code execution
 
-Updated 2026-10-06. Execute inline under the user's authorization to finish crew,
+Updated 2026-10-07. Execute inline under the user's authorization to finish crew,
 remaining M1 code and tests, and M2. This checklist adds no certification gate.
+
+## Current code status
+
+The replatform program branch implements the remaining M1 cancellation fix and M2
+company-key execution paths for Commander, crew and extraction. Crew task
+outputs, MCP authorization and Discussion recovery are integrated. Commander
+includes fenced streaming, accepted results, cost, audit, cancellation and
+recovery, plus protected warm checkpoint/resume, atomic conversation ownership,
+target/worker affinity and durable resource cleanup. Rollback preserves a
+retained executor until confirmed cleanup and capability expiry.
+
+MIG-001 preserves personal credential ownership and refuses unsupported armed
+device execution. Full device-local credential broker execution remains separate
+desktop work; this candidate does not implement it or upload personal auth homes.
+The supported distributed cohort uses company API keys. Personal metadata
+routing alone never authorizes execution.
+
+M1/crew and M2 code/testing are complete for the supported company-key execution
+paths. All remaining code PRs passed required CI and merged into
+`docs/replatform-program`: streaming #667, cleanup #669, retention #670,
+cancellation #671, placement #672, checkpoint regressions #673 and consumer #674.
+The integrated code matches the combined candidate that passed local verification.
+The sections below retain the implementation history and their original test
+counts; their old pending-work lists are superseded by this current status.
+Live Anthropic M1b remains deferred at the user's request. No rollout,
+deployment, main merge or milestone certification is included.
+
+### Combined verification
+
+- Recursive typecheck and repository build passed.
+- Full suite: 23,934 passed across 2,474 files; 1,920 tests skipped by existing
+  environment guards.
+- Explicit Windows PostgreSQL group: 156 passed across seven files. Placement,
+  leasing, property checks, credential redemption, crew output, Discussion
+  recovery and the actual drain ran against built packages. Seven older
+  Commander turn-claim tests unconditionally skip Windows; those remain covered
+  by Linux PR CI rather than being counted as locally executed.
+- Worker checkpoint/control and signed checkpoint/restore wire: 48 passed,
+  including late cancellation, lease loss and checkpoint deadline responses.
+- Citation integrity, test inventory and whitespace checks passed.
+
+### Next boundary
+
+Keep rollout off under the current instruction. Live Anthropic M1b remains
+deferred; no passing code test substitutes for that live result. Full device-local
+credential execution remains separate desktop scope. Browser/service breadth is
+the next planned engineering milestone (M3), outside this M1/M2 work.
 
 ## Constraints
 

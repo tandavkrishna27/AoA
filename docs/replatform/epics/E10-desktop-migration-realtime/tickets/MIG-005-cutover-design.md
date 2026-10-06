@@ -1,3 +1,19 @@
+## Current code checkpoint, 2026-10-07
+
+The combined program candidate implements company-key Commander dispatch with
+atomic source/handle ownership, at-use user/tool authorization, accepted streamed
+logs and results, cost, reply/audit persistence, cancellation, recovery and drain.
+Warm conversations use signed exact-resource checkpoint/resume, protected
+credential rotation, atomic reservation, original target/worker affinity and
+durable cleanup. Retained ownership prevents legacy spawning through rollback;
+existing legacy warm resources stay with their existing executor until cleanup.
+Unsupported armed personal/device placement refuses without copying an auth home.
+Full device-local execution remains desktop work. Combined typecheck, full-suite
+and build checks passed. All code PRs passed required CI and merged into the
+program branch; rollout and live calls remain off.
+
+The following sections preserve the historical design and earlier checkpoints.
+
 ## Code progress, 2026-10-06
 
 The user authorized completion of M2 code and tests, with live Anthropic calls

@@ -1,6 +1,6 @@
 # MIG-001 — target and credential routing
 
-Implementation in progress, 2026-10-06. M2 scope follows Decisions 117 and 121.
+Implementation checkpoint, 2026-10-07. M2 scope follows Decisions 117 and 121.
 The user authorized code and testing, with Anthropic credentials skipped and
 rollout flags off. This ticket adds no certification or activation requirement.
 
@@ -61,6 +61,12 @@ revoked connection, suspended user and mismatched conversation. Repository
 typecheck/build passed; the full local suite passed 23,576 tests before rebasing
 onto merged crew Discussion recovery. Normal CI validates the rebased candidate.
 
-Source-specific secret minting, Commander/extraction execution and asynchronous
-results remain to implement. Personal metadata routing does not authorize copying
-a personal CLI auth home into a cloud sandbox. Rollout remains off.
+Source-specific company-key minting and Commander/extraction asynchronous results
+are implemented on the combined program candidate. Armed Commander placement
+refusal surfaces an error rather than selecting a legacy executor. Warm retained
+ownership also suppresses legacy acquisition under rollback or a missing port.
+Personal routes retain independent owner checks and refuse unsupported execution;
+full device-local broker execution belongs to desktop work and remains unbuilt.
+Personal metadata routing does not authorize copying a CLI auth home into a
+cloud sandbox. Combined typecheck, full-suite and build checks passed. All code
+PRs passed required CI and merged into the program branch. Rollout remains off.
