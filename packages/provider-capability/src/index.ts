@@ -10,3 +10,6 @@ export {
   signOwnedLabelsCapability,
 } from "./capability.js";
 export type { OwnedLabelsCapability, OwnedLabelsCapabilitySignedFields } from "./capability.js";
+
+export { buildWarmResourceCapabilityCanonical, isWarmResourceCapabilityFields, signWarmResourceCapability, verifyWarmResourceCapability } from "./warm-resource-capability.js";
+export type { WarmResourceCapability, WarmResourceCapabilityFields } from "./warm-resource-capability.js";

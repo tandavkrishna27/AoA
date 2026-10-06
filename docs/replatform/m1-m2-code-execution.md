@@ -135,3 +135,28 @@ its isolated rerun passed before the successful full rerun. The new SSE tests
 preserve distributed ownership after partial-delivery errors, and recovery
 listing and retirement each have bounded waits. PR #660 passed all 16 CI checks
 and merged into the replatform branch. Warm VM ownership/resumption is next.
+
+## Warm Commander ownership foundation
+
+Lifecycle PR #661 passed the required CI checks and merged into the replatform
+branch. Warm execution remains open; the ephemeral consumer still preserves the
+legacy owner for warm conversations.
+
+The optional networked checkpoint/restore relay now uses the signed owned-resource
+gate. It remains off unless the driver explicitly enables both operations; an
+ungated server refuses them. Malformed receipts and unsupported far providers
+fail explicitly. A separate signed warm-resource grant binds one retained VM's
+original labels to one fresh primary capability without changing primary v1.
+It cannot replace the primary fence, broaden to another VM, outlive that fence,
+or overlap the previous capability's expiry. The durable checkpoint/session
+issuer and worker retained-resource lifecycle are not wired by this foundation.
+
+The warm claim policy refuses inactive owners, mismatched tenant/user/conversation
+or target identity, competing jobs, expired resources, stale device generations,
+unaccepted checkpoint evidence and a still-live previous capability. It remains
+a tested policy pending its transactional caller.
+
+Verification: 393 focused tests passed with one skipped; repository typecheck,
+23,786 full-suite tests (1,915 skipped, 2,462 passing files), build, citation
+integrity and test inventory checks passed. No live provider call, activation,
+deployment or main merge was performed.

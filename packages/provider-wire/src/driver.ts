@@ -69,7 +69,7 @@ import {
   decodeOpResponse,
   encodeOpRequest,
 } from "./codec.js";
-import type { OwnedLabelsCapability } from "./capability.js";
+import type { OwnedLabelsCapability, WarmResourceCapability } from "./capability.js";
 import type { RedactedListResult } from "./projection.js";
 
 export interface NetworkedProviderDriverOptions {
@@ -87,14 +87,17 @@ export interface NetworkedProviderDriverOptions {
    * UNGATED server ignores it (create's Unit-A body is byte-identical when it is absent).
    */
   readonly capability?: OwnedLabelsCapability;
+  /** Relay pause/resume only when the selected target explicitly supports both. Default off. */
+  readonly enableCheckpointRestore?: boolean;
+  readonly warmResourceCapability?: WarmResourceCapability;
 }
 
 export class NetworkedProviderDriver implements SandboxProvider {
   // Shape-faithful to the port contract ("always a superset of the 8 core ops").
   // Unit A only IMPLEMENTS create + execute; the rest throw until Unit B — an honest
   // "not built yet", not a silent no-op.
-  readonly advertisedOperations: ReadonlySet<ProviderOperation> = new Set(CORE_PROVIDER_OPERATIONS);
-  readonly checkpointMode: CheckpointMode = "none";
+  readonly advertisedOperations: ReadonlySet<ProviderOperation>;
+  readonly checkpointMode: CheckpointMode;
   readonly healthMode: HealthMode = "none";
   /**
    * DAT-009-3e — `"grant_upload"`: this driver RELAYS the artifact pair over the wire, as it
@@ -143,11 +146,18 @@ export class NetworkedProviderDriver implements SandboxProvider {
   readonly #baseUrl: string;
   readonly #fetch: typeof fetch;
   readonly #capability?: OwnedLabelsCapability;
+  readonly #warmResourceCapability?: WarmResourceCapability;
 
   constructor(options: NetworkedProviderDriverOptions) {
     this.#baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.#fetch = options.fetch ?? fetch;
     this.#capability = options.capability;
+    this.#warmResourceCapability = options.warmResourceCapability;
+    this.checkpointMode = options.enableCheckpointRestore === true ? "snapshot" : "none";
+    this.advertisedOperations = new Set<ProviderOperation>([
+      ...CORE_PROVIDER_OPERATIONS,
+      ...(options.enableCheckpointRestore === true ? ["checkpoint", "restore"] as const : []),
+    ]);
   }
 
   async create(spec: CreateSandboxSpec, ctx: ProviderOpContext): Promise<CreateResult> {
@@ -236,11 +246,23 @@ export class NetworkedProviderDriver implements SandboxProvider {
     };
   }
 
-  async checkpoint(_sandboxId: string, _ctx: ProviderOpContext): Promise<CheckpointResult> {
-    throw new UnsupportedProviderOperation("checkpoint");
+  async checkpoint(sandboxId: string, ctx: ProviderOpContext): Promise<CheckpointResult> {
+    if (this.checkpointMode === "none") throw new UnsupportedProviderOperation("checkpoint");
+    const result = await this.#post<unknown>("checkpoint", sandboxId, ctx, this.#capability);
+    if (!isRecord(result) || typeof result.providerOpId !== "string" || !result.providerOpId ||
+        result.mode !== "snapshot" || typeof result.checkpointRef !== "string" || !result.checkpointRef) {
+      throw new WireProtocolError("checkpoint returned a malformed receipt");
+    }
+    return { providerOpId: result.providerOpId, mode: "snapshot", checkpointRef: result.checkpointRef };
   }
-  async restore(_sandboxId: string, _ctx: ProviderOpContext): Promise<RestoreResult> {
-    throw new UnsupportedProviderOperation("restore");
+  async restore(sandboxId: string, ctx: ProviderOpContext): Promise<RestoreResult> {
+    if (this.checkpointMode === "none") throw new UnsupportedProviderOperation("restore");
+    const result = await this.#post<unknown>("restore", sandboxId, ctx, this.#capability);
+    if (!isRecord(result) || typeof result.providerOpId !== "string" || !result.providerOpId ||
+        typeof result.restored !== "boolean") {
+      throw new WireProtocolError("restore returned a malformed receipt");
+    }
+    return { providerOpId: result.providerOpId, restored: result.restored };
   }
   async health(_sandboxId: string, _ctx: ProviderOpContext): Promise<HealthResult> {
     throw new UnsupportedProviderOperation("health");
@@ -369,7 +391,7 @@ export class NetworkedProviderDriver implements SandboxProvider {
     const res = await this.#fetch(`${this.#baseUrl}/op/${op}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: encodeOpRequest(args, ctx, capability),
+      body: encodeOpRequest(args, ctx, capability, this.#warmResourceCapability),
     });
     // Body-driven: the codec decides ok vs err vs garbled regardless of HTTP status. A
     // non-JSON / non-envelope body (e.g. a bare 500) surfaces as a WireProtocolError,

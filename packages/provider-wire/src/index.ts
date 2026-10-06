@@ -28,3 +28,6 @@ export {
   signOwnedLabelsCapability,
 } from "./capability.js";
 export type { OwnedLabelsCapability, OwnedLabelsCapabilitySignedFields } from "./capability.js";
+
+export { isWarmResourceCapabilityFields, signWarmResourceCapability, verifyWarmResourceCapability } from "@armyofagents/provider-capability";
+export type { WarmResourceCapability, WarmResourceCapabilityFields } from "@armyofagents/provider-capability";

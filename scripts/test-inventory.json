@@ -10,7 +10,7 @@
     },
     "packages/adapter-manager": {
       "mode": "floor",
-      "count": 21
+      "count": 22
     },
     "packages/adapter-utils": {
       "mode": "floor",
@@ -34,7 +34,7 @@
     },
     "packages/provider-capability": {
       "mode": "floor",
-      "count": 1
+      "count": 2
     },
     "packages/provider-wire": {
       "mode": "floor",
@@ -78,7 +78,7 @@
     },
     "server": {
       "mode": "floor",
-      "count": 1600
+      "count": 1601
     },
     "tests": {
       "mode": "pinned",

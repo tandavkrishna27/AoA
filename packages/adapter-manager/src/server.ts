@@ -123,6 +123,8 @@ const GATE_REQUIRED_OPS: ReadonlySet<string> = new Set([
   "create",
   "execute",
   "cancel",
+  "checkpoint",
+  "restore",
   "kill",
   "destroy",
   "reconcile_cleanup",
@@ -224,8 +226,9 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
     args: unknown,
     ctx: ProviderOpContext,
     capability: OwnedLabelsCapability | undefined,
+    warmResourceCapability?: unknown,
   ): Promise<unknown> {
-    const deps = gateDeps!;
+    const deps = warmResourceCapability === undefined ? gateDeps! : { ...gateDeps!, warmResourceCapability };
     switch (op) {
       case "create": {
         // The DISTINCT create-gate (no inspect): verify -> spec-label match -> the
@@ -235,6 +238,14 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       case "execute": {
         const input = args as ExecuteInput;
         return gateOwnedOp(deps, input.sandboxId, ctx, capability, () => executeRelayingStdout(provider, args, ctx));
+      }
+      case "checkpoint": {
+        const sandboxId = args as string;
+        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.checkpoint(sandboxId, ctx));
+      }
+      case "restore": {
+        const sandboxId = args as string;
+        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.restore(sandboxId, ctx));
       }
       case "cancel": {
         const sandboxId = args as string;
@@ -411,8 +422,8 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
           // inspect -> field-wise owned-check -> dispatch). A refusal throws the uniform
           // ResourceNotAvailableError, caught below and coded back symmetrically.
           if (gated && GATE_REQUIRED_OPS.has(op)) {
-            const { args, ctx, capability } = decodeOpRequest(body);
-            const result = await routeGated(op, args, ctx, capability);
+            const { args, ctx, capability, warmResourceCapability } = decodeOpRequest(body);
+            const result = await routeGated(op, args, ctx, capability, warmResourceCapability);
             sendJson(res, 200, encodeOkResponse(result));
             return;
           }
