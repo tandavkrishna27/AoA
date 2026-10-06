@@ -29,6 +29,8 @@
 // exists). DAT-004 BINDS the destination + authorizes + resolves; the fence-aware egress
 // proxy that MATERIALIZES the value + enforces the destination is DAT-005 (non-goal here).
 
+import type { CommanderWarmSecretControl } from "./commander-warm-secret-issuer.js";
+
 import type { KeyObject } from "node:crypto";
 
 import type { AuthorizedSecretResolution, Db } from "@armyofagents/db";
@@ -145,6 +147,7 @@ export type SecretResolveOutcome =
        * and the route JSON UNTOUCHED.
        */
       ownedLabelsCapability?: OwnedLabelsCapability;
+      warmControl?: CommanderWarmSecretControl;
     }
   | { outcome: "device_handoff"; handoff: DeviceLocalHandoff }
   | { outcome: "denied"; reason: "stale_fence" | "attempt_terminal" | "target_revoked" | "malformed" };
@@ -284,6 +287,7 @@ export function createSecretBrokerService(input: {
   controlPlaneSigningKey?: KeyObject;
   /** DEP-011 Slice 1 — the capability TTL ceiling (clamped to the lease deadline). */
   ownedLabelsCapabilityTtlMs?: number;
+  finalizeSandboxResolution?: (outcome: SecretResolveOutcome, context: ResolvedFenceContext) => Promise<SecretResolveOutcome>;
 }) {
   const brokers = input.brokers ?? failClosedSecretBrokers;
   const maxHeartbeatAgeMs = Math.max(1000, input.maxHeartbeatAgeMs ?? 300_000);
@@ -417,6 +421,11 @@ export function createSecretBrokerService(input: {
           },
           { controlPlaneSigningKey, shortTtlMs: ownedLabelsCapabilityTtlMs },
         );
+      }
+
+      if (fenceCtx && input.finalizeSandboxResolution) {
+        try { outcome = await input.finalizeSandboxResolution(outcome, fenceCtx); }
+        catch { outcome = { outcome: "denied", reason: "malformed" }; }
       }
 
       // DEP-007 — count-only secret-read telemetry: the OUTCOME discriminant only, never

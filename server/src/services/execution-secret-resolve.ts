@@ -31,6 +31,7 @@
 // Every refusal is the broker's coarse, non-disclosing vocabulary. A caller learns that
 // the resolve was refused, never which invariant it tripped.
 
+import type { CommanderWarmSecretControl } from "./commander-warm-secret-issuer.js";
 import { z } from "zod";
 import type { AuthAudience } from "@armyofagents/worker-protocol";
 import type { OwnedLabelsCapability } from "@armyofagents/provider-capability";
@@ -103,6 +104,7 @@ export type ExecutionSecretResolveResult =
        * `resolved` arm UNTOUCHED (present only when a control-plane key is configured — absent
        * today). It carries ONLY the 7 owned labels + expiry, never the `value`/fence token. */
       readonly ownedLabelsCapability?: OwnedLabelsCapability;
+      readonly warmControl?: CommanderWarmSecretControl;
     }
   | { readonly outcome: "denied"; readonly reason: ExecutionSecretResolveDenial };
 
@@ -137,5 +139,6 @@ export function admitSandboxLocalResolution(
 
   // DEP-011 Slice 1 — carry the (optional) minted capability through the pure assembler
   // untouched. It is `undefined` unless the broker minted it on this sandbox-local arm.
-  return { outcome: "resolved", envTarget, value: outcome.material.value, ownedLabelsCapability: outcome.ownedLabelsCapability };
+  return { outcome: "resolved", envTarget, value: outcome.material.value, ownedLabelsCapability: outcome.ownedLabelsCapability,
+    ...(outcome.warmControl ? { warmControl: outcome.warmControl } : {}) };
 }

@@ -45,6 +45,7 @@ import { createSweepTrigger } from "../services/artifact-sweep-trigger.js";
 import { runArtifactOrphanSweep } from "../services/artifact-orphan-sweeper.js";
 import { createQuarantineGrantService } from "../services/quarantine-grant.js";
 import { createQuarantineFinalizeService } from "../services/quarantine-finalize.js";
+import { createCommanderWarmSecretIssuer } from "../services/commander-warm-secret-issuer.js";
 import { createSecretBrokerService } from "../services/secret-broker.js";
 import { createExecutionSecretBrokers } from "../services/execution-secret-brokers.js";
 import {
@@ -169,6 +170,7 @@ export function workerControlRoutes(opts: {
   const executionSecrets = createSecretBrokerService({
     appDb: opts.appDb,
     brokers: createExecutionSecretBrokers(opts.db),
+    finalizeSandboxResolution: createCommanderWarmSecretIssuer({ appDb: opts.appDb, controlPlaneSigningKey: opts.controlPlaneSigningKey }),
     metrics: opts.jobControlMetrics,
     // DEP-011 Slice 1 — inject the mint key (undefined today ⇒ inert; no capability minted).
     controlPlaneSigningKey: opts.controlPlaneSigningKey,
