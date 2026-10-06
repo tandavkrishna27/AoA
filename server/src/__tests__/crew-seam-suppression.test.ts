@@ -279,6 +279,7 @@ const TASK_PAYLOAD = { companyId: COMPANY_ID, source: "wakeup", issueId: ISSUE_I
 const resolveRunRolloutStateMock = vi.fn(async () => ({ state: "canary", organizationId: ORG_ID }));
 const resolveExecutionOwnerMock = vi.fn(async () => ({ owner: "distributed", jobId: DIST_JOB_ID, attemptId: DIST_ATTEMPT_ID }));
 const fakeHook = {
+  resolveOrganizationToolSurface: vi.fn(() => true),
   resolveRunRolloutState: resolveRunRolloutStateMock,
   resolveExecutionOwner: resolveExecutionOwnerMock,
   convertActiveRun: vi.fn(async () => ({ converted: false })),
@@ -340,6 +341,7 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     setDistributedRolloutPort(undefined); // never leak a hook into the next test/file
     if (savedFlag === undefined) delete process.env[CREW_FLAG];
     else process.env[CREW_FLAG] = savedFlag;
@@ -348,6 +350,8 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
   it("A — flag ON + canary + distributed owner: adapter.execute SUPPRESSED, durable marker written (no status), distributedHandoff returned, and the finally still runs", async () => {
     setDistributedRolloutPort(fakeHook);
     process.env[CREW_FLAG] = "true";
+    vi.stubEnv("AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED", "per-organization");
+    vi.stubEnv("AOA_API_URL", "https://control.example.test");
 
     const { db, updates } = makeDb();
     const result = await runAoaAgent(db as never, AGENT_ID, TASK_PAYLOAD);
@@ -363,6 +367,7 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
       idempotencyKey: string;
       rolloutState: string;
       source: unknown;
+      toolSurfaceAuthorized?: boolean;
       input?: { command?: unknown };
       stagedFiles?: ReadonlyArray<{ path: string; bytes: Uint8Array }>;
     };
@@ -378,6 +383,10 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
     );
     const prompt = ownerInput.stagedFiles!.find((file) => file.path.endsWith(".aoa-run-prompt.md"));
     expect(Buffer.from(prompt!.bytes).toString("utf8")).toContain("/home/user/aoa-output");
+    expect(ownerInput.toolSurfaceAuthorized).toBe(true);
+    expect(ownerInput.stagedFiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: expect.stringContaining("mcp") }),
+    ]));
 
     // 1. Legacy execution SUPPRESSED.
     expect(execMock).not.toHaveBeenCalled();
@@ -404,6 +413,21 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
     expect(writeFileMock).toHaveBeenCalled();
     expect(unlinkMock).toHaveBeenCalledTimes(1);
     expect(String(unlinkMock.mock.calls[0][0])).toMatch(/aoa-mcp-a-1-.*\.json$/);
+  });
+
+  it.each([[false, true], [true, false]])("withholds crew MCP when deployment=%s and organization tools=%s", async (deployment, organizationTools) => {
+    process.env[CREW_FLAG] = "true";
+    vi.stubEnv("AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED", deployment ? "per-organization" : "off");
+    vi.stubEnv("AOA_API_URL", "https://control.example.test");
+    setDistributedRolloutPort({ ...fakeHook, resolveOrganizationToolSurface: () => organizationTools });
+    const { db } = makeDb();
+    await runAoaAgent(db as never, AGENT_ID, TASK_PAYLOAD);
+    const input = resolveExecutionOwnerMock.mock.calls[0][0] as unknown as {
+      toolSurfaceAuthorized: boolean; stagedFiles: Array<{ path: string }>;
+    };
+    expect(input.toolSurfaceAuthorized).toBe(false);
+    expect(input.stagedFiles.some((file) => file.path.includes("mcp"))).toBe(false);
+    expect(execMock).not.toHaveBeenCalled();
   });
 
   it("B — flag OFF (env unset), otherwise identical to A: adapter.execute runs once, NO marker, hook never consulted (anti-vacuity control)", async () => {

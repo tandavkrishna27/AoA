@@ -17,7 +17,7 @@
 // DENIES access. A malformed rollout map fails closed to "no Organization armed".
 
 import type { Db } from "@armyofagents/db";
-import { companies, heartbeatRuns } from "@armyofagents/db";
+import { companies, heartbeatRuns, internalAgentRuns } from "@armyofagents/db";
 import { eq } from "drizzle-orm";
 
 import {
@@ -46,18 +46,22 @@ export function createDistributedToolSurfaceUseResolver(
   const rolloutSource = options.rolloutSource ?? createDistributedExecutionRolloutSource(env);
   return {
     async resolve({ signedRunId, companyId }): Promise<RunCurrencyVerdict> {
-      const [row] = await db
-        .select({
-          runCompanyId: heartbeatRuns.companyId,
-          executionOwner: heartbeatRuns.executionOwner,
-          organizationId: companies.organizationId,
-        })
-        .from(heartbeatRuns)
-        // The company -> Organization edge of the RUN's company (not the URL's): the tenant
-        // whose policy decides is the one the run belongs to.
-        .leftJoin(companies, eq(companies.id, heartbeatRuns.companyId))
-        .where(eq(heartbeatRuns.id, signedRunId))
-        .limit(1);
+      async function load(run: typeof heartbeatRuns | typeof internalAgentRuns) {
+        const [row] = await db
+          .select({
+            runCompanyId: run.companyId,
+            executionOwner: run.executionOwner,
+            organizationId: companies.organizationId,
+          })
+          .from(run)
+          // The company -> Organization edge of the RUN's company (not the URL's): the tenant
+          // whose policy decides is the one the run belongs to.
+          .leftJoin(companies, eq(companies.id, run.companyId))
+          .where(eq(run.id, signedRunId))
+          .limit(1);
+        return row;
+      }
+      const row = await load(heartbeatRuns) ?? await load(internalAgentRuns);
 
       if (!row) {
         return classifyToolSurfaceAtUse(

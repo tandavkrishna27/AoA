@@ -7,7 +7,7 @@
 // (the isolation pattern `lease-truth.ts` establishes; see CLAUDE.md Test Patterns).
 //
 // The query is the `guardActiveFence` join (job-control.ts:1920-1967) with a
-// `heartbeat_runs` hop on top: keyed on the SIGNED run id (a PRIMARY KEY probe), it
+// `heartbeat_runs` or `internal_agent_runs` hop on top: keyed on the SIGNED run id (a PRIMARY KEY probe), it
 // LEFT-JOINs the distributed attempt, its offered/active lease, and the lease's
 // execution target, computing lease freshness against the DB `clock_timestamp()` in
 // SQL. Every hop is a unique-index probe, so the read is bounded and never scans.
@@ -17,7 +17,7 @@
 // reader must NEVER catch-and-return "admit".
 
 import type { Db } from "@armyofagents/db";
-import { executionTargets, heartbeatRuns, jobAttempts, leases } from "@armyofagents/db";
+import { executionTargets, heartbeatRuns, internalAgentRuns, jobAttempts, leases } from "@armyofagents/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { classifyRunCurrency, type RunCurrencyVerdict } from "./distributed-run-currency.js";
@@ -34,47 +34,53 @@ export interface DistributedRunCurrencyResolver {
 
 export function createDistributedRunCurrencyResolver(db: Db): DistributedRunCurrencyResolver {
   return {
-    async resolve({ signedRunId, companyId }): Promise<RunCurrencyVerdict> {
-      const [row] = await db
-        .select({
-          runCompanyId: heartbeatRuns.companyId,
-          executionOwner: heartbeatRuns.executionOwner,
-          attemptStatus: jobAttempts.status,
-          leaseStatus: leases.status,
-          // Freshness against a FRESH database clock, in SQL — matching renewLease's strict
-          // `>` with no grace (job-control.ts:4041-4062). NULL expiry compares NULL → not fresh.
-          expiresFresh: sql<boolean>`(${leases.expiresAt} > clock_timestamp())`,
-          leaseTargetGeneration: leases.targetGeneration,
-          targetDeviceGeneration: executionTargets.deviceGeneration,
-          targetStatus: executionTargets.status,
-        })
-        .from(heartbeatRuns)
-        // The distributed attempt — joined ONLY for a run actually handed off to a worker.
-        // A local run (execution_owner NULL) or one with no distributed attempt yields a null
-        // attempt row, and the classifier admits it on `execution_owner !== "distributed"`.
-        .leftJoin(
-          jobAttempts,
-          and(
-            eq(heartbeatRuns.executionOwner, "distributed"),
-            eq(jobAttempts.id, heartbeatRuns.distributedAttemptId),
-            eq(jobAttempts.companyId, heartbeatRuns.companyId),
-          ),
-        )
-        // The attempt's current offered/active lease (leases_active_per_attempt_idx → ≤1 row).
-        .leftJoin(
-          leases,
-          and(eq(leases.attemptId, jobAttempts.id), inArray(leases.status, ["offered", "active"])),
-        )
-        // The lease's execution target (for the generation/disabled supersede cutoff).
-        .leftJoin(
-          executionTargets,
-          and(
-            eq(executionTargets.targetAuthorityKey, leases.targetAuthorityKey),
-            eq(executionTargets.id, leases.targetId),
-          ),
-        )
-        .where(eq(heartbeatRuns.id, signedRunId))
-        .limit(1);
+    async resolve({ signedRunId, companyId, agentId }): Promise<RunCurrencyVerdict> {
+      async function load(run: typeof heartbeatRuns | typeof internalAgentRuns) {
+        const [row] = await db
+          .select({
+            runCompanyId: run.companyId,
+            runAgentId: run.agentId,
+            executionOwner: run.executionOwner,
+            attemptStatus: jobAttempts.status,
+            leaseStatus: leases.status,
+            // Freshness against a FRESH database clock, in SQL — matching renewLease's strict
+            // `>` with no grace (job-control.ts:4041-4062). NULL expiry compares NULL → not fresh.
+            expiresFresh: sql<boolean>`(${leases.expiresAt} > clock_timestamp())`,
+            leaseTargetGeneration: leases.targetGeneration,
+            targetDeviceGeneration: executionTargets.deviceGeneration,
+            targetStatus: executionTargets.status,
+          })
+          .from(run)
+          // The distributed attempt — joined ONLY for a run actually handed off to a worker.
+          // A local run (execution_owner NULL) or one with no distributed attempt yields a null
+          // attempt row, and the classifier admits it on `execution_owner !== "distributed"`.
+          .leftJoin(
+            jobAttempts,
+            and(
+              eq(run.executionOwner, "distributed"),
+              eq(jobAttempts.id, run.distributedAttemptId),
+              eq(jobAttempts.jobId, run.distributedJobId),
+              eq(jobAttempts.companyId, run.companyId),
+            ),
+          )
+          // The attempt's current offered/active lease (leases_active_per_attempt_idx → ≤1 row).
+          .leftJoin(
+            leases,
+            and(eq(leases.attemptId, jobAttempts.id), inArray(leases.status, ["offered", "active"])),
+          )
+          // The lease's execution target (for the generation/disabled supersede cutoff).
+          .leftJoin(
+            executionTargets,
+            and(
+              eq(executionTargets.targetAuthorityKey, leases.targetAuthorityKey),
+              eq(executionTargets.id, leases.targetId),
+            ),
+          )
+          .where(eq(run.id, signedRunId))
+          .limit(1);
+        return row;
+      }
+      const row = await load(heartbeatRuns) ?? await load(internalAgentRuns);
 
       // No run row for this signed run id → not an org distributed run this gate covers.
       if (!row) {
@@ -91,6 +97,8 @@ export function createDistributedRunCurrencyResolver(db: Db): DistributedRunCurr
           companyId,
         );
       }
+
+      if (agentId && row.runAgentId !== agentId) return "deny";
 
       // The generation-only half of guardActiveFence's target_revoked cutoff, fail-CLOSED:
       // an absent target (left-join miss → null generation), a null lease generation, a

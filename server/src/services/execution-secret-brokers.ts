@@ -22,7 +22,8 @@
 // is a value lookup, and treating it as a second gate would split the authority.
 
 import type { Db } from "@armyofagents/db";
-import { heartbeatRuns } from "@armyofagents/db";
+import { heartbeatRuns, internalAgentRuns, jobs } from "@armyofagents/db";
+import { submitJobSourceSchema } from "@armyofagents/shared";
 import { and, desc, eq } from "drizzle-orm";
 import { createLocalAgentJwt } from "../agent-auth-jwt.js";
 import { secretService, type SecretConsumerContext } from "./secrets.js";
@@ -57,12 +58,12 @@ function consumerContextFor(handleId: string): SecretConsumerContext {
 
 /**
  * DAT-007 / CLI-008 — the PURE-of-DB mint-at-resolve decision for a `run_jwt` handle.
- * Split from the wiring (which supplies the heartbeat_runs read + the JWT signer) so the
+ * Split from the wiring (which supplies the durable run lookup + the JWT signer) so the
  * fail-closed logic + the run-id binding are unit-testable without a database.
  *
  * ★ THE R2 CRUX. classifyRunCurrency (DAT-007) FAILS OPEN on `!runFound` and on
  * `execution_owner !== 'distributed'`, so the minted `run_id` MUST resolve to the
- * distributed heartbeat_runs row the currency gate probes. The handle carries NO run id
+ * distributed heartbeat or crew run row the currency gate probes. The handle carries NO run id
  * (mint-at-resolve); `loadDistributedRun` re-derives it from the job's handoff marker
  * (distributed_job_id + execution_owner='distributed'), and this mints the JWT with THAT
  * run id. A missing distributed run, an owner that disagrees with the run's agent, or an
@@ -120,12 +121,24 @@ export function createExecutionSecretBrokers(db: Db): SecretBrokerSet {
     },
     async resolveRunJwt(input) {
       // Mint-at-resolve. `refId` is the distributed jobId; re-derive the run from the
-      // job's handoff marker so the minted run_id is the heartbeat_runs row DAT-007 probes.
-      // Mirrors createDistributedRunCurrencyResolver's direct heartbeat_runs read (company
+      // job's handoff marker so the minted run_id is the durable run row DAT-007 probes.
+      // Mirrors createDistributedRunCurrencyResolver's heartbeat/crew lookup (company
       // scoped in the WHERE; a foreign job can never select another company's run).
       return resolveRunJwtValue(
         {
           async loadDistributedRun({ companyId, jobId }) {
+            const [job] = await db.select({ sourceKind: jobs.sourceKind, sourceIntent: jobs.sourceIntent })
+              .from(jobs).where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
+            if (!job) return null;
+            if (job.sourceKind === "crew_run") {
+              const source = submitJobSourceSchema.safeParse(job.sourceIntent);
+              if (!source.success || source.data.kind !== "crew_run") return null;
+              const [crew] = await db.select({ runId: internalAgentRuns.id, agentId: internalAgentRuns.agentId })
+                .from(internalAgentRuns).where(and(eq(internalAgentRuns.id, source.data.crewRunId),
+                  eq(internalAgentRuns.companyId, companyId), eq(internalAgentRuns.distributedJobId, jobId),
+                  eq(internalAgentRuns.executionOwner, "distributed"))).limit(1);
+              return crew?.agentId ? { runId: crew.runId, agentId: crew.agentId } : null;
+            }
             const [row] = await db
               .select({ runId: heartbeatRuns.id, agentId: heartbeatRuns.agentId })
               .from(heartbeatRuns)

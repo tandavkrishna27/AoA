@@ -23,7 +23,11 @@ after terminal without inserting duplicate outputs.
 This slice delivers files on the **task**. Discussion entry enrichment remains a separate
 follow-up: the restricted `aoa_app` role has no access to `discussions`; no role grant or
 privileged projection bypass was added. Existing terminal run summaries are unchanged.
-Crew MCP authorization is also a follow-up. Crew rollout stays off. Live Anthropic M1b
+Crew MCP authorization is implemented on the companion code branch: staged
+configuration and token mint are bound to the durable crew run, with organization
+tool policy and live lease checks at every use. Real PostgreSQL and JWT-authenticated
+HTTP tests cover read, comment, review transition, revocation and stale-lease refusal.
+Crew rollout stays off. Live Anthropic M1b
 validation is deferred by the user's explicit choice to skip the API key; no paid model
 calls or provider substitution are part of these tests. This is M2 preparation, not an
 M2 rollout or a claim that live M1b passed.
