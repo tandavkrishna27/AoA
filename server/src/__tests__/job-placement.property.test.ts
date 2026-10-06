@@ -335,6 +335,24 @@ describe("JOB-009 slice B deterministic placement policy", () => {
     expect(JSON.stringify(normalized)).not.toContain("credentialOwnerPrincipalId");
   });
 
+  it.each([OWNER, "other-user", undefined])("requires independent personal credential owner authority: %s", (credentialOwnerPrincipalId) => {
+    const normalize = placementModule!.normalizeSubmittedJobPlacementFacts as (input: unknown) => Record<string, unknown>;
+    const target = candidate("owner_desktop", 1).registry;
+    const result = normalize({ sourceKind: "commander_turn", inputHash: INPUT_DIGEST, policyHash: POLICY_HASH,
+      requirements: { workloadType: "batch", requiredCapabilities: ["sandbox.process_isolated"] },
+      placementRequest: { policyId: "job-submission-default", policyVersion: 1, requestedTarget: null },
+      rollout: { enabled: true, mode: "active", reason: "enabled" },
+      credentialBinding: { credentialId: "personal-credential", credentialKind: "personal_subscription",
+        executionTargetSlug: target.targetSlug, pinnedTargetId: null, credentialOwnerPrincipalId },
+      resolvedTarget: target,
+    });
+    if (credentialOwnerPrincipalId === OWNER) {
+      expect(result).toMatchObject({ success: true, active: true, credentialOwnerId: OWNER });
+    } else {
+      expect(result).toMatchObject({ success: false, reason: "unmapped_execution_target" });
+    }
+  });
+
   it("[I-03] honors exact Decision #117 target identity instead of re-routing lexicographically", () => {
     const first = candidate("owner_desktop", 1);
     const bound = candidate("owner_desktop", 2);

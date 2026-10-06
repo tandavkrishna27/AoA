@@ -18,10 +18,8 @@
 // to {desktop, local_host} only), so there is still NO reachable path to an owner_desktop
 // target — the DE-29 owner-misrouting class stays structurally excluded.
 //
-// That matters because the check that would otherwise catch owner misrouting is
-// tautological: `credentialOwnerId` is read off the ROUTED target's profile
-// (job-placement.ts:279-281) and `requiredOwnerPrincipalId` off the SAME profile
-// (:289), so `candidateFits` compares a value to itself (:557-563).
+// M2 separately checks independently established personal credential ownership.
+// These tests preserve the historical M1 canary binding and replay digest.
 
 import { describe, expect, it } from "vitest";
 import {

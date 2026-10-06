@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import postgres, { type Sql } from "postgres";
 import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import type { Db } from "@armyofagents/db";
+import { createDrizzleJobCredentialRoutingResolver } from "../services/job-credential-routing.js";
+import { resolveCliAuthTopology } from "../services/cli-auth-topology.js";
 import {
   applyPendingMigrations,
   createOperatorDbConnection,
@@ -576,6 +580,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       credentialKind: "company_api_key" | "personal_subscription" | null;
       executionTargetSlug: string | null;
       pinnedTargetId: string | null;
+      credentialOwnerPrincipalId?: string | null;
     };
   }) {
     const { app, operator } = guard();
@@ -613,6 +618,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     const personalBoundToB = {
       credentialId: "personal-owner-b",
       credentialKind: "personal_subscription" as const,
+      credentialOwnerPrincipalId: OWNER_A,
       executionTargetSlug: "owner-b",
       pinnedTargetId: null,
     };
@@ -630,6 +636,15 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       targetClass: "owner_desktop",
       leaseEligible: true,
     });
+
+    for (const credentialOwnerPrincipalId of [null, "different-credential-owner"]) {
+      const jobId = randomUUID(); const attemptId = randomUUID();
+      await seedJob({ jobId, attemptId });
+      const denied = await place({ jobId, attemptId,
+        credentialBinding: { ...personalBoundToB, credentialOwnerPrincipalId } });
+      expect(denied).toMatchObject({ targetId: null, leaseEligible: false });
+      expect(denied.disposition).not.toBe("selected");
+    }
 
     const deniedCases = [
       {
@@ -680,11 +695,77 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     }
   });
 
+  it("[MIG-001] routes a durable Commander user through trusted metadata and current owner membership", async () => {
+    const { admin, app, operator } = guard();
+    const ownerClient = postgres(adminUrl, { max: 2 });
+    const ownerDb = drizzle(ownerClient) as unknown as Db;
+    const jobId = randomUUID(); const attemptId = randomUUID();
+    const runId = randomUUID(); const conversationId = randomUUID(); const connectionId = randomUUID();
+    await seedJob({ jobId, attemptId });
+    await admin`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+      VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active')
+      ON CONFLICT (company_id, principal_type, principal_id) DO UPDATE SET status = 'active'`;
+    await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id)
+      VALUES (${conversationId}, ${COMPANY_A}, ${OWNER_A})`;
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, provider)
+      VALUES (${runId}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'openai')`;
+    await admin`INSERT INTO internal_agent_messages (conversation_id, role, run_id)
+      VALUES (${conversationId}, 'assistant', ${runId})`;
+    await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${runId},
+      source_intent = ${{ kind: 'commander_turn', internalAgentRunId: runId, conversationId }},
+      requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+      executor_principal_kind = 'sandbox', executor_principal_id = ${runId} WHERE id = ${jobId}`;
+    await admin`INSERT INTO provider_connections
+      (id, organization_id, company_id, provider, auth_method, owner_user_id, execution_target_id,
+       state, sharing_policy, terms_attested_at)
+      VALUES (${connectionId}, ${ORG_A}, ${COMPANY_A}, 'openai', 'personal_subscription', ${OWNER_A},
+        'owner-b', 'verified', 'owner_only', now())`;
+    await admin`INSERT INTO provider_assignments
+      (organization_id, company_id, connection_id, provider, scope_type, scope_id)
+      VALUES (${ORG_A}, ${COMPANY_A}, ${connectionId}, 'openai', 'personal_execution_default', ${OWNER_A})`;
+    try {
+      const resolve = createDrizzleJobCredentialRoutingResolver(ownerDb, resolveCliAuthTopology({
+        env: {}, deploymentMode: 'local_trusted', deploymentExposure: 'private',
+      }));
+      const request = { organizationId: ORG_A, companyId: COMPANY_A, jobId, sourceKind: 'commander_turn' as const };
+      expect(await resolve(request)).toMatchObject({ credentialId: connectionId,
+        credentialOwnerPrincipalId: OWNER_A, executionTargetSlug: 'owner-b' });
+      const service = placementNamespace.createJobPlacementService({
+        appDb: app.db, operatorDb: operator.db, deploymentMode: 'local_trusted', deploymentEnabled: true,
+        resolveOrganizationPolicy: () => ({ enabled: true, mode: 'active' }),
+        resolveWorkloadPolicy: () => true, resolveCredentialBinding: resolve,
+      });
+      const placementInput = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId,
+        now: new Date('2026-08-10T10:00:05.000Z'), maxHeartbeatAgeMs: 30_000 };
+      const decision = await service.place(placementInput);
+      expect(decision, JSON.stringify(decision)).toMatchObject({ targetId: TARGET_OWNER_B,
+        targetClass: 'owner_desktop', leaseEligible: true });
+      expect(await service.place(placementInput)).toMatchObject({ targetId: TARGET_OWNER_B });
+      await expect(resolve({ ...request, companyId: COMPANY_B })).rejects.toMatchObject({ code: 'provider_unavailable' });
+      await expect(resolve({ ...request, organizationId: ORG_B })).rejects.toMatchObject({ code: 'provider_unavailable' });
+      await admin`UPDATE provider_connections SET state = 'revoked' WHERE id = ${connectionId}`;
+      await expect(resolve(request)).rejects.toMatchObject({ code: 'provider_unavailable' });
+      await admin`UPDATE provider_connections SET state = 'verified' WHERE id = ${connectionId}`;
+      await admin`UPDATE company_memberships SET status = 'suspended'
+        WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+      await expect(resolve(request)).rejects.toMatchObject({ code: 'provider_unavailable' });
+      await admin`UPDATE company_memberships SET status = 'active'
+        WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+      await admin`UPDATE internal_agent_conversations SET user_id = 'foreign-owner' WHERE id = ${conversationId}`;
+      await expect(resolve(request)).rejects.toMatchObject({ code: 'provider_unavailable' });
+    } finally {
+      await admin`DELETE FROM provider_assignments WHERE connection_id = ${connectionId}`;
+      await admin`DELETE FROM provider_connections WHERE id = ${connectionId}`;
+      await ownerClient.end({ timeout: 5 });
+    }
+  });
+
   it("[I-08] makes remove-first owner suspension/deletion fail closed in the final decision write", async () => {
     const { admin } = guard();
     const ownerBinding = {
       credentialId: "personal-owner-b",
       credentialKind: "personal_subscription" as const,
+      credentialOwnerPrincipalId: OWNER_A,
       executionTargetSlug: "owner-b",
       pinnedTargetId: null,
     };
@@ -777,6 +858,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     const ownerBinding = {
       credentialId: "personal-owner-b",
       credentialKind: "personal_subscription" as const,
+      credentialOwnerPrincipalId: OWNER_A,
       executionTargetSlug: "owner-b",
       pinnedTargetId: null,
     };
@@ -1050,6 +1132,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
           credentialKind: "company_api_key" | "personal_subscription" | null;
           executionTargetSlug: string | null;
           pinnedTargetId: string | null;
+      credentialOwnerPrincipalId?: string | null;
         };
       };
     }> = [

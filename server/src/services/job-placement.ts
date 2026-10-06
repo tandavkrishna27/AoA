@@ -48,6 +48,8 @@ export interface JobPlacementCredentialBinding {
   credentialKind: "company_api_key" | "personal_subscription" | null;
   executionTargetSlug: string | null;
   pinnedTargetId: string | null;
+  /** Owner established by the trusted credential resolver, never by the routed target. */
+  credentialOwnerPrincipalId?: string | null;
 }
 
 export interface PlacementTargetIdentityPolicy {
@@ -254,7 +256,9 @@ export function normalizeSubmittedJobPlacementFacts(input: {
   if (input.credentialBinding.credentialKind === "personal_subscription" &&
       (!input.credentialBinding.credentialId || !input.credentialBinding.executionTargetSlug ||
        target.targetSlug !== input.credentialBinding.executionTargetSlug ||
-       target.targetClass !== "owner_desktop" || !target.registeredProfile.ownerPrincipalId)) {
+       target.targetClass !== "owner_desktop" || !target.registeredProfile.ownerPrincipalId ||
+       !input.credentialBinding.credentialOwnerPrincipalId ||
+       input.credentialBinding.credentialOwnerPrincipalId !== target.registeredProfile.ownerPrincipalId)) {
     return { success: false, reason: "unmapped_execution_target" };
   }
   const capabilities = submittedCapabilities(submitted.data);
@@ -277,7 +281,7 @@ export function normalizeSubmittedJobPlacementFacts(input: {
       }
     : null;
   const credentialOwnerId = input.credentialBinding.credentialKind === "personal_subscription"
-    ? profile.ownerPrincipalId
+    ? input.credentialBinding.credentialOwnerPrincipalId!
     : null;
   const requirements: JobCapabilityRequirementsV1 = {
     protocol: { min: 1, max: 1 },
