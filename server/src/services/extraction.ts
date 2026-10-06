@@ -13,6 +13,7 @@ import {
   type CompanyProviderCredential,
 } from "./one-shot-provider-credential.js";
 import type { OneShotSandboxHandle } from "./one-shot-sandbox-cli.js";
+import { getOneShotDistributedPort } from "./one-shot-distributed-port.js";
 import { acquireExecutionContext } from "./acquire-execution-context.js";
 import { resolveRuntimeProviderConfig, environmentRuntimeService } from "./environment-runtime.js";
 import { runtimeProviderKeyService } from "./runtime-provider-keys.js";
@@ -551,6 +552,7 @@ export function extractionService(db: Db) {
               companyId,
               db,
               sandboxHandle,
+              operationIdentity: entry.id,
             });
             lastCliErr = undefined; // success — clear any prior transient error
             break; // exit retry loop
@@ -786,7 +788,8 @@ export function extractionService(db: Db) {
       // draft range before it (round-6 P2).
       let sandboxHandle: OneShotSandboxHandle | undefined;
       let releaseSandboxHandle: (() => Promise<unknown>) | undefined;
-      if (tenantIsolationEnforced()) {
+      const distributedBatch = await getOneShotDistributedPort()?.prefersDistributed?.(companyId) ?? false;
+      if (tenantIsolationEnforced() && !distributedBatch) {
         // Wave 3 review (FIX 2, MEDIUM — budget bypass): gate the batch
         // acquire on the SAME budget preflight runOneShotCliInSandbox runs
         // per-entry (one-shot-cli-budget.ts) BEFORE any sandbox is booted —

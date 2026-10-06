@@ -665,6 +665,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect(job).toHaveProperty("policy_hash");
       expect(job).toHaveProperty("requirements");
       expect(job).toHaveProperty("placement_request");
+      if (kind === "one_shot") expect(job.max_attempts).toBe(1);
 
       // BRW-001 — for a browser job, prove the PERSISTED workload is frozen-valid through
       // the real route and a real database. This is the end-to-end evidence that the

@@ -178,7 +178,7 @@ export async function recordOneShotCliCost(
   const billingType = params.billingType ?? params.source ?? "unknown";
 
   return db.transaction(async (tx) => {
-    const [event] = await tx
+    const write = tx
       .insert(costEvents)
       .values({
         companyId: params.companyId,
@@ -197,8 +197,17 @@ export async function recordOneShotCliCost(
         rateVersion: params.rateVersion ?? null,
         roundingMode: params.roundingMode ?? null,
         occurredAt,
-      })
-      .returning();
+      });
+    const [event] = params.sourceIdempotencyKey
+      ? await write.onConflictDoNothing({ target: [costEvents.companyId, costEvents.sourceIdempotencyKey],
+        where: sql`${costEvents.sourceIdempotencyKey} IS NOT NULL` }).returning()
+      : await write.returning();
+    if (!event && params.sourceIdempotencyKey) {
+      const [existing] = await tx.select().from(costEvents).where(and(eq(costEvents.companyId, params.companyId),
+        eq(costEvents.sourceIdempotencyKey, params.sourceIdempotencyKey))).limit(1);
+      if (existing) return existing;
+    }
+    if (!event) throw new Error("One-shot cost write produced no event");
 
     await tx
       .update(companies)

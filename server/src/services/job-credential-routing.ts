@@ -29,7 +29,7 @@ interface RoutingDependencies {
 export function createJobCredentialRoutingResolver(deps: RoutingDependencies): JobPlacementServiceDependencies["resolveCredentialBinding"] {
   return async (input) => {
     // Preserve the exact historical key set and digest for already placed M1 runs.
-    if (input.sourceKind === "task_run" || input.sourceKind === "crew_run") return resolveCanaryCredentialBinding();
+    if (input.sourceKind === "task_run" || input.sourceKind === "crew_run" || input.sourceKind === "one_shot") return resolveCanaryCredentialBinding();
     const unavailable = (reason: string, source?: CommanderCredentialSource) =>
       new ProviderUnavailableError(source?.provider ?? "unknown", reason, null);
     if (input.sourceKind !== "commander_turn") throw unavailable("source_not_supported");

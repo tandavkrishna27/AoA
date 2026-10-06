@@ -121,6 +121,13 @@ export async function resolveCompanyProviderCredential(
     throw new ProviderUnavailableError(provider, "empty_credential", null);
   }
 
+  const { model } = await resolveCompanyProviderPricing(db, companyId, { cliTool: opts.cliTool });
+  return { envName, value, provider, model };
+}
+
+/** Read-only pricing metadata for replaying already accepted output; no credential value is needed. */
+export async function resolveCompanyProviderPricing(db: Db, companyId: string, opts: { cliTool: string }): Promise<{ provider: string; model: string }> {
+  const provider = opts.cliTool === "codex" ? "openai" : "anthropic";
   const [row] = await db
     .select({ model: internalAgentConfig.model })
     .from(internalAgentConfig)
@@ -140,5 +147,5 @@ export async function resolveCompanyProviderCredential(
       ? resolveCodexChatModel(row?.model, null)
       : (row?.model ?? providerDefaultModel(provider));
 
-  return { envName, value, provider, model };
+  return { provider, model };
 }

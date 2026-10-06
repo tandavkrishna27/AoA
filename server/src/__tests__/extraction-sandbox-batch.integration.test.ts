@@ -56,6 +56,7 @@ import { sql } from "drizzle-orm";
 import { applyPendingMigrations, createDb, type Db } from "@armyofagents/db";
 import { setDeploymentMode, getDeploymentMode } from "../config/deployment-mode.js";
 import { EXTRACT_SCOPE_DEADLINE_MS } from "../services/extraction.js";
+import { setOneShotDistributedPort } from "../services/one-shot-distributed-port.js";
 
 // ── leaf mocks (see REAL-SHAPE NOTE above) ──────────────────────────────────
 
@@ -197,6 +198,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 afterEach(() => {
+  setOneShotDistributedPort(undefined);
   setDeploymentMode(savedDeploymentMode);
 });
 
@@ -415,6 +417,19 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
         expect(row.billing_type).toBe("extraction");
         expect(Number(row.cost_cents)).toBeGreaterThanOrEqual(0);
       }
+    }, 120_000);
+
+    it("[MIG-007] a one-shot canary does not pre-acquire a legacy batch sandbox", async () => {
+      if (setupError) throw new Error(String(setupError));
+      setDeploymentMode("cloud_auth");
+      const { companyId } = await seedCompanyWithFounder("DistributedBatch");
+      const { threadId } = await seedThreadWithEntries(companyId, ["Capture the worker result."]);
+      setOneShotDistributedPort({ prefersDistributed: async () => true, execute: vi.fn() });
+      mockRunOneShotCliInSandbox.mockResolvedValue({ stdout: JSON.stringify([{ type: "task", title: "Accepted task" }]), stderr: "", exitCode: 0, durationMs: 5 });
+      const result = await extractionService(db).extractThreadEntriesAwait(companyId, threadId);
+      expect(result.attempted).toBe(1); expect(result.failed).toBe(0);
+      expect(mockAcquireExecutionContext).not.toHaveBeenCalled(); expect(mockReleaseRunLease).not.toHaveBeenCalled();
+      expect(mockRunOneShotCliInSandbox.mock.calls[0]![0]).toMatchObject({ companyId, sandboxHandle: undefined });
     }, 120_000);
 
     it("the batch acquire happens BEFORE the deadline clock: a slow (250s) acquire does not eat into any entry's per-entry deadline budget", async () => {

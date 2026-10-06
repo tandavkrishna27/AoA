@@ -1637,6 +1637,21 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   // exist whether or not the scheduler does. Measured before this line existed: an eligible
   // canary task produced a run with `execution_owner = NULL` and NO `[CLI-006]` line at all.
   setDistributedRolloutPort(distributedRolloutHook);
+  const [{ createOneShotDistributedPort, setOneShotDistributedPort },
+    { createOneShotDistributedResultReader, createOneShotExistingOperationReader }, { createStorageProviderFromConfig: oneShotStorage }] = await Promise.all([
+    import("./services/one-shot-distributed-port.js"),
+    import("./services/one-shot-distributed-result-store.js"),
+    import("./storage/provider-registry.js"),
+  ]);
+  setOneShotDistributedPort(createOneShotDistributedPort({
+    rollout: distributedRolloutHook,
+    read: createOneShotDistributedResultReader(appDb, oneShotStorage(config)),
+    existing: createOneShotExistingOperationReader(appDb),
+    cancel: (scope) => jobReconciliationForCancel.requestCancellation({
+      organizationId: scope.organizationId, companyId: scope.companyId, jobId: scope.jobId,
+      reason: "one-shot result wait deadline", graceful: false,
+    }),
+  }));
 }
 
 if (config.heartbeatSchedulerEnabled) {

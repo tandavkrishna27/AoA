@@ -22,7 +22,8 @@ import {
   type CanonicalProviderBinding,
   type ExecutionSecretMintDecision,
 } from "./execution-secret-handle-mint.js";
-import type { EnvBinding } from "@armyofagents/shared";
+import { submitJobSourceSchema, type EnvBinding } from "@armyofagents/shared";
+import { oneShotAdapterForWorkload } from "./one-shot-distributed-invocation.js";
 
 /** The repository surface this runner needs — the two DAT-008 methods only, so a
  * unit test can supply a pair of functions instead of a whole tenant repo. */
@@ -55,6 +56,10 @@ export interface MintExecutionSecretHandleInput {
   readonly placementOwner: string | null;
   readonly credentialKind: string | null;
   readonly targetGeneration: number | null;
+  /** Frozen job context from the locked placement row, never HTTP credential input. */
+  readonly jobSource?: {
+    sourceKind: string; sourceIdentity: string; sourceIntent: Record<string, unknown>; input: Record<string, unknown>;
+  };
   /** Injected in tests; production reads the process deployment mode. */
   readonly deploymentMode?: string;
   readonly newHandleId?: () => string;
@@ -106,15 +111,21 @@ export async function mintExecutionSecretHandleForPlacement(
   // as `worker`/`sandbox` (Decision #121, never `agent`), and its `executorPrincipalId`
   // IS the agent id (`taskSourceIsAdmitted` → `{kind:"worker", id: agentId}`); so we load
   // the binding for those kinds too and let the load result + guard 3 decide coding-ness.
-  const agent = isAgentBackedExecutorKind(input.executorPrincipalKind)
+  const oneShot = input.jobSource?.sourceKind === "one_shot";
+  const parsed = oneShot ? submitJobSourceSchema.safeParse(input.jobSource!.sourceIntent) : null;
+  const sourceAdapter = parsed?.success && parsed.data.kind === "one_shot" &&
+    input.executorPrincipalKind === "worker" && input.executorPrincipalId === parsed.data.operationId &&
+    input.jobSource!.sourceIdentity === parsed.data.operationId
+    ? oneShotAdapterForWorkload(input.jobSource!.input) : null;
+  const agent = !oneShot && isAgentBackedExecutorKind(input.executorPrincipalKind)
     ? await repo.loadAgentAdapterBinding({ companyId: input.companyId, agentId: input.executorPrincipalId })
     : null;
-
-  const target = agent ? companyKeyTargetForAdapter(agent.adapterType) : null;
+  const adapterType = sourceAdapter ?? agent?.adapterType ?? "";
+  const target = adapterType ? companyKeyTargetForAdapter(adapterType) : null;
 
   const decision: ExecutionSecretMintDecision = decideExecutionSecretHandle({
     deploymentMode,
-    adapterType: agent?.adapterType ?? "",
+    adapterType,
     executorPrincipalKind: input.executorPrincipalKind,
     providerKeyTarget: target,
     providerBinding: agent && target
