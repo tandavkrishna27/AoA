@@ -37,11 +37,9 @@
 //      heartbeat computes `resolvedEnv` at heartbeat.ts:3378 and `hbProviderId` at
 //      heartbeat.ts:3430 — 140+ and 190+ lines AFTER the convert/place seam at
 //      heartbeat.ts:3231-3258 that reaches this resolver.
-//   3. PLACEMENT CANNOT CHECK A CREDENTIAL CLAIM. `credentialOwnerId` is read off
-//      the ROUTED TARGET's profile (job-placement.ts:279-281), and
-//      `requiredOwnerPrincipalId` off the SAME profile (job-placement.ts:289), so
-//      the owner comparison in `candidateFits` (job-placement.ts:557-563) is
-//      tautological. A richer credential binding would be accepted without ever being verified.
+//   3. M2 personal placement requires credentialOwnerPrincipalId from trusted
+//      credential metadata. The selected target cannot establish that owner.
+//      This M1 canary binding remains independent of the M2 metadata path.
 //
 // WHY THE SLUG IS SAFE — the DE-29 owner-misrouting class stays STRUCTURALLY excluded:
 // the three credential-shaped fields are all null, so target routing
@@ -53,9 +51,7 @@
 // {desktop, local_host} only), and a missing slug resolves to `null`, never a fall-through
 // to another class. There is therefore NO reachable path from this binding to an
 // `owner_desktop` target — the DE-29 class is structurally excluded, not merely checked.
-// (The owner comparison in `candidateFits` remains tautological, which is exactly why the
-// exclusion has to be structural: routing, not a predicate, is what keeps the canary off
-// an owner target.)
+// Personal placement also checks independently established credential ownership.
 //
 // WHY THE SLUG IS SAFE FOR REPLAY: the binding is hashed into
 // `placementInputDigest`/`placementPolicyDigest` (job-placement.ts:315 → :333-335), and a

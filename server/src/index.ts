@@ -1205,7 +1205,8 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     { createRunExecutionOwnerResolver, toRunExecutionPlacement },
     { createCanaryPreflight },
     { createDrizzleCanaryPreflightStore },
-    { resolveCanaryCredentialBinding },
+    { createDrizzleJobCredentialRoutingResolver },
+    { resolveCliAuthTopology },
     { createJobPlacementService },
   ] = await Promise.all([
     import("./services/heartbeat-distributed-rollout.js"),
@@ -1219,7 +1220,8 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     import("./services/run-execution-owner.js"),
     import("./services/canary-preflight.js"),
     import("./services/canary-preflight-store.js"),
-    import("./services/canary-credential-binding.js"),
+    import("./services/job-credential-routing.js"),
+    import("./services/cli-auth-topology.js"),
     import("./services/job-placement.js"),
   ]);
   const bridge = jobAdmissionBridge(appDb);
@@ -1252,7 +1254,9 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     // permissive test closure.
     resolveOrganizationPolicy: rolloutSource.resolveOrganizationPolicy,
     resolveWorkloadPolicy: rolloutSource.resolveWorkloadPolicy,
-    resolveCredentialBinding: resolveCanaryCredentialBinding,
+    resolveCredentialBinding: createDrizzleJobCredentialRoutingResolver(db, resolveCliAuthTopology({
+      deploymentMode: config.deploymentMode, deploymentExposure: config.deploymentExposure,
+    })),
   });
   const ownerResolver = createRunExecutionOwnerResolver({
     resolveRunRolloutState: ({ organizationId, workloadType }) =>
