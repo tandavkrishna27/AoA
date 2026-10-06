@@ -1,6 +1,6 @@
 # CLI-015 — Unit F link 6, the judge: a verifier that counts the right things
 
-**Status:** merged in PR #645; local checks passed, live useful-work completion pending. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
+**Status:** merged in PR #645; local checks passed, live useful-work completion pending with a provider-credit blocker. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
 link-scoped successor mapping) · **Filed:** 2026-09-21 (M0 unit 4, founder decisions D1 + D5)
 **Depends on:** `CLI-011` · **Milestone:** `M1b`
 **Owns:** [`E7-F016`](../findings.md#e7-f016)
@@ -9,7 +9,7 @@ link-scoped successor mapping) · **Filed:** 2026-09-21 (M0 unit 4, founder deci
 
 ## Current implementation — October 6
 
-The current implementation plan extends this work to the scanner repairs while
+The merged implementation extends this work to the scanner repairs while
 preserving their CLI-008 finding ownership. Lifecycle and capability evidence
 remain attempt-scoped. Secret scanning now includes sibling attempts' events and
 refuses explicitly when row, text or aggregate limits prevent a complete scan.
@@ -20,9 +20,13 @@ credential-shaped strings. Generic `sk-` text remains ambiguous, so E7-F033 is
 not claimed fully closed. Focused PostgreSQL and verifier tests passed locally.
 On merged `9925e8d87`, typecheck, build and the full local suite passed. Live run
 `37378134451` correctly refused useful-work acceptance with
-`capabilityProven: false` because no output was produced. The
+`capabilityProven: false` because no output was produced. MCP staging and
+diagnostics/cancellation repairs merged in #647/#648. Direct template probe
+[37392553802](https://github.com/tandavkrishna27/AoA/actions/runs/37392553802)
+reported `billing_error` / `Credit balance is too low`; it is inconclusive for
+output behavior, and useful-work capability remains unproven. The
 [direct checklist](../../../milestones/M1a/recovery-plan-2026-09-26.md) records
-the MCP staging and harness fixes required before another run.
+the tested revisions and the next live check after API funding is restored.
 
 The sections below retain the historical scope discussion; its claim that the
 producer is unbuilt and its separate ruling prerequisite are superseded.
