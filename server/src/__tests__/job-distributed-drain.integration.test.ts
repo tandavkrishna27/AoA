@@ -12,6 +12,7 @@
 //     throws at Company->Org resolution against the real bridge, so the clean org would
 //     stop draining); a terminal-only org drains zero and reports a clean sweep, not an error.
 import { randomUUID } from "node:crypto";
+import { executionSourceV1Schema } from "@armyofagents/worker-protocol";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   setupJobControlFixture,
@@ -328,6 +329,31 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       const rows = await drainAuditRows();
       expect(rows.map((row) => (row.details as { outcome: string }).outcome)).toEqual(["queued", "already_requested"]);
       expect(rows[0]!.details).toMatchObject({ commandId: deriveDrainCommandId(seeded.jobId) });
+    });
+
+    it.each(["task_run", "crew_run", "commander_turn", "one_shot"])("drains a leased %s through the real operator trigger exactly once", async (sourceKind) => {
+      guard();
+      const { seeded } = await fixture!.activateLease(95);
+      const requestedBy = { principalType: "user", principalId: "drain-owner" };
+      const agentId = randomUUID();
+      const executionPrincipal = sourceKind === "task_run" ? { principalType: "agent", principalId: agentId }
+        : { principalType: "system", principalId: seeded.jobId };
+      const common = { kind: sourceKind, requestedBy, executionPrincipal };
+      const source = sourceKind === "commander_turn" ? { ...common, internalAgentRunId: seeded.jobId, conversationId: randomUUID() }
+        : sourceKind === "crew_run" ? { ...common, crewRunId: seeded.jobId }
+        : sourceKind === "task_run" ? { ...common, runId: seeded.jobId, issueId: randomUUID(), assigneeAgentId: agentId }
+        : { ...common, operationId: seeded.jobId, operationKind: "extraction" };
+      expect(executionSourceV1Schema.safeParse(source).success).toBe(true);
+      await fixture!.admin`UPDATE jobs SET source_kind = ${sourceKind}, source_identity = ${seeded.jobId}, source_intent = ${source}
+        WHERE id = ${seeded.jobId}`;
+      const first = await runTrigger(); const replay = await runTrigger();
+      expect(first.code).toBe(0); expect(replay.code).toBe(0); expect(first.summary.cancelled).toBe(1);
+      expect(await attemptStatus(seeded.attemptId)).toBe("cancel_requested");
+      const commands = await fixture!.admin`SELECT command_id FROM job_control_commands WHERE job_id = ${seeded.jobId} AND command_kind = 'cancel'`;
+      expect(commands.map((row) => row.command_id)).toEqual([deriveDrainCommandId(seeded.jobId)]);
+      const audits = await drainAuditRows(); expect(audits).toHaveLength(2);
+      expect(audits.map((row) => (row.details as { outcome: string }).outcome)).toEqual(["queued", "already_requested"]);
+      expect(audits.every((row) => row.company_id === COMPANY && row.entity_id === seeded.jobId)).toBe(true);
     });
 
     it("[trigger / multi-tenant] two Organizations each drain under their OWN tenant binding; one org's failure is reported for that org only", async () => {

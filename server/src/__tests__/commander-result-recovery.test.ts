@@ -27,6 +27,28 @@ describe("Commander durable result recovery", () => {
     expect(retire).toHaveBeenCalledWith(candidate); expect(d.project).not.toHaveBeenCalled();
     expect(d.onError).toHaveBeenCalledOnce();
   });
+  it("bounds retirement failures so the convergence sweep cannot get stuck", async () => {
+    vi.useFakeTimers();
+    try {
+      const d = dependencies(); d.read.mockRejectedValue(new Error("membership revoked"));
+      const retire = vi.fn(() => new Promise<void>(() => {})); let finished = false;
+      const tick = createCommanderResultRecovery({ ...d, retire } as never).tick().then(() => { finished = true; });
+      await vi.advanceTimersByTimeAsync(5001);
+      expect(finished).toBe(true); await tick;
+      expect(d.onError).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  });
+  it("releases the sweep lock when listing owned work stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      const d = dependencies(); d.list.mockImplementationOnce(() => new Promise(() => {}));
+      const recovery = createCommanderResultRecovery(d as never);
+      const failed = recovery.tick().then(() => "unexpected success", (error: Error) => error.message);
+      await vi.advanceTimersByTimeAsync(5001);
+      expect(await Promise.race([failed, Promise.resolve("still blocked")])).toBe("Commander recovery listing deadline");
+      await recovery.tick(); expect(d.project).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   it("joins concurrent ticks to one sweep", async () => {
     const d = dependencies(); const recovery = createCommanderResultRecovery(d as never);
     await Promise.all([recovery.tick(), recovery.tick()]); expect(d.list).toHaveBeenCalledOnce(); expect(d.project).toHaveBeenCalledOnce();
