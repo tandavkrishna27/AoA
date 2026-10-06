@@ -18,6 +18,7 @@ import {
   decodeOpRequest,
   encodeOkResponse,
   signOwnedLabelsCapability,
+  signWarmResourceCapability,
 } from "@armyofagents/provider-wire";
 import type { OwnedLabelsCapability } from "@armyofagents/provider-wire";
 
@@ -79,6 +80,7 @@ describe("makeNetworkedRunProvider — construction (inert) + the type bridge", 
     const provider = callFactory(factory, cap);
     // Construction is inert — no hop fired yet.
     expect(provider).toBeInstanceOf(NetworkedProviderDriver);
+    expect(provider.checkpointMode).toBe("none");
     expect(fetchSpy).not.toHaveBeenCalled();
 
     // ONE op call fires the hop: the baseUrl is wired (URL) and the capability is carried (body).
@@ -108,5 +110,32 @@ describe("makeNetworkedRunProvider — construction (inert) + the type bridge", 
     const factory = makeNetworkedRunProvider("http://adapter-manager:9000");
     const wrongAud = { v: OWNED_LABELS_CAPABILITY_VERSION, audience: "someone-else", ownedLabels: OWNED, expiresAt: 1_700_000_060_000, sig: "x" };
     expect(() => callFactory(factory, wrongAud)).toThrow(NetworkedProviderCapabilityError);
+  });
+});
+
+
+describe("networked warm provider construction", () => {
+  it("carries only the signed retained-resource grant with a fresh primary capability", async () => {
+    const keys = generateKeyPairSync("ed25519");
+    const primary = signOwnedLabelsCapability({ v: 1, audience: "adapter-manager", ownedLabels: OWNED, expiresAt: 2000 }, keys.privateKey);
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const grant = signWarmResourceCapability({ v: 1, audience: "adapter-manager-warm-resource", sessionId, generation: 2, resourceId: "retained-vm",
+      physicalLabels: { ...OWNED, leaseId: "old-lease", jobId: "old-job" }, ownedLabels: OWNED,
+      previousCapabilityExpiresAt: 1000, issuedAt: 1000, expiresAt: 2000 }, keys.privateKey);
+    const control = { version: 1, sessionId, generation: 2, mode: "resume", resourceId: "retained-vm", idleTtlMs: 1800000,
+      historicalCanaries: ["old-private-key"], warmResourceCapability: grant };
+    let body = "";
+    const fetchSpy = vi.fn(async (_url, init) => {
+      body = String(init?.body);
+      return new Response(encodeOkResponse({ providerOpId: "restore-op", restored: true }));
+    });
+    const factory = makeNetworkedRunProvider("http://adapter-manager:9000", fetchSpy);
+    const provider = factory({ handoff: {}, capability: primary, warmControl: control } as unknown as Parameters<typeof factory>[0]);
+    expect(provider.checkpointMode).toBe("snapshot");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    await provider.restore("retained-vm", { deadlineMs: 5000, idempotencyKey: "restore" });
+    expect(decodeOpRequest(body)).toMatchObject({ capability: primary, warmResourceCapability: grant });
+    expect(body).not.toContain("old-private-key");
+    expect(body).not.toContain("historicalCanaries");
   });
 });

@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildCommanderDistributedInvocation, COMMANDER_INPUT_PATH, COMMANDER_RUNNER_PATH, COMMANDER_CAPTURE_SCRIPT } from "../services/commander-distributed-invocation.js";
+import { buildCommanderDistributedInvocation, COMMANDER_INPUT_PATH, COMMANDER_RUNNER_PATH, COMMANDER_CAPTURE_SCRIPT, COMMANDER_WARM_CAPTURE_SCRIPT } from "../services/commander-distributed-invocation.js";
 const base = { companyId: "c1000000-0000-4000-8000-000000000001", turnId: "c2000000-0000-4000-8000-000000000001", cliTool: "claude_cli", content: "literal $(secret) `text`; prompt", systemContext: "history and instructions", model: "claude-sonnet-4-6", apiBaseUrl: "https://aoa.example/api", timeoutMs: 240000 };
 function text(files: {path: string; bytes: Uint8Array}[], path: string) { return new TextDecoder().decode(files.find((file) => file.path === path)!.bytes); }
 describe("Commander distributed invocation", () => {
@@ -60,6 +60,30 @@ describe("Commander distributed invocation", () => {
       expect(await readFile(finished, "utf8").catch(() => null)).toBeNull();
       await exit;
       expect(JSON.parse(await readFile(result, "utf8"))).toMatchObject({ stdout: "[REDACTED]\nlast\n", exitCode: 0 });
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+  it("warm capture requires current turn authority before starting a child", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "aoa-warm-capture-"));
+    try {
+      const script = join(dir, "runner.cjs"), payload = join(dir, "input.json"), result = join(dir, "result.json"), marker = join(dir, "child-started");
+      await writeFile(script, COMMANDER_WARM_CAPTURE_SCRIPT);
+      await writeFile(payload, JSON.stringify({ operationId: base.turnId, args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`], stdinContent: "", timeoutMs: 5000 }));
+      expect(() => execFileSync(process.execPath, [script, process.execPath, payload, result], {
+        env: { ...process.env, AOA_COMMANDER_WARM_TURN: "wrong-turn" }, stdio: "pipe" })).toThrow();
+      expect(await readFile(marker, "utf8").catch(() => null)).toBeNull();
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+  it("warm capture scrubs historic keys while withholding redaction metadata from the fresh CLI", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "aoa-warm-redaction-"));
+    try {
+      const script = join(dir, "runner.cjs"), payload = join(dir, "input.json"), result = join(dir, "result.json");
+      await writeFile(script, COMMANDER_WARM_CAPTURE_SCRIPT);
+      await writeFile(payload, JSON.stringify({ operationId: base.turnId, args: ["-e", `process.stdout.write(JSON.stringify({ old: 'old-private-key', fresh: process.env.OPENAI_API_KEY, metadata: process.env.AOA_COMMANDER_REDACTION_CANARIES ?? null, turn: process.env.AOA_COMMANDER_WARM_TURN ?? null }))`], stdinContent: "", timeoutMs: 5000 }));
+      const stdout = execFileSync(process.execPath, [script, process.execPath, payload, result], { env: { ...process.env,
+        OPENAI_API_KEY: "fresh-private-key", AOA_COMMANDER_WARM_TURN: base.turnId,
+        AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify(["old-private-key"]) }, encoding: "utf8" });
+      expect(JSON.parse(stdout)).toEqual({ old: "[REDACTED]", fresh: "[REDACTED]", metadata: null, turn: null });
+      expect(await readFile(result, "utf8")).not.toContain("old-private-key");
     } finally { await rm(dir, { recursive: true, force: true }); }
   });
   it.each([{ cliTool: "opencode" }, { apiBaseUrl: "https://user:password@aoa.example/api" }, { apiBaseUrl: "file:///tmp" }, { timeoutMs: 0 }, { timeoutMs: 240001 }, { turnId: "fake" }, { model: "bad\nmodel" }, { content: "x".repeat(1048577) }])("declines unsupported or unsafe input before ownership transfer", (change) => {

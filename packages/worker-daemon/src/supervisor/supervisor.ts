@@ -1,3 +1,4 @@
+import { readCommanderWarmControl, type CommanderWarmControl } from "../lease/commander-warm-control.js";
 /**
  * `Supervisor` — the sandbox lifecycle orchestrator (WRK-004).
  *
@@ -50,6 +51,7 @@ import {
 } from "./provider.js";
 import type { RunCanaryCoordinator } from "./run-canaries.js";
 import { createCommanderLiveOutput } from "./commander-live-output.js";
+import { labelsEqual } from "./provider.js";
 import { RUN_OUTPUT_DROPPED_METRIC, createRunOutputCapture, scrubOutputText } from "./run-output.js";
 import { ENV_PROBE_DEFAULT_DEADLINE_MS, ENV_PROBE_ERROR_CODES, envProbeLogMessage, runEnvProbe } from "./env-probe.js";
 import { PROVIDER_AUTH_ENV_TARGETS } from "../lease/secret-redemption.js";
@@ -140,7 +142,7 @@ export interface SupervisorDeps {
    * AFTER redemption. SYNC (no `await` between the two authority reassignments — §2a.3). REQUIRES
    * `materializeRunSecrets` (the rebuild only runs inside its block) — fail-fast pairing them.
    */
-  readonly makeRunProvider?: (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike }) => SandboxProvider;
+  readonly makeRunProvider?: (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }) => SandboxProvider;
   readonly identity: WorkerSupervisionIdentity;
   readonly eventSink: WorkerEventSink;
   readonly metrics?: Metrics;
@@ -281,7 +283,7 @@ export interface SupervisorDeps {
    */
   readonly materializeRunSecrets?: (
     handoff: LeaseHandoff,
-  ) => Promise<{ env: Record<string, string>; canaries: readonly string[]; capability?: OwnedLabelsCapabilityLike }>;
+  ) => Promise<{ env: Record<string, string>; canaries: readonly string[]; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }>;
   /**
    * DAT-008 slice 5 — the per-lease canary coordinator shared with the fence-close proxy, so ONE
    * redemption seeds BOTH event streams. Absent = the supervisor uses its own per-run array
@@ -632,6 +634,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     // durable terminal and escalates cleanup WITHOUT creating a sandbox — a partial/empty env would
     // burn a provider round-trip and surface a misleading auth error much later.
     let env: Readonly<Record<string, string>> = {};
+    let warmControl: CommanderWarmControl | undefined;
     let secretElapsedMs = 0;
     if (deps.materializeRunSecrets) {
       const t0 = now();
@@ -661,6 +664,15 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       // the lifecycle stream AND the fence-close proxy stream.
       runCanaries.push(...mat.canaries);
       env = mat.env;
+      if (mat.warmControl) {
+        const validated = readCommanderWarmControl(mat.warmControl, mat.capability);
+        if (!validated || !mat.capability || !labelsEqual(mat.capability.ownedLabels, run.labels)) {
+          await events.terminal({ status: "failed", exitCode: null, errorCode: "warm_control_required", errorMessage: null });
+          return;
+        }
+        warmControl = validated;
+      }
+
       secretElapsedMs = now() - t0;
 
       // DEP-011 Slice 2a — the NETWORKED branch: the per-run capability now exists, so REBUILD the
@@ -685,14 +697,31 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         // SYNCHRONOUS SWAP (§2a.3): `makeRunProvider` is sync and NO `await` separates the two
         // reassignments, so a concurrent cancel/onLeaseLost reaching `escalateCleanup` sees EITHER
         // both no-op OR both real — never a half-swap.
-        const driver = deps.makeRunProvider!({ handoff, capability });
-        const rebuilt = buildAuthorities(driver, run.labels, run.fence);
+        const driver = deps.makeRunProvider!({ handoff, capability, ...(warmControl ? { warmControl } : {}) });
+        if (warmControl && (driver.checkpointMode !== "snapshot" || !driver.advertisedOperations.has("checkpoint") || !driver.advertisedOperations.has("restore"))) {
+          await events.terminal({ status: "failed", exitCode: null, errorCode: "warm_checkpoint_unavailable", errorMessage: null });
+          return;
+        }
+        const rebuilt = buildAuthorities(driver, warmControl?.warmResourceCapability?.physicalLabels ?? run.labels, run.fence);
         run.effect = rebuilt.effect;
         run.cleanup = rebuilt.cleanup;
-        run.capExpiresAt = capability.expiresAt;
+        run.capExpiresAt = Math.min(capability.expiresAt, warmControl?.warmResourceCapability?.expiresAt ?? capability.expiresAt);
       }
     }
-    const spec = createSpecFor(handoff, run.labels, env);
+    let spec = createSpecFor(handoff, run.labels, env);
+    const warmRunner = handoff.offer.job.source.kind === "commander_turn" && spec.command === "node" &&
+      spec.args.length === 4 && spec.args[0] === "/home/user/aoa-commander-warm-v1.cjs" &&
+      ["codex", "claude"].includes(spec.args[1]) && spec.args[2] === "/home/user/aoa-commander-input.json" &&
+      spec.args[3] === "/home/user/aoa-output/aoa-one-shot-result.json";
+    if ((warmRunner && (!networked || !warmControl)) || (warmControl && !warmRunner)) {
+      await events.terminal({ status: "failed", exitCode: null, errorCode: "warm_control_required", errorMessage: null });
+      return;
+    }
+    if (warmControl && handoff.offer.job.source.kind === "commander_turn") {
+      spec = { ...spec, env: { ...env, AOA_COMMANDER_WARM_TURN: handoff.offer.job.source.internalAgentRunId,
+        AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify(runCanaries) } };
+    }
+
 
     // 1. create — raced against its deadline, REDUCED by the redemption time so redeem + create stay
     // within `createDeadlineMs` (R6 "subtracted, not added").
@@ -704,7 +733,20 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       // must be born with the run's lifetime, not the base 60 s. The create RACE is still
       // `createBudget` (30 s minus redemption) - a slow CREATE is a different failure from a
       // long-running command, and only the latter is what the workload budgets for.
-      created = await withDeadline(run.effect.create(spec, run.makeCtx()), createBudget);
+      if (warmControl?.mode === "resume") {
+        const sandboxId = warmControl.resourceId!;
+        run.sandboxId = sandboxId; // Cleanup must know the retained resource even if resume fails.
+        const restored = await withDeadline(run.effect.resume(sandboxId, run.makeCtx()), createBudget);
+        if (restored === TIMEOUT) created = TIMEOUT;
+        else {
+          if (!restored.restored) throw new Error("Commander warm restore refused");
+          created = { providerOpId: restored.providerOpId, sandboxId, generation: run.labels.deviceGeneration };
+        }
+      } else {
+        const createContext = run.makeCtx();
+        created = await withDeadline(run.effect.create(warmControl ? { ...spec, env: {} } : spec,
+          warmControl ? { ...createContext, deadlineMs: createContext.deadlineMs + warmControl.idleTtlMs } : createContext), createBudget);
+      }
     } catch (err) {
       emitOp("create", "failed");
       await events.terminal({ status: "failed", exitCode: null, errorCode: "create_failed", errorMessage: null });
@@ -959,7 +1001,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         })
       : null;
     const commanderLive = handoff.offer.job.source.kind === "commander_turn" && spec.command === "node" &&
-      spec.args.length === 4 && spec.args[0] === "/home/user/aoa-commander-runner.cjs"
+      spec.args.length === 4 && ["/home/user/aoa-commander-runner.cjs", "/home/user/aoa-commander-warm-v1.cjs"].includes(spec.args[0])
       ? createCommanderLiveOutput({ canaries: runCanaries,
           emit: (message) => events.log({ stream: "stdout", level: "info", message }) }) : null;
     const execStartedAt = now();
@@ -1089,6 +1131,36 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     const status = exec.exitCode === 0 && !exec.timedOut ? "succeeded" : "failed";
     const errorCode = exec.timedOut ? "exec_timeout" : exec.signal !== null ? "exec_signalled" : null;
     const errorMessage = exec.signal !== null ? `signal:${exec.signal}` : null;
+    if (warmControl && status === "succeeded") {
+      let receipt: Awaited<ReturnType<EffectAuthority["checkpoint"]>>;
+      try {
+        if (run.cancelled || !run.effect.isActive()) throw new Error("Commander warm fence closed");
+        const checkpoint = await withDeadline(run.effect.checkpoint(created.sandboxId, run.makeCtx()), Math.min(opDeadlineMs, 5000));
+        if (checkpoint === TIMEOUT || checkpoint.mode !== "snapshot" || !checkpoint.checkpointRef || checkpoint.checkpointRef.length > 512 ||
+            !checkpoint.providerOpId || run.cancelled || !run.effect.isActive()) throw new Error("Commander warm checkpoint unavailable");
+        receipt = checkpoint;
+      } catch {
+        await events.terminal({ status: run.cancelled ? "cancelled" : "failed", exitCode: exec.exitCode,
+          errorCode: run.cancelled ? "cancelled" : "warm_checkpoint_failed", errorMessage: null });
+        await escalateCleanup(run, "warm_checkpoint_failed");
+        return;
+      }
+      // Ledger sink failures are fatal: emitting a terminal past a missing
+      // sequence would leave an un-ingestable success claim. Last-resort cleanup
+      // handles the failure; it cannot retain the resource.
+      await events.log({ stream: "stdout", level: "info", message: "aoa-commander-checkpoint-v1:" + JSON.stringify({
+        version: 1, sessionId: warmControl.sessionId, generation: warmControl.generation, resourceId: created.sandboxId,
+        checkpointRef: receipt.checkpointRef, resourceLabels: warmControl.warmResourceCapability?.physicalLabels ?? run.labels }) });
+      if (run.cancelled || !run.effect.isActive()) {
+        await events.terminal({ status: "cancelled", exitCode: exec.exitCode, errorCode: "cancelled", errorMessage: null });
+        await escalateCleanup(run, "warm_fence_closed_after_checkpoint");
+        return;
+      }
+      await events.terminal({ status: "succeeded", exitCode: exec.exitCode, errorCode, errorMessage });
+      if (!run.cancelled && run.effect.isActive()) return; // Durable checkpoint + terminal; CP owns retention/reaping.
+      await escalateCleanup(run, "warm_fence_closed_after_terminal");
+      return;
+    }
     await events.terminal({ status, exitCode: exec.exitCode, errorCode, errorMessage });
 
     // 5. destroy UNDER EFFECT AUTHORITY (happy-path reclaim).

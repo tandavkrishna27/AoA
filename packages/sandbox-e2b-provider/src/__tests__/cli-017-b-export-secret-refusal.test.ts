@@ -739,3 +739,37 @@ describe("CLI-017-B — the secret classification, stated and pinned", () => {
     expect(() => scan({ bytes, sandboxId: "s", secrets: [SECRET_A], signal })).toThrow();
   });
 });
+
+
+describe("warm execute reseeds the private export scanner after credential rotation and provider restart", () => {
+  it("refuses historical and fresh keys even when the VM was created without credentials", async () => {
+    const { provider, transport, sandboxId } = await sandbox({ env: {} });
+    await provider.execute({ sandboxId, command: "node", args: [], env: { OPENAI_API_KEY: SECRET_B,
+      AOA_COMMANDER_WARM_TURN: "turn", AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify([SECRET_A]) } }, CTX);
+    const grant = await planted(provider, transport, sandboxId, SECRET_A + ":" + SECRET_B);
+    const store = recordingFetch();
+    try {
+      await expect(provider.exportArtifact(sandboxId, `${ROOT}/answer.md`, grant, CTX)).rejects.toBeInstanceOf(SandboxExportScannerRefusedError);
+      expect(store.puts).toHaveLength(0);
+    } finally { store.restore(); }
+  });
+  it("repopulates a restarted provider only from explicit bounded warm metadata", async () => {
+    const created = await sandbox({ env: {} });
+    const restarted = new E2bSandboxProvider({ transport: created.transport, scanExportBytes: createRunSecretExportScanner() });
+    await restarted.execute({ sandboxId: created.sandboxId, command: "node", args: [], env: { OPENAI_API_KEY: SECRET_B,
+      AOA_COMMANDER_WARM_TURN: "turn", AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify([SECRET_A]) } }, CTX);
+    const grant = await planted(restarted, created.transport, created.sandboxId, SECRET_A);
+    const store = recordingFetch();
+    try {
+      await expect(restarted.exportArtifact(created.sandboxId, `${ROOT}/answer.md`, grant, CTX)).rejects.toBeInstanceOf(SandboxExportScannerRefusedError);
+      expect(store.puts).toHaveLength(0);
+    } finally { store.restore(); }
+  });
+  it("refuses malformed historic metadata before executing a command", async () => {
+    const { provider, transport, sandboxId } = await sandbox({ env: {} });
+    const execute = vi.spyOn(transport, "runCommand");
+    await expect(provider.execute({ sandboxId, command: "node", args: [], env: {
+      AOA_COMMANDER_WARM_TURN: "turn", AOA_COMMANDER_REDACTION_CANARIES: "not-json" } }, CTX)).rejects.toThrow();
+    expect(execute).not.toHaveBeenCalled();
+  });
+});

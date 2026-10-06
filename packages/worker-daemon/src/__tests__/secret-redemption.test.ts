@@ -336,3 +336,41 @@ describe("createRedeemer — client round-trip + bounded retry (R7)", () => {
     );
   });
 });
+
+
+describe("warm turn control on protected secret redemption", () => {
+  const primary = { v: 1, audience: "adapter-manager", ownedLabels: {
+    organizationId: "org", targetId: "target", workerId: "worker", jobId: "job", attempt: 1,
+    leaseId: "lease", deviceGeneration: 1 }, expiresAt: 2000, sig: "a".repeat(86) };
+  const control = { version: 1, sessionId: "11111111-1111-4111-8111-111111111111", generation: 1,
+    mode: "create", resourceId: null, idleTtlMs: 1800000, historicalCanaries: ["previous-private-value"] };
+  const response = (warmControl: unknown, capability: unknown = primary) => ({ status: 200,
+    body: { outcome: "resolved", envTarget: "OPENAI_API_KEY", value: "current-private-value",
+      ownedLabelsCapability: capability, warmControl } });
+  it("preserves validated create control without exposing old keys as CLI credentials", async () => {
+    const classified = classifyResolveResponse(response(control));
+    expect(classified).toMatchObject({ kind: "resolved", warmControl: control });
+    const result = await synthesiseRunSecrets([envHandle(HANDLE_A, "OPENAI_API_KEY")], async () => classified);
+    expect(result).toMatchObject({ warmControl: control, env: { OPENAI_API_KEY: "current-private-value" } });
+    expect(result.canaries).toEqual(["current-private-value", "previous-private-value"]);
+    expect(Object.values(result.env)).not.toContain("previous-private-value");
+  });
+  it.each([
+    null, {}, { ...control, generation: 0 }, { ...control, idleTtlMs: 1800001 },
+    { ...control, resourceId: "unowned" }, { ...control, mode: "resume", resourceId: "unowned" },
+    { ...control, historicalCanaries: Array(65).fill("private") },
+    { ...control, historicalCanaries: ["a".repeat(65537)] },
+    { ...control, env: { PATH: "injected" } },
+  ])("fails closed on present malformed warm control %j", (value) => {
+    expect(classifyResolveResponse(response(value))).toEqual({ kind: "malformed" });
+  });
+  it("refuses warm control without its primary lease capability", () => {
+    expect(classifyResolveResponse(response(control, null))).toEqual({ kind: "malformed" });
+  });
+  it("refuses disagreeing warm control across two credential handles", async () => {
+    const one = classifyResolveResponse(response(control));
+    const two = classifyResolveResponse(response({ ...control, sessionId: "22222222-2222-4222-8222-222222222222" }));
+    await expect(synthesiseRunSecrets([envHandle(HANDLE_A, "OPENAI_API_KEY"), envHandle(HANDLE_B, "OPENAI_API_KEY")],
+      async (id) => id === HANDLE_A ? one : two)).rejects.toMatchObject({ reason: "warm_control_divergence" });
+  });
+});

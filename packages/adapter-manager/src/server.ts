@@ -35,7 +35,7 @@ import type {
   SandboxProvider,
   StagedFileRequest,
 } from "@armyofagents/worker-daemon";
-import { createRunOutputCapture } from "@armyofagents/worker-daemon";
+import { createRunOutputCapture, readCommanderWarmRedactionCanaries } from "@armyofagents/worker-daemon";
 import {
   EXECUTE_CAPTURE_STDOUT_KEY,
   EXECUTE_STDOUT_TAIL_KEY,
@@ -602,7 +602,7 @@ async function executeRelayingStdout(provider: SandboxProvider, args: unknown, c
   if (requested[EXECUTE_CAPTURE_STDOUT_KEY] !== true) return provider.execute(requested, ctx);
   const { [EXECUTE_CAPTURE_STDOUT_KEY]: _flag, ...input } = requested;
   const env = isRecordOfUnknown(input.env) ? input.env : {};
-  const canaries = Object.values(env).filter((v): v is string => typeof v === "string" && v.length > 0);
+  const canaries = [...Object.values(env).filter((v): v is string => typeof v === "string" && v.length > 0), ...readCommanderWarmRedactionCanaries(env)];
   const capture = createRunOutputCapture({ canaries });
   let result;
   try {

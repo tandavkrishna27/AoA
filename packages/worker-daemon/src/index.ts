@@ -138,6 +138,8 @@ export {
   synthesiseRunSecrets,
 } from "./lease/secret-redemption.js";
 export type { RedeemFn, ResolveClassification, RunFenceContext } from "./lease/secret-redemption.js";
+export { readCommanderWarmControl, readCommanderWarmRedactionCanaries } from "./lease/commander-warm-control.js";
+export type { CommanderWarmControl } from "./lease/commander-warm-control.js";
 // CLI-008 Unit B — the worker-side staged-input pointer reader + grant minter.
 export {
   STAGED_INPUT_EXTENSION_NAMESPACE,
