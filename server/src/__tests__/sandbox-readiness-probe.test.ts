@@ -28,9 +28,10 @@ vi.mock("../services/one-shot-sandbox-cli.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../services/one-shot-provider-credential.js", () => ({
-  resolveCompanyProviderCredential: (...a: unknown[]) => mockResolveCompanyProviderCredential(...a),
-}));
+vi.mock("../services/one-shot-provider-credential.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/one-shot-provider-credential.js")>();
+  return { ...actual, resolveCompanyProviderCredential: (...a: unknown[]) => mockResolveCompanyProviderCredential(...a) };
+});
 
 import {
   probeReadinessInSandbox,

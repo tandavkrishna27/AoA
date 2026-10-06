@@ -23,6 +23,7 @@ import {
   type OneShotSandboxHandle,
 } from "../services/one-shot-sandbox-cli.js";
 import { setDistributedShadowPort } from "../services/distributed-shadow-port.js";
+import { setOneShotDistributedPort } from "../services/one-shot-distributed-port.js";
 
 const COMPANY_ID = "co-1";
 
@@ -98,6 +99,7 @@ describe("runOneShotCliInSandbox (U13.1)", () => {
   let environmentRuntimeService: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    setOneShotDistributedPort(undefined);
     acquireExecutionContext = vi.fn().mockResolvedValue(fakeAcquiredSandbox());
     execute = vi.fn().mockResolvedValue({ exitCode: 0, signal: null, timedOut: false, stdout: "ok", stderr: "" });
     releaseLease = vi.fn().mockResolvedValue({ cleanupStatus: "success" });
@@ -125,6 +127,47 @@ describe("runOneShotCliInSandbox (U13.1)", () => {
       environmentRuntimeService,
     };
   }
+
+  it("suppresses legacy acquisition and execute only after actual distributed transfer", async () => {
+    const distributed = vi.fn().mockResolvedValue({ stdout: "accepted", stderr: "", exitCode: 0, timedOut: false, durationMs: 3 });
+    setOneShotDistributedPort({ execute: distributed });
+    try {
+      await expect(runOneShotCliInSandbox(baseInput({ deps: deps() }))).resolves.toMatchObject({ stdout: "accepted", exitCode: 0 });
+      expect(distributed).toHaveBeenCalledOnce();
+      expect(acquireExecutionContext).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+      expect(recordOneShotCliCost).toHaveBeenCalledOnce();
+    } finally { setOneShotDistributedPort(undefined); }
+  });
+
+  it("never falls back to a second executor on a post-transfer error", async () => {
+    setOneShotDistributedPort({ execute: vi.fn().mockRejectedValue(new Error("accepted result unavailable")) });
+    try {
+      await expect(runOneShotCliInSandbox(baseInput({ deps: deps() }))).rejects.toThrow("accepted result unavailable");
+      expect(acquireExecutionContext).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+      expect(recordOneShotCliCost).not.toHaveBeenCalled();
+    } finally { setOneShotDistributedPort(undefined); }
+  });
+  it("does not charge an estimate after the accepted usage ledger owns pricing", async () => {
+    setOneShotDistributedPort({ execute: vi.fn().mockResolvedValue({ stdout: "accepted", stderr: "", exitCode: 0, timedOut: false, durationMs: 3, usageAccepted: true }) });
+    try {
+      await runOneShotCliInSandbox(baseInput({ deps: deps() }));
+      expect(recordOneShotCliCost).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+    } finally { setOneShotDistributedPort(undefined); }
+  });
+  it("replays accepted output after a caller restart without new budget authorization or credential access", async () => {
+    const place = vi.fn(); const resume = vi.fn().mockResolvedValue({ stdout: "accepted", stderr: "", exitCode: 0, timedOut: false, durationMs: 3 });
+    setOneShotDistributedPort({ execute: place, resume });
+    try {
+      preflightOneShotCliSpend.mockResolvedValue({ allowed: false, reason: "already reached" });
+      const resolveCompanyProviderPricing = vi.fn().mockResolvedValue({ provider: "anthropic", model: "claude-sonnet-4-6" });
+      const input = baseInput({ operationIdentity: "durable-entry", deps: { ...deps(), resolveCompanyProviderPricing } });
+      await runOneShotCliInSandbox(input); await runOneShotCliInSandbox(input);
+      expect(resume.mock.calls[0]![0].operationId).toBe(resume.mock.calls[1]![0].operationId);
+      expect(recordOneShotCliCost.mock.calls[0]![1].sourceIdempotencyKey).toBe(recordOneShotCliCost.mock.calls[1]![1].sourceIdempotencyKey);
+      expect(preflightOneShotCliSpend).not.toHaveBeenCalled(); expect(resolveCompanyProviderCredential).not.toHaveBeenCalled();
+      expect(place).not.toHaveBeenCalled(); expect(acquireExecutionContext).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled();
+    } finally { setOneShotDistributedPort(undefined); }
+  });
 
   it("acquires once with environmentId:null, resolves config once, executes once, then releases once via environmentRuntimeService(db).releaseRunLease (Wave 3 review, FIX 1) — NOT the raw provider releaseLease", async () => {
     const input = baseInput({ deps: deps() });

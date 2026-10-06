@@ -63,7 +63,7 @@ describe("trusted job credential routing", () => {
   });
   it("refuses unsupported sources before any authority read", async () => {
     const { deps, resolve } = setup();
-    await expect(resolve({ ...request, sourceKind: "one_shot" })).rejects.toMatchObject({ code: "provider_unavailable" });
+    await expect(resolve({ ...request, sourceKind: "browser_request" })).rejects.toMatchObject({ code: "provider_unavailable" });
     expect(deps.loadCommanderSource).not.toHaveBeenCalled();
   });
   it("refuses Commander agent overrides instead of borrowing a crew identity", async () => {

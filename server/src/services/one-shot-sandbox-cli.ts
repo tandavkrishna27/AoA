@@ -63,6 +63,10 @@ import {
   type OneShotCliCostSource,
 } from "./one-shot-cli-budget.js";
 import { recordDistributedShadow } from "./distributed-shadow-port.js";
+import { getOneShotDistributedPort } from "./one-shot-distributed-port.js";
+import { oneShotOperationId } from "./one-shot-operation-identity.js";
+import { resolveCompanyProviderPricing as defaultResolveCompanyProviderPricing } from "./one-shot-provider-credential.js";
+import type { CapturedOneShotResult } from "./one-shot-distributed-result.js";
 import { logger } from "../middleware/logger.js";
 
 export type OneShotSandboxErrorKind = "sandbox_unavailable" | "timeout" | "nonzero_exit";
@@ -95,6 +99,7 @@ export interface OneShotSandboxHandle {
 }
 
 export interface OneShotDeps {
+  resolveCompanyProviderPricing: typeof defaultResolveCompanyProviderPricing;
   acquireExecutionContext: typeof defaultAcquireExecutionContext;
   sandboxProviderRuntime: typeof defaultSandboxProviderRuntime;
   resolveRuntimeProviderConfig: typeof defaultResolveRuntimeProviderConfig;
@@ -107,6 +112,7 @@ export interface OneShotDeps {
 }
 
 const DEFAULT_DEPS: OneShotDeps = {
+  resolveCompanyProviderPricing: defaultResolveCompanyProviderPricing,
   acquireExecutionContext: defaultAcquireExecutionContext,
   sandboxProviderRuntime: defaultSandboxProviderRuntime,
   resolveRuntimeProviderConfig: defaultResolveRuntimeProviderConfig,
@@ -133,6 +139,8 @@ const ONE_SHOT_SHADOW_OPERATION_KIND: Record<
 };
 
 export interface RunOneShotCliInput {
+  /** Existing durable caller identity (e.g. Discussion entry), not a fabricated run. */
+  operationIdentity?: string;
   db: Db;
   companyId: string;
   cliTool: string; // "claude" | "codex"
@@ -169,6 +177,27 @@ function readString(value: unknown): string | null {
 export async function runOneShotCliInSandbox(input: RunOneShotCliInput): Promise<OneShotCliResult> {
   const deps: OneShotDeps = { ...DEFAULT_DEPS, ...input.deps };
   const startedAt = Date.now();
+  const distributedPort = getOneShotDistributedPort();
+  const operationId = distributedPort ? oneShotOperationId(input) : null;
+  const consumeDistributed = async (result: CapturedOneShotResult, pricing: { provider: string; model: string }): Promise<OneShotCliResult> => {
+    if (result.timedOut) throw new OneShotSandboxError("One-shot CLI timed out inside the worker sandbox.", "timeout");
+    if (result.exitCode !== 0) throw new OneShotSandboxError(
+      `One-shot CLI exited with code ${result.exitCode}.`, "nonzero_exit", result.exitCode, result.stderr,
+    );
+    try {
+      if (!result.usageAccepted) await deps.recordOneShotCliCost(input.db, {
+        companyId: input.companyId, provider: pricing.provider, model: pricing.model,
+        inputTokens: estimateTokens(input.stdinContent ?? input.stagedFile?.content ?? ""),
+        outputTokens: estimateTokens(result.stdout), source: input.source,
+        sourceIdempotencyKey: `one-shot:${input.companyId}:${operationId}`,
+      });
+    } catch (err) { logger.error({ err }, "recordOneShotCliCost failed after a successful distributed one-shot CLI run"); }
+    return { stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode, durationMs: Date.now() - startedAt };
+  };
+  if (operationId && input.operationIdentity && !input.sandboxHandle) {
+    const resumed = await distributedPort!.resume?.({ ...input, operationId });
+    if (resumed) return consumeDistributed(resumed, await deps.resolveCompanyProviderPricing(input.db, input.companyId, { cliTool: input.cliTool }));
+  }
 
   // U13.4: fail BEFORE any spend — credential resolve, sandbox acquire, and
   // execute all cost something (a DB round-trip at minimum, real sandbox
@@ -189,6 +218,11 @@ export async function runOneShotCliInSandbox(input: RunOneShotCliInput): Promise
   const credential = await deps.resolveCompanyProviderCredential(input.db, input.companyId, {
     cliTool: input.cliTool,
   });
+
+  // A successful placement owns this invocation before legacy acquires any sandbox.
+  // Do not catch the accepted-result wait: falling back after placement would run it twice.
+  const distributed = operationId ? await distributedPort!.execute({ ...input, operationId }) : null;
+  if (distributed) return consumeDistributed(distributed, credential);
 
   const handle = input.sandboxHandle;
   const selfAcquired = !handle;

@@ -266,3 +266,31 @@ describe("mintRunJwtHandleForPlacement — the run_jwt (AOA_API_KEY) placement m
     expect(inserted).toEqual([]);
   });
 });
+
+
+describe("MIG-007 agentless one-shot mint", () => {
+  const operationId = "01234567-1234-4234-8234-012345678901";
+  const source = { kind: "one_shot" as const, operationId, operationKind: "extraction" as const };
+  const workload = { command: "node", args: ["/home/user/aoa-one-shot-runner.cjs", "codex",
+    "/home/user/aoa-one-shot-input.json", "/home/user/aoa-output/aoa-one-shot-result.json"],
+    stdinArtifactId: null, maxRuntimeSeconds: 60 };
+  const input = { ...BASE, executorPrincipalKind: "worker", executorPrincipalId: operationId,
+    jobSource: { sourceKind: "one_shot", sourceIdentity: operationId, sourceIntent: source, input: workload } };
+  it("mints the actual company key for the source CLI without an agent lookup", async () => {
+    const { stub, inserted } = repo(null);
+    expect(await mintExecutionSecretHandleForPlacement(stub, input)).toMatchObject({ minted: true, refKind: "provider_key" });
+    expect(stub.loadAgentAdapterBinding).not.toHaveBeenCalled();
+    expect(inserted[0]).toMatchObject({ refId: "provider:openai", envTarget: "OPENAI_API_KEY",
+      ownerPrincipalKind: "worker", ownerPrincipalId: operationId });
+  });
+  it.each([
+    { executorPrincipalId: "other-operation" },
+    { jobSource: { ...input.jobSource, sourceIdentity: "other-operation" } },
+    { jobSource: { ...input.jobSource, sourceKind: "commander_turn" } },
+    { jobSource: { ...input.jobSource, input: { ...workload, command: "sh" } } },
+  ])("refuses unproven agentless source identity %j", async (change) => {
+    const { stub, inserted } = repo(null);
+    expect(await mintExecutionSecretHandleForPlacement(stub, { ...input, ...change })).toMatchObject({ minted: false });
+    expect(inserted).toHaveLength(0);
+  });
+});

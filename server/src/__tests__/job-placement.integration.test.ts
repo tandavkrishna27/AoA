@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,6 +9,11 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import type { Db } from "@armyofagents/db";
 import { createDrizzleJobCredentialRoutingResolver } from "../services/job-credential-routing.js";
 import { resolveCliAuthTopology } from "../services/cli-auth-topology.js";
+import { buildOneShotDistributedInvocation } from "../services/one-shot-distributed-invocation.js";
+import { createOneShotDistributedResultReader, createOneShotExistingOperationReader } from "../services/one-shot-distributed-result-store.js";
+import { oneShotResultArtifactId } from "../services/one-shot-distributed-result.js";
+import { Readable } from "node:stream";
+import { recordOneShotCliCost } from "../services/one-shot-cli-budget.js";
 import {
   applyPendingMigrations,
   createOperatorDbConnection,
@@ -1510,6 +1515,100 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(replay).toEqual(decision);
     const afterReplay = await admin`SELECT id FROM job_secret_handles WHERE job_id = ${mintedJob}`;
     expect(afterReplay.length).toBe(1);
+  });
+
+  it("[MIG-007] mints a replay-stable company key for the real agentless operation source", async () => {
+    const { admin } = guard(); const jobId = randomUUID(); const attemptId = randomUUID(); const operationId = randomUUID();
+    const built = buildOneShotDistributedInvocation({ operationId, cliTool: 'codex', command: 'codex', args: ['exec'],
+      stdinContent: 'fake extraction prompt', timeoutMs: 30_000 })!;
+    await seedJob({ jobId, attemptId, targetClass: 'managed_cloud' });
+    await admin`UPDATE jobs SET source_kind = 'one_shot', source_identity = ${operationId},
+      source_intent = ${{ kind: 'one_shot', operationId, operationKind: 'extraction' }},
+      executor_principal_kind = 'worker', executor_principal_id = ${operationId}, input = ${built.workload},
+      authenticated_principal_kind = 'system', authenticated_principal_id = ${COMPANY_A}
+      WHERE id = ${jobId}`;
+    const decision = await placeCanary({ jobId, attemptId, mintCredentialAuthority: 'company_api_key' });
+    expect(decision, JSON.stringify(decision)).toMatchObject({ disposition: 'selected', leaseEligible: true });
+    expect(await placeCanary({ jobId, attemptId, mintCredentialAuthority: 'company_api_key' })).toEqual(decision);
+    const handles = await admin`SELECT ref_kind, ref_id, materialization_target, owner_principal_id
+      FROM job_secret_handles WHERE job_id = ${jobId}`;
+    expect(handles).toHaveLength(1);
+    expect(handles[0]).toMatchObject({ ref_kind: 'provider_key', ref_id: 'provider:openai',
+      materialization_target: 'OPENAI_API_KEY', owner_principal_id: operationId });
+    expect(await admin`SELECT id FROM agents WHERE id = ${operationId}`).toHaveLength(0);
+    const { app } = guard(); const existing = createOneShotExistingOperationReader(app.db);
+    const query = { companyId: COMPANY_A, organizationId: ORG_A, operationId, operationKind: "extraction" as const, workload: built.workload };
+    expect(await existing(query)).toEqual({ jobId, attemptId });
+    expect(await existing({ ...query, companyId: COMPANY_B })).toBeNull();
+    await expect(existing({ ...query, workload: { ...built.workload, maxRuntimeSeconds: 90 } })).rejects.toThrow("authority mismatch");
+    await admin`UPDATE jobs SET authenticated_principal_kind = 'agent' WHERE id = ${jobId}`;
+    await expect(existing(query)).rejects.toThrow("authority mismatch");
+  });
+
+  it("[MIG-007] returns only committed output paired with accepted events of this operation attempt", async () => {
+    const { admin, app } = guard(); const jobId = randomUUID(); const attemptId = randomUUID(); const operationId = randomUUID(); const leaseId = randomUUID();
+    await seedJob({ jobId, attemptId, targetClass: "managed_cloud" });
+    await admin`UPDATE jobs SET source_kind = 'one_shot', source_identity = ${operationId},
+      source_intent = ${{ kind: "one_shot", operationId, operationKind: "extraction" }},
+      executor_principal_kind = 'worker', executor_principal_id = ${operationId} WHERE id = ${jobId}`;
+    await admin`INSERT INTO leases (id, organization_id, company_id, job_id, attempt_id, attempt_number, worker_id, target_id,
+      target_authority_key, target_generation, profile_hash, provider_constraint_hash, ack_deadline, expires_at, status, fence)
+      VALUES (${leaseId}, ${ORG_A}, ${COMPANY_A}, ${jobId}, ${attemptId}, 1, ${WORKER_A}, ${TARGET_A},
+        ${`organization:${ORG_A}`}, 1, ${"a".repeat(64)}, ${"b".repeat(64)}, now(), now() + interval '1 minute', 'released', 'result-fence')`;
+    const identifier = oneShotResultArtifactId(jobId, 1);
+    const result = { version: 1, operationId, stdout: "fake extracted answer", stderr: "", exitCode: 0, timedOut: false, durationMs: 5, captureError: null };
+    const bytes = Buffer.from(JSON.stringify(result)); const objectKey = `organizations/${ORG_A}/jobs/${jobId}/attempts/1/${identifier}`;
+    await admin`INSERT INTO job_artifacts (organization_id, job_id, identifier, status, attempt, lease_id, fence_token, object_key, sha256, size_bytes, content_type, kind)
+      VALUES (${ORG_A}, ${jobId}, ${identifier}, 'committed', 1, ${leaseId}, 'result-fence', ${objectKey}, ${sha256(bytes)}, ${bytes.length}, 'application/json', 'other')`;
+    const getObject = vi.fn(async () => ({ stream: Readable.from([bytes]) }));
+    const read = createOneShotDistributedResultReader(app.db, { getObject } as never);
+    const scope = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, operationId };
+    expect(await read(scope)).toEqual({ state: "pending" }); expect(getObject).not.toHaveBeenCalled();
+    async function accept(sequence: number, eventType: string, payload: Record<string, unknown>) {
+      const eventId = randomUUID(); const event = { eventType, payload };
+      await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        VALUES (${ORG_A}, ${COMPANY_A}, ${jobId}, ${attemptId}, 1, ${leaseId}, ${eventId}, ${sequence}, ${eventType}, 'result-fence', ${"a".repeat(64)}, ${event}, now())`;
+    }
+    await accept(1, "artifact_prepared", { artifactId: identifier, kind: "other" });
+    expect(await read(scope)).toEqual({ state: "pending" });
+    await accept(2, "terminal", { status: "succeeded", exitCode: 0, errorCode: null, errorMessage: null });
+    expect(await read(scope)).toEqual({ state: "result", result: { ...result, usageAccepted: false } });
+    await expect(read({ ...scope, companyId: COMPANY_B })).rejects.toThrow("not found");
+    await expect(read({ ...scope, organizationId: ORG_B })).rejects.toThrow("not found");
+    await expect(read({ ...scope, operationId: randomUUID() })).rejects.toThrow("source mismatch");
+    await admin`UPDATE job_artifacts SET fence_token = 'foreign-fence' WHERE job_id = ${jobId}`;
+    await expect(read(scope)).rejects.toThrow("provenance");
+    await admin`UPDATE job_artifacts SET fence_token = 'result-fence' WHERE job_id = ${jobId}`;
+    await admin`INSERT INTO job_attempts (organization_id, company_id, job_id, attempt_number, status) VALUES (${ORG_A}, ${COMPANY_A}, ${jobId}, 2, 'pending')`;
+    expect(await read(scope)).toEqual({ state: "failed" });
+  });
+
+  it("[MIG-007] a recovered operation records its estimate and company rollup once", async () => {
+    const { admin } = guard(); const client = postgres(adminUrl, { max: 2 }); const db = drizzle(client) as unknown as Db;
+    try {
+      const [before] = await admin`SELECT spent_monthly_cents FROM companies WHERE id = ${COMPANY_A}`;
+      const input = { companyId: COMPANY_A, provider: "openai", model: "gpt-5.5", inputTokens: 100, outputTokens: 100,
+        source: "extraction" as const, costCents: 7, sourceIdempotencyKey: `one-shot:${COMPANY_A}:${randomUUID()}` };
+      const first = await recordOneShotCliCost(db, input);
+      const second = await recordOneShotCliCost(db, input);
+      expect(first.id).toBe(second.id);
+      expect(await admin`SELECT id FROM cost_events WHERE company_id = ${COMPANY_A} AND source_idempotency_key = ${input.sourceIdempotencyKey}`).toHaveLength(1);
+      const [after] = await admin`SELECT spent_monthly_cents FROM companies WHERE id = ${COMPANY_A}`;
+      expect(after.spent_monthly_cents - before.spent_monthly_cents).toBe(7);
+    } finally { await client.end(); }
+  });
+
+  it("[MIG-007] rolls back a leasable decision when an operation cannot mint its required key", async () => {
+    const { admin } = guard(); const jobId = randomUUID(); const attemptId = randomUUID(); const operationId = randomUUID();
+    await seedJob({ jobId, attemptId, targetClass: "managed_cloud" });
+    await admin`UPDATE jobs SET source_kind = 'one_shot', source_identity = ${operationId},
+      source_intent = ${{ kind: "one_shot", operationId, operationKind: "extraction" }},
+      executor_principal_kind = 'worker', executor_principal_id = ${operationId}, input = ${{ command: "node", args: ["untrusted-wrapper"], stdinArtifactId: null, maxRuntimeSeconds: 60 }}
+      WHERE id = ${jobId}`;
+    await expect(placeCanary({ jobId, attemptId, mintCredentialAuthority: "company_api_key" })).rejects.toThrow("execution_secret_required");
+    const [attempt] = await admin`SELECT placement_decided_at, placement_lease_eligible FROM job_attempts WHERE id = ${attemptId}`;
+    expect(attempt.placement_decided_at).toBeNull(); expect(attempt.placement_lease_eligible).toBeNull();
+    expect(await admin`SELECT id FROM job_secret_handles WHERE job_id = ${jobId}`).toHaveLength(0);
   });
 
   it("[CLI-007] mints NO handle when the canary presents no authority — the E7-F001 fail-closed state", async () => {

@@ -50,11 +50,19 @@ remaining M1 code and tests, and M2. This checklist adds no certification gate.
 - M1 drain, cancellation, budget hard-stop and authoritative cost parity checks
   passed 95 focused tests, including real PostgreSQL. Worker cleanup and diagnostic
   tests remain covered by the full required suite; live M1b is still deferred.
-- M2 independent owner routing and trusted Commander metadata resolution are
-  implemented on the credential-routing branch; validation and integration continue.
-- Commander signed-turn fencing and organization tool policy are implemented
-  locally with focused tests. Execution ownership, source-specific secret minting,
-  Commander results and agentless extraction remain to implement.
+- M2 independent owner routing and trusted Commander metadata resolution merged
+  in PR #655 after repository checks and required CI passed.
+- Commander signed-turn fencing and organization tool policy merged in PR #656.
+  Actual execution ownership, source-specific credential redemption and results
+  are being implemented next.
+- Agentless one-shot authorization, mandatory credential mint, accepted result
+  return, deadline cancellation and legacy suppression are implemented. Stable
+  Discussion operation identity rejoins owned work after restart; estimates and
+  company spend are idempotent and accepted usage takes pricing precedence.
+  The final focused group passed 223 tests, including real PostgreSQL; the updated
+  readiness mock passed 7 tests. Repository typecheck, full suite (23,639 passed,
+  1,903 skipped) and build passed on the integration base. Normal PR CI is next.
+- Worker cleanup and diagnostic reconciliation passed another 18 focused tests.
 - Live Anthropic M1b validation remains deferred. Rollout stays off.
 
 Historical milestone designs contain obsolete starting-state observations; read

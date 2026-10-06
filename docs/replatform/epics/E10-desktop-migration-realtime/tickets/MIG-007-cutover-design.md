@@ -1,3 +1,23 @@
+## Current implementation progress — 2026-10-06
+
+The historical blocked verdict below describes the August starting state. The current
+code now supports a source-bound company-key handle for an agentless operation, stages
+a bounded CLI capture wrapper, and returns integrity-checked committed output paired
+with accepted artifact and terminal events. Actual one-shot callers attempt ownership
+before legacy sandbox acquisition; a transferred operation never falls back after a
+result failure. Extraction batches skip legacy pre-acquisition for the one-shot canary.
+
+Tests cover real child-process success/failure/timeout without model calls, actual
+PostgreSQL placement and rollback, tenant/fence/source/attempt rejection, legacy
+suppression, bounded reads, cancellation and cost-estimate suppression when accepted
+usage owns pricing. Reclaimed entries derive their operation identity from the existing
+entry and full invocation, rejoin placed jobs, and record fallback estimates once.
+One-shot jobs do not automatically repeat ambiguous model spend on lease expiry.
+Rollout remains off; live calls remain deferred. This does not establish M2 completion
+or activation; Commander execution is being implemented separately.
+
+---
+
 > ★★★ **REVIEW-VERIFIED (2026-08-27): extraction is NOT buildable today, and NOT recommended even once
 > unblocked.** This design's blocked verdict was checked against source and holds: `one_shot` refuses at
 > the mint's guard 3 (agentless principal, same gate as `commander_turn`), extraction is a sync

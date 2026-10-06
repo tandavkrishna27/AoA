@@ -131,6 +131,7 @@ export interface ExtractViaCliOptions {
    *  inert: when omitted, the cloud path self-acquires its own ephemeral
    *  sandbox per call via `runOneShotCliInSandbox`. */
   sandboxHandle?: OneShotSandboxHandle;
+  operationIdentity?: string;
   /**
    * U13.5 — file-import (`extractFromRawText`, extraction.ts) supplies this
    * on cloud so the uploaded file's content is staged into the sandbox VM as
@@ -160,7 +161,7 @@ export async function extractViaCli(
   content: string,
   options: ExtractViaCliOptions = {},
 ): Promise<ExtractedItem[]> {
-  const { timeoutMs = 60_000, codexModel = null, credential = null, companyId, db, sandboxHandle, stagedFile } = options;
+  const { timeoutMs = 60_000, codexModel = null, credential = null, companyId, db, sandboxHandle, stagedFile, operationIdentity } = options;
   const binary = CLI_BINARY_MAP[cliTool];
 
   if (!binary) {
@@ -186,6 +187,7 @@ export async function extractViaCli(
       companyId,
       db,
       sandboxHandle,
+      operationIdentity,
       stagedFile,
     });
   }
@@ -296,6 +298,7 @@ async function extractViaCliSandbox(
     companyId?: string;
     db?: Db;
     sandboxHandle?: OneShotSandboxHandle;
+    operationIdentity?: string;
     stagedFile?: { remotePath: string; content: string };
   },
 ): Promise<ExtractedItem[]> {
@@ -371,6 +374,7 @@ async function extractViaCliSandbox(
       stagedFile,
       timeoutMs: opts.timeoutMs,
       sandboxHandle: opts.sandboxHandle,
+      operationIdentity: opts.operationIdentity,
       source: "extraction",
     });
   } catch (err) {

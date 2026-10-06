@@ -312,6 +312,9 @@ export async function submitJobWithinTenant(
           priority: priority(input.command.source),
           availableAt: now,
           status: "queued",
+          // A one-shot caller owns explicit retry/recovery. Never blindly repeat model spend
+          // after an ambiguous lease expiry; the durable operation can be rejoined instead.
+          maxAttempts: input.command.source.kind === "one_shot" ? 1 : undefined,
           createdAt: now,
           updatedAt: now,
         });
