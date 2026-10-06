@@ -140,6 +140,31 @@ describe("W7.5d cloud Commander reroute + atomic release", () => {
   });
   afterEach(() => setDeploymentMode("local_trusted"));
 
+  it("consumes distributed Commander output before any warm sandbox, adapter or host acquire", async () => {
+    const { setCommanderDistributedPort } = await import("../services/commander-distributed-port.js");
+    const execute = vi.fn(async () => ({ version: 1 as const, operationId: "run-1", stdout: [
+      JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "distributed answer" } } }),
+      JSON.stringify({ type: "result", is_error: false, usage: { input_tokens: 4, output_tokens: 2 } })].join("\n"),
+      stderr: "", exitCode: 0, timedOut: false, durationMs: 20, captureError: null, usageAccepted: true }));
+    setCommanderDistributedPort({ execute });
+    try {
+      const { chunks, spawn, execSync } = await runChat("claude_cli", { userMessageId: "message-a" });
+      expect(chunks).toContainEqual({ type: "text", delta: "distributed answer" });
+      expect(chunks.filter((chunk) => chunk.type === "done")).toHaveLength(1);
+      expect(execute).toHaveBeenCalledWith(expect.objectContaining({ turnId: "run-1", messageId: "message-a", userId: "user1", conversationId: "conversation-a" }));
+      expect(resolveCommanderSandboxContextMock).not.toHaveBeenCalled(); expect(runCommanderAdapterTurnMock).not.toHaveBeenCalled();
+      expect(spawn).not.toHaveBeenCalled(); expect(execSync).not.toHaveBeenCalled();
+    } finally { setCommanderDistributedPort(undefined); }
+  });
+  it("throws a transferred Commander result failure without starting a legacy sandbox", async () => {
+    const { setCommanderDistributedPort } = await import("../services/commander-distributed-port.js");
+    setCommanderDistributedPort({ execute: vi.fn(async () => { throw new Error("accepted output unavailable"); }) });
+    try {
+      await expect(runChat("claude_cli", { userMessageId: "message-a" })).rejects.toThrow("accepted output unavailable");
+      expect(resolveCommanderSandboxContextMock).not.toHaveBeenCalled(); expect(runCommanderAdapterTurnMock).not.toHaveBeenCalled();
+    } finally { setCommanderDistributedPort(undefined); }
+  });
+
   it("claude_cli: delegates to adapter.execute (NOT host spawn) and releases exactly once", async () => {
     const release = vi.fn(async () => {});
     resolveCommanderSandboxContextMock.mockResolvedValue(providerSandboxContext(release));

@@ -49,6 +49,8 @@ export interface RunExecutionPlacement {
     mintCredentialAuthority?: JobPlacementCredentialBinding["credentialKind"];
     /** CLI-008 Unit C — gates the run_jwt (AOA_API_KEY) mint; off by default. */
     toolSurfaceAuthorized?: boolean;
+    /** Trusted source dispatch requires atomic provider/tool handles and handoff. */
+    requireExecutionSecrets?: boolean;
   }): Promise<{ disposition: string; leaseEligible?: boolean }>;
 }
 
@@ -324,6 +326,10 @@ export function createRunExecutionOwnerResolver(
           return legacy("rollout_not_canary", `rollout state is ${state}`);
         }
 
+        if (source.kind === "commander_turn" && !toolSurfaceAuthorized) {
+          return legacy("preflight_refused", "Commander distributed tool surface is disabled");
+        }
+
         // 1b. CLI-008 Unit D — a workload that DEPENDS on staged files cannot run on a
         //     deployment with no staging port. Checked FIRST, before the convert claims
         //     anything, so the refusal costs nothing and leaves no inert attempt behind.
@@ -391,9 +397,10 @@ export function createRunExecutionOwnerResolver(
           // CLI-007: the authority the preflight ESTABLISHED (step 2) rides to the mint
           // here. `gate` is the ok variant by this point, so it always carries it; a
           // refused gate returned legacy above and never reaches placement.
-          mintCredentialAuthority: gate.credentialAuthority,
+          mintCredentialAuthority: source.kind === "commander_turn" ? undefined : gate.credentialAuthority,
           // CLI-008 Unit C — forward the tool-surface gate to the run_jwt mint (S3b).
           toolSurfaceAuthorized,
+          ...(source.kind === "commander_turn" ? { requireExecutionSecrets: true } : {}),
         });
         if (decision.disposition !== "selected" || decision.leaseEligible !== true) {
           // The run goes legacy, so the slot this convert claimed must go back — otherwise the

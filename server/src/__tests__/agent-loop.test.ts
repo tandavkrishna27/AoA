@@ -501,6 +501,17 @@ describe("agentLoopService.chat — assistant persistence (MX-chatpersist)", () 
     expect(roles).toEqual(["user", "assistant"]);
   });
 
+  it("does not append a duplicate reply already committed by Commander recovery", async () => {
+    scriptStream([
+      { type: "reply_persisted" },
+      { type: "text", delta: "Recovered reply" },
+      { type: "done", summary: { runId: "original-paid-turn", toolsCalled: [], durationMs: 1, costCents: 0,
+        tokenUsage: { inputTokens: 0, outputTokens: 0 } } },
+    ]);
+    await drain(agentLoopService(dbWithConfig({ cliTool: "codex", executionMode: "cli" })));
+    expect(appendMessage.mock.calls.filter((call) => (call[1] as any).role === "assistant")).toHaveLength(0);
+  });
+
   it("forwards every chunk to the caller in order (streaming byte-unchanged)", async () => {
     const scripted = [
       { type: "text", delta: "Hello " },

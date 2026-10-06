@@ -10,6 +10,8 @@ export interface CapturedOneShotResult {
   timedOut: boolean; durationMs: number; captureError: null;
   /** Added only by the ledger reader, never trusted from the worker result object. */
   usageAccepted?: boolean;
+  /** Set by the Commander control plane after the accepted reply commits. */
+  replyPersisted?: boolean;
 }
 export type OneShotResultObservation =
   | { state: "pending" }

@@ -8,6 +8,11 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import type { Db } from "@armyofagents/db";
 import { createDrizzleJobCredentialRoutingResolver } from "../services/job-credential-routing.js";
+import { resolveAuthoritativeRate } from "../services/job-authoritative-rate.js";
+import { buildCommanderDistributedInvocation } from "../services/commander-distributed-invocation.js";
+import { persistCommanderDistributedReply, persistCommanderDistributedFailure } from "../services/commander-distributed-reply.js";
+import { rejoinCommanderRun } from "../services/commander-rejoin-run.js";
+import { createCommanderSourcePreparer, createCommanderExistingTurnReader, createCommanderDistributedResultReader } from "../services/commander-distributed-store.js";
 import { resolveCliAuthTopology } from "../services/cli-auth-topology.js";
 import { buildOneShotDistributedInvocation } from "../services/one-shot-distributed-invocation.js";
 import { createOneShotDistributedResultReader, createOneShotExistingOperationReader } from "../services/one-shot-distributed-result-store.js";
@@ -682,6 +687,88 @@ integration("JOB-009 slice A schema and role boundaries", () => {
         }
       }
     } finally { setDeploymentMode(oldMode); }
+  });
+
+  it("binds the current Commander user message before dispatch and denies foreign or active prior ownership", async () => {
+    const { admin } = guard(); const ownerClient = postgres(adminUrl, { max: 2 });
+    const ownerDb = drizzle(ownerClient) as unknown as Db;
+    try {
+    const turnId = randomUUID(); const conversationId = randomUUID(); const messageId = randomUUID();
+    await admin`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+      VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active') ON CONFLICT (company_id, principal_type, principal_id) DO UPDATE SET status = 'active'`;
+    await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id) VALUES (${conversationId}, ${COMPANY_A}, ${OWNER_A})`;
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status)
+      VALUES (${turnId}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'running')`;
+    await admin`INSERT INTO internal_agent_messages (id, conversation_id, role, content) VALUES (${messageId}, ${conversationId}, 'user', 'prompt')`;
+    const request = { companyId: COMPANY_A, turnId, userId: OWNER_A, userRole: "team_member", conversationId, messageId,
+      cliTool: "codex", content: "prompt", model: "gpt-4.1", provider: "openai" as const, apiBaseUrl: "https://aoa.example/api", timeoutMs: 1000 };
+    const prepare = createCommanderSourcePreparer(ownerDb);
+    expect(await prepare({ ...request, companyId: COMPANY_B })).toBe(false);
+    expect(await prepare({ ...request, userId: "foreign-user" })).toBe(false);
+    expect(await prepare({ ...request, messageId: randomUUID() })).toBe(false);
+    expect(await prepare(request)).toBe(true);
+    const [run] = await admin`SELECT provider, model, conversation_message_id FROM internal_agent_runs WHERE id = ${turnId}`;
+    expect(run).toMatchObject({ provider: "openai", model: "gpt-4.1", conversation_message_id: messageId });
+    const [message] = await admin`SELECT run_id FROM internal_agent_messages WHERE id = ${messageId}`; expect(message.run_id).toBe(turnId);
+    const newer = randomUUID();
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status)
+      VALUES (${newer}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'running')`;
+    expect(await prepare({ ...request, turnId: newer })).toBe(false);
+    await admin`UPDATE internal_agent_runs SET status = 'failed' WHERE id = ${turnId}`;
+    expect(await prepare({ ...request, turnId: newer })).toBe(true);
+    const jobId = randomUUID(); const attemptId = randomUUID();
+    await seedJob({ jobId, attemptId });
+    await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${newer},
+      source_intent = ${{ kind: 'commander_turn', internalAgentRunId: newer, conversationId }},
+      requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+      executor_principal_kind = 'sandbox', executor_principal_id = ${newer} WHERE id = ${jobId}`;
+    await admin`UPDATE internal_agent_runs SET execution_owner = 'distributed', distributed_job_id = ${jobId},
+      distributed_attempt_id = ${attemptId} WHERE id = ${newer}`;
+    const stagedFiles = buildCommanderDistributedInvocation({ ...request, turnId: newer })!.stagedFiles;
+    for (const file of stagedFiles) {
+      await admin`INSERT INTO job_artifacts (organization_id, job_id, identifier, attempt, kind, status, content_type, size_bytes, sha256, object_key)
+        VALUES (${ORG_A}, ${jobId}, ${randomUUID()}, 1, 'staged_input', 'committed', ${`application/vnd.aoa.staged-input; path=${file.path}`},
+          ${file.bytes.byteLength}, ${sha256(file.bytes)}, 'control-plane-input')`;
+    }
+    const existing = createCommanderExistingTurnReader(ownerDb);
+    const replay = { ...request, turnId: newer, stagedFiles };
+    expect(await existing(replay)).toEqual({ organizationId: ORG_A, jobId, attemptId, operationId: newer });
+    await expect(existing({ ...replay, conversationId: randomUUID() })).rejects.toThrow("source authority");
+    await expect(existing({ ...replay, stagedFiles: [{ ...stagedFiles[0], bytes: new TextEncoder().encode("changed") }] })).rejects.toThrow("staged input");
+    expect(await existing({ ...replay, userId: "foreign-user" })).toBeNull();
+    expect(await prepare({ ...request, turnId: newer })).toBe(false);
+
+    const placeholder = randomUUID();
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status)
+      VALUES (${placeholder}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'running')`;
+    expect(await existing({ ...replay, turnId: placeholder })).toEqual({ organizationId: ORG_A, jobId, attemptId, operationId: newer });
+    await admin`INSERT INTO internal_agent_config (company_id, provider, model) VALUES (${COMPANY_A}, 'anthropic', 'claude-sonnet-4-6')
+      ON CONFLICT (company_id) DO UPDATE SET provider = 'anthropic', model = 'claude-sonnet-4-6'`;
+    const rate = await resolveAuthoritativeRate(ownerDb, { companyId: COMPANY_A,
+      source: { kind: 'commander_turn', internalAgentRunId: newer, conversationId },
+      units: { inputTokens: 10000, outputTokens: 10000, cachedInputTokens: 0, runtimeMillis: 1 } });
+    expect(rate).toMatchObject({ provider: "openai", model: "gpt-4.1", costCents: 10 });
+    const { recordOneShotCliCost } = await import("../services/one-shot-cli-budget.js");
+    const estimate = { companyId: COMPANY_A, provider: rate.provider, model: rate.model, inputTokens: 10000, outputTokens: 10000,
+      costCents: rate.costCents, billingType: "commander_estimate", sourceIdempotencyKey: `commander:${COMPANY_A}:${newer}` };
+    const firstEstimate = await recordOneShotCliCost(ownerDb, estimate);
+    expect((await recordOneShotCliCost(ownerDb, estimate)).id).toBe(firstEstimate.id);
+    await expect(rejoinCommanderRun(ownerDb, { companyId: COMPANY_A, userId: "foreign-user", originalRunId: newer, placeholderRunId: placeholder, conversationId })).rejects.toThrow("source mismatch");
+    expect(await rejoinCommanderRun(ownerDb, { companyId: COMPANY_A, userId: OWNER_A, originalRunId: newer, placeholderRunId: placeholder, conversationId })).toBe(newer);
+    expect(await admin`SELECT id FROM internal_agent_runs WHERE id = ${placeholder}`).toHaveLength(0);
+    expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.rejoined'`).toHaveLength(1);
+
+    await admin`UPDATE job_attempts SET status = 'cancelled' WHERE id = ${attemptId}`;
+    const failedScope = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, operationId: newer,
+      userId: OWNER_A, conversationId, messageId };
+    await Promise.all([persistCommanderDistributedFailure(ownerDb, failedScope), persistCommanderDistributedFailure(ownerDb, failedScope)]);
+    expect((await admin`SELECT status FROM internal_agent_runs WHERE id = ${newer}`)[0].status).toBe("cancelled");
+    expect((await admin`SELECT turn_status FROM internal_agent_messages WHERE id = ${messageId}`)[0].turn_status).toBe("failed");
+    expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.failed'`).toHaveLength(1);
+    // A cancelled paid owner remains owned; retry never creates another job.
+    expect(await existing(replay)).toMatchObject({ jobId, attemptId, operationId: newer });
+
+    } finally { await ownerClient.end({ timeout: 5 }); }
   });
 
   it("[I-03] consumes Decision #117 binding for two owner targets and fails mismatch/foreign/shared closed", async () => {
@@ -1642,6 +1729,70 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     await expect(read({ ...scope, companyId: COMPANY_B })).rejects.toThrow("not found");
     await expect(read({ ...scope, organizationId: ORG_B })).rejects.toThrow("not found");
     await expect(read({ ...scope, operationId: randomUUID() })).rejects.toThrow("source mismatch");
+    await admin`UPDATE job_artifacts SET fence_token = 'foreign-fence' WHERE job_id = ${jobId}`;
+    await expect(read(scope)).rejects.toThrow("provenance");
+    await admin`UPDATE job_artifacts SET fence_token = 'result-fence' WHERE job_id = ${jobId}`;
+    await admin`INSERT INTO job_attempts (organization_id, company_id, job_id, attempt_number, status) VALUES (${ORG_A}, ${COMPANY_A}, ${jobId}, 2, 'pending')`;
+    expect(await read(scope)).toEqual({ state: "failed" });
+  });
+
+  it("Commander returns only accepted output for the owned turn and denies revoked membership", async () => {
+    const { admin, app } = guard(); const jobId = randomUUID(); const attemptId = randomUUID(); const operationId = randomUUID(); const leaseId = randomUUID();
+    await seedJob({ jobId, attemptId, targetClass: "managed_cloud" });
+    const conversationId = randomUUID(); const messageId = randomUUID();
+    await admin`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+      VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active') ON CONFLICT DO NOTHING`;
+    await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id) VALUES (${conversationId}, ${COMPANY_A}, ${OWNER_A})`;
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, provider, model,
+      execution_owner, distributed_job_id, distributed_attempt_id, conversation_message_id)
+      VALUES (${operationId}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'openai', 'gpt-4.1',
+        'distributed', ${jobId}, ${attemptId}, ${messageId})`;
+    await admin`INSERT INTO internal_agent_messages (id, conversation_id, role, content, run_id)
+      VALUES (${messageId}, ${conversationId}, 'user', 'fake prompt', ${operationId})`;
+    await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${operationId},
+      source_intent = ${{ kind: "commander_turn", internalAgentRunId: operationId, conversationId }},
+      executor_principal_kind = 'sandbox', executor_principal_id = ${operationId}, requester_principal_kind = 'user', requester_principal_id = ${OWNER_A} WHERE id = ${jobId}`;
+    await admin`INSERT INTO leases (id, organization_id, company_id, job_id, attempt_id, attempt_number, worker_id, target_id,
+      target_authority_key, target_generation, profile_hash, provider_constraint_hash, ack_deadline, expires_at, status, fence)
+      VALUES (${leaseId}, ${ORG_A}, ${COMPANY_A}, ${jobId}, ${attemptId}, 1, ${WORKER_A}, ${TARGET_A},
+        ${`organization:${ORG_A}`}, 1, ${"a".repeat(64)}, ${"b".repeat(64)}, now(), now() + interval '1 minute', 'released', 'result-fence')`;
+    const identifier = oneShotResultArtifactId(jobId, 1);
+    const result = { version: 1, operationId, stdout: "fake extracted answer", stderr: "", exitCode: 0, timedOut: false, durationMs: 5, captureError: null };
+    const bytes = Buffer.from(JSON.stringify(result)); const objectKey = `organizations/${ORG_A}/jobs/${jobId}/attempts/1/${identifier}`;
+    await admin`INSERT INTO job_artifacts (organization_id, job_id, identifier, status, attempt, lease_id, fence_token, object_key, sha256, size_bytes, content_type, kind)
+      VALUES (${ORG_A}, ${jobId}, ${identifier}, 'committed', 1, ${leaseId}, 'result-fence', ${objectKey}, ${sha256(bytes)}, ${bytes.length}, 'application/json', 'other')`;
+    const getObject = vi.fn(async () => ({ stream: Readable.from([bytes]) }));
+    const read = createCommanderDistributedResultReader(app.db, { getObject } as never);
+    const scope = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, operationId };
+    expect(await read(scope)).toEqual({ state: "pending" }); expect(getObject).not.toHaveBeenCalled();
+    async function accept(sequence: number, eventType: string, payload: Record<string, unknown>) {
+      const eventId = randomUUID(); const event = { eventType, payload };
+      await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
+        VALUES (${ORG_A}, ${COMPANY_A}, ${jobId}, ${attemptId}, 1, ${leaseId}, ${eventId}, ${sequence}, ${eventType}, 'result-fence', ${"a".repeat(64)}, ${event}, now())`;
+    }
+    await accept(1, "artifact_prepared", { artifactId: identifier, kind: "other" });
+    expect(await read(scope)).toEqual({ state: "pending" });
+    await accept(2, "terminal", { status: "succeeded", exitCode: 0, errorCode: null, errorMessage: null });
+    expect(await read(scope)).toEqual({ state: "result", result: { ...result, usageAccepted: false } });
+    await expect(read({ ...scope, companyId: COMPANY_B })).rejects.toThrow("not found");
+    await expect(read({ ...scope, organizationId: ORG_B })).rejects.toThrow("not found");
+    await expect(read({ ...scope, operationId: randomUUID() })).rejects.toThrow("source mismatch");
+    const replyInput = { ...scope, userId: OWNER_A, conversationId, messageId,
+      chunks: [{ type: "text" as const, delta: "recovered answer" }, { type: "done" as const, summary: {
+        runId: operationId, toolsCalled: [], durationMs: 5, costCents: 0,
+        tokenUsage: { inputTokens: 1, outputTokens: 1 }, model: "gpt-4.1", provider: "openai",
+      } }] };
+    const replyClient = postgres(adminUrl, { max: 2 }); const replyDb = drizzle(replyClient) as unknown as Db;
+    try {
+      await Promise.all([persistCommanderDistributedReply(replyDb, replyInput), persistCommanderDistributedReply(replyDb, replyInput)]);
+    expect(await admin`SELECT id FROM internal_agent_messages WHERE reply_to_user_message_id = ${messageId} AND role = 'assistant'`).toHaveLength(1);
+    expect((await admin`SELECT status FROM internal_agent_runs WHERE id = ${operationId}`)[0].status).toBe("completed");
+    expect((await admin`SELECT turn_status FROM internal_agent_messages WHERE id = ${messageId}`)[0].turn_status).toBe("done");
+      await expect(persistCommanderDistributedReply(replyDb, { ...replyInput, userId: "foreign-user" })).rejects.toThrow("authority");
+    } finally { await replyClient.end(); }
+    await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+    await expect(read(scope)).rejects.toThrow("source mismatch");
+    await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     await admin`UPDATE job_artifacts SET fence_token = 'foreign-fence' WHERE job_id = ${jobId}`;
     await expect(read(scope)).rejects.toThrow("provenance");
     await admin`UPDATE job_artifacts SET fence_token = 'result-fence' WHERE job_id = ${jobId}`;

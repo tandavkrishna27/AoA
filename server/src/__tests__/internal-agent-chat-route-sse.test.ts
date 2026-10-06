@@ -197,6 +197,9 @@ vi.mock("../services/internal-agent/agent-loop.js", () => ({
 }));
 
 // ── detectCliTool mock (used for test-connection, etc.) ─────────────────────
+const rejoinState = vi.hoisted(() => ({ apply: vi.fn(async (_db: unknown, input: { originalRunId: string }) => input.originalRunId) }));
+vi.mock("../services/commander-rejoin-run.js", () => ({ rejoinCommanderRun: rejoinState.apply }));
+
 vi.mock("../services/internal-agent/cli-mode.js", () => ({
   detectCliTool: vi.fn(async () => ({ available: true, path: "/usr/local/bin/codex" })),
 }));
@@ -363,6 +366,24 @@ describe("internal-agent chat route SSE-contract + run persistence (Task 3)", ()
     // …but the pre-created run row is DELETED, not finalized as completed.
     expect(runDeleted).toBe(true);
     expect(persistedRun).toBeNull();
+  });
+
+  it("finalizes and returns the original paid run when a network retry rejoins", async () => {
+    const originalRunId = "paid-original-run";
+    rejoinState.apply.mockClear();
+    streamState.impl = async function* () {
+      yield { type: "run_rejoined", runId: originalRunId };
+      yield* scriptedChatStream();
+    };
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    expect(rejoinState.apply).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      companyId: "cmp-sse-test", originalRunId, placeholderRunId: "run-sse-123",
+    }));
+    const done = sseEvents.find((event) => event.event === "done");
+    expect(done?.data.runId).toBe(originalRunId);
+    expect(done?.data.messageId).toBe(originalRunId);
+    expect(persistedRun?.status).toBe("completed");
+    expect(sseEvents.some((event) => event.event === "run_rejoined")).toBe(false);
   });
 
   it("emits exactly one event:reasoning SSE line", async () => {

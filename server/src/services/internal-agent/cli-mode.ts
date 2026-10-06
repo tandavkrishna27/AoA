@@ -41,6 +41,8 @@ import { assertUnsandboxedMultitenantAllowed } from "../unsandboxed-multitenant-
 import { getServerAdapter } from "../../adapters/registry.js";
 import { instanceSettingsService } from "../instance-settings.js";
 import { resolveCommanderSandboxContext, runCommanderAdapterTurn } from "./commander-sandbox.js";
+import { getCommanderDistributedPort } from "../commander-distributed-port.js";
+import { parseCommanderDistributedOutput } from "../commander-distributed-output.js";
 import type { CommanderSandboxContext } from "./commander-sandbox.js";
 import { recordDistributedShadow, type ShadowSinkInput } from "../distributed-shadow-port.js";
 
@@ -956,6 +958,24 @@ export function cliModeService(db: Db) {
           message: "Commander conversation context is required for CLI execution.",
         };
         return;
+      }
+
+      const distributedCommander = getCommanderDistributedPort();
+      if (distributedCommander && params.runId && params.userMessageId) {
+        const model = config.cliTool === "codex" ? resolveCodexChatModel(config.model, null) : config.model ?? "claude-sonnet-4-6";
+        const experimental = await instanceSettingsService(db).getExperimental().catch(() => null);
+        const result = await distributedCommander.execute({ companyId: params.companyId, userId: params.userId,
+          userRole: params.userRole, conversationId, messageId: params.userMessageId, turnId: params.runId,
+          cliTool: config.cliTool, content: params.rawContent ?? params.content, systemContext: params.systemContext,
+          model, vendorCliBypassEnabled: config.vendorCliBypassEnabled ?? true,
+          warmConversation: experimental?.warmCommanderConversations !== false,
+          apiBaseUrl: resolveCommanderApiBaseUrl(), timeoutMs: 240000 });
+        if (result) {
+          if (result.replyPersisted) yield { type: "reply_persisted" };
+          if (result.operationId !== params.runId) yield { type: "run_rejoined", runId: result.operationId };
+          for (const chunk of await parseCommanderDistributedOutput({ result, cliTool: config.cliTool, turnId: result.operationId, model })) yield chunk;
+          return;
+        }
       }
 
       // 3. Resolve the warm sandbox — cloud only (null on self-hosted, where the
