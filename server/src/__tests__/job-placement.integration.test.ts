@@ -690,7 +690,13 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     } finally { setDeploymentMode(oldMode); }
   });
 
-  it("binds the current Commander user message before dispatch and denies foreign or active prior ownership", async () => {
+  it.each([
+    { terminal: "cancelled", membership: "inactive", unavailable: false, expected: "cancelled" },
+    { terminal: "failed", membership: "deleted", unavailable: false, expected: "failed" },
+    { terminal: "succeeded", membership: "inactive", unavailable: false, expected: "failed" },
+    { terminal: "succeeded", membership: "active", unavailable: false, expected: "running" },
+    { terminal: "succeeded", membership: "active", unavailable: true, expected: "failed" },
+  ])("binds the current Commander message and retires $terminal with $membership membership (invalid reply $unavailable)", async ({ terminal, membership, unavailable, expected }) => {
     const { admin } = guard(); const ownerClient = postgres(adminUrl, { max: 2 });
     const ownerDb = drizzle(ownerClient) as unknown as Db;
     try {
@@ -759,16 +765,20 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(await admin`SELECT id FROM internal_agent_runs WHERE id = ${placeholder}`).toHaveLength(0);
     expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.rejoined'`).toHaveLength(1);
 
-    await admin`UPDATE job_attempts SET status = 'cancelled' WHERE id = ${attemptId}`;
-    await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+    await admin`UPDATE job_attempts SET status = ${terminal} WHERE id = ${attemptId}`;
+    if (membership === "deleted") await admin`DELETE FROM company_memberships WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
+    else await admin`UPDATE company_memberships SET status = ${membership} WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     const failedScope = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, operationId: newer,
-      userId: OWNER_A, conversationId, messageId };
+      userId: OWNER_A, conversationId, messageId, acceptedReplyUnavailable: unavailable };
     await Promise.all([persistCommanderDistributedFailure(ownerDb, failedScope), persistCommanderDistributedFailure(ownerDb, failedScope)]);
-    expect((await admin`SELECT status FROM internal_agent_runs WHERE id = ${newer}`)[0].status).toBe("cancelled");
-    expect((await admin`SELECT turn_status FROM internal_agent_messages WHERE id = ${messageId}`)[0].turn_status).toBe("failed");
-    expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.failed'`).toHaveLength(1);
-    await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
-    // A cancelled paid owner remains owned; retry never creates another job.
+    expect((await admin`SELECT status FROM internal_agent_runs WHERE id = ${newer}`)[0].status).toBe(expected);
+    const turn = (await admin`SELECT turn_status FROM internal_agent_messages WHERE id = ${messageId}`)[0].turn_status;
+    if (expected === "running") expect(turn).not.toBe("failed"); else expect(turn).toBe("failed");
+    expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.failed'`).toHaveLength(expected === "running" ? 0 : 1);
+    expect(await admin`SELECT id FROM internal_agent_messages WHERE run_id = ${newer} AND role = 'assistant'`).toHaveLength(0);
+    await admin`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+      VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active') ON CONFLICT (company_id, principal_type, principal_id) DO UPDATE SET status = 'active'`;
+    // A stopped paid owner remains owned; retry never creates another job.
     expect(await existing(replay)).toMatchObject({ jobId, attemptId, operationId: newer });
 
     } finally { await ownerClient.end({ timeout: 5 }); }

@@ -114,3 +114,16 @@ Streaming checkpoint verification: 134 focused tests passed, including 33 real
 PostgreSQL placement/result/retirement tests. Repository typecheck passed; the
 full suite passed 23,721 tests with 1,907 skipped across 2,459 passing files.
 Build and citation integrity checks passed. Flags remain off.
+
+## M2 lifecycle reconciliation
+
+Recovery retirement now has a five-second bound, so a stalled status cleanup
+cannot hold the existing convergence timer indefinitely. Added PostgreSQL cases
+cover cancelled/revoked, failed/deleted-member and succeeded/revoked runs,
+retryable active-member success, and explicitly invalid accepted replies.
+The real operator drain is exercised for each task/crew/Commander/extraction
+source, preserving one stable cancellation command on replay. Existing governed
+Commander confirmation and product approval parity paths remain in force.
+Focused checks passed 37 placement/retirement tests, 15 drain tests, 13 product
+approval parity tests, and 37 Commander approval/recovery tests. No provider call
+or rollout change is part of these checks.

@@ -49,7 +49,13 @@ export function createCommanderResultRecovery(deps: {
           timer = setTimeout(() => { controller.abort(); reject(new Error("Commander recovery deadline")); }, 15000);
         })]);
       } catch (error) {
-        try { await deps.retire?.(candidate); } catch (retirementError) { deps.onError(retirementError, candidate); }
+        let retirementTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          if (deps.retire) await Promise.race([deps.retire(candidate), new Promise<never>((_resolve, reject) => {
+            retirementTimer = setTimeout(() => reject(new Error("Commander retirement deadline")), 5000);
+          })]);
+        } catch (retirementError) { deps.onError(retirementError, candidate); }
+        finally { if (retirementTimer) clearTimeout(retirementTimer); }
         deps.onError(error, candidate);
       }
       finally { if (timer) clearTimeout(timer); }
