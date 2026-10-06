@@ -2,7 +2,7 @@
 // Internal Agent HTTP endpoints — T13a
 import { Router, type Request } from "express";
 import { z } from "zod";
-import { and, eq, asc, desc, gte, lte, isNull, inArray, sql, type SQL } from "drizzle-orm";
+import { and, or, eq, asc, desc, gte, lte, isNull, inArray, sql, type SQL } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import {
   internalAgentConfig,
@@ -407,7 +407,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
           `event: error\ndata: ${JSON.stringify({ code: "INTERNAL", message })}\n\n`,
         );
 
-        // Mark run failed if it hasn't been completed already
+        // HTTP failure owns only legacy status; distributed completion/recovery owns its run.
         await db
           .update(internalAgentRuns)
           .set({
@@ -416,7 +416,8 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
             errorMessage: message,
           })
           .where(and(eq(internalAgentRuns.id, run.id), eq(internalAgentRuns.companyId, companyId),
-            eq(internalAgentRuns.status, "running")))
+            eq(internalAgentRuns.status, "running"),
+            or(isNull(internalAgentRuns.executionOwner), eq(internalAgentRuns.executionOwner, "legacy"))))
           .catch(() => {});
       }
 

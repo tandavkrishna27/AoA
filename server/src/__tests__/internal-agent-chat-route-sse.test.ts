@@ -32,6 +32,7 @@ import type { Request, Response } from "express";
 // ── drizzle-orm mock ─────────────────────────────────────────────────────────
 vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: any[]) => ({ and: args })),
+  or: vi.fn((...args: any[]) => ({ or: args })),
   eq: vi.fn((a: any, b: any) => ({ eq: [a, b] })),
   desc: vi.fn((v: any) => ({ desc: v })),
   asc: vi.fn((v: any) => ({ asc: v })),
@@ -83,6 +84,7 @@ vi.mock("@armyofagents/db", () => ({
     triggerType: "run_trigger_type",
     triggerSource: "run_trigger_source",
     status: "run_status",
+    executionOwner: "run_execution_owner",
     createdAt: "run_created_at",
     userId: "run_user_id",
   },
@@ -230,6 +232,7 @@ async function callChatRoute(opts: {
   companyId?: string;
   message?: string;
   failDoneWrite?: boolean;
+  failContentWrite?: boolean;
   /** DB mock response sequence for insert+select */
   dbResponses?: {
     insert?: { returning: () => Promise<any[]> };
@@ -295,6 +298,7 @@ async function callChatRoute(opts: {
   const res: any = {
     setHeader: vi.fn(),
     write: vi.fn((chunk: string) => {
+      if (opts.failContentWrite && chunk.startsWith("event: content")) throw new Error("client disconnected");
       if (opts.failDoneWrite && chunk.startsWith("event: done")) throw new Error("client disconnected");
       sseWrites.push(chunk);
     }),
@@ -392,11 +396,19 @@ describe("internal-agent chat route SSE-contract + run persistence (Task 3)", ()
     expect(sseEvents.some((event) => event.event === "run_rejoined")).toBe(false);
   });
 
+  it("leaves distributed run status with its owner when partial delivery disconnects", async () => {
+    const { runUpdatePredicates } = await callChatRoute({ db: {}, failContentWrite: true });
+    expect(runUpdatePredicates.at(-1)).toEqual({ and: [
+      { eq: ["run_id", "run-sse-123"] }, { eq: ["run_company_id", "cmp-sse-test"] }, { eq: ["run_status", "running"] },
+      { or: [{ isNull: "run_execution_owner" }, { eq: ["run_execution_owner", "legacy"] }] },
+    ] });
+  });
   it("does not overwrite an accepted completion when done delivery fails", async () => {
     const { runUpdatePredicates, sseEvents } = await callChatRoute({ db: {}, failDoneWrite: true });
     expect(sseEvents.some((event) => event.event === "error")).toBe(true);
     expect(runUpdatePredicates.at(-1)).toEqual({ and: [
       { eq: ["run_id", "run-sse-123"] }, { eq: ["run_company_id", "cmp-sse-test"] }, { eq: ["run_status", "running"] },
+      { or: [{ isNull: "run_execution_owner" }, { eq: ["run_execution_owner", "legacy"] }] },
     ] });
   });
   it("emits exactly one event:reasoning SSE line", async () => {
