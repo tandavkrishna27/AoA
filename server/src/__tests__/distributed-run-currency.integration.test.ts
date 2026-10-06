@@ -347,6 +347,67 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect(await createDistributedRunCurrencyResolver(db).resolve({ signedRunId: runId, companyId: TENANT_B.company, agentId: TENANT_B.agent })).toBe("deny");
     });
 
+    async function seedCommanderTurn(opts: { attemptStatus: "running" | "expired"; leaseExpiry: "future" | "past" }) {
+      const chain = await seedDistributedChain(opts);
+      const userId = `commander-${randomUUID()}`; const conversationId = randomUUID();
+      await db.execute(sql`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+        VALUES (${COMPANY}, 'user', ${userId}, 'active')`);
+      await db.execute(sql`INSERT INTO internal_agent_conversations (id, company_id, user_id)
+        VALUES (${conversationId}, ${COMPANY}, ${userId})`);
+      await db.execute(sql`INSERT INTO internal_agent_runs
+        (id, company_id, user_id, trigger_type, trigger_source, execution_owner, distributed_job_id, distributed_attempt_id)
+        VALUES (${chain.runId}, ${COMPANY}, ${userId}, 'conversation', 'user_message', 'distributed', ${chain.jobId}, ${chain.attemptId})`);
+      await db.execute(sql`INSERT INTO internal_agent_messages (conversation_id, role, run_id)
+        VALUES (${conversationId}, 'assistant', ${chain.runId})`);
+      await db.execute(sql`DELETE FROM heartbeat_runs WHERE id = ${chain.runId}`);
+      await db.execute(sql`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${chain.runId},
+        source_intent = ${JSON.stringify({ kind: 'commander_turn', internalAgentRunId: chain.runId, conversationId })}::jsonb,
+        requester_principal_kind = 'user', requester_principal_id = ${userId},
+        executor_principal_kind = 'sandbox', executor_principal_id = ${chain.runId} WHERE id = ${chain.jobId}`);
+      return { ...chain, userId, conversationId };
+    }
+
+    it.each([
+      { attemptStatus: 'running' as const, leaseExpiry: 'future' as const, expected: 'admit' },
+      { attemptStatus: 'running' as const, leaseExpiry: 'past' as const, expected: 'deny' },
+      { attemptStatus: 'expired' as const, leaseExpiry: 'future' as const, expected: 'deny' },
+    ])('MIG-005 Commander live fence: $attemptStatus / $leaseExpiry', async ({ attemptStatus, leaseExpiry, expected }) => {
+      assertSetupOk(); const turn = await seedCommanderTurn({ attemptStatus, leaseExpiry });
+      const input = { signedRunId: turn.runId, companyId: COMPANY, agentId: null,
+        commander: { userId: turn.userId, conversationId: turn.conversationId } };
+      const currency = createDistributedRunCurrencyResolver(db);
+      expect(await currency.resolve(input)).toBe(expected);
+      expect(await currency.resolve({ ...input, companyId: TENANT_B.company })).toBe('deny');
+      expect(await currency.resolve({ ...input, commander: { ...input.commander, userId: 'other' } })).toBe('deny');
+      expect(await currency.resolve({ ...input, commander: { ...input.commander, conversationId: randomUUID() } })).toBe('deny');
+    });
+    it('MIG-005 binds Commander authority to the frozen source, active user and exact attempt job', async () => {
+      assertSetupOk(); const turn = await seedCommanderTurn({ attemptStatus: 'running', leaseExpiry: 'future' });
+      const input = { signedRunId: turn.runId, companyId: COMPANY, agentId: null,
+        commander: { userId: turn.userId, conversationId: turn.conversationId } };
+      const currency = createDistributedRunCurrencyResolver(db);
+      expect(await currency.resolve(input)).toBe('admit');
+      await db.execute(sql`UPDATE company_memberships SET status = 'suspended'
+        WHERE company_id = ${COMPANY} AND principal_id = ${turn.userId}`);
+      expect(await currency.resolve(input)).toBe('deny');
+      await db.execute(sql`UPDATE company_memberships SET status = 'active'
+        WHERE company_id = ${COMPANY} AND principal_id = ${turn.userId}`);
+      await db.execute(sql`UPDATE jobs SET source_kind = 'crew_run' WHERE id = ${turn.jobId}`);
+      expect(await currency.resolve(input)).toBe('deny');
+      await db.execute(sql`UPDATE jobs SET source_kind = 'commander_turn' WHERE id = ${turn.jobId}`);
+      expect(await currency.resolve(input)).toBe('admit');
+      await db.execute(sql`UPDATE internal_agent_runs SET distributed_job_id = ${randomUUID()} WHERE id = ${turn.runId}`);
+      expect(await currency.resolve(input)).toBe('deny');
+    });
+    it('MIG-005 denies absent turns but preserves an actual local Commander turn', async () => {
+      assertSetupOk(); const turn = await seedCommanderTurn({ attemptStatus: 'running', leaseExpiry: 'future' });
+      const input = { signedRunId: turn.runId, companyId: COMPANY, agentId: null,
+        commander: { userId: turn.userId, conversationId: turn.conversationId } };
+      await db.execute(sql`UPDATE internal_agent_runs SET execution_owner = NULL WHERE id = ${turn.runId}`);
+      expect(await createDistributedRunCurrencyResolver(db).resolve(input)).toBe('admit');
+      expect(await createDistributedRunCurrencyResolver(db).resolve({ ...input, signedRunId: randomUUID() })).toBe('deny');
+    });
+
     it("mints a crew token from the durable job binding and refuses a different agent", async () => {
       assertSetupOk();
       const { runId, jobId } = await seedDistributedChain({ attemptStatus: "running", leaseExpiry: "future" });

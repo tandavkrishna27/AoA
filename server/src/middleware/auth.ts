@@ -324,6 +324,7 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
           userRole: commanderClaims.user_role,
           conversationId: commanderClaims.conversation_id,
           turnId: commanderClaims.turn_id,
+          signedRunId: commanderClaims.turn_id,
           // Keeps existing run-scoped audit/telemetry (getActorInfo) populated
           // without a separate field.
           runId: commanderClaims.turn_id,

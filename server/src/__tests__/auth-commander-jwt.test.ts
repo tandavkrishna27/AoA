@@ -69,6 +69,7 @@ describe("actorMiddleware: commander JWT branch", () => {
       userRole: "founder",
       conversationId: "conv1",
       turnId: "run1",
+      signedRunId: "run1",
       // runId mirrors turnId so run-scoped audit/telemetry stays populated.
       runId: "run1",
     });

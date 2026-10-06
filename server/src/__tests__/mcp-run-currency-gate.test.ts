@@ -227,3 +227,47 @@ describe("CLI-016 — /mcp per-Organization tool-surface use gate (route mount)"
     expect(toolSurface).not.toHaveBeenCalled();
   });
 });
+
+
+describe("MIG-005 Commander signed turn currency and tools", () => {
+  let saved: string | undefined;
+  beforeEach(() => { saved = process.env[FLAG]; process.env[FLAG] = "1"; });
+  afterEach(() => { if (saved === undefined) delete process.env[FLAG]; else process.env[FLAG] = saved; });
+  const commander = { type: "commander", source: "commander_jwt", companyId: "company-1",
+    userId: "founder", userRole: "founder", conversationId: "conversation", turnId: "signed-turn",
+    signedRunId: "signed-turn", runId: "spoofed-live-turn" };
+  it("gates every method using the signed turn and actual user/conversation", async () => {
+    const currency = vi.fn().mockResolvedValue("deny");
+    const app = buildApp(commander, currency);
+    for (const method of ["initialize", "tools/list", "tools/call"]) {
+      expect((await request(app).post("/api/companies/company-1/mcp").send(rpc(method))).status).toBe(403);
+    }
+    expect(currency).toHaveBeenCalledWith({ signedRunId: "signed-turn", companyId: "company-1", agentId: null,
+      commander: { userId: "founder", conversationId: "conversation" } });
+  });
+  it("admits a current turn when its organization is armed", async () => {
+    const currency = vi.fn().mockResolvedValue("admit"); const tools = vi.fn().mockResolvedValue("admit");
+    expect((await request(buildApp(commander, currency, tools)).post("/api/companies/company-1/mcp")
+      .send(rpc("initialize"))).status).toBe(200);
+    expect(tools).toHaveBeenCalledWith({ signedRunId: "signed-turn", companyId: "company-1" });
+  });
+  it("denies organization tool revocation even with a current turn", async () => {
+    expect((await request(buildApp(commander, vi.fn().mockResolvedValue("admit"), vi.fn().mockResolvedValue("deny")))
+      .post("/api/companies/company-1/mcp").send(rpc("initialize"))).status).toBe(403);
+  });
+  it("propagates currency errors as a denial", async () => {
+    expect((await request(buildApp(commander, vi.fn().mockRejectedValue(new Error("db down"))))
+      .post("/api/companies/company-1/mcp").send(rpc("initialize"))).status).not.toBe(200);
+  });
+  it("refuses a Commander actor missing its signed turn", async () => {
+    const { signedRunId: _ignored, ...unsigned } = commander;
+    expect((await request(buildApp(unsigned, vi.fn().mockResolvedValue("admit")))
+      .post("/api/companies/company-1/mcp").send(rpc("initialize"))).status).toBe(403);
+  });
+  it("keeps deployment-off legacy Commander access", async () => {
+    delete process.env[FLAG]; const currency = vi.fn().mockResolvedValue("deny");
+    expect((await request(buildApp(commander, currency)).post("/api/companies/company-1/mcp")
+      .send(rpc("initialize"))).status).toBe(200);
+    expect(currency).not.toHaveBeenCalled();
+  });
+});
