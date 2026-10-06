@@ -213,7 +213,9 @@ function evidenceDir(state) {
 }
 
 function writeEvidence(state, name, value) {
-  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  // Scrub decoded fields before JSON escaping can hide a quote/newline-bearing secret.
+  const text = typeof value === "string" ? value : JSON.stringify(value,
+    (_key, field) => typeof field === "string" ? redactSecrets(field, state.redact) : field, 2);
   writeFileSync(path.join(evidenceDir(state), name), redactSecrets(text, state.redact) + "\n");
 }
 
@@ -928,10 +930,13 @@ async function dispatch(state) {
     const t = state.tenants[key];
     const { issue, run } = await dispatchTenant(state, key);
     const signals = tenantSignals(state, key, run);
-    if (t.role === "enabled") {
-      const evidence = evaluateShippedBootEvidence(signals);
-      if (!evidence.pass) fail(`tenant ${key}: required audit/cost evidence failed: ${evidence.reasons.join("; ")}`);
-    }
+    const auditCostEvidence = t.role === "enabled" ? evaluateShippedBootEvidence(signals) : null;
+    // Retain the exact accepted failure before an audit/cost assertion can exit. This query is
+    // bounded and read-only; it does not dispatch another tenant or change the acceptance rules.
+    const diagnostics = t.role === "enabled" ? retainM1bAttemptDiagnostics(state, {
+      organizationId: t.organizationId, companyId: t.companyId,
+      jobId: run?.distributed_job_id ?? null, attemptId: run?.distributed_attempt_id ?? null,
+    }, `journey-attempt-${key}-diagnostics.json`) : null;
     let verifierExit = null;
     let usageViolations = null;
     let verdict = null;
@@ -943,6 +948,17 @@ async function dispatch(state) {
       verifierExit = v.status;
       verifierOutput = redactSecrets(`${v.stdout}${v.stderr}`, state.redact);
       verdict = parseVerifierVerdict(v.stdout);
+      writeEvidence(state, `verifier-${key}.txt`, verifierOutput);
+    }
+    writeEvidence(state, `journey-tenant-${key}.json`, {
+      candidate: state.candidate, mode: state.mode, tenant: key, role: t.role,
+      organizationId: t.organizationId, companyId: t.companyId, issueId: issue.id,
+      run, signals, auditCostEvidence, diagnostics, verifierExit, verdict,
+    });
+    if (auditCostEvidence && !auditCostEvidence.pass) {
+      fail(`tenant ${key}: required audit/cost evidence failed: ${auditCostEvidence.reasons.join("; ")}`);
+    }
+    if (t.role === "enabled" && run) {
       // The verifier reads no provider identity (runbook §11): a fake provider's lease + events
       // would pass it. The worker's own log line naming a real sandbox is required as well.
       // The worker logs pino JSON (`"sandboxId":"…"`); the original `/sandboxId=/` filter could
@@ -1079,10 +1095,10 @@ async function dispatch(state) {
       rolloutResolution,
       providerEvidence,
       signals,
+      diagnostics,
       envProbe,
       outcome,
     };
-    if (verifierOutput) writeEvidence(state, `verifier-${key}.txt`, verifierOutput);
   }
   const passed = Object.values(outcomes).every((o) => o.outcome.pass);
   const summary = {
@@ -1158,7 +1174,7 @@ async function usefulWorkProviderEvidence(state, run, tenant) {
       buildBindings.every((b) => b.verdict.pass === true) };
 }
 
-function retainM1bAttemptDiagnostics(state, identity) {
+function retainM1bAttemptDiagnostics(state, identity, file = "m1b-attempt-diagnostics.json") {
   let diagnostics;
   try {
     const query = buildM1bAttemptDiagnosticsQuery(identity);
@@ -1181,8 +1197,8 @@ finally { await sql.end({ timeout: 5 }); }
       collectionError: "accepted_event_diagnostics_unavailable", truncated: true,
       truncationReasons: ["collection_failed"], events: [] };
   }
-  writeEvidence(state, "m1b-attempt-diagnostics.json", { candidate: state.candidate, ...diagnostics });
-  return { file: "m1b-attempt-diagnostics.json", collectionError: diagnostics.collectionError,
+  writeEvidence(state, file, { candidate: state.candidate, ...diagnostics });
+  return { file, collectionError: diagnostics.collectionError,
     truncated: diagnostics.truncated, truncationReasons: diagnostics.truncationReasons };
 }
 

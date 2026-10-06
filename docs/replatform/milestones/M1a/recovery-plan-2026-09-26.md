@@ -2,13 +2,14 @@
 
 **Updated:** `2026-10-06`
 **Integration branch:** `docs/replatform-program`
-**Status:** M1a passed; M1b remains in progress after live CLI startup failure
+**Status:** M1a previously passed; latest runtime follow-up failed before M1b
 
 PRs [#646](https://github.com/tandavkrishna27/AoA/pull/646) and
 [#645](https://github.com/tandavkrishna27/AoA/pull/645) are merged. The current
-integration revision after follow-up
-[#647](https://github.com/tandavkrishna27/AoA/pull/647) is
-`f72a59649dfd375c66814e6c10dc3e223f8642f8`.
+integration revision after follow-ups
+[#647](https://github.com/tandavkrishna27/AoA/pull/647) and
+[#648](https://github.com/tandavkrishna27/AoA/pull/648) is
+`b673b25dce932150a5562797ec21770554ff432e`.
 Required CI passed for #646 at `232d15298db0e459e147b0062110f3457b7ec46f` in
 [37372575453](https://github.com/tandavkrishna27/AoA/actions/runs/37372575453),
 and for #645 at `94f9542cddf08fa66fbd64286eab44287b65b1c8` in
@@ -281,6 +282,31 @@ already been allocated. Independent code review found no remaining blocker.
 Neither fix counts as a passing live useful-work result; that remains required.
 The failed run `37378134451` did not retain the agent transcript, so its precise
 reason for finishing without a file remains unknown.
+
+PR #648 merged the diagnostics and cancellation fixes as
+`b673b25dce932150a5562797ec21770554ff432e`, with the same file tree as tested head
+`9251424fdcb678c39189357bb9081f9c1a6c6e99`. Local typecheck and build passed;
+the full suite passed 2,444 files / 23,555 tests, with 222 files / 1,872 tests
+skipped. [CI 37388234393](https://github.com/tandavkrishna27/AoA/actions/runs/37388234393)
+passed 2,657 files / 25,350 tests across four Linux shards, with 77 tests skipped;
+E2E passed 169 tests with 18 skipped.
+
+Named keyed follow-up
+[37390095584](https://github.com/tandavkrishna27/AoA/actions/runs/37390095584)
+failed in the initial tenant A journey, before M1b. The attempt failed and the
+harness stopped at its required positive-cost assertion. That early exit omitted
+the run, accepted failure message and detailed cost observations; the assertion
+alone does not identify the underlying execution failure. The remaining M1a
+mechanism phases and M1b were skipped. The follow-up retains bounded per-tenant
+attempt diagnostics and observations before such assertions, while preserving
+the assertions and immediate failure behavior.
+
+The cleanup repair worked in this failed run: the normal board cancellation API
+settled the job as cancelled, preserved the failed attempt, and revoked its lease.
+The sole sandbox had a matching provider create/kill pair, authenticated GET 404
+and an empty live provider list. Compose resources were independently empty, and
+the leak scan passed. The earlier M1a passing record remains evidence for its
+named revision; this latest run is not a pass. Useful M1b output remains unproven.
 
 ## Historical September 26 recovery instructions
 
