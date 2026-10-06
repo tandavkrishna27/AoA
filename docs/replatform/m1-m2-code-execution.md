@@ -90,3 +90,8 @@ Warm conversations preserve their existing owner. Warm continuity, live streamin
 remaining personal/device execution and the final lifecycle reconciliation remain
 open M2 work. This checkpoint does not mark M2 complete. Rollout stays off and
 live Anthropic M1b remains deferred.
+
+Commander consumer PR #659 code head `25dad8e16f83a06312b1dc30ecddef42134439a5`
+passed repository typecheck, 148 focused tests (including real PostgreSQL),
+the full suite (23,703 passed, 1,907 skipped) and build. Required CI runs after
+marking the PR ready. Warm continuity and streaming remain subsequent code work.
