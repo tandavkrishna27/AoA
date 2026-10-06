@@ -57,6 +57,9 @@ import { createReaperMetrics, renderReaperMetrics, type ReaperMetricsCounter } f
 import { classifyOpFailure, formatOpFailure, type OpFailureClassification } from "./op-failure-classification.js";
 
 export interface CreateProviderServerOptions {
+  /** Required for warm creates; ordinary provider operations remain unchanged. */
+  readonly warmCleanupJournal?: import("./warm-cleanup-journal.js").WarmCleanupJournal;
+  readonly isWarmEnabled?: () => boolean;
   readonly provider: SandboxProvider;
   /**
    * The pinned control-plane PUBLIC key (DEP-012 Units B1/B2). When PRESENT, the server
@@ -231,23 +234,46 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
     onStdout?: (chunk: string) => void,
   ): Promise<unknown> {
     const deps = warmResourceCapability === undefined ? gateDeps! : { ...gateDeps!, warmResourceCapability };
+    const requireWarmExecution = (sandboxId: string, labels: import("@armyofagents/worker-daemon").ResourceLabels) => {
+      if ((warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(sandboxId, labels)) && !options.isWarmEnabled?.()) {
+        throw new WireProtocolError("warm resource lifecycle unavailable");
+      }
+    };
     switch (op) {
       case "create": {
         // The DISTINCT create-gate (no inspect): verify -> spec-label match -> the
         // durable ledger -> provider.create with a stripped key. NOT gateOwnedOp.
-        return gateCreate(createGateDeps!, args as CreateSandboxSpec, ctx, capability);
+        const spec = args as CreateSandboxSpec;
+        const warm = spec.command === "node" && spec.args?.length === 4 &&
+          spec.args[0] === "/home/user/aoa-commander-warm-v1.cjs" && ["claude", "codex"].includes(spec.args[1]) &&
+          spec.args[2] === "/home/user/aoa-commander-input.json" && spec.args[3] === "/home/user/aoa-output/aoa-one-shot-result.json";
+        if (warm && (!options.isWarmEnabled?.() || !options.warmCleanupJournal || provider.checkpointMode !== "snapshot" ||
+            !provider.advertisedOperations.has("checkpoint") || !provider.advertisedOperations.has("restore"))) {
+          return Promise.reject(new WireProtocolError("warm resource lifecycle unavailable"));
+        }
+        return gateCreate(createGateDeps!, spec, ctx, capability).then((created) => {
+          if (warm) options.warmCleanupJournal!.register(created.sandboxId, created.resourceLabels);
+          return created;
+        });
       }
       case "execute": {
         const input = args as ExecuteInput;
-        return gateOwnedOp(deps, input.sandboxId, ctx, capability, () => executeRelayingStdout(provider, args, ctx, onStdout));
+        return gateOwnedOp(deps, input.sandboxId, ctx, capability, (detail) => {
+          requireWarmExecution(input.sandboxId, detail.resourceLabels);
+          return executeRelayingStdout(provider, args, ctx, onStdout);
+        });
       }
       case "checkpoint": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.checkpoint(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, (detail) => {
+          requireWarmExecution(sandboxId, detail.resourceLabels); return provider.checkpoint(sandboxId, ctx);
+        });
       }
       case "restore": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.restore(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, (detail) => {
+          requireWarmExecution(sandboxId, detail.resourceLabels); return provider.restore(sandboxId, ctx);
+        });
       }
       case "cancel": {
         const sandboxId = args as string;
@@ -259,11 +285,25 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       }
       case "destroy": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.destroy(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, async (detail) => {
+          const journal = options.warmCleanupJournal;
+          const warm = journal?.isRegistered(sandboxId, detail.resourceLabels);
+          if (warm) journal!.plan(sandboxId, detail.resourceLabels);
+          const result = await provider.destroy(sandboxId, ctx);
+          if (warm && result.cleanupStatus === "success") journal!.confirm(sandboxId, detail.resourceLabels, result.providerOpId);
+          return result;
+        });
       }
       case "reconcile_cleanup": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.reconcileCleanup(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, async (detail) => {
+          const journal = options.warmCleanupJournal;
+          const warm = journal?.isRegistered(sandboxId, detail.resourceLabels);
+          if (warm) journal!.plan(sandboxId, detail.resourceLabels);
+          const result = await provider.reconcileCleanup(sandboxId, ctx);
+          if (warm && result.cleanupStatus === "success") journal!.confirm(sandboxId, detail.resourceLabels, result.providerOpId);
+          return result;
+        });
       }
       case "inspect": {
         const sandboxId = args as string;
