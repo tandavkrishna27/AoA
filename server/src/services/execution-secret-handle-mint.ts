@@ -222,6 +222,8 @@ export function decideExecutionSecretHandle(input: ExecutionSecretMintInput): Ex
 export const RUN_JWT_ENV_TARGET = "AOA_API_KEY" as const;
 
 export interface RunJwtHandleMintInput {
+  /** Set only after the placement runner validates the frozen Commander source. */
+  readonly commanderTurn?: boolean;
   readonly deploymentMode: string;
   /** `agents.adapter_type` — run_jwt is `claude_local` ONLY. */
   readonly adapterType: string;
@@ -250,7 +252,7 @@ export function decideRunJwtHandle(input: RunJwtHandleMintInput): RunJwtHandleMi
   //    executes as worker/sandbox (never `agent`); a system/service run mints nothing.
   if (!isAgentBackedExecutorKind(input.executorPrincipalKind)) return { mint: false, reason: "executor_not_agent" };
   // 3. claude_local ONLY — codex has no aoa MCP tool surface, so it never gets a run JWT (R6).
-  if (input.adapterType !== "claude_local") return { mint: false, reason: "adapter_not_claude_local" };
+  if (input.adapterType !== "claude_local" && !(input.commanderTurn && input.adapterType === "codex_local")) return { mint: false, reason: "adapter_not_claude_local" };
   // 4. The tool-surface flag, computed once at dispatch. `false` until S4 → inert by default.
   if (!input.toolSurfaceAuthorized) return { mint: false, reason: "tool_surface_not_authorized" };
   return { mint: true, envTarget: RUN_JWT_ENV_TARGET };

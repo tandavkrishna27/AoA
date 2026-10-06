@@ -28,6 +28,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { createLocalAgentJwt } from "../agent-auth-jwt.js";
 import { secretService, type SecretConsumerContext } from "./secrets.js";
 import type { SecretBrokerSet } from "./secret-broker.js";
+import { createCommanderExecutionBrokers } from "./commander-secret-broker.js";
+import { COMMANDER_CONNECTION_SELECTOR } from "./commander-execution-credential.js";
 
 /** Parse the stored selector back into what `resolveSecretValue` takes. Anything that
  * is not a positive integer resolves as `latest`, which is also the canonical default
@@ -100,12 +102,16 @@ export async function resolveRunJwtValue(
 
 export function createExecutionSecretBrokers(db: Db): SecretBrokerSet {
   const secrets = secretService(db);
+  const commander = createCommanderExecutionBrokers(db);
   return {
     async resolveConnectorOAuth() {
       // Intentionally unreachable from the sandbox-local path — see the header.
       throw new Error("connector_oauth broker not wired (fence_proxy class, DAT-008 non-goal)");
     },
     async resolveProviderOrCompanySecret(input) {
+      if (input.refVersion?.startsWith(COMMANDER_CONNECTION_SELECTOR)) {
+        return commander.resolveConnectionSecret(input);
+      }
       const context = consumerContextFor(input.handleId);
       if (input.refKind === "provider_key") {
         // A `provider:<id>` NAME, not an id — the same name `resolveProviderKeyTarget`
@@ -120,6 +126,10 @@ export function createExecutionSecretBrokers(db: Db): SecretBrokerSet {
       );
     },
     async resolveRunJwt(input) {
+      const [source] = await db.select({ kind: jobs.sourceKind }).from(jobs)
+        .where(and(eq(jobs.id, input.refId), eq(jobs.companyId, input.companyId))).limit(1);
+      if (source?.kind === "commander_turn") return commander.resolveRunJwt({ companyId: input.companyId,
+        jobId: input.refId, ownerPrincipalId: input.ownerPrincipalId });
       // Mint-at-resolve. `refId` is the distributed jobId; re-derive the run from the
       // job's handoff marker so the minted run_id is the durable run row DAT-007 probes.
       // Mirrors createDistributedRunCurrencyResolver's heartbeat/crew lookup (company

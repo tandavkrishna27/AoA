@@ -50,6 +50,8 @@ export interface JobPlacementCredentialBinding {
   pinnedTargetId: string | null;
   /** Owner established by the trusted credential resolver, never by the routed target. */
   credentialOwnerPrincipalId?: string | null;
+  /** Trusted Commander assignment metadata. No credential values enter placement. */
+  commanderCredential?: { connectionId: string; secretId: string; provider: string; adapterType: string };
 }
 
 export interface PlacementTargetIdentityPolicy {
@@ -396,6 +398,8 @@ export interface PlaceJobAttemptInput {
    * `mintCredentialAuthority`.
    */
   toolSurfaceAuthorized?: boolean;
+  /** Actual Commander dispatch requires both handles and an atomic source handoff. */
+  requireExecutionSecrets?: boolean;
 }
 
 export interface JobPlacementServiceInput extends Omit<PlaceJobAttemptInput, "appDb" | "operatorDb" | "rollout"> {}

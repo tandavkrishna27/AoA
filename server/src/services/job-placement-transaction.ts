@@ -7,7 +7,11 @@ import {
   listPlatformPlacementCandidateSnapshots,
   type JobAttempt,
   type PlacementCandidateSnapshot,
+  internalAgentRuns,
+  jobSecretHandles,
 } from "@armyofagents/db";
+import { and, eq, isNull, or } from "drizzle-orm";
+import { loadCommanderJobAuthority } from "./commander-job-authority.js";
 import { runInTenant } from "../db/tenant-context.js";
 import {
   decideJobPlacement,
@@ -33,12 +37,13 @@ import {
   type ExecutionSecretMintRefusal,
 } from "./execution-secret-handle-mint.js";
 import { mintCredentialKindFor } from "./canary-mint-authority.js";
+import { insertActivityLog } from "./activity-log.js";
 import { logger } from "../middleware/logger.js";
 
 const SOURCE_KINDS = new Set<string>(EXECUTION_SOURCE_KINDS);
 
 export class JobPlacementError extends Error {
-  constructor(public readonly code: "placement_not_found" | "placement_already_decided" | "execution_secret_required") {
+  constructor(public readonly code: "placement_not_found" | "placement_already_decided" | "execution_secret_required" | "commander_handoff_refused") {
     super(code);
     this.name = "JobPlacementError";
   }
@@ -114,7 +119,7 @@ export async function placeJobAttemptTransaction(
   input: PlaceJobAttemptInput,
   resolveAuthority: JobPlacementAuthorityResolver,
 ): Promise<JobPlacementDecision> {
-  return runInTenant(input.appDb, input.organizationId, async (repos) => {
+  return runInTenant(input.appDb, input.organizationId, async (repos, tx) => {
     const context = await repos.jobControl.lockPlacementContext({
       organizationId: input.organizationId,
       companyId: input.companyId,
@@ -222,6 +227,26 @@ export async function placeJobAttemptTransaction(
       if (existing) {
         if (existing.inputDigest !== authorityDigest || existing.policyDigest !== authorityDigest) {
           throw new JobPlacementError("placement_already_decided");
+        }
+        if (input.requireExecutionSecrets && existing.leaseEligible) {
+          const source = await loadCommanderJobAuthority(tx, input);
+          if (!source || source.status !== "running" || source.executionOwner !== "distributed" ||
+            source.distributedJobId !== input.jobId || source.distributedAttemptId !== input.attemptId) {
+            throw new JobPlacementError("commander_handoff_refused");
+          }
+          const credential = authority.credentialBinding.commanderCredential;
+          const handles = await tx.select().from(jobSecretHandles).where(and(
+            eq(jobSecretHandles.organizationId, input.organizationId), eq(jobSecretHandles.jobId, input.jobId),
+            eq(jobSecretHandles.status, "active"), eq(jobSecretHandles.ownerPrincipalKind, "sandbox"),
+            eq(jobSecretHandles.ownerPrincipalId, source.turnId),
+            ...(existing.targetGeneration === null ? [] : [eq(jobSecretHandles.boundTargetGeneration, existing.targetGeneration)])
+          ));
+          if (!credential || !input.toolSurfaceAuthorized ||
+            !handles.some((row) => row.refKind === "company_secret" && row.refId === credential.secretId &&
+              row.refVersion === `commander-connection:${credential.connectionId}`) ||
+            !handles.some((row) => row.refKind === "run_jwt" && row.refId === input.jobId && row.materializationTarget === "AOA_API_KEY")) {
+            throw new JobPlacementError("execution_secret_required");
+          }
         }
         return existing;
       }
@@ -370,9 +395,12 @@ export async function placeJobAttemptTransaction(
         // Agentless one-shot has no alternate credential channel. Roll back this SAME
         // transaction if mint fails, so ownership can safely stay legacy before visibility.
         const executionSecretRequired = context.job.sourceKind === "one_shot";
+        let providerHandleMinted = false;
+        let toolHandleMinted = false;
         try {
           const mint = await mintExecutionSecretHandleForPlacement(repos.jobControl, {
             jobSource: context.job,
+            commanderCredential: authority.credentialBinding.commanderCredential,
             organizationId: input.organizationId,
             companyId: input.companyId,
             jobId: input.jobId,
@@ -394,6 +422,7 @@ export async function placeJobAttemptTransaction(
             ),
             targetGeneration: decision.targetGeneration,
           });
+          providerHandleMinted = mint.minted;
           if (executionSecretRequired && !mint.minted) throw new JobPlacementError("execution_secret_required");
           // The refusal reason is the whole point of computing one. Discarding it made
           // a blocked agent silently stay on the legacy executor with no signal
@@ -421,7 +450,9 @@ export async function placeJobAttemptTransaction(
         // the provider-key mint above: a failure (or the normal refusal) must never fail
         // placement or take the shared legacy path down with it.
         try {
-          await mintRunJwtHandleForPlacement(repos.jobControl, {
+          const toolMint = await mintRunJwtHandleForPlacement(repos.jobControl, {
+            jobSource: context.job,
+            commanderCredential: authority.credentialBinding.commanderCredential,
             organizationId: input.organizationId,
             companyId: input.companyId,
             jobId: input.jobId,
@@ -430,9 +461,28 @@ export async function placeJobAttemptTransaction(
             targetGeneration: decision.targetGeneration,
             toolSurfaceAuthorized: input.toolSurfaceAuthorized ?? false,
           });
+          toolHandleMinted = toolMint.minted;
         } catch {
           // Best-effort: a run_jwt mint failure must never fail placement.
         }
+        if (input.requireExecutionSecrets && stored.placementLeaseEligible) {
+          if (sourceKind !== "commander_turn" || !providerHandleMinted || !toolHandleMinted) {
+            throw new JobPlacementError("execution_secret_required");
+          }
+          const source = await loadCommanderJobAuthority(tx, input);
+          if (!source || source.status !== "running") throw new JobPlacementError("commander_handoff_refused");
+          const marker = await tx.update(internalAgentRuns).set({ executionOwner: "distributed",
+            distributedJobId: input.jobId, distributedAttemptId: input.attemptId }).where(and(
+              eq(internalAgentRuns.id, source.turnId), eq(internalAgentRuns.companyId, input.companyId),
+              eq(internalAgentRuns.userId, source.userId), eq(internalAgentRuns.status, "running"),
+              or(isNull(internalAgentRuns.distributedJobId), eq(internalAgentRuns.distributedJobId, input.jobId))
+            )).returning({ id: internalAgentRuns.id });
+          if (marker.length !== 1) throw new JobPlacementError("commander_handoff_refused");
+          await insertActivityLog(tx, { companyId: input.companyId, actorType: "user", actorId: source.userId,
+            action: "commander.execution.handed_off", entityType: "internal_agent_run", entityId: source.turnId,
+            details: { jobId: input.jobId, attemptId: input.attemptId, executionOwner: "distributed" } });
+        }
+
       }
 
       return decisionFromAttempt(stored)!;

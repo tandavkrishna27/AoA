@@ -24,6 +24,7 @@ import {
 } from "./execution-secret-handle-mint.js";
 import { submitJobSourceSchema, type EnvBinding } from "@armyofagents/shared";
 import { oneShotAdapterForWorkload } from "./one-shot-distributed-invocation.js";
+import { commanderAdapterForPlacement, COMMANDER_CONNECTION_SELECTOR, type CommanderExecutionCredential, type PlacementJobSource } from "./commander-execution-credential.js";
 
 /** The repository surface this runner needs — the two DAT-008 methods only, so a
  * unit test can supply a pair of functions instead of a whole tenant repo. */
@@ -48,6 +49,8 @@ export interface ExecutionSecretMintRepo {
 }
 
 export interface MintExecutionSecretHandleInput {
+  readonly jobSource?: PlacementJobSource;
+  readonly commanderCredential?: CommanderExecutionCredential;
   readonly organizationId: string;
   readonly companyId: string;
   readonly jobId: string;
@@ -56,10 +59,6 @@ export interface MintExecutionSecretHandleInput {
   readonly placementOwner: string | null;
   readonly credentialKind: string | null;
   readonly targetGeneration: number | null;
-  /** Frozen job context from the locked placement row, never HTTP credential input. */
-  readonly jobSource?: {
-    sourceKind: string; sourceIdentity: string; sourceIntent: Record<string, unknown>; input: Record<string, unknown>;
-  };
   /** Injected in tests; production reads the process deployment mode. */
   readonly deploymentMode?: string;
   readonly newHandleId?: () => string;
@@ -111,16 +110,19 @@ export async function mintExecutionSecretHandleForPlacement(
   // as `worker`/`sandbox` (Decision #121, never `agent`), and its `executorPrincipalId`
   // IS the agent id (`taskSourceIsAdmitted` → `{kind:"worker", id: agentId}`); so we load
   // the binding for those kinds too and let the load result + guard 3 decide coding-ness.
+  const commander = input.jobSource?.sourceKind === "commander_turn";
+  const commanderAdapter = commanderAdapterForPlacement(input);
+  if (commander && !commanderAdapter) return { minted: false, reason: "commander_authority_missing" };
   const oneShot = input.jobSource?.sourceKind === "one_shot";
   const parsed = oneShot ? submitJobSourceSchema.safeParse(input.jobSource!.sourceIntent) : null;
   const sourceAdapter = parsed?.success && parsed.data.kind === "one_shot" &&
     input.executorPrincipalKind === "worker" && input.executorPrincipalId === parsed.data.operationId &&
     input.jobSource!.sourceIdentity === parsed.data.operationId
     ? oneShotAdapterForWorkload(input.jobSource!.input) : null;
-  const agent = !oneShot && isAgentBackedExecutorKind(input.executorPrincipalKind)
+  const agent = !oneShot && !commander && isAgentBackedExecutorKind(input.executorPrincipalKind)
     ? await repo.loadAgentAdapterBinding({ companyId: input.companyId, agentId: input.executorPrincipalId })
     : null;
-  const adapterType = sourceAdapter ?? agent?.adapterType ?? "";
+  const adapterType = commanderAdapter ?? sourceAdapter ?? agent?.adapterType ?? "";
   const target = adapterType ? companyKeyTargetForAdapter(adapterType) : null;
 
   const decision: ExecutionSecretMintDecision = decideExecutionSecretHandle({
@@ -128,7 +130,9 @@ export async function mintExecutionSecretHandleForPlacement(
     adapterType,
     executorPrincipalKind: input.executorPrincipalKind,
     providerKeyTarget: target,
-    providerBinding: agent && target
+    providerBinding: commander && input.commanderCredential
+      ? { type: "secret_ref", secretId: input.commanderCredential.secretId, version: "latest" }
+      : agent && target
       ? providerBindingForEnvVar(agent.adapterConfig, target.envVar)
       : null,
     placementOwner: input.placementOwner,
@@ -154,7 +158,8 @@ export async function mintExecutionSecretHandleForPlacement(
     envTarget: decision.envTarget,
     // `null` = latest. A pinned agent secret keeps the version it pinned; the company
     // key is unpinned by design so rotation is picked up on the next lease.
-    refVersion: decision.secretVersion === null ? null : String(decision.secretVersion),
+    refVersion: commander ? `${COMMANDER_CONNECTION_SELECTOR}${input.commanderCredential!.connectionId}`
+      : decision.secretVersion === null ? null : String(decision.secretVersion),
     boundTargetGeneration: decision.boundTargetGeneration,
     // Denormalized from the job's executing principal, so `resolveExecutionSecret` can
     // re-derive the owner from the LOCKED job row rather than trusting a request.
@@ -174,6 +179,8 @@ export async function mintExecutionSecretHandleForPlacement(
 // -----------------------------------------------------------------------------
 
 export interface MintRunJwtHandleInput {
+  readonly jobSource?: PlacementJobSource;
+  readonly commanderCredential?: CommanderExecutionCredential;
   readonly organizationId: string;
   readonly companyId: string;
   readonly jobId: string;
@@ -202,13 +209,17 @@ export async function mintRunJwtHandleForPlacement(
   const deploymentMode = input.deploymentMode ?? getDeploymentMode();
   // Same load as the provider-key mint (an agent-owned coding run executes as worker/sandbox
   // with executorPrincipalId = the agent id); the decision needs the agent's adapter_type.
-  const agent = isAgentBackedExecutorKind(input.executorPrincipalKind)
+  const commander = input.jobSource?.sourceKind === "commander_turn";
+  const commanderAdapter = commanderAdapterForPlacement(input);
+  if (commander && !commanderAdapter) return { minted: false, reason: "commander_authority_missing" };
+  const agent = !commander && isAgentBackedExecutorKind(input.executorPrincipalKind)
     ? await repo.loadAgentAdapterBinding({ companyId: input.companyId, agentId: input.executorPrincipalId })
     : null;
 
   const decision = decideRunJwtHandle({
     deploymentMode,
-    adapterType: agent?.adapterType ?? "",
+    adapterType: commanderAdapter ?? agent?.adapterType ?? "",
+    commanderTurn: commander,
     executorPrincipalKind: input.executorPrincipalKind,
     toolSurfaceAuthorized: input.toolSurfaceAuthorized,
   });
