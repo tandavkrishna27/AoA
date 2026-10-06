@@ -663,6 +663,13 @@ These are read by tests and dev scripts; you should not need to set them in prod
 
 ### Internal Commander warm execution metadata
 
+`AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED` defaults off. It guards warm credential
+issuance at use, including after asynchronous encryption. Turning it off retires
+retained resources through the authenticated resource-truth peer channel; physical
+cleanup acknowledgement and capability expiry precede releasing conversation
+ownership. It also requires distributed execution and the independent authenticated
+truth route. This integration remains incomplete; do not enable it yet.
+
 These values are injected per execution by the worker after protected credential
 redemption. They are not deployment settings and must not be configured globally.
 

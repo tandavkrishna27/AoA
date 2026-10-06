@@ -30,6 +30,7 @@ function refuse(): never { throw new Error("Commander warm authority unavailable
  * No default rollout or provider effect is introduced by this delivery seam. */
 export function createCommanderWarmSecretIssuer(options: {
   appDb: Db; controlPlaneSigningKey?: KeyObject; shortTtlMs?: number; vault?: CommanderWarmCanaryVault;
+  isWarmEnabled?: () => boolean;
 }) {
   const vault = options.vault ?? createCommanderWarmCanaryVault();
   return async (outcome: SecretResolveOutcome, context: ResolvedFenceContext): Promise<SecretResolveOutcome> => {
@@ -39,7 +40,7 @@ export function createCommanderWarmSecretIssuer(options: {
       const [job] = await tx.select().from(jobs).where(and(eq(jobs.id, fence.jobId),
         eq(jobs.organizationId, fence.organizationId), eq(jobs.companyId, context.companyId))).limit(1);
       if (!job || !isCommanderWarmWorkload(job.input)) return outcome;
-      if (!options.controlPlaneSigningKey || job.sourceKind !== "commander_turn") return refuse();
+      if (!options.isWarmEnabled?.() || !options.controlPlaneSigningKey || job.sourceKind !== "commander_turn") return refuse();
       let active = await repos.jobControl.lockActiveFence(fence);
       const source = await loadCommanderJobAuthority(tx, { organizationId: fence.organizationId,
         companyId: context.companyId, jobId: fence.jobId });
@@ -78,6 +79,7 @@ export function createCommanderWarmSecretIssuer(options: {
       const redaction = await vault.seal(state, mergeCommanderWarmCanaries(currentCanaries, historicalCanaries, [outcome.material.value]));
       // Encryption/profile checks can await I/O. Use a fresh database clock and
       // fence after them, so a late resolve never signs past lease expiration.
+      if (!options.isWarmEnabled?.()) return refuse();
       active = await repos.jobControl.lockActiveFence(fence);
       now = await repos.jobControl.currentDatabaseTime();
       const freshSource = await loadCommanderJobAuthority(tx, { organizationId: fence.organizationId,

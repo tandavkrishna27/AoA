@@ -24,6 +24,8 @@ export const commanderWarmStateSchema = z.object({
   currentLeaseId: z.string().uuid().nullable(),
   redaction: commanderWarmCanaryMaterialSchema.optional(),
   redactionBeforeTurn: commanderWarmCanaryMaterialSchema.optional(),
+  reclaimedResource: z.object({ id: z.string().min(1).max(256), labels,
+    providerOpId: z.string().min(1).max(512), confirmedAtMs: z.number().int().safe() }).strict().optional(),
 }).strict();
 export type CommanderWarmState = z.infer<typeof commanderWarmStateSchema>;
 export const COMMANDER_WARM_CHECKPOINT_PREFIX = "aoa-commander-checkpoint-v1:";

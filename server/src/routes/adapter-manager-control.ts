@@ -36,6 +36,7 @@ import { validate } from "../middleware/validate.js";
 import { runInTenantReadOnly } from "../db/tenant-context.js";
 import { readDistributedExecutionDeploymentFlag } from "../config/distributed-execution.js";
 import { TRUTH_SHARED_SECRET_HEADER, truthBearerAccepted } from "./adapter-manager-control-auth.js";
+import { COMMANDER_WARM_ENABLED_ENV, createCommanderWarmResourceTruth, warmResourceTruthSchema } from "../services/commander-warm-resource-truth.js";
 
 /** The independent, default-off second gate on the unauthenticated lease-truth route
  * (B1-F1). Read via `process.env[CONST]` so the string never appears as a
@@ -65,6 +66,29 @@ export interface LeaseTruthResponse {
 
 export function adapterManagerControlRoutes(opts: { appDb: Db }): Router {
   const router = Router();
+  const warm = createCommanderWarmResourceTruth({ appDb: opts.appDb,
+    isWarmEnabled: () => process.env[COMMANDER_WARM_ENABLED_ENV]?.trim() === "1" });
+  const batch = z.object({ resources: z.array(warmResourceTruthSchema).max(128) }).strict();
+  const receipt = warmResourceTruthSchema.extend({ providerOpId: z.string().min(1).max(512) });
+  for (const [path, schema] of [["resource-truth", batch], ["resource-reclaimed", receipt]] as const) {
+    router.post("/adapter-manager-control/" + path, (req, res, next) => {
+      if (!readDistributedExecutionDeploymentFlag(process.env) || process.env[TRUTH_ROUTE_ENABLED_ENV]?.trim() !== "1" ||
+          !truthBearerAccepted(process.env, req.get(TRUTH_SHARED_SECRET_HEADER))) {
+        res.status(404).json({ error: "Not found" }); return;
+      }
+      next();
+    }, validate(schema), async (req, res, next) => {
+      try {
+        if (path === "resource-reclaimed") {
+          res.status(200).json({ acknowledged: await warm.reclaimed(receipt.parse(req.body)) }); return;
+        }
+        const { resources } = batch.parse(req.body);
+        const verdicts = [];
+        for (const resource of resources) verdicts.push({ ...resource, verdict: await warm.truth(resource) });
+        res.status(200).json({ verdicts });
+      } catch (error) { next(error); }
+    });
+  }
 
   router.post(
     "/adapter-manager-control/lease-truth",
