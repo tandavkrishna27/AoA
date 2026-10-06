@@ -660,3 +660,19 @@ These are read by tests and dev scripts; you should not need to set them in prod
 | `AOA_TEST_DATABASE_URL` | Postgres URL for tests that need a real DB connection |
 | `AOA_TEST_SECRET_PROBE` | Test-only probe var set by `mcp-connectors-env.test.ts` to assert `buildConnectorProcessEnv` scrubs AoA/infra secrets out of the env handed to external MCP connectors. Never read in production. |
 | `AOA_API_BASE` | API base URL used by the Commander review seed script; defaults to `http://127.0.0.1:3100/api` |
+
+### Internal Commander warm execution metadata
+
+These values are injected per execution by the worker after protected credential
+redemption. They are not deployment settings and must not be configured globally.
+
+- `AOA_COMMANDER_WARM_TURN`: the actual current Commander turn ID. The staged warm
+  capture runner checks it against the staged input before starting the vendor CLI,
+  then removes it from the child environment.
+- `AOA_COMMANDER_REDACTION_CANARIES`: bounded JSON history of credentials that must
+  remain redacted across warm turns. It is confidential execution metadata. The
+  worker, provider export scanner and capture runner consume it; the runner removes
+  it before starting the vendor CLI. Do not log or expose this value.
+
+Warm routing and provider activation remain off until the full integration is
+complete; these internal variables do not enable either.
