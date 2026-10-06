@@ -20,3 +20,6 @@ export type {
   OwnedLabelsCapability,
   OwnedLabelsCapabilitySignedFields,
 } from "@armyofagents/provider-capability";
+
+export { isWarmResourceCapabilityFields, signWarmResourceCapability, verifyWarmResourceCapability } from "@armyofagents/provider-capability";
+export type { WarmResourceCapability, WarmResourceCapabilityFields } from "@armyofagents/provider-capability";

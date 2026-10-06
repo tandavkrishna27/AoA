@@ -45,7 +45,7 @@ import {
   hashResourceLabels,
   labelsEqual,
 } from "@armyofagents/worker-daemon";
-import { WireProtocolError } from "@armyofagents/provider-wire";
+import { WireProtocolError, verifyWarmResourceCapability } from "@armyofagents/provider-wire";
 import type { OwnedLabelsCapability, RedactedListResult } from "@armyofagents/provider-wire";
 
 import { verifyOwnedLabelsCapability } from "./capability-verify.js";
@@ -64,6 +64,7 @@ export interface OwnedOpGateDeps {
    * reach (deploy-owed, β1.6). `gateList` has no single-sandbox target, so it is unlocked.
    */
   readonly sandboxLock: KeyedMutex;
+  readonly warmResourceCapability?: unknown;
 }
 
 /**
@@ -147,6 +148,12 @@ export async function gateOwnedOp<R>(
   //    unauthenticated caller must never acquire a per-sandboxId lock; the crafted
   //    sandboxId keys the lock map, so an unverified caller could otherwise grow it).
   const ownedLabels = verifyOrUniform(capability, controlPlanePublicKey, now());
+  // Verify the exact retained resource BEFORE acquiring a lock or reading the provider.
+  const warm = deps.warmResourceCapability === undefined ? null : verifyWarmResourceCapability(
+    deps.warmResourceCapability, controlPlanePublicKey,
+    { nowMs: now(), resourceId: sandboxId, ownedLabels, primaryExpiresAt: capability!.expiresAt },
+  );
+  if (deps.warmResourceCapability !== undefined && !warm) throw new ResourceNotAvailableError();
 
   // 2. The TOCTOU lock spans inspect -> owned-check -> dispatch so THIS instance can't
   //    interleave the check-to-use gap on one sandbox. Released in runExclusive's finally
@@ -179,7 +186,7 @@ export async function gateOwnedOp<R>(
 
       // Field-wise owned-check (BOTH clauses — labels AND generation). A mismatch is
       // refused IDENTICALLY to not-found.
-      if (!labelsEqual(detail.resourceLabels, ownedLabels) || detail.generation !== ownedLabels.deviceGeneration) {
+      if (!labelsEqual(detail.resourceLabels, warm?.physicalLabels ?? ownedLabels) || detail.generation !== ownedLabels.deviceGeneration) {
         throw new ResourceNotAvailableError();
       }
 

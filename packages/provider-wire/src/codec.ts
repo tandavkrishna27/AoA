@@ -57,6 +57,8 @@ export interface OpRequestEnvelope {
   readonly args: unknown;
   readonly ctx: ProviderOpContext;
   readonly capability?: OwnedLabelsCapability;
+  /** Opaque until the signed-resource ownership gate verifies it. */
+  readonly warmResourceCapability?: unknown;
 }
 
 /** The serialized error shape. `name` selects the class; the optional STRUCTURED fields
@@ -89,11 +91,11 @@ export const EXECUTE_STDOUT_TAIL_KEY = "stdoutTail";
 
 // ---- request codec (client encodes, server decodes) -------------------------
 
-export function encodeOpRequest(args: unknown, ctx: ProviderOpContext, capability?: OwnedLabelsCapability): string {
+export function encodeOpRequest(args: unknown, ctx: ProviderOpContext, capability?: OwnedLabelsCapability, warmResourceCapability?: unknown): string {
   // The capability key is emitted ONLY when present, so a create request (no
   // capability) is byte-identical to the Unit-A `{ args, ctx }` body.
   const envelope: OpRequestEnvelope = capability === undefined ? { args, ctx } : { args, ctx, capability };
-  return JSON.stringify(envelope);
+  return JSON.stringify(warmResourceCapability === undefined ? envelope : { ...envelope, warmResourceCapability });
 }
 
 export function decodeOpRequest(body: string): OpRequestEnvelope {
@@ -113,9 +115,9 @@ export function decodeOpRequest(body: string): OpRequestEnvelope {
     if (!isValidCapability(parsed.capability)) {
       throw new WireProtocolError("request body carries a malformed capability");
     }
-    return { args: parsed.args, ctx: parsed.ctx, capability: parsed.capability };
+    return { args: parsed.args, ctx: parsed.ctx, capability: parsed.capability, ...(parsed.warmResourceCapability === undefined ? {} : { warmResourceCapability: parsed.warmResourceCapability }) };
   }
-  return { args: parsed.args, ctx: parsed.ctx };
+  return { args: parsed.args, ctx: parsed.ctx, ...(parsed.warmResourceCapability === undefined ? {} : { warmResourceCapability: parsed.warmResourceCapability }) };
 }
 
 // ---- response codec (server encodes, client decodes) ------------------------
