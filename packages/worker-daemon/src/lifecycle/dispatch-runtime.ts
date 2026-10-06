@@ -1,3 +1,4 @@
+import type { CommanderWarmControl } from "../lease/commander-warm-control.js";
 // WRK-008 slice 2b — the dispatch runtime: compose the poll loop, supervisor, lease-renewal
 // driver and durable event outbox from a provisioned self-model + a live session lifecycle.
 //
@@ -113,7 +114,7 @@ export interface ComposeDispatchRuntimeDeps {
   /** DEP-011 Slice 2a — the per-run networked provider FACTORY (a TYPE here; the impl comes from the
    * outside composition root, Slice 2b). Passed through to the supervisor, which builds a per-run
    * driver over the run's minted capability AFTER redemption. */
-  readonly makeRunProvider?: (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike }) => SandboxProvider;
+  readonly makeRunProvider?: (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }) => SandboxProvider;
   /** The PROVISIONED self-model (matchable): its `report` is the provisioned hello. */
   readonly self: WorkerSelfModel;
   readonly key: DeviceKey;

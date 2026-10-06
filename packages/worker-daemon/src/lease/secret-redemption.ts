@@ -19,6 +19,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { readCommanderWarmControl, commanderWarmControlIdentity, type CommanderWarmControl } from "./commander-warm-control.js";
 
 import type { SecretHandleRef } from "@armyofagents/worker-protocol";
 
@@ -69,6 +70,7 @@ export type ResolveClassification =
        * on desktop/self-hosted (no CP key) — byte-identical pre-DEP-011 behaviour.
        */
       readonly ownedLabelsCapability?: OwnedLabelsCapabilityLike;
+      readonly warmControl?: CommanderWarmControl;
     }
   | { readonly kind: "denied"; readonly reason: string }
   | { readonly kind: "transport" }
@@ -120,6 +122,12 @@ export function classifyResolveResponse(res: WorkerOperationHttpResponse): Resol
       // DEP-011 Slice 2a — carry a PRESENT + WELL-SHAPED capability through; a malformed one is
       // treated as ABSENT (never carried as junk, never failing the resolve — it is optional).
       const cap = body.ownedLabelsCapability;
+      if (Object.prototype.hasOwnProperty.call(body, "warmControl")) {
+        if (!isOwnedLabelsCapabilityShape(cap)) return { kind: "malformed" };
+        const warmControl = readCommanderWarmControl(body.warmControl, cap);
+        if (!warmControl) return { kind: "malformed" };
+        return { kind: "resolved", envTarget, value, ownedLabelsCapability: cap, warmControl };
+      }
       if (isOwnedLabelsCapabilityShape(cap)) {
         return { kind: "resolved", envTarget, value, ownedLabelsCapability: cap };
       }
@@ -142,7 +150,7 @@ export function classifyResolveResponse(res: WorkerOperationHttpResponse): Resol
 export async function synthesiseRunSecrets(
   handles: readonly SecretHandleRef[],
   redeem: RedeemFn,
-): Promise<{ env: Record<string, string>; canaries: string[]; capability?: OwnedLabelsCapabilityLike }> {
+): Promise<{ env: Record<string, string>; canaries: string[]; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }> {
   const env: Record<string, string> = {};
   const canaries: string[] = [];
   // DEP-011 Slice 2a — the run mints N times (once per resolvable handle), so N caps ride the N
@@ -153,6 +161,8 @@ export async function synthesiseRunSecrets(
   // no CP key) → undefined, a no-op the supervisor's networked branch treats as fail-closed and the
   // desktop branch ignores.
   let capability: OwnedLabelsCapabilityLike | undefined;
+  let warmControl: CommanderWarmControl | undefined;
+  let warmPresence: boolean | undefined;
   for (const handle of handles) {
     if (handle.materialization.kind !== "env" || handle.usePolicy !== "sandbox_local_only") continue;
     const target = handle.materialization.target;
@@ -162,11 +172,28 @@ export async function synthesiseRunSecrets(
     if (outcome.envTarget !== target) {
       throw new SecretMaterializationError("target_mismatch", "resolve response env target disagrees with the handle");
     }
+    const present = outcome.warmControl !== undefined;
+    if (warmPresence !== undefined && warmPresence !== present) throw new SecretMaterializationError("warm_control_divergence");
+    warmPresence = present;
+    if (outcome.warmControl) {
+      if (warmControl && commanderWarmControlIdentity(warmControl) !== commanderWarmControlIdentity(outcome.warmControl)) {
+        throw new SecretMaterializationError("warm_control_divergence");
+      }
+      const next = outcome.warmControl;
+      if (!warmControl || (next.warmResourceCapability?.expiresAt ?? 0) > (warmControl.warmResourceCapability?.expiresAt ?? 0)) warmControl = next;
+    }
     env[target] = outcome.value;
     canaries.push(outcome.value);
     if (outcome.ownedLabelsCapability !== undefined) {
       capability = foldCapability(capability, outcome.ownedLabelsCapability);
     }
+  }
+  if (warmControl) {
+    for (const value of warmControl.historicalCanaries) if (!canaries.includes(value)) canaries.push(value);
+    if (new Set(canaries).size > 64 || [...new Set(canaries)].reduce((sum, value) => sum + Buffer.byteLength(value, "utf8"), 0) > 65536) {
+      throw new SecretMaterializationError("warm_canaries_overflow");
+    }
+    return { env, canaries, capability, warmControl };
   }
   return capability === undefined ? { env, canaries } : { env, canaries, capability };
 }

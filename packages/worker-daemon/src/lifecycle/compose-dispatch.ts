@@ -1,3 +1,4 @@
+import type { CommanderWarmControl } from "../lease/commander-warm-control.js";
 // WRK-008 slice 2 / 2b — should this daemon compose a dispatch loop, and if not, why not.
 //
 // WHY THIS IS A PURE FUNCTION IN ITS OWN FILE. The refusals below are the whole
@@ -28,7 +29,7 @@ import type { WorkerSelfModel } from "../poll/capacity.js";
 
 /** DEP-011 Slice 2a — the container worker's per-run networked provider factory type (the impl is
  * supplied by the OUTSIDE composition root, Slice 2b; worker-daemon names only the TYPE). */
-export type MakeRunProvider = (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike }) => SandboxProvider;
+export type MakeRunProvider = (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }) => SandboxProvider;
 
 /** The four coarse outcomes the self-model read collapses to (Step 3). 401/403/404 all fold
  * to `no_profile` so the route is never an oracle; a terminal session is `session_terminal`;

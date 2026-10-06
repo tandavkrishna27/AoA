@@ -50,8 +50,32 @@ child.on("close", (code) => {
 });
 child.stdin.end(input.stdinContent);
 `.trim();
+export const COMMANDER_WARM_RUNNER_PATH = "/home/user/aoa-commander-warm-v1.cjs";
+// An older worker may stage this script, but cannot start paid CLI execution
+// without the current turn marker supplied by validated protected warm control.
+// Historical secrets are redaction metadata, never child process credentials.
+export const COMMANDER_WARM_CAPTURE_SCRIPT = COMMANDER_CAPTURE_SCRIPT
+  .replace('const startedAt = Date.now();', String.raw`
+if (typeof input.operationId !== "string" || process.env.AOA_COMMANDER_WARM_TURN !== input.operationId) {
+  throw new Error("Commander warm turn authorization required");
+}
+let historicalCanaries;
+try { historicalCanaries = JSON.parse(process.env.AOA_COMMANDER_REDACTION_CANARIES || "[]"); }
+catch { throw new Error("Commander warm redaction metadata invalid"); }
+if (!Array.isArray(historicalCanaries) || historicalCanaries.length > 64 ||
+    historicalCanaries.some((value) => typeof value !== "string" || !value) ||
+    historicalCanaries.reduce((sum, value) => sum + Buffer.byteLength(value, "utf8"), 0) > 65536) {
+  throw new Error("Commander warm redaction metadata invalid");
+}
+delete process.env.AOA_COMMANDER_WARM_TURN;
+delete process.env.AOA_COMMANDER_REDACTION_CANARIES;
+const startedAt = Date.now();`.trim())
+  .replace('.filter(Boolean))].sort', String.raw`.concat(historicalCanaries.flatMap((value) => [value, ...value.split(/\r?\n|\r/)]))
+  .filter(Boolean))].sort`);
 export interface CommanderDistributedInvocationInput {
   companyId: string; turnId: string; cliTool: string; content: string;
+  /** Internal dispatch choice after verified warm placement; absent preserves the existing capture bytes. */
+  distributedWarm?: boolean;
   vendorCliBypassEnabled?: boolean;
   systemContext?: string | null; model?: string | null; apiBaseUrl: string; timeoutMs: number;
 }
@@ -74,7 +98,8 @@ export function buildCommanderDistributedInvocation(input: CommanderDistributedI
     ...(input.model ? ["--model", input.model] : []), ...(input.systemContext ? ["--system-prompt-file", INSTRUCTIONS_PATH] : [])];
   const encoder = new TextEncoder();
   const file = (path: string, content: string, contentType: string): SandboxStagedFile => ({ path, bytes: encoder.encode(content), contentType });
-  const stagedFiles = [file(COMMANDER_RUNNER_PATH, COMMANDER_CAPTURE_SCRIPT, "text/javascript"),
+  const runnerPath = input.distributedWarm ? COMMANDER_WARM_RUNNER_PATH : COMMANDER_RUNNER_PATH;
+  const stagedFiles = [file(runnerPath, input.distributedWarm ? COMMANDER_WARM_CAPTURE_SCRIPT : COMMANDER_CAPTURE_SCRIPT, "text/javascript"),
     file(COMMANDER_INPUT_PATH, JSON.stringify({ operationId: input.turnId, args,
       stdinContent: codex && input.systemContext ? `${input.systemContext}\n\n${input.content}` : input.content,
       timeoutMs: input.timeoutMs }), "application/json")];
@@ -84,7 +109,7 @@ export function buildCommanderDistributedInvocation(input: CommanderDistributedI
     if (input.systemContext) stagedFiles.push(file(INSTRUCTIONS_PATH, input.systemContext, "text/markdown"));
   }
   if (stagedFiles.some((entry) => entry.bytes.byteLength > MAX_STAGED_FILE_BYTES)) return null;
-  const workload = batchWorkloadV1Schema.safeParse({ command: "node", args: [COMMANDER_RUNNER_PATH,
+  const workload = batchWorkloadV1Schema.safeParse({ command: "node", args: [runnerPath,
     codex ? "codex" : "claude", COMMANDER_INPUT_PATH, ONE_SHOT_RESULT_PATH], stdinArtifactId: null,
     maxRuntimeSeconds: Math.max(60, Math.ceil(input.timeoutMs / 1000)) });
   return workload.success ? { workload: workload.data, stagedFiles, provider: codex ? "openai" : "anthropic" } : null;

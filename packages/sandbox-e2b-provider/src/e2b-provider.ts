@@ -73,6 +73,7 @@ import { grantPutHeaders } from "@armyofagents/worker-daemon";
 
 import { METADATA_KEYS } from "./directives.js";
 import { classifyRunSecrets } from "./export-secret-scan.js";
+import { readCommanderWarmRedactionCanaries } from "@armyofagents/worker-daemon";
 import type { ExportBytesScanner } from "./export-secret-scan.js";
 import {
   ProcessLaunchNotAcknowledged,
@@ -548,10 +549,11 @@ export class E2bSandboxProvider implements SandboxProvider {
     sandboxId: string,
     env: Readonly<Record<string, string>> | undefined,
     ttlMs: number,
+    additionalValues: readonly string[] = [],
   ): void {
     this.#purgeRunSecrets(sandboxId);
     const entry: { readonly values: readonly string[]; timer: ReturnType<typeof setTimeout> } = {
-      values: classifyRunSecrets(env),
+      values: Object.freeze([...new Set([...classifyRunSecrets(env), ...additionalValues])].sort((a, b) => b.length - a.length)),
       // Replaced immediately below; assigned first so the closure can compare identities.
       timer: undefined as unknown as ReturnType<typeof setTimeout>,
     };
@@ -646,6 +648,19 @@ export class E2bSandboxProvider implements SandboxProvider {
         stdoutRef: `ref:stdout:${input.sandboxId}`,
         stderrRef: `ref:stderr:${input.sandboxId}`,
       };
+    }
+    if (input.env?.AOA_COMMANDER_REDACTION_CANARIES !== undefined) {
+      const historical = readCommanderWarmRedactionCanaries(input.env);
+      const credentialEnv = { ...input.env };
+      delete credentialEnv.AOA_COMMANDER_REDACTION_CANARIES;
+      delete credentialEnv.AOA_COMMANDER_WARM_TURN;
+      const values = [...new Set([...(this.#runSecrets.get(input.sandboxId)?.values ?? []), ...classifyRunSecrets(credentialEnv), ...historical])];
+      if (values.length > 64 || values.reduce((sum, value) => sum + Buffer.byteLength(value, "utf8"), 0) > 65536) {
+        throw new Error("Commander warm redaction metadata invalid");
+      }
+      // Execute refreshes current and historical values, including after an AM
+      // restart. They remain private until explicit cleanup or bounded idle TTL.
+      this.#registerRunSecrets(input.sandboxId, credentialEnv, ctx.deadlineMs + 1800000, values);
     }
     try {
       const request = {

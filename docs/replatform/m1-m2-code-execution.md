@@ -194,3 +194,26 @@ At-use expiry verification: repository typecheck and build passed; the full suit
 passed 23,790 tests with 1,915 skipped across 2,462 passing files. The wire
 checkpoint group passed 20 tests, including the four expiry cases. Citation
 integrity and inventory checks passed. Rollout flags remain off.
+## Warm Commander worker lifecycle
+
+Durable reservation PR #663 passed all 16 CI checks and merged into the replatform
+branch. The worker now reads bounded protected warm control during credential
+redemption, checks it against the actual handoff, and forwards only its signed
+resource grant into the provider driver. Malformed or competing control fails
+before execution. Self-hosted direct execution and the existing ephemeral runner
+keep their default behavior.
+
+A warm VM is created without credentials or resumed by exact resource ID. The
+fresh CLI receives the current turn's environment and staged history. Historical
+redaction metadata is removed before starting that CLI. A successful checkpoint
+is recorded before the terminal; execution, restore, checkpoint and ledger-write
+failures reclaim the VM. The export and stdout scanners retain historical keys
+across credential rotation and explicitly reseed after provider restart.
+
+The worker/provider regression group passed 1,733 tests with 33 skipped. This
+worker slice remains inactive: control-plane issuance, accepted checkpoint
+projection, placement/affinity and retained-resource cleanup still require
+integration. The optional warm invocation builder is not yet selected by the
+Commander consumer. Rollout and live provider tests remain off.
+
+Worker candidate local verification: recursive typecheck passed; full suite passed 23,832 tests (1,916 skipped) across 2,465 passing files; build passed. The first full run caught a prohibited conformance error-code substring; corrected to `warm_checkpoint_unavailable` and reran the full suite successfully. Paid calls and rollout flags remain off. Commander issuer, projection, affinity and reaper integration remain pending.

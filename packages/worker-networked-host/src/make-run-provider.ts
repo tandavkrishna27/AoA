@@ -40,6 +40,7 @@ import {
 } from "@armyofagents/provider-wire";
 import type { OwnedLabelsCapability } from "@armyofagents/provider-wire";
 import type { MakeRunProvider } from "@armyofagents/worker-daemon";
+import { readCommanderWarmControl } from "@armyofagents/worker-daemon";
 
 /** Fail-closed: the run's capability is absent or does not match the pinned version/audience.
  * Carries NO capability fields (labels are the caller's own, but a codec must never log `sig`). */
@@ -61,7 +62,7 @@ export class NetworkedProviderCapabilityError extends Error {
  * @param fetchImpl  injectable fetch (default: the global) — tests spy on the network hop.
  */
 export function makeNetworkedRunProvider(baseUrl: string, fetchImpl: typeof fetch = fetch): MakeRunProvider {
-  return ({ capability }) => {
+  return ({ capability, warmControl }) => {
     if (capability === undefined) {
       throw new NetworkedProviderCapabilityError("no owned-labels capability was minted for this run");
     }
@@ -83,6 +84,9 @@ export function makeNetworkedRunProvider(baseUrl: string, fetchImpl: typeof fetc
       expiresAt: capability.expiresAt,
       sig: capability.sig,
     };
-    return new NetworkedProviderDriver({ baseUrl, capability: validated, fetch: fetchImpl });
+    const warm = warmControl === undefined ? null : readCommanderWarmControl(warmControl, validated);
+    if (warmControl !== undefined && !warm) throw new NetworkedProviderCapabilityError("invalid warm resource authority");
+    return new NetworkedProviderDriver({ baseUrl, capability: validated, fetch: fetchImpl,
+      ...(warm ? { enableCheckpointRestore: true, warmResourceCapability: warm.warmResourceCapability } : {}) });
   };
 }

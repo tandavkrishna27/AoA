@@ -156,6 +156,19 @@ describe("WRK-018 — adapter-manager relays the stdout channel (gated wire)", (
     expect(got[0]).toContain('"input_tokens":1');
   });
 
+  it("scrubs historical warm secrets from the raw response after credential rotation", async () => {
+    const { driver, sandboxId } = await createOwned(labelsFor("org-warm", "lease-warm"), {});
+    const env = { OPENAI_API_KEY: CANARY_B, AOA_COMMANDER_WARM_TURN: "current-turn",
+      AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify([CANARY_A]),
+      [DIRECTIVE_KEYS.streamChunks]: JSON.stringify(claudeStream(CANARY_A, { i: 1, o: 2, c: 3 })) };
+    const got: string[] = [];
+    await driver.execute({ sandboxId, command: "node", args: [], env, onStdout: (chunk) => got.push(chunk) }, ctx("e-warm"));
+    expect(transport.stdoutSeen.join("")).toContain(CANARY_A);
+    expect(executeBodies[0]).not.toContain(CANARY_A);
+    expect(got.join("")).not.toContain(CANARY_A);
+    expect(got.join("")).toContain(MARKER);
+  });
+
   it("without the capture flag the response carries NO tail and the provider gets NO handlers", async () => {
     const env = { [DIRECTIVE_KEYS.streamChunks]: JSON.stringify(claudeStream(CANARY_A, { i: 1, o: 2, c: 3 })) };
     const { driver, sandboxId } = await createOwned(labelsFor("org-a", "lease-a"), env);
