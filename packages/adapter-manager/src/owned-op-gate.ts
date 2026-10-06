@@ -52,6 +52,9 @@ import { verifyOwnedLabelsCapability } from "./capability-verify.js";
 import type { KeyedMutex } from "./keyed-mutex.js";
 
 export interface OwnedOpGateDeps {
+  /** Interrupts use their own serialization lane and recheck even an ordinary
+   * primary capability after queueing and inspection. */
+  readonly requirePrimaryAuthorityAtUse?: boolean;
   readonly provider: SandboxProvider;
   readonly controlPlanePublicKey: KeyObject;
   /** ms-epoch clock for the capability expiry check. */
@@ -159,13 +162,13 @@ export async function gateOwnedOp<R>(
   // inspection. Recheck its primary fence at the same instant; the additional
   // grant never supplies a replacement for an expired primary capability.
   const requireWarmAuthorityAtUse = () => {
-    if (deps.warmResourceCapability === undefined) return;
+    if (deps.warmResourceCapability === undefined && !deps.requirePrimaryAuthorityAtUse) return;
     const atUse = now();
     const currentLabels = verifyOrUniform(capability, controlPlanePublicKey, atUse);
-    if (!labelsEqual(currentLabels, ownedLabels) || !verifyWarmResourceCapability(
+    if (!labelsEqual(currentLabels, ownedLabels) || (deps.warmResourceCapability !== undefined && !verifyWarmResourceCapability(
       deps.warmResourceCapability, controlPlanePublicKey,
       { nowMs: atUse, resourceId: sandboxId, ownedLabels: currentLabels, primaryExpiresAt: capability!.expiresAt },
-    )) throw new ResourceNotAvailableError();
+    ))) throw new ResourceNotAvailableError();
   };
 
   // 2. The TOCTOU lock spans inspect -> owned-check -> dispatch so THIS instance can't
