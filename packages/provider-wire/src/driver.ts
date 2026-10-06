@@ -63,6 +63,7 @@ import { CORE_PROVIDER_OPERATIONS } from "@armyofagents/worker-protocol";
 import { ResourceNotAvailableError, UnsupportedProviderOperation } from "@armyofagents/sandbox-e2b-provider/errors.js";
 
 import {
+  EXECUTE_LIVE_STDOUT_KEY,
   EXECUTE_CAPTURE_STDOUT_KEY,
   EXECUTE_STDOUT_TAIL_KEY,
   WireProtocolError,
@@ -88,6 +89,7 @@ export interface NetworkedProviderDriverOptions {
    */
   readonly capability?: OwnedLabelsCapability;
   /** Relay pause/resume only when the selected target explicitly supports both. Default off. */
+  readonly enableLiveStdout?: boolean;
   readonly enableCheckpointRestore?: boolean;
   readonly warmResourceCapability?: WarmResourceCapability;
 }
@@ -143,6 +145,7 @@ export class NetworkedProviderDriver implements SandboxProvider {
    */
   readonly processSupervisionMode: ProcessSupervisionMode = "none";
 
+  readonly #enableLiveStdout: boolean;
   readonly #baseUrl: string;
   readonly #fetch: typeof fetch;
   readonly #capability?: OwnedLabelsCapability;
@@ -151,6 +154,7 @@ export class NetworkedProviderDriver implements SandboxProvider {
   constructor(options: NetworkedProviderDriverOptions) {
     this.#baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.#fetch = options.fetch ?? fetch;
+    this.#enableLiveStdout = options.enableLiveStdout === true;
     this.#capability = options.capability;
     this.#warmResourceCapability = options.warmResourceCapability;
     this.checkpointMode = options.enableCheckpointRestore === true ? "snapshot" : "none";
@@ -190,6 +194,7 @@ export class NetworkedProviderDriver implements SandboxProvider {
       // No stdout channel requested: the pre-WRK-018 body, byte for byte.
       return this.#post<ExecuteResult>("execute", input, ctx, this.#capability);
     }
+    if (this.#enableLiveStdout) return this.#executeLive(wireInput, ctx, onStdout);
     // WRK-018 — the stdout channel over the wire: a callback cannot cross HTTP, so ask the
     // adapter-manager to capture (a FLAG, never the function) and replay its returned,
     // already-scrubbed tail into the caller's callback. The tail is stripped from the result
@@ -376,6 +381,53 @@ export class NetworkedProviderDriver implements SandboxProvider {
     _ctx: ProviderOpContext,
   ): Promise<ProcessSignalResult> {
     throw new UnsupportedProviderOperation("signal_process");
+  }
+
+  async #executeLive(input: Omit<ExecuteInput, "onStdout">, ctx: ProviderOpContext, onStdout: (chunk: string) => void): Promise<ExecuteResult> {
+    const response = await this.#fetch(`${this.#baseUrl}/op/execute`, { method: "POST",
+      headers: { "content-type": "application/json" },
+      body: encodeOpRequest({ ...input, [EXECUTE_CAPTURE_STDOUT_KEY]: true, [EXECUTE_LIVE_STDOUT_KEY]: true },
+        ctx, this.#capability, this.#warmResourceCapability),
+      signal: AbortSignal.timeout(Math.max(1, Math.ceil(ctx.deadlineMs) + 5000)) });
+    // Older peers keep their ordinary JSON response. No retry or second execute.
+    if (!response.headers.get("content-type")?.includes("application/x-ndjson")) {
+      const raw = decodeOpResponse<Record<string, unknown>>(await response.text());
+      const { [EXECUTE_STDOUT_TAIL_KEY]: tail, ...result } = raw;
+      if (typeof tail === "string" && tail) onStdout(tail);
+      return result as unknown as ExecuteResult;
+    }
+    if (!response.body) throw new WireProtocolError("missing live execute body");
+    const reader = response.body.getReader(); const decoder = new TextDecoder();
+    let pending = ""; let bytes = 0; let result: ExecuteResult | undefined;
+    const consume = (line: string) => {
+      if (result) throw new WireProtocolError("frame after execute result");
+      let frame: unknown;
+      try { frame = JSON.parse(line); } catch { throw new WireProtocolError("malformed live execute frame"); }
+      if (!frame || typeof frame !== "object" || Array.isArray(frame)) throw new WireProtocolError("malformed live execute frame");
+      const record = frame as Record<string, unknown>;
+      if (Object.keys(record).length === 1 && typeof record.stdout === "string") {
+        if (record.stdout.length > 65536) throw new WireProtocolError("live stdout frame overflow");
+        onStdout(record.stdout); return;
+      }
+      if (Object.keys(record).length !== 1 || (!("ok" in record) && !("err" in record)))
+        throw new WireProtocolError("malformed live execute frame");
+      result = decodeOpResponse<ExecuteResult>(line);
+    };
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) { pending += decoder.decode(); break; }
+        bytes += chunk.value.byteLength;
+        if (bytes > 2 * 1048576) throw new WireProtocolError("live execute body overflow");
+        pending += decoder.decode(chunk.value, { stream: true });
+        let end: number;
+        while ((end = pending.indexOf("\n")) >= 0) { consume(pending.slice(0, end)); pending = pending.slice(end + 1); }
+        if (pending.length > 1048576) throw new WireProtocolError("live execute frame overflow");
+      }
+      if (pending) consume(pending);
+      if (!result) throw new WireProtocolError("live execute ended without result");
+      return result;
+    } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
   }
 
   async #post<R>(
