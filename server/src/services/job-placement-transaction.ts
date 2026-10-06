@@ -9,8 +9,9 @@ import {
   type PlacementCandidateSnapshot,
   internalAgentRuns,
   jobSecretHandles,
+  type Db,
 } from "@armyofagents/db";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, or } from "drizzle-orm";
 import { loadCommanderJobAuthority } from "./commander-job-authority.js";
 import { runInTenant } from "../db/tenant-context.js";
 import {
@@ -39,6 +40,8 @@ import {
 import { mintCredentialKindFor } from "./canary-mint-authority.js";
 import { insertActivityLog } from "./activity-log.js";
 import { logger } from "../middleware/logger.js";
+import { COMMANDER_WARM_RUNNER_PATH, claimCommanderWarmTurn, commanderWarmStateSchema } from "./commander-warm-store.js";
+const WARM_ENABLED_ENV = "AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED";
 
 const SOURCE_KINDS = new Set<string>(EXECUTION_SOURCE_KINDS);
 
@@ -138,6 +141,30 @@ export async function placeJobAttemptTransaction(
       sourceKind,
       workloadType: context.job.workloadType,
     });
+    const workload = context.job.input;
+    const warmRequested = sourceKind === "commander_turn" && workload.command === "node" && Array.isArray(workload.args) &&
+      workload.args.length === 4 && workload.args[0] === COMMANDER_WARM_RUNNER_PATH && ["claude", "codex"].includes(workload.args[1]) &&
+      workload.args[2] === "/home/user/aoa-commander-input.json" && workload.args[3] === "/home/user/aoa-output/aoa-one-shot-result.json";
+    if (warmRequested && (!input.requireExecutionSecrets || !authority.rollout.enabled || process.env[WARM_ENABLED_ENV]?.trim() !== "1")) {
+      throw new JobPlacementError("commander_handoff_refused");
+    }
+    let heldTarget: { id: string; generation: number } | null = null;
+    if (warmRequested) {
+      const source = await loadCommanderJobAuthority(tx, input);
+      if (!source || source.status !== "running") throw new JobPlacementError("commander_handoff_refused");
+      const holders = await tx.select({ state: internalAgentRuns.distributedWarmState }).from(internalAgentRuns).where(and(
+        eq(internalAgentRuns.companyId, input.companyId), eq(internalAgentRuns.userId, source.userId),
+        eq(internalAgentRuns.distributedWarmConversationId, source.conversationId), isNotNull(internalAgentRuns.distributedWarmState),
+      )).limit(2);
+      if (holders.length > 1) throw new JobPlacementError("commander_handoff_refused");
+      if (holders.length === 1) {
+        const parsed = commanderWarmStateSchema.safeParse(holders[0].state);
+        if (!parsed.success || parsed.data.organizationId !== input.organizationId || parsed.data.companyId !== input.companyId ||
+          parsed.data.userId !== source.userId || parsed.data.conversationId !== source.conversationId ||
+          !["paused", "claimed"].includes(parsed.data.status)) throw new JobPlacementError("commander_handoff_refused");
+        heldTarget = { id: parsed.data.targetId, generation: parsed.data.targetGeneration };
+      }
+    }
     const tenantSnapshots = authority.rollout.enabled
       ? await repos.jobControl.listPlacementCandidateSnapshots()
       : [];
@@ -159,11 +186,15 @@ export async function placeJobAttemptTransaction(
       const requestedTarget = placementRequest && typeof placementRequest.requestedTarget === "string"
         ? placementRequest.requestedTarget
         : null;
+      if (heldTarget && ((requestedTarget !== null && requestedTarget !== heldTarget.id) ||
+        (authority.credentialBinding.pinnedTargetId !== null && authority.credentialBinding.pinnedTargetId !== heldTarget.id))) {
+        throw new JobPlacementError("commander_handoff_refused");
+      }
       if (authority.rollout.enabled) {
         try {
           routedRow = chooseExecutionTargetRow({
             credentialKind: authority.credentialBinding.credentialKind,
-            pinnedTargetId: requestedTarget ?? authority.credentialBinding.pinnedTargetId,
+            pinnedTargetId: heldTarget?.id ?? requestedTarget ?? authority.credentialBinding.pinnedTargetId,
             executionTargetSlug: authority.credentialBinding.executionTargetSlug,
             targets: resolverTargets,
           });
@@ -190,6 +221,9 @@ export async function placeJobAttemptTransaction(
         }
       }
       const resolvedTarget = routedRow ? await normalizePlacementRegistryTarget(routedRow) : null;
+      if (heldTarget && resolvedTarget && (resolvedTarget.targetId !== heldTarget.id || resolvedTarget.targetGeneration !== heldTarget.generation)) {
+        throw new JobPlacementError("commander_handoff_refused");
+      }
       const normalized = normalizeSubmittedJobPlacementFacts({
             sourceKind,
             inputHash: context.job.inputHash,
@@ -199,6 +233,7 @@ export async function placeJobAttemptTransaction(
             rollout: authority.rollout,
             credentialBinding: authority.credentialBinding,
             resolvedTarget,
+            ...(warmRequested ? { commanderWarm: { maxRuntimeSeconds: Number(workload.maxRuntimeSeconds) } } : {}),
           });
       const authorityFacts: Record<string, unknown> = normalized?.success
         ? normalized.authorityFacts
@@ -247,6 +282,14 @@ export async function placeJobAttemptTransaction(
             !handles.some((row) => row.refKind === "run_jwt" && row.refId === input.jobId && row.materializationTarget === "AOA_API_KEY")) {
             throw new JobPlacementError("execution_secret_required");
           }
+          if (warmRequested && process.env[WARM_ENABLED_ENV]?.trim() !== "1") throw new JobPlacementError("commander_handoff_refused");
+          if (warmRequested && existing.targetId && existing.targetGeneration !== null) await claimCommanderWarmTurn(tx as unknown as Db, {
+            organizationId: input.organizationId, companyId: input.companyId, jobId: input.jobId, attemptId: input.attemptId,
+            targetId: existing.targetId, targetGeneration: existing.targetGeneration,
+            supportsCheckpointRestore: resolvedTarget?.providerConstraintProfile.checkpointMode === "snapshot" &&
+              resolvedTarget.providerConstraintProfile.supportedOperations.includes("checkpoint") &&
+              resolvedTarget.providerConstraintProfile.supportedOperations.includes("restore"),
+          });
         }
         return existing;
       }
@@ -481,6 +524,14 @@ export async function placeJobAttemptTransaction(
           await insertActivityLog(tx, { companyId: input.companyId, actorType: "user", actorId: source.userId,
             action: "commander.execution.handed_off", entityType: "internal_agent_run", entityId: source.turnId,
             details: { jobId: input.jobId, attemptId: input.attemptId, executionOwner: "distributed" } });
+          if (warmRequested && process.env[WARM_ENABLED_ENV]?.trim() !== "1") throw new JobPlacementError("commander_handoff_refused");
+          if (warmRequested && decision.targetId && decision.targetGeneration !== null) await claimCommanderWarmTurn(tx as unknown as Db, {
+            organizationId: input.organizationId, companyId: input.companyId, jobId: input.jobId, attemptId: input.attemptId,
+            targetId: decision.targetId, targetGeneration: decision.targetGeneration,
+            supportsCheckpointRestore: resolvedTarget?.providerConstraintProfile.checkpointMode === "snapshot" &&
+              resolvedTarget.providerConstraintProfile.supportedOperations.includes("checkpoint") &&
+              resolvedTarget.providerConstraintProfile.supportedOperations.includes("restore"),
+          });
         }
 
       }

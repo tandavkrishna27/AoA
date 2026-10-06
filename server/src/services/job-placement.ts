@@ -227,6 +227,7 @@ export function normalizeSubmittedJobPlacementFacts(input: {
   rollout: { enabled: boolean; mode: PlacementMode; reason: string };
   credentialBinding: JobPlacementCredentialBinding;
   resolvedTarget: NormalizedPlacementRegistryTarget | null;
+  commanderWarm?: { maxRuntimeSeconds: number };
 }): NormalizedSubmittedJobPlacementFacts {
   const submitted = parseSubmittedRequirements(input.requirements);
   const request = parseSubmittedPlacementRequest(input.placementRequest);
@@ -265,6 +266,20 @@ export function normalizeSubmittedJobPlacementFacts(input: {
   }
   const capabilities = submittedCapabilities(submitted.data);
   const providerDemand = boundedDemand(target);
+  if (input.commanderWarm) {
+    const runtime = input.commanderWarm.maxRuntimeSeconds;
+    const provider = target.providerConstraintProfile;
+    if (input.sourceKind !== "commander_turn" || submitted.data.workloadType !== "batch" ||
+        !Number.isSafeInteger(runtime) || runtime < 1 || runtime > 240 || provider.checkpointMode !== "snapshot" ||
+        provider.maxIdleSeconds < 1800 || provider.maxContinuousRuntimeSeconds < runtime + 1800 ||
+        !provider.supportedOperations.includes("checkpoint") || !provider.supportedOperations.includes("restore")) {
+      return { success: false, reason: "unmapped_execution_target" };
+    }
+    if (capabilities && !capabilities.includes("provider.checkpoint_v1")) capabilities.push("provider.checkpoint_v1");
+    providerDemand.maxRuntimeSeconds = runtime + 1800;
+    providerDemand.maxIdleSeconds = 1800;
+    providerDemand.operations = ["create", "execute", "checkpoint", "restore"];
+  }
   if (!capabilities || providerDemand.operations.length === 0 || providerDemand.localityTags.length === 0 ||
       providerDemand.maxRuntimeSeconds < 1 || providerDemand.maxIdleSeconds < 1 ||
       providerDemand.resources.cpuMillis < 1 || providerDemand.resources.memoryMiB < 1 ||
@@ -273,7 +288,8 @@ export function normalizeSubmittedJobPlacementFacts(input: {
   }
 
   const profile = target.registeredProfile;
-  const requestedIdentity = request.data.requestedTarget ?? input.credentialBinding.pinnedTargetId;
+  const requestedIdentity = request.data.requestedTarget ?? input.credentialBinding.pinnedTargetId ??
+    (input.commanderWarm ? target.targetId : null);
   const targetIdentityPolicy: PlacementTargetIdentityPolicy | null = requestedIdentity
     ? {
         disposition: "required",
@@ -332,6 +348,7 @@ export function normalizeSubmittedJobPlacementFacts(input: {
       providerDemand,
       credentialOwnerId,
       targetIdentityPolicy,
+      ...(input.commanderWarm ? { commanderWarm: input.commanderWarm } : {}),
     },
   };
 }

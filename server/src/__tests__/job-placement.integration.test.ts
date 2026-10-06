@@ -833,9 +833,25 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(handles).toHaveLength(0);
   });
 
-  it("commits Commander handles and ownership together, and rolls everything back when the source is stale", async () => {
+  it.each([false, true])("commits Commander handles and ownership together (warm %s), and rolls everything back when the source is stale", async (warm) => {
     const { admin, app, operator } = guard();
     const oldMode = getDeploymentMode(); setDeploymentMode("cloud_auth");
+    const warmFlag = "AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED";
+    const oldWarmFlag = process.env[warmFlag];
+    const [oldTarget] = await admin`SELECT registered_profile, registered_profile_hash, provider_constraint_profile FROM execution_targets WHERE id = ${TARGET_PLATFORM}`;
+    const [oldWorker] = await admin`SELECT profile_snapshot, profile_hash FROM workers WHERE id = ${WORKER_PLATFORM}`;
+    if (warm) {
+      process.env[warmFlag] = "1";
+      const { digest: _digest, ...fields } = providerProfile();
+      const unsigned = { ...fields, checkpointMode: "snapshot" as const, maxIdleSeconds: 1800,
+        supportedOperations: [...fields.supportedOperations, "checkpoint", "restore"] };
+      const provider = { ...unsigned, digest: sha256(canonicalProviderConstraintProfileDigestInputV1(unsigned)) } as ProviderConstraintProfileV1;
+      const profile = { ...registeredProfile(provider), capabilityCeiling: [...registeredProfile(provider).capabilityCeiling, "provider.checkpoint_v1"] };
+      const hello = { ...platformWorkerHello(), reportedCapabilities: [...platformWorkerHello().reportedCapabilities, "provider.checkpoint_v1"] };
+      await admin`UPDATE execution_targets SET registered_profile = ${profile}, registered_profile_hash = ${sha256(canonicalizeJsonV1(profile))},
+        provider_constraint_profile = ${provider} WHERE id = ${TARGET_PLATFORM}`;
+      await admin`UPDATE workers SET profile_snapshot = ${hello}, profile_hash = ${sha256(JSON.stringify(hello))} WHERE id = ${WORKER_PLATFORM}`;
+    }
     const credentialId = randomUUID(); const connectionId = randomUUID(); const secretId = randomUUID();
     const service = placementNamespace.createJobPlacementService({
       appDb: app.db, operatorDb: operator.db, deploymentMode: "cloud_auth", deploymentEnabled: true,
@@ -859,6 +875,12 @@ integration("JOB-009 slice A schema and role boundaries", () => {
           source_intent = ${{ kind: 'commander_turn', internalAgentRunId: runId, conversationId }},
           requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
           executor_principal_kind = 'sandbox', executor_principal_id = ${runId} WHERE id = ${jobId}`;
+        if (warm) {
+          const input = { command: "node", args: ["/home/user/aoa-commander-warm-v1.cjs", "codex",
+            "/home/user/aoa-commander-input.json", "/home/user/aoa-output/aoa-one-shot-result.json"],
+            stdinArtifactId: null, maxRuntimeSeconds: 240 };
+          await admin`UPDATE jobs SET input = ${input}, input_hash = ${sha256(canonicalizeJsonV1(input))} WHERE id = ${jobId}`;
+        }
         const request = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId,
           now: new Date('2026-08-10T10:00:05.000Z'), maxHeartbeatAgeMs: 30_000, requireExecutionSecrets: true, toolSurfaceAuthorized: true };
         if (status === "running") {
@@ -869,6 +891,27 @@ integration("JOB-009 slice A schema and role boundaries", () => {
           const handles = await admin`SELECT ref_kind, owner_principal_id FROM job_secret_handles WHERE job_id = ${jobId}`;
           expect(handles).toHaveLength(2); expect(handles.every((row) => row.owner_principal_id === runId)).toBe(true);
           expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${runId} AND action = 'commander.execution.handed_off'`).toHaveLength(1);
+          if (warm) {
+            const [reserved] = await admin`SELECT distributed_warm_state FROM internal_agent_runs WHERE id = ${runId}`;
+            expect(reserved.distributed_warm_state).toMatchObject({ version: 1, generation: 1, status: "claimed",
+              currentJobId: jobId, currentAttemptId: attemptId, targetId: TARGET_PLATFORM, targetGeneration: 4 });
+            expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${runId} AND action = 'commander.warm.claimed'`).toHaveLength(1);
+            const nextJob = randomUUID(); const nextAttempt = randomUUID(); const nextRun = randomUUID();
+            await seedJob({ jobId: nextJob, attemptId: nextAttempt, targetClass: "managed_cloud" });
+            await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, provider, status)
+              VALUES (${nextRun}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'openai', 'running')`;
+            await admin`INSERT INTO internal_agent_messages (conversation_id, role, run_id) VALUES (${conversationId}, 'assistant', ${nextRun})`;
+            const [original] = await admin`SELECT input, input_hash FROM jobs WHERE id = ${jobId}`;
+            await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${nextRun},
+              source_intent = ${{ kind: 'commander_turn', internalAgentRunId: nextRun, conversationId }},
+              requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+              executor_principal_kind = 'sandbox', executor_principal_id = ${nextRun},
+              input = ${original.input}, input_hash = ${original.input_hash},
+              placement_request = ${{ policyId: 'job-submission-default', policyVersion: 1, requestedTarget: TARGET_A }} WHERE id = ${nextJob}`;
+            await expect(service.place({ ...request, jobId: nextJob, attemptId: nextAttempt })).rejects.toMatchObject({ code: 'commander_handoff_refused' });
+            expect((await admin`SELECT placement_decided_at FROM job_attempts WHERE id = ${nextAttempt}`)[0].placement_decided_at).toBeNull();
+            expect(await admin`SELECT id FROM job_secret_handles WHERE job_id = ${nextJob}`).toHaveLength(0);
+          }
           await admin`UPDATE job_secret_handles SET status = 'revoked' WHERE job_id = ${jobId} AND ref_kind = 'run_jwt'`;
           await expect(service.place(request)).rejects.toMatchObject({ code: "execution_secret_required" });
         } else {
@@ -878,7 +921,14 @@ integration("JOB-009 slice A schema and role boundaries", () => {
           expect(await admin`SELECT id FROM job_secret_handles WHERE job_id = ${jobId}`).toHaveLength(0);
         }
       }
-    } finally { setDeploymentMode(oldMode); }
+    } finally {
+      setDeploymentMode(oldMode);
+      if (oldWarmFlag === undefined) delete process.env[warmFlag]; else process.env[warmFlag] = oldWarmFlag;
+      await admin`UPDATE execution_targets SET registered_profile = ${oldTarget.registered_profile},
+        registered_profile_hash = ${oldTarget.registered_profile_hash}, provider_constraint_profile = ${oldTarget.provider_constraint_profile}
+        WHERE id = ${TARGET_PLATFORM}`;
+      await admin`UPDATE workers SET profile_snapshot = ${oldWorker.profile_snapshot}, profile_hash = ${oldWorker.profile_hash} WHERE id = ${WORKER_PLATFORM}`;
+    }
   });
 
   it.each([
