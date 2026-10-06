@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import { setDeploymentMode } from "../config/deployment-mode.js";
 
+const warmOwner = vi.hoisted(() => vi.fn(async () => false));
+vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: warmOwner }));
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
@@ -129,6 +131,7 @@ async function runChat(cliTool: string, paramsOverrides: Record<string, unknown>
 
 describe("W7.5d cloud Commander reroute + atomic release", () => {
   beforeEach(() => {
+    warmOwner.mockResolvedValue(false);
     vi.clearAllMocks();
     vi.resetModules();
     setDeploymentMode("cloud_auth");
@@ -140,6 +143,19 @@ describe("W7.5d cloud Commander reroute + atomic release", () => {
     runCommanderAdapterTurnMock.mockReset();
   });
   afterEach(() => setDeploymentMode("local_trusted"));
+
+  it.each([false, true])("blocks legacy acquisition with retained ownership when a port declines (%s)", async (declines) => {
+    const { setCommanderDistributedPort } = await import("../services/commander-distributed-port.js");
+    const execute = vi.fn(async () => null);
+    setCommanderDistributedPort(declines ? { execute } : undefined);
+    warmOwner.mockResolvedValue(true);
+    try {
+      const { chunks, spawn, execSync } = await runChat('claude_cli', { userMessageId: 'message-a' });
+      expect(chunks).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('retained') })]);
+      expect(resolveCommanderSandboxContextMock).not.toHaveBeenCalled(); expect(runCommanderAdapterTurnMock).not.toHaveBeenCalled();
+      expect(spawn).not.toHaveBeenCalled(); expect(execSync).not.toHaveBeenCalled();
+    } finally { setCommanderDistributedPort(undefined); }
+  });
 
   it("consumes distributed Commander output before any warm sandbox, adapter or host acquire", async () => {
     const { setCommanderDistributedPort } = await import("../services/commander-distributed-port.js");

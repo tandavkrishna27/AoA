@@ -42,6 +42,7 @@ import { getServerAdapter } from "../../adapters/registry.js";
 import { instanceSettingsService } from "../instance-settings.js";
 import { resolveCommanderSandboxContext, runCommanderAdapterTurn } from "./commander-sandbox.js";
 import { getCommanderDistributedPort } from "../commander-distributed-port.js";
+import { hasCommanderWarmOwner } from "../commander-warm-owner.js";
 import { createCommanderStreamQueue, removeDeliveredCommanderChunks } from "../commander-stream-queue.js";
 import { parseCommanderDistributedOutput } from "../commander-distributed-output.js";
 import type { CommanderSandboxContext } from "./commander-sandbox.js";
@@ -982,6 +983,13 @@ export function cliModeService(db: Db) {
           for (const chunk of removeDeliveredCommanderChunks(final, delivered)) yield chunk;
           return;
         }
+      }
+
+      // This survives missing ports and rollback switches. Never acquire or
+      // spawn a second owner while a distributed physical session is retained.
+      if (await hasCommanderWarmOwner(db, { companyId: params.companyId, userId: params.userId, conversationId })) {
+        yield { type: "error", message: "Commander retained session requires distributed execution; cleanup is pending." };
+        return;
       }
 
       // 3. Resolve the warm sandbox — cloud only (null on self-hosted, where the
