@@ -86,7 +86,7 @@ export function makeNetworkedRunProvider(baseUrl: string, fetchImpl: typeof fetc
     };
     const warm = warmControl === undefined ? null : readCommanderWarmControl(warmControl, validated);
     if (warmControl !== undefined && !warm) throw new NetworkedProviderCapabilityError("invalid warm resource authority");
-    return new NetworkedProviderDriver({ baseUrl, capability: validated, fetch: fetchImpl,
+    return new NetworkedProviderDriver({ baseUrl, capability: validated, fetch: fetchImpl, enableLiveStdout: true,
       ...(warm ? { enableCheckpointRestore: true, warmResourceCapability: warm.warmResourceCapability } : {}) });
   };
 }
