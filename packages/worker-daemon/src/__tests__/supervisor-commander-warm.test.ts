@@ -72,6 +72,47 @@ describe("Commander retained VM lifecycle through the actual supervisor", () => 
     expect(run.sink.events.at(-1)?.payload).toMatchObject({ status: "failed", errorCode: "warm_checkpoint_failed" });
     expect(run.fake.callCount("destroy")).toBe(1);
   });
+  it.each(['cancel', 'leaseLost'] as const)("does not retain a late checkpoint after %s", async (reason) => {
+    const run = setup(); const offer = handoff();
+    let started!: () => void; let release!: () => void;
+    const checkpointStarted = new Promise<void>((resolve) => { started = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    run.checkpoint.mockImplementation(async () => {
+      started(); await released;
+      return { mode: 'snapshot', checkpointRef: 'late-checkpoint', providerOpId: 'late-op' };
+    });
+    const accepted = run.supervisor.accept(offer);
+    try {
+      await checkpointStarted;
+      if (reason === 'cancel') await run.supervisor.cancel(offer.offer.leaseId);
+      else await run.supervisor.onLeaseLost(offer.offer.leaseId);
+    } finally { release(); await accepted; }
+    expect(run.sink.events.some((event) => event.eventType === 'log' && JSON.stringify(event.payload).includes('aoa-commander-checkpoint-v1:'))).toBe(false);
+    expect(run.sink.events.some((event) => event.eventType === 'terminal' && (event.payload as { status: string }).status === 'succeeded')).toBe(false);
+    expect(run.fake.callCount('destroy')).toBeGreaterThanOrEqual(1);
+    expect(run.supervisor.activeRunCount()).toBe(0);
+  });
+  it("reclaims a timed-out checkpoint and ignores its later completion", async () => {
+    vi.useFakeTimers();
+    const run = setup(); let started!: () => void; let release!: () => void;
+    const checkpointStarted = new Promise<void>((resolve) => { started = resolve; });
+    const released = new Promise<void>((resolve) => { release = resolve; });
+    run.checkpoint.mockImplementation(async () => {
+      started(); await released;
+      return { mode: 'snapshot', checkpointRef: 'late-checkpoint', providerOpId: 'late-op' };
+    });
+    const accepted = run.supervisor.accept(handoff());
+    try {
+      await checkpointStarted;
+      await vi.advanceTimersByTimeAsync(5001);
+      await accepted;
+      release(); await Promise.resolve();
+      expect(run.sink.events.some((event) => event.eventType === 'log' && JSON.stringify(event.payload).includes('aoa-commander-checkpoint-v1:'))).toBe(false);
+      expect(run.sink.events.at(-1)?.payload).toMatchObject({ status: 'failed', errorCode: 'warm_checkpoint_failed' });
+      expect(run.fake.callCount('destroy')).toBeGreaterThanOrEqual(1);
+      expect(run.supervisor.activeRunCount()).toBe(0);
+    } finally { release(); vi.useRealTimers(); await accepted; }
+  });
 });
 
 describe("Commander retained resource transfer and ledger failure", () => {
