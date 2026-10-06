@@ -1658,17 +1658,24 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     { createCommanderDistributedResultReader, createCommanderExistingTurnReader, createCommanderSourcePreparer },
     { readDistributedToolSurfaceFlag, resolveDistributedToolSurface },
     { preflightOneShotCliSpend, recordOneShotCliCost }, { parseCommanderDistributedOutput },
-    { persistCommanderDistributedReply, persistCommanderDistributedFailure }, { createCommanderResultRecovery, createCommanderRecoveryCandidateReader }] = await Promise.all([
+    { persistCommanderDistributedReply, persistCommanderDistributedFailure }, { createCommanderResultRecovery, createCommanderRecoveryCandidateReader },
+    { createCommanderAcceptedStreamReader }] = await Promise.all([
     import("./services/commander-distributed-port.js"), import("./services/commander-distributed-store.js"),
     import("./config/distributed-execution.js"), import("./services/one-shot-cli-budget.js"),
     import("./services/commander-distributed-output.js"),
     import("./services/commander-distributed-reply.js"), import("./services/commander-result-recovery.js"),
+    import("./services/commander-accepted-stream.js"),
   ]);
   const commanderRolloutHook = distributedRolloutHook;
   const commanderRead = createCommanderDistributedResultReader(appDb, oneShotStorage(config));
   const projectCommanderReply = async (input: import("./services/commander-result-recovery.js").CommanderRecoveryCandidate,
     result: import("./services/one-shot-distributed-result.js").CapturedOneShotResult) => {
-    const chunks = await parseCommanderDistributedOutput({ result, cliTool: input.cliTool, turnId: input.operationId, model: input.model });
+    let chunks: import("./services/internal-agent/agent-loop.js").AgentStreamChunk[];
+    try { chunks = await parseCommanderDistributedOutput({ result, cliTool: input.cliTool, turnId: input.operationId, model: input.model }); }
+    catch (error) {
+      await persistCommanderDistributedFailure(db, { ...input, acceptedReplyUnavailable: true });
+      throw error;
+    }
     const done = chunks.find((chunk) => chunk.type === "done");
     if (done?.type !== "done") throw new Error("Commander accepted reply has no terminal");
     if (!result.usageAccepted) await recordOneShotCliCost(db, { companyId: input.companyId, provider: done.summary.provider!, model: input.model,
@@ -1679,7 +1686,8 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   };
   commanderResultRecovery = createCommanderResultRecovery({ list: createCommanderRecoveryCandidateReader(db),
     read: commanderRead, project: projectCommanderReply,
-    fail: (candidate) => persistCommanderDistributedFailure(db, candidate),
+    fail: (candidate) => persistCommanderDistributedFailure(db, { ...candidate, acceptedReplyUnavailable: true }),
+    retire: (candidate) => persistCommanderDistributedFailure(db, candidate),
     onError: (err, candidate) => logger.warn({ err, companyId: candidate.companyId, runId: candidate.operationId }, "Commander reply recovery will retry") });
 
   setCommanderDistributedPort(createCommanderDistributedPort({
@@ -1689,6 +1697,7 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     existing: createCommanderExistingTurnReader(db), prepare: createCommanderSourcePreparer(db),
     preflight: (input) => preflightOneShotCliSpend(db, input),
     read: commanderRead,
+    readLive: createCommanderAcceptedStreamReader(appDb),
     cancel: (scope) => jobReconciliationForCancel.requestCancellation({ organizationId: scope.organizationId,
       companyId: scope.companyId, jobId: scope.jobId, reason: "Commander result wait deadline", graceful: false }),
     async persistReply(input, scope, result) {

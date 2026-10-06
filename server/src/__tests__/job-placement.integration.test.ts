@@ -10,6 +10,7 @@ import type { Db } from "@armyofagents/db";
 import { createDrizzleJobCredentialRoutingResolver } from "../services/job-credential-routing.js";
 import { resolveAuthoritativeRate } from "../services/job-authoritative-rate.js";
 import { buildCommanderDistributedInvocation } from "../services/commander-distributed-invocation.js";
+import { createCommanderAcceptedStreamReader } from "../services/commander-accepted-stream.js";
 import { persistCommanderDistributedReply, persistCommanderDistributedFailure } from "../services/commander-distributed-reply.js";
 import { rejoinCommanderRun } from "../services/commander-rejoin-run.js";
 import { createCommanderSourcePreparer, createCommanderExistingTurnReader, createCommanderDistributedResultReader } from "../services/commander-distributed-store.js";
@@ -759,12 +760,14 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.rejoined'`).toHaveLength(1);
 
     await admin`UPDATE job_attempts SET status = 'cancelled' WHERE id = ${attemptId}`;
+    await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     const failedScope = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, operationId: newer,
       userId: OWNER_A, conversationId, messageId };
     await Promise.all([persistCommanderDistributedFailure(ownerDb, failedScope), persistCommanderDistributedFailure(ownerDb, failedScope)]);
     expect((await admin`SELECT status FROM internal_agent_runs WHERE id = ${newer}`)[0].status).toBe("cancelled");
     expect((await admin`SELECT turn_status FROM internal_agent_messages WHERE id = ${messageId}`)[0].turn_status).toBe("failed");
     expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${newer} AND action = 'commander.execution.failed'`).toHaveLength(1);
+    await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     // A cancelled paid owner remains owned; retry never creates another job.
     expect(await existing(replay)).toMatchObject({ jobId, attemptId, operationId: newer });
 
@@ -1770,9 +1773,19 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id, sequence, event_type, fence_token, event_digest, event, occurred_at)
         VALUES (${ORG_A}, ${COMPANY_A}, ${jobId}, ${attemptId}, 1, ${leaseId}, ${eventId}, ${sequence}, ${eventType}, 'result-fence', ${"a".repeat(64)}, ${event}, now())`;
     }
-    await accept(1, "artifact_prepared", { artifactId: identifier, kind: "other" });
+    const readLive = createCommanderAcceptedStreamReader(app.db);
+    const line = '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"live answer"}}}\n';
+    await accept(1, "log", { stream: "stdout", level: "info", message: "aoa-commander-stream-v1:" + line });
+    expect(await readLive(scope, 0)).toEqual([{ sequence: 1, text: line }]);
+    expect(await readLive(scope, 1)).toEqual([]);
+    await expect(readLive({ ...scope, companyId: COMPANY_B }, 0)).rejects.toThrow("authority");
+    await expect(readLive({ ...scope, operationId: randomUUID() }, 0)).rejects.toThrow("authority");
+    await admin`UPDATE job_events SET fence_token = 'foreign-log-fence' WHERE job_id = ${jobId} AND event_type = 'log'`;
+    expect(await readLive(scope, 0)).toEqual([]);
+    await admin`UPDATE job_events SET fence_token = 'result-fence' WHERE job_id = ${jobId} AND event_type = 'log'`;
+    await accept(2, "artifact_prepared", { artifactId: identifier, kind: "other" });
     expect(await read(scope)).toEqual({ state: "pending" });
-    await accept(2, "terminal", { status: "succeeded", exitCode: 0, errorCode: null, errorMessage: null });
+    await accept(3, "terminal", { status: "succeeded", exitCode: 0, errorCode: null, errorMessage: null });
     expect(await read(scope)).toEqual({ state: "result", result: { ...result, usageAccepted: false } });
     await expect(read({ ...scope, companyId: COMPANY_B })).rejects.toThrow("not found");
     await expect(read({ ...scope, organizationId: ORG_B })).rejects.toThrow("not found");
@@ -1792,6 +1805,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     } finally { await replyClient.end(); }
     await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     await expect(read(scope)).rejects.toThrow("source mismatch");
+    await expect(readLive(scope, 0)).rejects.toThrow("authority");
     await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A} AND principal_id = ${OWNER_A}`;
     await admin`UPDATE job_artifacts SET fence_token = 'foreign-fence' WHERE job_id = ${jobId}`;
     await expect(read(scope)).rejects.toThrow("provenance");

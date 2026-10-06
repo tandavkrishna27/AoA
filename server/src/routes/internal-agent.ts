@@ -415,7 +415,8 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
             completedAt: new Date(),
             errorMessage: message,
           })
-          .where(eq(internalAgentRuns.id, run.id))
+          .where(and(eq(internalAgentRuns.id, run.id), eq(internalAgentRuns.companyId, companyId),
+            eq(internalAgentRuns.status, "running")))
           .catch(() => {});
       }
 

@@ -1,3 +1,5 @@
+import type { AgentStreamChunk } from "./internal-agent/agent-loop.js";
+import { StreamJsonParser } from "./internal-agent/parse-stream-json.js";
 import type { HeartbeatDistributedRolloutHook } from "./heartbeat-distributed-rollout.js";
 import { buildCommanderDistributedInvocation, type CommanderDistributedInvocationInput } from "./commander-distributed-invocation.js";
 import { waitForOneShotResult, type CapturedOneShotResult, type OneShotResultObservation, type OneShotResultScope } from "./one-shot-distributed-result.js";
@@ -8,7 +10,7 @@ export interface CommanderDistributedInput extends CommanderDistributedInvocatio
 }
 export interface CommanderDistributedPort {
   /** Null is a pre-transfer legacy choice. Any error after ownership stays an error. */
-  execute(input: CommanderDistributedInput): Promise<CapturedOneShotResult | null>;
+  execute(input: CommanderDistributedInput, onChunk?: (chunk: AgentStreamChunk) => void): Promise<CapturedOneShotResult | null>;
 }
 let registered: CommanderDistributedPort | undefined;
 export function setCommanderDistributedPort(port: CommanderDistributedPort | undefined): void { registered = port; }
@@ -21,11 +23,30 @@ export function createCommanderDistributedPort(deps: {
   preflight(input: { companyId: string }): Promise<{ allowed: boolean }>;
   read(scope: OneShotResultScope, signal?: AbortSignal): Promise<OneShotResultObservation>;
   cancel(scope: OneShotResultScope): Promise<unknown>;
+  readLive?(scope: OneShotResultScope, afterSequence: number, signal?: AbortSignal): Promise<{ sequence: number; text: string }[]>;
   persistReply?(input: CommanderDistributedInput, scope: OneShotResultScope, result: CapturedOneShotResult): Promise<void>;
   recordFallback?(input: CommanderDistributedInput, result: CapturedOneShotResult): Promise<void>;
 }): CommanderDistributedPort {
-  const settle = async (input: CommanderDistributedInput, scope: OneShotResultScope) => {
-    const result = await waitForOneShotResult({ scope, timeoutMs: input.timeoutMs + 30000, read: deps.read, cancel: deps.cancel });
+  const settle = async (input: CommanderDistributedInput, scope: OneShotResultScope, onChunk?: (chunk: AgentStreamChunk) => void) => {
+    let cursor = 0;
+    const parser = input.cliTool === "claude_cli" && onChunk && deps.readLive ? new StreamJsonParser() : null;
+    const read = async (current: OneShotResultScope, signal?: AbortSignal) => {
+      if (parser && deps.readLive) {
+        const rows = await deps.readLive(current, cursor, signal);
+        if (signal?.aborted) throw new Error("Commander stream read aborted");
+        for (const row of rows) {
+          if (!Number.isSafeInteger(row.sequence) || row.sequence <= cursor) continue;
+          cursor = row.sequence;
+          for (const chunk of parser.push(row.text)) {
+            // Completion comes only from the accepted terminal + committed artifact.
+            if (chunk.type === "done") continue;
+            try { onChunk?.(chunk); } catch { /* Reader failure cannot redispatch or discard the result. */ }
+          }
+        }
+      }
+      return deps.read(current, signal);
+    };
+    const result = await waitForOneShotResult({ scope, timeoutMs: input.timeoutMs + 30000, read, cancel: deps.cancel });
     if (!result.usageAccepted && deps.recordFallback) {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -46,13 +67,13 @@ export function createCommanderDistributedPort(deps: {
     }
     return result;
   };
-  return { async execute(input) {
+  return { async execute(input, onChunk) {
     const built = buildCommanderDistributedInvocation(input);
     if (!built) return null;
     // A durable owner may outlive its rollout switch. Rejoin before new-spend gates.
     const owned = await deps.existing({ ...input, stagedFiles: built.stagedFiles });
     if (owned) return settle({ ...input, turnId: owned.operationId ?? input.turnId },
-      { ...owned, companyId: input.companyId, operationId: owned.operationId ?? input.turnId });
+      { ...owned, companyId: input.companyId, operationId: owned.operationId ?? input.turnId }, onChunk);
     // Batch capture is ephemeral; existing warm resources keep their legacy owner.
     if (input.warmConversation) return null;
     const rollout = await deps.rollout.resolveRunRolloutState({ companyId: input.companyId, sourceKind: "commander_turn" });
@@ -66,6 +87,6 @@ export function createCommanderDistributedPort(deps: {
     if (owner.owner !== "distributed") return null;
     // Deliberately outside the owner resolver's pre-transfer catch/fallback boundary.
     return settle(input, { companyId: input.companyId, organizationId: rollout.organizationId,
-      jobId: owner.jobId, attemptId: owner.attemptId, operationId: input.turnId });
+      jobId: owner.jobId, attemptId: owner.attemptId, operationId: input.turnId }, onChunk);
   } };
 }

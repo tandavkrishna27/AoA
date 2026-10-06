@@ -49,6 +49,7 @@ import {
   type StagedFileRequest,
 } from "./provider.js";
 import type { RunCanaryCoordinator } from "./run-canaries.js";
+import { createCommanderLiveOutput } from "./commander-live-output.js";
 import { RUN_OUTPUT_DROPPED_METRIC, createRunOutputCapture, scrubOutputText } from "./run-output.js";
 import { ENV_PROBE_DEFAULT_DEADLINE_MS, ENV_PROBE_ERROR_CODES, envProbeLogMessage, runEnvProbe } from "./env-probe.js";
 import { PROVIDER_AUTH_ENV_TARGETS } from "../lease/secret-redemption.js";
@@ -957,6 +958,10 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
           onDrop: (reason) => deps.metrics?.inc(RUN_OUTPUT_DROPPED_METRIC, { reason }),
         })
       : null;
+    const commanderLive = handoff.offer.job.source.kind === "commander_turn" && spec.command === "node" &&
+      spec.args.length === 4 && spec.args[0] === "/home/user/aoa-commander-runner.cjs"
+      ? createCommanderLiveOutput({ canaries: runCanaries,
+          emit: (message) => events.log({ stream: "stdout", level: "info", message }) }) : null;
     const execStartedAt = now();
     let exec;
     try {
@@ -967,7 +972,9 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
             command: spec.command,
             args: spec.args,
             env: spec.env,
-            ...(output ? { onStdout: output.onStdout } : {}),
+            ...(output || commanderLive ? { onStdout: (chunk: string) => {
+              output?.onStdout(chunk); commanderLive?.onStdout(chunk);
+            } } : {}),
           },
           // H1 - the run's budget on BOTH sides: the ctx is the provider's own command
           // timeout, and the race below is the supervisor-side backstop for a provider that
@@ -978,6 +985,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         run.opDeadlineMs,
       );
       if (raced === TIMEOUT) {
+        await commanderLive?.close();
         output?.close(); // discard: a late chunk is dropped + counted, never buffered
         emitOp("execute", "timed_out");
         const cancelled = run.cancelled;
@@ -993,6 +1001,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       exec = raced;
     } catch (err) {
       output?.close();
+      await commanderLive?.close();
       emitOp("execute", "failed");
       // §2.1 — this is the ONLY lifecycle exit and it MUST still reach a durable
       // terminal. The common cancel/lease-loss path tears down the sandbox
@@ -1014,6 +1023,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     // Close the channel the moment execute returns: the tail is final, and anything a provider
     // delivers after this point is dropped, not appended to a run that has already ended.
     const captured = output?.close();
+    await commanderLive?.close();
 
     if (run.cancelled) {
       // Cancelled while executing — emit a durable cancelled terminal (CLI-003/D3),

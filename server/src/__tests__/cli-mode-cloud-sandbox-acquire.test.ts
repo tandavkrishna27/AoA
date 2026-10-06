@@ -95,7 +95,7 @@ function providerSandboxContext(release: () => Promise<void>) {
   };
 }
 
-async function runChat(cliTool: string, paramsOverrides: Record<string, unknown> = {}) {
+async function runChat(cliTool: string, paramsOverrides: Record<string, unknown> = {}, observed?: (chunk: any) => void) {
   // vi.resetModules() (beforeEach) gives us a FRESH deployment-mode singleton for
   // the dynamically-imported cli-mode; set the mode on THAT instance (the static
   // top-level import points at a stale pre-reset instance).
@@ -122,6 +122,7 @@ async function runChat(cliTool: string, paramsOverrides: Record<string, unknown>
     { cliTool, executionMode: "cli" } as any,
   )) {
     chunks.push(chunk);
+    observed?.(chunk);
   }
   return { chunks, spawn: vi.mocked(cp.spawn), execSync: vi.mocked(cp.execSync) };
 }
@@ -151,9 +152,33 @@ describe("W7.5d cloud Commander reroute + atomic release", () => {
       const { chunks, spawn, execSync } = await runChat("claude_cli", { userMessageId: "message-a" });
       expect(chunks).toContainEqual({ type: "text", delta: "distributed answer" });
       expect(chunks.filter((chunk) => chunk.type === "done")).toHaveLength(1);
-      expect(execute).toHaveBeenCalledWith(expect.objectContaining({ turnId: "run-1", messageId: "message-a", userId: "user1", conversationId: "conversation-a" }));
+      expect(execute).toHaveBeenCalledWith(expect.objectContaining({ turnId: "run-1", messageId: "message-a", userId: "user1", conversationId: "conversation-a" }), expect.any(Function));
       expect(resolveCommanderSandboxContextMock).not.toHaveBeenCalled(); expect(runCommanderAdapterTurnMock).not.toHaveBeenCalled();
       expect(spawn).not.toHaveBeenCalled(); expect(execSync).not.toHaveBeenCalled();
+    } finally { setCommanderDistributedPort(undefined); }
+  });
+  it("streams before acceptance and does not repeat live text when the accepted artifact arrives", async () => {
+    const { setCommanderDistributedPort } = await import("../services/commander-distributed-port.js");
+    let release!: (value: any) => void; let observed!: () => void;
+    const firstChunk = new Promise<void>((resolve) => { observed = resolve; });
+    const accepted = new Promise<any>((resolve) => { release = resolve; });
+    setCommanderDistributedPort({ execute: async (_input, emit) => {
+      emit?.({ type: "text", delta: "early" }); return accepted;
+    } });
+    try {
+      let finished = false;
+      const running = runChat("claude_cli", { userMessageId: "message-a" }, (chunk) => {
+        if (chunk.type === "text") observed();
+      }).then((value) => { finished = true; return value; });
+      await firstChunk; expect(finished).toBe(false);
+      expect(resolveCommanderSandboxContextMock).not.toHaveBeenCalled();
+      release({ version: 1, operationId: "run-1", stdout: [
+        JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "early" } } }),
+        JSON.stringify({ type: "result", is_error: false, usage: { input_tokens: 4, output_tokens: 2 } })].join("\n"),
+        stderr: "", exitCode: 0, timedOut: false, durationMs: 20, captureError: null });
+      const { chunks } = await running;
+      expect(chunks.filter((chunk) => chunk.type === "text")).toEqual([{ type: "text", delta: "early" }]);
+      expect(chunks.filter((chunk) => chunk.type === "done")).toHaveLength(1);
     } finally { setCommanderDistributedPort(undefined); }
   });
   it("throws a transferred Commander result failure without starting a legacy sandbox", async () => {

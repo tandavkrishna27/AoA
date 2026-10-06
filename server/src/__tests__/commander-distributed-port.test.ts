@@ -77,6 +77,21 @@ describe("Commander actual distributed dispatch", () => {
     expect(d.preflight).not.toHaveBeenCalled(); expect(d.prepare).not.toHaveBeenCalled();
     expect(d.rollout.resolveExecutionOwner).not.toHaveBeenCalled();
   });
+  it("delivers accepted live Claude deltas once and withholds terminal until the accepted result", async () => {
+    const d = deps(); const onChunk = vi.fn();
+    const readLive = vi.fn(async () => [{ sequence: 1, text: '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"early"}}}\n' },
+      { sequence: 2, text: '{"type":"result","usage":{"input_tokens":1,"output_tokens":1},"duration_ms":1}\n' }]);
+    await createCommanderDistributedPort({ ...d, readLive } as never).execute(input, onChunk);
+    expect(readLive).toHaveBeenCalledWith(expect.objectContaining({ operationId: turnId }), 0, expect.anything());
+    expect(onChunk).toHaveBeenCalledWith({ type: "text", delta: "early" });
+    expect(onChunk.mock.calls.some((call) => call[0].type === "done")).toBe(false);
+  });
+  it("cancels owned work when the accepted live log reader loses source authority", async () => {
+    const d = deps(); const readLive = vi.fn(async () => { throw new Error("Commander stream authority mismatch"); });
+    await expect(createCommanderDistributedPort({ ...d, readLive } as never).execute(input, vi.fn())).rejects.toThrow("authority mismatch");
+    expect(d.cancel).toHaveBeenCalledOnce(); expect(d.read).not.toHaveBeenCalled();
+    expect(d.rollout.resolveExecutionOwner).toHaveBeenCalledOnce();
+  });
   it("never returns a legacy decline after an accepted-output read fails", async () => {
     const d = deps(); d.read.mockRejectedValue(new Error("storage unavailable"));
     await expect(createCommanderDistributedPort(d as never).execute(input)).rejects.toThrow("storage unavailable");
