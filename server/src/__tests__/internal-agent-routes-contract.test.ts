@@ -62,6 +62,7 @@ vi.mock("@armyofagents/db", () => ({
 // ── Mock dependencies that routes need ───────────────────────────────────────
 vi.mock("../middleware/rbac.js", () => ({
   assertRole: vi.fn(),
+  assertHumanRole: vi.fn(),
 }));
 
 vi.mock("../routes/authz.js", () => ({
@@ -106,6 +107,19 @@ vi.mock("../services/company-skills.js", () => ({
 import { internalAgentRoutes } from "../routes/internal-agent.js";
 
 describe("internal-agent-routes-contract", () => {
+  it("omits retained resource authority from the actual run history response", async () => {
+    const row = { id: "run", status: "completed", distributedWarmConversationId: "private-conversation", distributedWarmState: { id: "session", resource: "private-vm" } };
+    const db = { select: vi.fn()
+      .mockReturnValueOnce({ from: () => ({ where: async () => [{ totalRuns: 1, totalCostCents: 0, avgDurationMs: 1, failedCount: 0 }] }) })
+      .mockReturnValueOnce({ from: () => ({ where: () => ({ orderBy: () => ({ limit: () => ({ offset: async () => [row] }) }) }) }) }) };
+    const router = internalAgentRoutes(db as any);
+    const route = router.stack.find((layer: any) => layer.route?.path === "/companies/:companyId/internal-agent/runs");
+    const json = vi.fn();
+    await route!.route.stack.at(-1).handle({ params: { companyId: "company" }, query: {} }, { json });
+    expect(json.mock.calls[0][0].runs).toEqual([{ id: "run", status: "completed" }]);
+    expect(row.distributedWarmState).toEqual({ id: "session", resource: "private-vm" });
+  });
+
   it("returns an Express Router", () => {
     const db = {} as any;
     const router = internalAgentRoutes(db);

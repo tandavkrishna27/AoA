@@ -1,6 +1,7 @@
 // server/src/routes/internal-agent.ts
 // Internal Agent HTTP endpoints — T13a
 import { Router, type Request } from "express";
+import { commanderPublicRun } from "../services/commander-public-run.js";
 import { z } from "zod";
 import { and, or, eq, asc, desc, gte, lte, isNull, inArray, sql, type SQL } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
@@ -1050,7 +1051,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
         .offset(offset);
 
       res.json({
-        runs,
+        runs: runs.map(commanderPublicRun),
         total: totalRuns,
         limit,
         offset,

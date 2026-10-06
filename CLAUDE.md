@@ -498,7 +498,7 @@ All table definitions live in `packages/db/src/schema/`. Schema changes use Driz
 | `internal_agent_config` | Per-company: executionMode, provider, model, `autonomyLevel` (Commander dial) + `crewAutonomyLevel` (agent-work dial — D18 split), enabledCapabilities (12 types), budget, proactive interval |
 | `internal_agent_conversations` | Multi-chat per user per company. `summarizedContext` for token management. `pinned` (sidebar pin), `sortOrder` (nullable manual drag-order; null = recency/date groups), `archivedAt` |
 | `internal_agent_messages` | `role`: user/assistant/system/tool_call/tool_result. `toolCalls`/`toolResults` JSON. `pageContext`, `departmentContext` |
-| `internal_agent_runs` | `triggerType`: conversation/proactive/event/sub_agent. `toolsCalled`, `tokenUsage`, `costCents` |
+| `internal_agent_runs` | `triggerType`: conversation/proactive/event/sub_agent. `toolsCalled`, `tokenUsage`, `costCents`  Private `distributedWarmConversationId`/`distributedWarmState` reserve one retained resource generation on an actual conversation turn; omitted from run APIs. The issuer/worker warm lifecycle is still pending cutover. |
 | `internal_agent_reminders` | Scheduled reminders. `triggerAt`, `status`: pending/fired/cancelled |
 | `internal_agent_runtime_approvals` | Runtime approval requests for governed Commander/tool actions |
 | `internal_agent_tool_trust_rules` | Trust rules for repeated runtime approval decisions |

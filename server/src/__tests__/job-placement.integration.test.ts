@@ -514,6 +514,113 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     if (dataDir) await rm(dataDir, { recursive: true, force: true }).catch(() => {});
   });
 
+  it("atomically reserves warm ownership on an actual Commander turn under the existing app role", async () => {
+    const { admin, app } = guard();
+    const { claimCommanderWarmTurn } = await import("../services/commander-warm-store.js");
+    const conversationId = randomUUID(); const contextTaskId = randomUUID();
+    await admin`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+      VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active') ON CONFLICT (company_id, principal_type, principal_id) DO UPDATE SET status = 'active'`;
+    await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id) VALUES (${conversationId}, ${COMPANY_A}, ${OWNER_A})`;
+    const requests = [];
+    for (let i = 0; i < 2; i++) {
+      const turnId = randomUUID(), jobId = randomUUID(), attemptId = randomUUID();
+      await seedJob({ jobId, attemptId });
+      await place({ jobId, attemptId });
+      await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status, provider,
+        execution_owner, distributed_job_id, distributed_attempt_id, related_entity_type, related_entity_id)
+        VALUES (${turnId}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'running', 'openai', 'distributed', ${jobId}, ${attemptId}, 'task', ${contextTaskId})`;
+      await admin`INSERT INTO internal_agent_messages (conversation_id, role, content, run_id) VALUES (${conversationId}, 'user', 'warm', ${turnId})`;
+      await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${turnId},
+        source_intent = ${{ kind: 'commander_turn', internalAgentRunId: turnId, conversationId }},
+        requester_principal_kind = 'user', requester_principal_id = ${OWNER_A}, executor_principal_kind = 'sandbox', executor_principal_id = ${turnId}
+        WHERE id = ${jobId}`;
+      requests.push({ organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, targetId: TARGET_A, targetGeneration: 1, supportsCheckpointRestore: true });
+    }
+    const claim = (request: typeof requests[number]) => runInTenant(app.db, ORG_A, (_repos, tx) => claimCommanderWarmTurn(tx, request));
+    await expect(claim({ ...requests[0], companyId: COMPANY_B })).rejects.toMatchObject({ reason: "source_authority" });
+    await expect(claim({ ...requests[0], supportsCheckpointRestore: false })).rejects.toMatchObject({ reason: "provider_unsupported" });
+    await expect(claim({ ...requests[0], targetGeneration: 2 })).rejects.toMatchObject({ reason: "placement_authority" });
+    await expect(runInTenant(app.db, ORG_A, async (_repos, tx) => {
+      await claimCommanderWarmTurn(tx, requests[0]);
+      throw new Error("warm_rollback_probe");
+    })).rejects.toThrow("warm_rollback_probe");
+    expect(await admin`SELECT id FROM internal_agent_runs WHERE company_id = ${COMPANY_A}
+      AND distributed_warm_conversation_id = ${conversationId} AND distributed_warm_state IS NOT NULL`).toHaveLength(0);
+    const settled = await Promise.allSettled(requests.map(claim));
+    const winner = settled.findIndex((entry) => entry.status === "fulfilled");
+    expect(winner, settled.map((entry) => entry.status === "rejected" ? String(entry.reason?.cause?.message ?? entry.reason) : "ok").join("; ")).toBeGreaterThanOrEqual(0);
+    expect(settled.filter((entry) => entry.status === "fulfilled")).toHaveLength(1);
+    expect(settled.find((entry) => entry.status === "rejected")).toMatchObject({ reason: { reason: "resource_busy" } });
+    const first = (settled[winner] as PromiseFulfilledResult<unknown>).value;
+    expect(first).toMatchObject({ generation: 1, conversationId, status: "claimed", currentJobId: requests[winner].jobId, resource: null });
+    expect(await claim(requests[winner])).toEqual(first);
+    const rows = await admin`SELECT id, related_entity_type, related_entity_id, distributed_warm_state FROM internal_agent_runs WHERE company_id = ${COMPANY_A}
+      AND distributed_warm_conversation_id = ${conversationId} AND distributed_warm_state IS NOT NULL`;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ related_entity_type: "task", related_entity_id: contextTaskId });
+    expect(rows[0].distributed_warm_state.currentJobId).toBe(requests[winner].jobId);
+    // A forged paused marker does not establish an accepted checkpoint or a
+    // retired predecessor fence. The helper must reload the ledger and lease.
+    const forged = { ...(first as Record<string, unknown>), status: "paused", workerId: WORKER_A,
+      currentJobId: null, currentAttemptId: null, currentLeaseId: null,
+      resource: { id: "fake-retained-vm", labels: { organizationId: ORG_A, targetId: TARGET_A, workerId: WORKER_A,
+        jobId: requests[winner].jobId, attempt: 1, leaseId: randomUUID(), deviceGeneration: 1 },
+        checkpointEventId: randomUUID(), attemptId: requests[winner].attemptId,
+        previousCapabilityExpiresAtMs: Date.now() - 1000, previousFenceRetired: true } };
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${forged} WHERE id = ${rows[0].id}`;
+    await expect(claim(requests[1 - winner])).rejects.toMatchObject({ reason: "checkpoint_unaccepted" });
+    const oldCapDeadline = new Date(Date.now() - 1000);
+    forged.resource.previousCapabilityExpiresAtMs = oldCapDeadline.getTime();
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${forged} WHERE id = ${rows[0].id}`;
+    await admin`INSERT INTO leases (id, organization_id, company_id, job_id, attempt_id, attempt_number, worker_id, target_id,
+      target_authority_key, target_generation, profile_hash, provider_constraint_hash, ack_deadline, expires_at, status, fence)
+      VALUES (${forged.resource.labels.leaseId}, ${ORG_A}, ${COMPANY_A}, ${requests[winner].jobId}, ${requests[winner].attemptId}, 1, ${WORKER_A}, ${TARGET_A},
+        ${`organization:${ORG_A}`}, 1, ${"a".repeat(64)}, ${"b".repeat(64)}, ${new Date(oldCapDeadline.getTime() - 1000)}, ${oldCapDeadline}, 'released', 'warm-fence')`;
+    await admin`UPDATE job_attempts SET status = 'succeeded' WHERE id = ${requests[winner].attemptId}`;
+    const receipt = { version: 1, sessionId: (first as { id: string }).id, generation: 1, resourceId: forged.resource.id,
+      checkpointRef: "fake-checkpoint", resourceLabels: forged.resource.labels };
+    const logEvent = { eventType: "log", payload: { stream: "stdout", level: "info", message: "aoa-commander-checkpoint-v1:" + JSON.stringify(receipt) } };
+    await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+      sequence, event_type, fence_token, event_digest, event, occurred_at)
+      VALUES (${ORG_A}, ${COMPANY_A}, ${requests[winner].jobId}, ${requests[winner].attemptId}, 1, ${forged.resource.labels.leaseId},
+        ${forged.resource.checkpointEventId}, 1, 'log', 'warm-fence', ${"a".repeat(64)}, ${logEvent}, now())`;
+    // Checkpoint alone cannot transfer without a later accepted success terminal.
+    await expect(claim(requests[1 - winner])).rejects.toMatchObject({ reason: "checkpoint_unaccepted" });
+    const terminal = { eventType: "terminal", payload: { status: "succeeded", exitCode: 0, errorCode: null, errorMessage: null } };
+    await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+      sequence, event_type, fence_token, event_digest, event, occurred_at)
+      VALUES (${ORG_A}, ${COMPANY_A}, ${requests[winner].jobId}, ${requests[winner].attemptId}, 1, ${forged.resource.labels.leaseId},
+        ${randomUUID()}, 2, 'terminal', 'warm-fence', ${"a".repeat(64)}, ${terminal}, now())`;
+    // A retired database fence still cannot invalidate an offline capability
+    // before its signed upper bound. Neither a forged marker nor membership
+    // revocation may authorize the next turn.
+    const futureDeadline = new Date(Date.now() + 60_000);
+    await admin`UPDATE leases SET expires_at = ${futureDeadline} WHERE id = ${forged.resource.labels.leaseId}`;
+    await expect(claim(requests[1 - winner])).rejects.toMatchObject({ reason: "checkpoint_unaccepted" });
+    forged.resource.previousCapabilityExpiresAtMs = futureDeadline.getTime();
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${forged} WHERE id = ${rows[0].id}`;
+    await expect(claim(requests[1 - winner])).rejects.toMatchObject({ reason: "previous_capability_live" });
+    await admin`UPDATE leases SET expires_at = ${oldCapDeadline} WHERE id = ${forged.resource.labels.leaseId}`;
+    forged.resource.previousCapabilityExpiresAtMs = oldCapDeadline.getTime();
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${forged} WHERE id = ${rows[0].id}`;
+    await admin`UPDATE company_memberships SET status = 'inactive' WHERE company_id = ${COMPANY_A}
+      AND principal_type = 'user' AND principal_id = ${OWNER_A}`;
+    await expect(claim(requests[1 - winner])).rejects.toMatchObject({ reason: "source_authority" });
+    await admin`UPDATE company_memberships SET status = 'active' WHERE company_id = ${COMPANY_A}
+      AND principal_type = 'user' AND principal_id = ${OWNER_A}`;
+    const successor = await Promise.all([claim(requests[1 - winner]), claim(requests[1 - winner])]);
+    expect(successor[0]).toMatchObject({ id: (first as { id: string }).id, generation: 2, status: "claimed", currentJobId: requests[1 - winner].jobId });
+    expect(successor[1]).toEqual(successor[0]);
+    const moved = await admin`SELECT id FROM internal_agent_runs WHERE company_id = ${COMPANY_A}
+      AND distributed_warm_conversation_id = ${conversationId} AND distributed_warm_state IS NOT NULL`;
+    expect(moved).toHaveLength(1);
+    expect(moved[0].id).not.toBe(rows[0].id);
+    expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.claimed'
+      AND details->>'conversationId' = ${conversationId}`).toHaveLength(2);
+
+
+  });
+
   it("applies the placement migration at head and replays the journal as a no-op", async () => {
     const { admin } = guard();
     await expect(applyPendingMigrations(adminUrl)).resolves.toBeUndefined();
