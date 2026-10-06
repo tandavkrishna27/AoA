@@ -28,6 +28,7 @@ import { issues, discussions, discussionEntries } from "@armyofagents/db";
 import type { ShowRef } from "@armyofagents/shared";
 import { publishLiveEvent } from "./live-events.js";
 import { synthesizeThreadDeliveryRefs } from "./viewer-ref-synthesis.js";
+import { insertActivityLog } from "./activity-log.js";
 import { logger } from "../middleware/logger.js";
 
 const log = logger.child({ svc: "crew-result-relay" });
@@ -168,6 +169,8 @@ export interface DeliverCrewRunResultInput {
   issueId: string;
   runId: string;
   agentId: string | null;
+  /** Reconcile late committed products into the same entry. */
+  refreshExisting?: boolean;
 }
 
 export interface DeliverCrewRunResultDeps {
@@ -202,147 +205,85 @@ export interface DeliverCrewRunResultResult {
  *     sets it — we assert it defensively; a mismatch aborts the delivery).
  *   - Best-effort: wrapped in try/catch. NEVER throws into the crew run.
  *
- * Returns `{ delivered: true }` only when a new entry was inserted.
+ * Returns `{ delivered: true }` when an entry was inserted or its products refreshed.
  */
 export async function deliverCrewRunResult(
   input: DeliverCrewRunResultInput,
   deps: DeliverCrewRunResultDeps = { synthesize: synthesizeThreadDeliveryRefs },
 ): Promise<DeliverCrewRunResultResult> {
   const { db, companyId, issueId, runId, agentId } = input;
-
   try {
-    // ── Load the issue (company-scoped: tenant-isolation guard) ───────────────
-    const [issue] = await db
-      .select({
-        id: issues.id,
-        sourceDiscussionId: issues.sourceDiscussionId,
-        assigneeAgentId: issues.assigneeAgentId,
-        companyId: issues.companyId,
-      })
-      .from(issues)
-      .where(and(eq(issues.id, issueId), eq(issues.companyId, companyId)))
-      .limit(1);
-
-    if (!issue) {
-      // Foreign, deleted, or missing issue → nothing to deliver.
-      return { delivered: false };
-    }
-
-    // ── Thread-only: no source thread → nothing to deliver to ─────────────────
-    const threadId = issue.sourceDiscussionId;
-    if (!threadId) {
-      return { delivered: false };
-    }
-
-    // ── Idempotency (P3-1): one run-result entry per runId ────────────────────
-    // Marker lives in `sourceInfo.runResultRunId`. A retried success side-effect
-    // finds the prior entry and short-circuits — no double-post.
-    const priorRows = await db
-      .select({ id: discussionEntries.id })
-      .from(discussionEntries)
-      .where(
-        and(
-          eq(discussionEntries.discussionId, threadId),
-          sql`${discussionEntries.sourceInfo}->>'runResultRunId' = ${runId}`,
-        ),
-      )
-      .limit(1);
-    if (priorRows.length > 0) {
-      return { delivered: false };
-    }
-
-    // ── Synthesize the navigational refs (aggregate task products) ────────────
-    const refs: ShowRef[] = await deps.synthesize({
-      db,
-      companyId: issue.companyId,
-      issueId,
-      threadId,
-      runId,
-      agentId,
-    });
-
-    // ── RBAC assert (P2-2): every ref points at THIS origin thread ────────────
-    // The synth helper stamps provenance.entityId = threadId. Assert it here so
-    // a bug can never deliver a ref scoped to a foreign surface/thread. On
-    // mismatch, abort the whole delivery (caught below → { delivered: false }).
-    for (const ref of refs) {
-      // Only v:2 refs carry provenance (the synth helper emits v:2 exclusively).
-      if (ref.v === 2 && ref.provenance && ref.provenance.entityId !== threadId) {
-        throw new Error(
-          `RBAC assertion failed: ref provenance.entityId (${ref.provenance.entityId}) !== threadId (${threadId})`,
-        );
+    const result = await db.transaction(async (tx) => {
+      const [issue] = await tx.select({ id: issues.id, sourceDiscussionId: issues.sourceDiscussionId,
+        assigneeAgentId: issues.assigneeAgentId, companyId: issues.companyId })
+        .from(issues).where(and(eq(issues.id, issueId), eq(issues.companyId, companyId))).limit(1);
+      if (!issue?.sourceDiscussionId) return null;
+      const threadId = issue.sourceDiscussionId;
+      // Serialize every delivery and refresh on the company-scoped parent. The
+      // idempotency read belongs inside this lock, before any counter increment.
+      const [thread] = await tx.select({ id: discussions.id }).from(discussions)
+        .where(and(eq(discussions.id, threadId), eq(discussions.companyId, companyId)))
+        .limit(1).for("update");
+      if (!thread) return null;
+      const [prior] = await tx.select({ id: discussionEntries.id, seq: discussionEntries.seq,
+        outputRefs: discussionEntries.outputRefs, rawContent: discussionEntries.rawContent })
+        .from(discussionEntries).where(and(eq(discussionEntries.discussionId, threadId),
+          sql`${discussionEntries.sourceInfo}->>'runResultRunId' = ${runId}`)).limit(1);
+      if (prior && !input.refreshExisting) return null;
+      const refs = await deps.synthesize({ db: tx as unknown as Db, companyId, issueId, threadId, runId, agentId });
+      for (const ref of refs) {
+        if (ref.v === 2 && ref.provenance && ref.provenance.entityId !== threadId) {
+          throw new Error("Crew result ref belongs to another thread");
+        }
       }
-    }
-
-    // ── Compose the human-readable line ───────────────────────────────────────
-    // N = the non-task results (refs minus the always-present single task ref).
-    const nonTaskCount = Math.max(0, refs.length - 1);
-    const rawContent =
-      nonTaskCount > 0
-        ? `Run finished — ${nonTaskCount} result${nonTaskCount === 1 ? "" : "s"}`
-        : "Run finished";
-    const now = new Date();
-    // author/createdBy: the delivering agent, falling back to the assignee, then
-    // a non-null sentinel (createdBy is NOT NULL) — mirrors relayCrewResult.
-    const authorAgentId = agentId ?? issue.assigneeAgentId ?? null;
-    const createdBy: string = agentId ?? issue.assigneeAgentId ?? issue.id;
-
-    // ── Atomic insert: bump entrySeq + entryCount, assign seq ─────────────────
-    const { entry, companyId: threadCompanyId } = await db.transaction(async (tx) => {
-      // Constrained UPDATE: companyId in WHERE so a cross-company write is
-      // impossible (mirrors relayCrewResult Guard 3).
-      const [{ entrySeq, companyId: cid }] = await tx
-        .update(discussions)
-        .set({
-          entrySeq: sql`${discussions.entrySeq} + 1`,
-          entryCount: sql`${discussions.entryCount} + 1`,
-          updatedAt: now,
-        })
-        .where(and(eq(discussions.id, threadId), eq(discussions.companyId, issue.companyId)))
-        .returning({ entrySeq: discussions.entrySeq, companyId: discussions.companyId });
-
-      const [inserted] = await tx
-        .insert(discussionEntries)
-        .values({
-          discussionId: threadId,
-          inputType: "agent",
-          rawContent,
-          authorAgentId,
-          createdBy,
-          extractionStatus: "skipped",
-          seq: entrySeq,
-          outputRefs: refs,
-          sourceInfo: { runResultRunId: runId },
-        })
-        .returning();
-
-      return { entry: inserted, companyId: cid };
+      const count = Math.max(0, refs.length - 1);
+      const rawContent = count ? `Run finished — ${count} result${count === 1 ? "" : "s"}` : "Run finished";
+      // A new synthesis timestamp alone is not a changed product. Preserve the
+      // original refs on a no-op to avoid perpetual writes on each recovery tick.
+      const comparable = (value: unknown) => JSON.stringify(value, (key, val) => {
+        if (key === "emittedAt") return undefined;
+        // jsonb canonicalizes object-key order; preserve array order, but sort
+        // object keys so a read-back compares equal to the freshly built refs.
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+          return Object.fromEntries(Object.entries(val).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
+        }
+        return val;
+      });
+      if (prior && prior.rawContent === rawContent && comparable(prior.outputRefs) === comparable(refs)) return null;
+      const now = new Date();
+      if (prior) {
+        const [entry] = await tx.update(discussionEntries).set({ outputRefs: refs, rawContent })
+          .where(and(eq(discussionEntries.id, prior.id), eq(discussionEntries.discussionId, threadId))).returning();
+        await tx.update(discussions).set({ updatedAt: now })
+          .where(and(eq(discussions.id, threadId), eq(discussions.companyId, companyId)));
+        await insertActivityLog(tx as unknown as Db, { companyId, actorType: "system", actorId: "crew-result-recovery",
+          action: "discussion.entry.results_refreshed", entityType: "discussion_entry", entityId: entry.id,
+          agentId, details: { crewRunId: runId, issueId } });
+        return { entry, threadId };
+      }
+      const [{ entrySeq }] = await tx.update(discussions).set({
+        entrySeq: sql`${discussions.entrySeq} + 1`, entryCount: sql`${discussions.entryCount} + 1`, updatedAt: now,
+      }).where(and(eq(discussions.id, threadId), eq(discussions.companyId, companyId)))
+        .returning({ entrySeq: discussions.entrySeq });
+      const [entry] = await tx.insert(discussionEntries).values({ discussionId: threadId, inputType: "agent",
+        rawContent, authorAgentId: agentId ?? issue.assigneeAgentId ?? null,
+        createdBy: agentId ?? issue.assigneeAgentId ?? issue.id, extractionStatus: "skipped", seq: entrySeq,
+        outputRefs: refs, sourceInfo: { runResultRunId: runId },
+      }).returning();
+      await insertActivityLog(tx as unknown as Db, { companyId, actorType: "system", actorId: "crew-result-delivery",
+        action: "discussion.entry.run_result_delivered", entityType: "discussion_entry", entityId: entry.id,
+        agentId, details: { crewRunId: runId, issueId } });
+      return { entry, threadId };
     });
-
-    // ── Publish live events (same pair as relayCrewResult; UI refetches) ──────
-    publishLiveEvent({
-      companyId: threadCompanyId,
-      type: "discussion.entry.created",
-      payload: { discussionId: threadId, entryId: entry.id, inputType: "agent" },
-    });
-    publishLiveEvent({
-      companyId: threadCompanyId,
-      type: "thread.entry.created",
-      payload: { threadId, entryId: entry.id, seq: entry.seq ?? 0 },
-    });
-
-    log.debug(
-      { threadId, issueId, runId, refCount: refs.length },
-      "delivered crew run-result entry",
-    );
-
+    if (!result) return { delivered: false };
+    // Existing refetch events retain the entry identity on an in-place refresh.
+    publishLiveEvent({ companyId, type: "discussion.entry.created",
+      payload: { discussionId: result.threadId, entryId: result.entry.id, inputType: "agent" } });
+    publishLiveEvent({ companyId, type: "thread.entry.created",
+      payload: { threadId: result.threadId, entryId: result.entry.id, seq: result.entry.seq ?? 0 } });
     return { delivered: true };
   } catch (err) {
-    // Best-effort: a delivery failure NEVER breaks the run.
-    log.warn(
-      { err, issueId, runId },
-      "deliverCrewRunResult failed (non-fatal)",
-    );
+    log.warn({ err, issueId, runId }, "deliverCrewRunResult failed (non-fatal)");
     return { delivered: false };
   }
 }

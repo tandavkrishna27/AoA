@@ -9,6 +9,9 @@
 //
 // MULTI-TENANT (F10): two Organizations, each with its own Company, target, worker, agent and
 // model config, price side by side; a hard stop in one refuses only that one.
+import { createCrewResultRecovery } from "../services/crew-result-recovery.js";
+import { deliverCrewRunResult } from "../services/crew-result-relay.js";
+import { synthesizeThreadDeliveryRefs } from "../services/viewer-ref-synthesis.js";
 import { randomUUID, createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import express from "express";
@@ -1009,6 +1012,30 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       const response = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
       expect(response.status).toBe(200);
       expect(response.text).toBe("late output");
+    });
+
+    it("recovers a late crew file into the same Discussion entry through separate owner and tenant pools", async () => {
+      const p = await projected(TENANT_A, Buffer.from("late discussion file"), { crew: true, late: true, redrive: true });
+      const threadId = randomUUID();
+      await guard().admin`INSERT INTO discussions (id, company_id, created_by) VALUES (${threadId}, ${COMPANY}, ${USER_A})`;
+      await guard().admin`UPDATE issues SET source_discussion_id = ${threadId} WHERE id = ${p.issueId}`;
+      const delivery = { db: ownerDb(), companyId: COMPANY, issueId: p.issueId, runId: p.crewRunId!, agentId: AGENT_A };
+      await deliverCrewRunResult(delivery, { synthesize: async (input) => (await synthesizeThreadDeliveryRefs(input)).filter((ref) => ref.kind === "task") });
+      const [before] = await guard().admin`SELECT id FROM discussion_entries WHERE discussion_id = ${threadId}`;
+      expect(before).toBeDefined();
+      const recovery = createCrewResultRecovery({ ownerDb: ownerDb(), appDb: guard().app.db });
+      await recovery.tick();
+      // Restart resets the cursor; durable state and parent serialization retain one entry.
+      await createCrewResultRecovery({ ownerDb: ownerDb(), appDb: guard().app.db }).tick();
+      const entries = await guard().admin`SELECT id, output_refs FROM discussion_entries WHERE discussion_id = ${threadId}`;
+      expect(entries).toHaveLength(1);
+      expect(entries[0].id).toBe(before.id);
+      expect(entries[0].output_refs).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "output", id: p.outputId })]));
+      const [thread] = await guard().admin`SELECT entry_count, entry_seq FROM discussions WHERE id = ${threadId}`;
+      expect(thread).toMatchObject({ entry_count: 1, entry_seq: 1 });
+      const [audit] = await guard().admin`SELECT count(*)::int AS n FROM activity_log WHERE entity_id = ${before.id} AND action = 'discussion.entry.results_refreshed'`;
+      expect(audit.n).toBe(1);
+      expect((await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`)).text).toBe("late discussion file");
     });
 
     it("keeps an output pending until the durable crew handoff binding is available", async () => {

@@ -211,7 +211,20 @@ describe("N8 — the backoff split", () => {
 // SHARED projection rather than a second writer.
 describe("N7 — the composition root actually starts it", () => {
   const SRC = readFileSync(fileURLToPath(new URL("../index.ts", import.meta.url)), "utf8");
-  const region = SRC.slice(SRC.indexOf("const convergenceSweeper = createJobControlSweeper("), SRC.indexOf("const convergenceSweeper = createJobControlSweeper(") + 2200);
+  const start = SRC.indexOf("const convergenceSweeper = createJobControlSweeper(");
+  const end = SRC.indexOf("const { createServiceReconciler }", start);
+  const region = SRC.slice(start, end);
+
+  it("locates the convergence block before the next reconciler", () => {
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+  });
+
+  it("drives durable crew result recovery on the same convergence timer", () => {
+    expect(SRC.match(/createCrewResultRecovery\(/g) ?? []).toHaveLength(1);
+    expect(region).toContain("await crewResultRecovery.tick()");
+    expect(region.indexOf("crewResultRecovery.tick()")).toBeLessThan(region.indexOf("convergenceTimer = setTimeout"));
+  });
 
   it("constructs the sweeper exactly once", () => {
     expect(SRC.match(/createJobControlSweeper\(/g) ?? []).toHaveLength(1);

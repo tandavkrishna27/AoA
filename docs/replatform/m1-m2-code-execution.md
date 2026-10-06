@@ -44,7 +44,9 @@ remaining M1 code and tests, and M2. This checklist adds no certification gate.
 - Task output delivery and recovery merged in PR #652.
 - Crew tool access implemented; 48 focused tests passed, including PostgreSQL and
   actual JWT-authenticated HTTP tool calls. Repository typecheck passed.
-- Crew Discussion recovery and M2 Commander/extraction remain to implement.
+- Crew tool access merged in PR #653 after all required CI checks passed.
+- Crew Discussion recovery is implemented on its scoped branch; full verification
+  and CI are pending. M2 Commander/extraction remain to implement.
 
 Historical milestone designs contain obsolete starting-state observations; read
 current code before carrying any of those observations forward.
