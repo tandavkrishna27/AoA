@@ -59,7 +59,8 @@ describe("trusted job credential routing", () => {
     const { resolve } = setup([{ ...row, authMethod: "api_key", scopeType: "company_default",
       scopeId: null, sharingPolicy: "company_agents", secretRef: "vault-reference", executionTargetId: null }]);
     expect(await resolve(request)).toEqual({ credentialId: "connection", credentialKind: "company_api_key",
-      executionTargetSlug: "aoa-canary-e2b", pinnedTargetId: null });
+      executionTargetSlug: "aoa-canary-e2b", pinnedTargetId: null,
+      commanderCredential: { connectionId: "connection", secretId: "vault-reference", provider: "openai", adapterType: "codex_local" } });
   });
   it("refuses unsupported sources before any authority read", async () => {
     const { deps, resolve } = setup();

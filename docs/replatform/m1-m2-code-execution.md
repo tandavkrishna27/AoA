@@ -63,6 +63,12 @@ remaining M1 code and tests, and M2. This checklist adds no certification gate.
   readiness mock passed 7 tests. Repository typecheck, full suite (23,639 passed,
   1,903 skipped) and build passed on the integration base. Normal PR CI is next.
 - Worker cleanup and diagnostic reconciliation passed another 18 focused tests.
+- Commander source-specific handle mint and at-use connection/JWT redemption are
+  implemented. Required dispatch handles and the durable run owner marker commit
+  together; stale turns roll back placement and handles. Replays reject revoked
+  handles and do not duplicate the handoff audit. Focused tests passed 68, including
+  real PostgreSQL; repository typecheck, full suite (23,611 passed, 1,900 skipped)
+  and build passed. The actual chat consumer and remaining lifecycle work continue.
 - Live Anthropic M1b validation remains deferred. Rollout stays off.
 
 Historical milestone designs contain obsolete starting-state observations; read

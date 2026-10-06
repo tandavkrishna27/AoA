@@ -578,6 +578,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
   async function place(input: {
     jobId: string; attemptId: string; organizationId?: string; companyId?: string;
     mode?: "active" | "shadow"; enabled?: boolean; credentialId?: string | null;
+    requireExecutionSecrets?: boolean;
     organizationEnabled?: boolean;
     workloadEnabled?: boolean;
     credentialBinding?: {
@@ -615,8 +616,73 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       attemptId: input.attemptId,
       now: new Date("2026-08-10T10:00:05.000Z"),
       maxHeartbeatAgeMs: 30_000,
+      requireExecutionSecrets: input.requireExecutionSecrets,
     });
   }
+
+  it("requires authorized execution handles before a Commander attempt becomes leasable", async () => {
+    const { admin } = guard();
+    const jobId = randomUUID(); const attemptId = randomUUID(); const runId = randomUUID();
+    const conversationId = randomUUID();
+    await seedJob({ jobId, attemptId, targetClass: "managed_cloud" });
+    await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${runId},
+      source_intent = ${{ kind: 'commander_turn', internalAgentRunId: runId, conversationId }},
+      executor_principal_kind = 'sandbox', executor_principal_id = ${runId} WHERE id = ${jobId}`;
+    await expect(place({ jobId, attemptId, requireExecutionSecrets: true })).rejects.toMatchObject({ code: "execution_secret_required" });
+    const [attempt] = await admin`SELECT placement_decided_at, placement_lease_eligible FROM job_attempts WHERE id = ${attemptId}`;
+    expect(attempt.placement_decided_at).toBeNull();
+    expect(attempt.placement_lease_eligible).toBeNull();
+    const handles = await admin`SELECT id FROM job_secret_handles WHERE job_id = ${jobId}`;
+    expect(handles).toHaveLength(0);
+  });
+
+  it("commits Commander handles and ownership together, and rolls everything back when the source is stale", async () => {
+    const { admin, app, operator } = guard();
+    const oldMode = getDeploymentMode(); setDeploymentMode("cloud_auth");
+    const credentialId = randomUUID(); const connectionId = randomUUID(); const secretId = randomUUID();
+    const service = placementNamespace.createJobPlacementService({
+      appDb: app.db, operatorDb: operator.db, deploymentMode: "cloud_auth", deploymentEnabled: true,
+      resolveOrganizationPolicy: () => ({ enabled: true, mode: "active" }), resolveWorkloadPolicy: () => true,
+      resolveCredentialBinding: () => ({ credentialId, credentialKind: "company_api_key",
+        credentialOwnerPrincipalId: null, executionTargetSlug: null, pinnedTargetId: TARGET_PLATFORM,
+        commanderCredential: { connectionId, secretId, provider: "openai", adapterType: "codex_local" } }),
+    });
+    try {
+      await admin`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+        VALUES (${COMPANY_A}, 'user', ${OWNER_A}, 'active')
+        ON CONFLICT (company_id, principal_type, principal_id) DO UPDATE SET status = 'active'`;
+      for (const status of ["running", "completed"]) {
+        const jobId = randomUUID(); const attemptId = randomUUID(); const runId = randomUUID(); const conversationId = randomUUID();
+        await seedJob({ jobId, attemptId, targetClass: "managed_cloud" });
+        await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id) VALUES (${conversationId}, ${COMPANY_A}, ${OWNER_A})`;
+        await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, provider, status)
+          VALUES (${runId}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'openai', ${status})`;
+        await admin`INSERT INTO internal_agent_messages (conversation_id, role, run_id) VALUES (${conversationId}, 'assistant', ${runId})`;
+        await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${runId},
+          source_intent = ${{ kind: 'commander_turn', internalAgentRunId: runId, conversationId }},
+          requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+          executor_principal_kind = 'sandbox', executor_principal_id = ${runId} WHERE id = ${jobId}`;
+        const request = { organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId,
+          now: new Date('2026-08-10T10:00:05.000Z'), maxHeartbeatAgeMs: 30_000, requireExecutionSecrets: true, toolSurfaceAuthorized: true };
+        if (status === "running") {
+          expect(await service.place(request)).toMatchObject({ leaseEligible: true });
+          const [run] = await admin`SELECT execution_owner, distributed_job_id, distributed_attempt_id FROM internal_agent_runs WHERE id = ${runId}`;
+          expect(run).toMatchObject({ execution_owner: "distributed", distributed_job_id: jobId, distributed_attempt_id: attemptId });
+          expect(await service.place(request)).toMatchObject({ leaseEligible: true });
+          const handles = await admin`SELECT ref_kind, owner_principal_id FROM job_secret_handles WHERE job_id = ${jobId}`;
+          expect(handles).toHaveLength(2); expect(handles.every((row) => row.owner_principal_id === runId)).toBe(true);
+          expect(await admin`SELECT id FROM activity_log WHERE entity_id = ${runId} AND action = 'commander.execution.handed_off'`).toHaveLength(1);
+          await admin`UPDATE job_secret_handles SET status = 'revoked' WHERE job_id = ${jobId} AND ref_kind = 'run_jwt'`;
+          await expect(service.place(request)).rejects.toMatchObject({ code: "execution_secret_required" });
+        } else {
+          await expect(service.place(request)).rejects.toMatchObject({ code: "commander_handoff_refused" });
+          const [attempt] = await admin`SELECT placement_lease_eligible FROM job_attempts WHERE id = ${attemptId}`;
+          expect(attempt.placement_lease_eligible).toBeNull();
+          expect(await admin`SELECT id FROM job_secret_handles WHERE job_id = ${jobId}`).toHaveLength(0);
+        }
+      }
+    } finally { setDeploymentMode(oldMode); }
+  });
 
   it("[I-03] consumes Decision #117 binding for two owner targets and fails mismatch/foreign/shared closed", async () => {
     const { admin } = guard();
