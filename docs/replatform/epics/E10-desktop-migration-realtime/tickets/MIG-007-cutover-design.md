@@ -1,3 +1,13 @@
+## Current code checkpoint — 2026-10-07
+
+Extraction's source-bound company-key authorization, stable operation identity,
+accepted asynchronous output, cancellation, replay, cost and legacy suppression
+are merged into the replatform program branch. Tests include real PostgreSQL and
+controlled CLI child processes without model calls. The combined M1/M2 candidate
+passed typecheck, full-suite and build checks. All code PRs passed required CI and
+merged into the program branch. Rollout and live calls remain off.
+The following sections preserve historical design and implementation checkpoints.
+
 ## Current implementation progress — 2026-10-06
 
 The historical blocked verdict below describes the August starting state. The current
