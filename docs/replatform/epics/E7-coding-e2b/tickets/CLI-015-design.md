@@ -1,6 +1,6 @@
 # CLI-015 — Unit F link 6, the judge: a verifier that counts the right things
 
-**Status:** merged in PR #645; local checks passed, live useful-work completion pending with a provider-credit blocker. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
+**Status:** merged in PR #645; local checks passed, Anthropic-dependent live useful-work testing deferred by founder choice. · **Epic:** E7 · **Was:** `CLI-008-F6` (see `program-design.md`, the
 link-scoped successor mapping) · **Filed:** 2026-09-21 (M0 unit 4, founder decisions D1 + D5)
 **Depends on:** `CLI-011` · **Milestone:** `M1b`
 **Owns:** [`E7-F016`](../findings.md#e7-f016)
@@ -26,7 +26,9 @@ diagnostics/cancellation repairs merged in #647/#648. Direct template probe
 reported `billing_error` / `Credit balance is too low`; it is inconclusive for
 output behavior, and useful-work capability remains unproven. The
 [direct checklist](../../../milestones/M1a/recovery-plan-2026-09-26.md) records
-the tested revisions and the next live check after API funding is restored.
+the tested revisions and the October 6 instruction to continue without the
+Anthropic API key. Continue local/keyless checks; do not request funding or
+replacement credentials. Live useful-work acceptance remains deferred.
 
 The sections below retain the historical scope discussion; its claim that the
 producer is unbuilt and its separate ruling prerequisite are superseded.

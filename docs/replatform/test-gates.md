@@ -29,6 +29,17 @@ Historical QA and handoff records retain their original verdicts. Passing this
 direct checklist authorizes progression from M1a to M1b without rewriting those
 records. It does not assert a D0–D6/E11 production-release certification.
 
+### Anthropic-dependent testing deferred — founder instruction, 2026-10-06
+
+The founder explicitly chose to skip the Anthropic API key and continue the
+remaining work. Do not request a replacement key or top-up, run Anthropic-backed
+tests, or substitute another paid provider unless the founder changes this
+instruction. Continue local, deterministic, PostgreSQL and keyless integration
+work without waiting for API funding. Existing runtime assertions remain intact.
+Record the live Anthropic-dependent M1b check as deferred by founder choice;
+local or keyless results do not establish a successful live model run. Keep this
+limitation visible without making it a prerequisite for independent code/test work.
+
 ## Threshold classes
 
 - **HARD:** A security or correctness invariant with zero tolerance. It cannot receive a conditional pass or waiver.

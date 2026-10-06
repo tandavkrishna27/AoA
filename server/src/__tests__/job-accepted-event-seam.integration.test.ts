@@ -902,18 +902,21 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
   "CLI-018 founder reads accepted distributed output content (embedded PG)", () => {
     beforeEach(async () => { if (fixture) await resetBridgeRows(); });
 
-    async function projected(tenant = TENANT_A, bytes = Buffer.from("founder result bytes")) {
+    async function projected(tenant = TENANT_A, bytes = Buffer.from("founder result bytes"),
+      options: { kind?: "workspace_patch" | "other"; contentType?: string } = {}) {
+      const kind = options.kind ?? "workspace_patch";
+      const contentType = options.contentType ?? "text/plain";
       const issueId = await seedIssue(tenant.companyId);
       const fence = await seedLeasedAttempt(tenant, taskSourceFor(tenant === TENANT_A ? AGENT_A : AGENT_B, issueId));
       const identifier = randomUUID();
       const objectKey = expectedAttemptObjectPrefix({ organizationId: tenant.organizationId, jobId: fence.jobId, attempt: 1 }) + "founder.txt";
       const digest = createHash("sha256").update(bytes).digest("hex");
       const committed = await runInTenant(guard().app.db, tenant.organizationId, (repos) => repos.jobControl.commitArtifactVersion({
-        ...fence, identifier, objectKey, contentType: "text/plain", kind: "workspace_patch", sensitivity: "sensitive",
+        ...fence, identifier, objectKey, contentType, kind, sensitivity: "sensitive",
         retention: "standard", declaredSizeBytes: bytes.length, actualSizeBytes: bytes.length,
         declaredSha256: digest, actualSha256: digest, prefixValid: true, tenantValid: true,
       }));
-      const accepted = await acceptWithBridges(fence, [artifactEv(fence, 1, identifier), terminal(fence, 2)]);
+      const accepted = await acceptWithBridges(fence, [artifactEv(fence, 1, identifier, kind), terminal(fence, 2)]);
       expect(accepted.result.acceptedEventProjections?.find((p) => p.projectionKind === "output_projection")?.outcome).toBe("applied");
       const [output] = await guard().admin`SELECT id FROM task_outputs WHERE external_id = ${committed.id}`;
       const storage: StorageProvider = {
@@ -951,6 +954,28 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       const [audit] = await guard().admin`SELECT actor_id, action, details FROM activity_log WHERE action = 'task_output.content_read'`;
       expect(audit).toMatchObject({ actor_id: USER_A, action: "task_output.content_read", details: { artifactId: p.artifactId, jobId: p.fence.jobId, attempt: 1 } });
       expect(await count("job_attempts", `id = '${p.fence.attemptId}' AND status = 'succeeded'`)).toBe(1);
+    });
+
+    it("projects the composed worker's other artifact kind and downloads byte-exact useful-work JSON", async () => {
+      const result = { companyId: COMPANY, referenceTaskId: randomUUID(), referenceTitle: "M1b reference café ∆" };
+      const bytes = Buffer.from(JSON.stringify(result, null, 2) + "\n", "utf8");
+      const p = await projected(TENANT_A, bytes, { kind: "other", contentType: "application/json" });
+      const [artifact] = await guard().admin`SELECT kind, content_type, size_bytes, sha256 FROM job_artifacts WHERE id = ${p.artifactId}`;
+      expect(artifact).toMatchObject({ kind: "other", content_type: "application/json",
+        sha256: createHash("sha256").update(bytes).digest("hex") });
+      expect(Number(artifact!.size_bytes)).toBe(bytes.length);
+      const [output] = await guard().admin`SELECT provider, external_id, metadata FROM task_outputs WHERE id = ${p.outputId}`;
+      expect(output).toMatchObject({ provider: "aoa_distributed_job", external_id: p.artifactId,
+        metadata: { artifactKind: "other", jobId: p.fence.jobId, attemptId: p.fence.attemptId } });
+      const res = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toMatch(/^application\/json(?:;|$)/);
+      expect(Number(res.headers["content-length"])).toBe(bytes.length);
+      expect(res.headers["content-disposition"]).toContain("attachment;");
+      expect(Buffer.from(res.text, "utf8")).toEqual(bytes);
+      expect(res.body).toEqual(result);
+      expect(createHash("sha256").update(Buffer.from(res.text, "utf8")).digest("hex")).toBe(artifact!.sha256);
+      expect(p.storage.getObject).toHaveBeenCalledWith({ objectKey: p.objectKey });
     });
 
     it("cannot retrieve another company's projected output even with matching forged metadata", async () => {
