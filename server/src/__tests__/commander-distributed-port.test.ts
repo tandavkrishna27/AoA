@@ -10,6 +10,38 @@ function deps(state = "canary") {
     preflight: vi.fn(async () => ({ allowed: true })), read: vi.fn(async () => ({ state: "result", result: captured })), cancel: vi.fn(async () => undefined) };
 }
 describe("Commander actual distributed dispatch", () => {
+  it("selects the warm runner only with explicit warm enablement", async () => {
+    const d = deps();
+    expect(await createCommanderDistributedPort({ ...d, isWarmEnabled: () => true } as never).execute({ ...input, warmConversation: true })).toEqual(captured);
+    expect(d.rollout.resolveExecutionOwner).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ args: expect.arrayContaining(['/home/user/aoa-commander-warm-v1.cjs']) }),
+    }));
+  });
+  it("keeps an existing legacy warm resource on its owner before new placement", async () => {
+    const d = deps();
+    expect(await createCommanderDistributedPort({ ...d, isWarmEnabled: () => true, hasLegacyWarmOwner: async () => true } as never).execute({ ...input, warmConversation: true })).toBeNull();
+    expect(d.preflight).not.toHaveBeenCalled(); expect(d.prepare).not.toHaveBeenCalled();
+    expect(d.rollout.resolveExecutionOwner).not.toHaveBeenCalled();
+  });
+  it("refuses legacy fallback for retained ownership when warm execution is off", async () => {
+    const d = deps('off');
+    await expect(createCommanderDistributedPort({ ...d, hasWarmOwner: async () => true } as never).execute(input)).rejects.toThrow('retained');
+    expect(d.preflight).not.toHaveBeenCalled(); expect(d.prepare).not.toHaveBeenCalled();
+    expect(d.rollout.resolveExecutionOwner).not.toHaveBeenCalled();
+  });
+  it("rejoins the paid turn before checking retained ownership or warm enablement", async () => {
+    const d = deps('off');
+    d.existing.mockResolvedValue({ organizationId: 'org', jobId: 'existing', attemptId: 'old-attempt' } as never);
+    const hasWarmOwner = vi.fn(async () => true);
+    expect(await createCommanderDistributedPort({ ...d, hasWarmOwner } as never).execute({ ...input, warmConversation: true })).toEqual(captured);
+    expect(hasWarmOwner).not.toHaveBeenCalled(); expect(d.preflight).not.toHaveBeenCalled();
+  });
+  it("refuses an armed Commander placement failure without starting another executor", async () => {
+    const d = deps();
+    d.rollout.resolveExecutionOwner.mockResolvedValue({ owner: 'legacy', reason: 'placement_unavailable' } as never);
+    await expect(createCommanderDistributedPort(d as never).execute(input)).rejects.toThrow('placement unavailable');
+    expect(d.read).not.toHaveBeenCalled(); expect(d.rollout.resolveExecutionOwner).toHaveBeenCalledOnce();
+  });
   it("binds the actual user/turn/conversation and consumes accepted output after transfer", async () => {
     const d = deps(); expect(await createCommanderDistributedPort(d as never).execute(input)).toEqual(captured);
     expect(d.rollout.resolveExecutionOwner).toHaveBeenCalledWith(expect.objectContaining({ source: { kind: "commander_turn", internalAgentRunId: turnId, conversationId: input.conversationId }, actor: { kind: "user", id: input.userId, role: input.userRole, companyId: input.companyId }, toolSurfaceAuthorized: true }));
@@ -31,7 +63,7 @@ describe("Commander actual distributed dispatch", () => {
     if (reason === "budget") d.preflight.mockResolvedValue({ allowed: false } as never);
     if (reason === "source") d.prepare.mockResolvedValue(false);
     if (reason === "placement") d.rollout.resolveExecutionOwner.mockResolvedValue({ owner: "legacy" } as never);
-    if (reason === "budget" || reason === "source") await expect(createCommanderDistributedPort(d as never).execute(input)).rejects.toThrow();
+    if (reason === "budget" || reason === "source" || reason === "placement") await expect(createCommanderDistributedPort(d as never).execute(input)).rejects.toThrow();
     else expect(await createCommanderDistributedPort(d as never).execute(input)).toBeNull();
     expect(d.read).not.toHaveBeenCalled();
   });

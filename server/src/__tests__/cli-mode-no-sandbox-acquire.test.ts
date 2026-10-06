@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventEmitter } from "node:events";
 import { setDeploymentMode } from "../config/deployment-mode.js";
 
+const warmOwner = vi.hoisted(() => vi.fn(async () => false));
+vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: warmOwner }));
 vi.mock("node:child_process", () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
@@ -132,6 +134,7 @@ async function runChat(
 
 describe("Commander turns: sandbox-acquire is deployment-mode-gated", () => {
   beforeEach(() => {
+    warmOwner.mockResolvedValue(false);
     vi.clearAllMocks();
     vi.resetModules();
     acquireExecutionContextMock.mockClear();
@@ -140,6 +143,12 @@ describe("Commander turns: sandbox-acquire is deployment-mode-gated", () => {
   });
 
   describe("self-hosted (local_trusted): NEVER acquires (host-direct spawn)", () => {
+    it.each(['claude_cli', 'codex'])("refuses a retained distributed owner without a port for %s", async (tool) => {
+      warmOwner.mockResolvedValue(true);
+      const { chunks, spawn } = await runChat(tool, "local_trusted", { runId: "run-1" });
+      expect(chunks).toEqual([expect.objectContaining({ type: 'error', message: expect.stringContaining('retained') })]);
+      expect(spawn).not.toHaveBeenCalled(); expect(acquireExecutionContextMock).not.toHaveBeenCalled();
+    });
     it("claude_cli: a full Commander turn spawns the CLI without ever calling acquireExecutionContext", async () => {
       const { spawn } = await runChat("claude_cli", "local_trusted", { runId: "run-1" });
       expect(spawn).toHaveBeenCalledTimes(1);

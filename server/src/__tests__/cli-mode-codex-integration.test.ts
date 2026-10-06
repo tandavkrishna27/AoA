@@ -65,6 +65,7 @@ const FAKE_CODEX_BIN_DIR = path.join(
 
 // fs.statSync is used by getBridgeEntrypoint() to detect production vs dev mode.
 // Return a truthy object so it sees the .js "exists" → uses `node` not `tsx`.
+vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: vi.fn(async () => false) }));
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
   return { ...actual, statSync: vi.fn(() => ({ isFile: () => true })) };

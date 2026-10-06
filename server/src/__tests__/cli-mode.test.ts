@@ -6,6 +6,7 @@ import { execSync } from "node:child_process";
 // transitively imports it (via the E2B one-shot provider-credential chain,
 // U13.x), and the provider resolution it drives fails gracefully to host
 // login in tests. We still override execSync/spawn (test-controlled).
+vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: vi.fn(async () => false) }));
 vi.mock("node:child_process", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:child_process")>()),
   execSync: vi.fn(),
