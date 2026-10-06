@@ -980,6 +980,40 @@ integration("JOB-003 atomic poll/offer and ready hints", () => {
     if (dataDir) await rm(dataDir, { recursive: true, force: true }).catch(() => {});
   }, 60_000);
 
+  it("filters retained Commander worker ownership before claiming the eligible head", async () => {
+    const { admin, app } = guard();
+    await resetRuntimeRows();
+    const held = await seedPlacedJob({ ordinal: 7101, outbox: false });
+    const ordinary = await seedPlacedJob({ ordinal: 7102, outbox: false });
+    const conversationId = "a3400000-0000-4000-8000-000000007101";
+    const runId = "a3500000-0000-4000-8000-000000007101";
+    await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id)
+      VALUES (${conversationId}, ${COMPANY}, 'warm-affinity-user')`;
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status,
+      distributed_job_id, distributed_attempt_id, distributed_warm_conversation_id, distributed_warm_state)
+      VALUES (${runId}, ${COMPANY}, 'warm-affinity-user', 'conversation', 'user_message', 'running',
+        ${held.jobId}, ${held.attemptId}, ${conversationId}, ${{ status: 'claimed', workerId: OTHER_WORKER }})`;
+    const provider = providerProfile();
+    const scan = (workerId: string) => runInTenant(app.db, ORG, (_repos, tx) => createJobControlRepository(tx as Db).lockEligibleLeaseCandidates({
+      admissibleWorkloadTypes: ['batch'], eligibilityVersion: 1, limit: 256,
+      placementOwner: 'organization_dedicated', staticContextHash: '9'.repeat(64),
+      targetAuthorityKey: `organization:${ORG}`, targetClass: 'organization_dedicated',
+      targetGeneration: 1, targetId: TARGET, targetProfileHash: sha256(canonicalizeJsonV1(registeredProfile(provider))),
+      targetProviderConstraintHash: provider.digest, targetScope: 'organization', workerId,
+    }));
+    try {
+      expect((await scan(WORKER)).candidates.map((row) => row.job.id)).toEqual([ordinary.jobId]);
+      expect((await scan(OTHER_WORKER)).candidates.map((row) => row.job.id)).toEqual([held.jobId, ordinary.jobId]);
+      await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${{ status: 'quarantined', workerId: OTHER_WORKER }} WHERE id = ${runId}`;
+      expect((await scan(OTHER_WORKER)).candidates.map((row) => row.job.id)).toEqual([ordinary.jobId]);
+      await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${{ status: 'claimed', workerId: null }} WHERE id = ${runId}`;
+      expect((await scan(WORKER)).candidates.map((row) => row.job.id)).toEqual([held.jobId, ordinary.jobId]);
+    } finally {
+      await admin`DELETE FROM internal_agent_runs WHERE id = ${runId}`;
+      await admin`DELETE FROM internal_agent_conversations WHERE id = ${conversationId}`;
+    }
+  });
+
   it("cleans only exact certificate tuples and reports truthful bounded cardinality in the same tenant transaction", async () => {
     // Mutation caught: independent worker/target/attempt IN lists delete the retained
     // WORKER x attempt-2 cross-tuple when attempt-1 and OTHER_WORKER x attempt-2 are selected.
