@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -422,6 +422,58 @@ integration("DAT-004 lease-scoped secret broker", () => {
     // drops it once the rollback window has closed, and flips this line back to
     // `.not.toContain("revoked_at")` in the same commit.
   });
+
+  it("delivers first-turn warm authority through the real fenced broker without replaying the device proof", async () => {
+    const { createCommanderWarmSecretIssuer } = await import("../services/commander-warm-secret-issuer.js");
+    const { admin, app } = guardCtx();
+    const turnId = crypto.randomUUID(), conversationId = crypto.randomUUID();
+    const { seeded, offer } = await activateLease({ kind: "sandbox", id: turnId });
+    const raw = providerProfile(); const { digest: _oldDigest, ...fields } = raw;
+    const unsigned = { ...fields, checkpointMode: "snapshot" as const, maxIdleSeconds: 1800,
+      supportedOperations: [...fields.supportedOperations, "checkpoint", "restore"] };
+    const provider = { ...unsigned, digest: sha256(canonicalProviderConstraintProfileDigestInputV1(unsigned)) };
+    const profile = registeredProfile(provider);
+    const profileHash = sha256(canonicalizeJsonV1(profile));
+    await admin`UPDATE execution_targets SET registered_profile = ${profile}, registered_profile_hash = ${profileHash},
+      provider_constraint_profile = ${provider} WHERE id = ${TARGET}`;
+    await admin`UPDATE leases SET provider_constraint_hash = ${provider.digest} WHERE id = ${offer.leaseId}`;
+    await admin`UPDATE job_attempts SET placement_profile_hash = ${profileHash}, placement_provider_constraint_hash = ${provider.digest}
+      WHERE id = ${seeded.attemptId}`;
+    await admin`INSERT INTO internal_agent_conversations (id, company_id, user_id, title)
+      VALUES (${conversationId}, ${COMPANY}, ${OWNER_USER}, 'warm broker test')`;
+    const state = { version: 1, id: crypto.randomUUID(), generation: 1, organizationId: ORG, companyId: COMPANY,
+      userId: OWNER_USER, conversationId, targetId: TARGET, targetGeneration: 1, workerId: null, status: 'claimed',
+      expiresAtMs: Date.now() + 1800000, resource: null, currentJobId: seeded.jobId, currentAttemptId: seeded.attemptId, currentLeaseId: null };
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status, provider,
+      execution_owner, distributed_job_id, distributed_attempt_id, distributed_warm_conversation_id, distributed_warm_state)
+      VALUES (${turnId}, ${COMPANY}, ${OWNER_USER}, 'conversation', 'user_message', 'running', 'openai', 'distributed',
+        ${seeded.jobId}, ${seeded.attemptId}, ${conversationId}, ${state})`;
+    await admin`INSERT INTO internal_agent_messages (conversation_id, role, content, run_id) VALUES (${conversationId}, 'user', 'warm test', ${turnId})`;
+    const workload = { command: 'node', args: ['/home/user/aoa-commander-warm-v1.cjs', 'codex',
+      '/home/user/aoa-commander-input.json', '/home/user/aoa-output/aoa-one-shot-result.json'], stdinArtifactId: null, maxRuntimeSeconds: 600 };
+    await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${turnId},
+      source_intent = ${{ kind: 'commander_turn', internalAgentRunId: turnId, conversationId }},
+      requester_principal_kind = 'user', requester_principal_id = ${OWNER_USER}, input = ${workload} WHERE id = ${seeded.jobId}`;
+    await mintHandle(seeded.jobId, "h-warm-provider", { ownerPrincipalKind: "sandbox", ownerPrincipalId: turnId });
+    const keys = generateKeyPairSync("ed25519");
+    let finalizeError: unknown;
+    const finalize = createCommanderWarmSecretIssuer({ appDb: app.db, controlPlaneSigningKey: keys.privateKey });
+    const svc = createSecretBrokerService({ appDb: app.db, brokers: recordingBrokers(), controlPlaneSigningKey: keys.privateKey,
+      finalizeSandboxResolution: async (outcome, ctx) => { try { return await finalize(outcome, ctx); }
+        catch (error) { finalizeError = error; throw error; } } });
+    vi.stubEnv("AOA_SECRETS_MASTER_KEY", "a1".repeat(32));
+    try {
+      const res = await svc.resolve({ auth: auth(`r-warm-${crypto.randomUUID()}`), request: request(offer, "h-warm-provider") });
+      expect(finalizeError).toBeUndefined();
+      expect(res.outcome).toBe("resolved"); if (res.outcome !== "resolved") throw new Error("warm resolve refused");
+      expect(res.warmControl).toMatchObject({ mode: "create", generation: 1, historicalCanaries: [] });
+      expect(res.ownedLabelsCapability?.ownedLabels.leaseId).toBe(offer.leaseId);
+      const [saved] = await admin`SELECT distributed_warm_state FROM internal_agent_runs WHERE id = ${turnId}`;
+      expect(saved.distributed_warm_state).toMatchObject({ workerId: WORKER, currentLeaseId: offer.leaseId });
+      expect(JSON.stringify(saved)).not.toContain(SECRET_MARKER);
+      expect(saved.distributed_warm_state.redaction.scheme).toBe("local_encrypted_v1");
+    } finally { vi.unstubAllEnvs(); }
+  }, 60000);
 
   // ---- happy resolves per ref_kind ----------------------------------------
 

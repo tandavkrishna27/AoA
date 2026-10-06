@@ -618,6 +618,43 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.claimed'
       AND details->>'conversationId' = ${conversationId}`).toHaveLength(2);
 
+    // On the third turn the VM keeps its creation labels, while the latest
+    // checkpoint belongs to the second turn's distinct lease and attempt.
+    const secondLeaseId = randomUUID(), secondCheckpointId = randomUUID();
+    const secondDeadline = new Date(Date.now() - 500);
+    const checkpointLabels = { ...forged.resource.labels, jobId: requests[1 - winner].jobId, leaseId: secondLeaseId };
+    const pausedSecond = { ...successor[0], status: "paused", currentJobId: null, currentAttemptId: null, currentLeaseId: null,
+      resource: { ...successor[0].resource!, checkpointLabels, checkpointEventId: secondCheckpointId,
+        attemptId: requests[1 - winner].attemptId, previousCapabilityExpiresAtMs: secondDeadline.getTime() } };
+    await admin`UPDATE internal_agent_runs SET distributed_warm_state = ${pausedSecond} WHERE id = ${moved[0].id}`;
+    await admin`INSERT INTO leases (id, organization_id, company_id, job_id, attempt_id, attempt_number, worker_id, target_id,
+      target_authority_key, target_generation, profile_hash, provider_constraint_hash, ack_deadline, expires_at, status, fence)
+      VALUES (${secondLeaseId}, ${ORG_A}, ${COMPANY_A}, ${requests[1 - winner].jobId}, ${requests[1 - winner].attemptId}, 1, ${WORKER_A}, ${TARGET_A},
+        ${`organization:${ORG_A}`}, 1, ${"a".repeat(64)}, ${"b".repeat(64)}, ${new Date(secondDeadline.getTime() - 1000)}, ${secondDeadline}, 'released', 'warm-fence-second')`;
+    await admin`UPDATE job_attempts SET status = 'succeeded' WHERE id = ${requests[1 - winner].attemptId}`;
+    const secondReceipt = { ...receipt, generation: 2 };
+    const secondLog = { eventType: "log", payload: { stream: "stdout", level: "info", message: "aoa-commander-checkpoint-v1:" + JSON.stringify(secondReceipt) } };
+    for (const [eventId, sequence, type, event] of [[secondCheckpointId, 1, 'log', secondLog], [randomUUID(), 2, 'terminal', terminal]] as const) {
+      await admin`INSERT INTO job_events (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+        sequence, event_type, fence_token, event_digest, event, occurred_at)
+        VALUES (${ORG_A}, ${COMPANY_A}, ${requests[1 - winner].jobId}, ${requests[1 - winner].attemptId}, 1, ${secondLeaseId},
+          ${eventId}, ${sequence}, ${type}, 'warm-fence-second', ${"a".repeat(64)}, ${event}, now())`;
+    }
+    const thirdJobId = randomUUID(), thirdAttemptId = randomUUID(), thirdTurnId = randomUUID();
+    await seedJob({ jobId: thirdJobId, attemptId: thirdAttemptId }); await place({ jobId: thirdJobId, attemptId: thirdAttemptId });
+    await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status, provider,
+      execution_owner, distributed_job_id, distributed_attempt_id)
+      VALUES (${thirdTurnId}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'running', 'openai', 'distributed', ${thirdJobId}, ${thirdAttemptId})`;
+    await admin`INSERT INTO internal_agent_messages (conversation_id, role, content, run_id) VALUES (${conversationId}, 'user', 'third warm turn', ${thirdTurnId})`;
+    await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${thirdTurnId},
+      source_intent = ${{ kind: 'commander_turn', internalAgentRunId: thirdTurnId, conversationId }},
+      requester_principal_kind = 'user', requester_principal_id = ${OWNER_A}, executor_principal_kind = 'sandbox', executor_principal_id = ${thirdTurnId}
+      WHERE id = ${thirdJobId}`;
+    const third = await claim({ ...requests[0], jobId: thirdJobId, attemptId: thirdAttemptId });
+    expect(third).toMatchObject({ generation: 3, resource: { labels: forged.resource.labels, checkpointLabels }, currentJobId: thirdJobId });
+    expect(await admin`SELECT id FROM activity_log WHERE company_id = ${COMPANY_A} AND action = 'commander.warm.claimed'
+      AND details->>'conversationId' = ${conversationId}`).toHaveLength(3);
+
 
   });
 

@@ -217,3 +217,35 @@ integration. The optional warm invocation builder is not yet selected by the
 Commander consumer. Rollout and live provider tests remain off.
 
 Worker candidate local verification: recursive typecheck passed; full suite passed 23,832 tests (1,916 skipped) across 2,465 passing files; build passed. The first full run caught a prohibited conformance error-code substring; corrected to `warm_checkpoint_unavailable` and reran the full suite successfully. Paid calls and rollout flags remain off. Commander issuer, projection, affinity and reaper integration remain pending.
+
+## Warm Commander issuer and third-turn checkpoint proof
+
+Protected sandbox credential redemption now wires an at-use warm issuer through
+worker control. It rechecks the actual active database fence without consuming
+its device proof twice, locks the real Commander turn, verifies the current
+checkpoint/restore provider profile and membership, and signs only the exact
+retained resource under the fresh lease. Encryption awaits are followed by a
+fresh fence, source and database-clock check. Ordinary replies carry no warm
+control. Existing column privileges suffice; no grants or migrations are added.
+
+Historical provider and tool credential values are encrypted with the existing
+local encrypted secret provider and authenticated to company/user/conversation/
+session/generation. Each turn returns an immutable historical baseline across
+separate handles while adding its fresh values to the encrypted aggregate.
+History overflow, missing signing authority, expiry or competing owners deny.
+
+The third-turn PostgreSQL regression distinguishes immutable physical VM labels
+from the latest checkpoint's lease/attempt labels. Resume must prove that latest
+accepted checkpoint and successful terminal, and wait for its capability expiry.
+A previous focused invocation omitted the Windows integration opt-in and skipped
+the database assertions. It was corrected and rerun with
+`AOA_RUN_WIN_INTEGRATION=1`; the strengthened expiry/membership and third-turn
+cases passed. The current focused issuer/broker/placement/canary/assembler group
+passed all 98 tests, including real PostgreSQL tests.
+
+This remains an inactive integration slice. Accepted-checkpoint projection,
+placement reservation, worker affinity, exact-resource reaper retention, warm
+consumer routing, personal/device execution and real wire streaming still need
+completion. All rollout flags and paid provider calls remain off.
+
+Issuer candidate verification: recursive typecheck and build passed; full suite passed 23,814 tests with 1,917 skipped across 2,465 passing files. The separate 98-test focused group ran with Windows integration explicitly enabled and passed without skips. Citation integrity, inventory and whitespace checks passed.

@@ -6,12 +6,13 @@ import { logPayloadV1Schema, terminalEventPayloadV1Schema } from "@armyofagents/
 import { loadCommanderJobAuthority } from "./commander-job-authority.js";
 import { insertActivityLog } from "./activity-log.js";
 import { decideCommanderWarmClaim } from "./commander-warm-authority.js";
+import { commanderWarmCanaryMaterialSchema } from "./commander-warm-canaries.js";
 
 export const COMMANDER_WARM_RUNNER_PATH = "/home/user/aoa-commander-warm-v1.cjs";
 export const COMMANDER_WARM_IDLE_MS = 30 * 60_000;
 const labels = z.object({ organizationId: z.string().uuid(), targetId: z.string().uuid(), workerId: z.string().uuid(),
   jobId: z.string().uuid(), attempt: z.number().int().positive(), leaseId: z.string().uuid(), deviceGeneration: z.number().int().positive() }).strict();
-const resource = z.object({ id: z.string().min(1).max(256), labels, checkpointEventId: z.string().uuid(),
+const resource = z.object({ id: z.string().min(1).max(256), labels, checkpointLabels: labels.optional(), checkpointEventId: z.string().uuid(),
   attemptId: z.string().uuid(), previousCapabilityExpiresAtMs: z.number().int().safe(),
   previousFenceRetired: z.literal(true) }).strict();
 export const commanderWarmStateSchema = z.object({
@@ -21,6 +22,8 @@ export const commanderWarmStateSchema = z.object({
   status: z.enum(["claimed", "paused", "quarantined", "retired"]), expiresAtMs: z.number().int().safe(),
   resource: resource.nullable(), currentJobId: z.string().uuid().nullable(), currentAttemptId: z.string().uuid().nullable(),
   currentLeaseId: z.string().uuid().nullable(),
+  redaction: commanderWarmCanaryMaterialSchema.optional(),
+  redactionBeforeTurn: commanderWarmCanaryMaterialSchema.optional(),
 }).strict();
 export type CommanderWarmState = z.infer<typeof commanderWarmStateSchema>;
 export const COMMANDER_WARM_CHECKPOINT_PREFIX = "aoa-commander-checkpoint-v1:";
@@ -29,23 +32,30 @@ export const commanderWarmCheckpointSchema = z.object({ version: z.literal(1), s
   checkpointRef: z.string().min(1).max(512), resourceLabels: labels }).strict();
 /** Accepted log + later success terminal + exact retired database lease. A
  * mutable warm marker alone is never evidence of a checkpoint or fence expiry. */
-export async function loadAcceptedCommanderWarmCheckpoint(tx: Db, state: CommanderWarmState, nowMs: number) {
+export async function loadAcceptedCommanderWarmCheckpoint(tx: Db, state: CommanderWarmState, nowMs: number, options: { requirePreviousCapabilityExpired?: boolean } = {}) {
   if (!state.resource || !Number.isFinite(nowMs)) return null;
   const physical = state.resource.labels;
-  const [lease] = await tx.select().from(leases).where(and(eq(leases.id, physical.leaseId),
-    eq(leases.organizationId, state.organizationId), eq(leases.companyId, state.companyId), eq(leases.jobId, physical.jobId),
-    eq(leases.attemptId, state.resource.attemptId), eq(leases.attemptNumber, physical.attempt),
-    eq(leases.workerId, physical.workerId), eq(leases.targetId, physical.targetId), eq(leases.targetGeneration, physical.deviceGeneration))).limit(1);
+  // Physical labels never change. The accepted checkpoint and prior capability
+  // belong to the most recent turn, which has a fresh job/attempt/lease tuple.
+  const checkpointOwner = state.resource.checkpointLabels ?? physical;
+  if (physical.organizationId !== state.organizationId || physical.targetId !== state.targetId ||
+      physical.deviceGeneration !== state.targetGeneration || checkpointOwner.organizationId !== state.organizationId ||
+      checkpointOwner.targetId !== state.targetId || checkpointOwner.deviceGeneration !== state.targetGeneration ||
+      checkpointOwner.workerId !== state.workerId) return null;
+  const [lease] = await tx.select().from(leases).where(and(eq(leases.id, checkpointOwner.leaseId),
+    eq(leases.organizationId, state.organizationId), eq(leases.companyId, state.companyId), eq(leases.jobId, checkpointOwner.jobId),
+    eq(leases.attemptId, state.resource.attemptId), eq(leases.attemptNumber, checkpointOwner.attempt),
+    eq(leases.workerId, checkpointOwner.workerId), eq(leases.targetId, checkpointOwner.targetId), eq(leases.targetGeneration, checkpointOwner.deviceGeneration))).limit(1);
   if (!lease || !["released", "expired", "revoked"].includes(lease.status) || !lease.expiresAt) return null;
   const previousCapabilityExpiresAtMs = lease.expiresAt.getTime();
   if (!Number.isFinite(previousCapabilityExpiresAtMs) || state.resource.previousCapabilityExpiresAtMs !== previousCapabilityExpiresAtMs) return null;
   const [attempt] = await tx.select({ status: jobAttempts.status }).from(jobAttempts).where(and(
     eq(jobAttempts.id, state.resource.attemptId), eq(jobAttempts.organizationId, state.organizationId),
-    eq(jobAttempts.companyId, state.companyId), eq(jobAttempts.jobId, physical.jobId), eq(jobAttempts.attemptNumber, physical.attempt))).limit(1);
+    eq(jobAttempts.companyId, state.companyId), eq(jobAttempts.jobId, checkpointOwner.jobId), eq(jobAttempts.attemptNumber, checkpointOwner.attempt))).limit(1);
   if (attempt?.status !== "succeeded") return null;
   const scope = [eq(jobEvents.organizationId, state.organizationId), eq(jobEvents.companyId, state.companyId),
-    eq(jobEvents.jobId, physical.jobId), eq(jobEvents.attemptId, state.resource.attemptId), eq(jobEvents.attemptNumber, physical.attempt),
-    eq(jobEvents.leaseId, physical.leaseId), eq(jobEvents.fenceToken, lease.fence)];
+    eq(jobEvents.jobId, checkpointOwner.jobId), eq(jobEvents.attemptId, state.resource.attemptId), eq(jobEvents.attemptNumber, checkpointOwner.attempt),
+    eq(jobEvents.leaseId, checkpointOwner.leaseId), eq(jobEvents.fenceToken, lease.fence)];
   const [checkpoint] = await tx.select().from(jobEvents).where(and(...scope,
     eq(jobEvents.eventId, state.resource.checkpointEventId), eq(jobEvents.eventType, "log"))).limit(1);
   if (!checkpoint) return null;
@@ -62,7 +72,7 @@ export async function loadAcceptedCommanderWarmCheckpoint(tx: Db, state: Command
     gt(jobEvents.sequence, checkpoint.sequence))).limit(1);
   const verdict = terminalEventPayloadV1Schema.safeParse(terminal?.event.payload);
   if (!verdict.success || verdict.data.status !== "succeeded") return null;
-  if (previousCapabilityExpiresAtMs > nowMs) throw new CommanderWarmClaimError("previous_capability_live");
+  if (options.requirePreviousCapabilityExpired !== false && previousCapabilityExpiresAtMs > nowMs) throw new CommanderWarmClaimError("previous_capability_live");
   return { lease, receipt: receipt.data, checkpoint, previousCapabilityExpiresAtMs };
 }
 
@@ -127,7 +137,8 @@ export async function claimCommanderWarmTurn(tx: Db, input: {
     organizationId: input.organizationId, companyId: input.companyId, conversationId: source.conversationId, userId: source.userId,
     targetId: input.targetId, targetGeneration: input.targetGeneration, workerId: old?.workerId ?? null,
     status: "claimed", expiresAtMs: nowMs + COMMANDER_WARM_IDLE_MS, resource: old?.resource ?? null,
-    currentJobId: input.jobId, currentAttemptId: input.attemptId, currentLeaseId: null };
+    currentJobId: input.jobId, currentAttemptId: input.attemptId, currentLeaseId: null,
+    ...(old?.redaction ? { redaction: old.redaction, redactionBeforeTurn: old.redaction } : {}) };
   commanderWarmStateSchema.parse(state);
   if (holder) await tx.update(internalAgentRuns).set({ distributedWarmState: null }).where(and(
     eq(internalAgentRuns.id, holder.id), eq(internalAgentRuns.companyId, input.companyId), eq(internalAgentRuns.userId, source.userId)));
