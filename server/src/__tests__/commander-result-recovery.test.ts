@@ -38,6 +38,17 @@ describe("Commander durable result recovery", () => {
       expect(d.onError).toHaveBeenCalledTimes(2);
     } finally { vi.useRealTimers(); }
   });
+  it("releases the sweep lock when listing owned work stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      const d = dependencies(); d.list.mockImplementationOnce(() => new Promise(() => {}));
+      const recovery = createCommanderResultRecovery(d as never);
+      const failed = recovery.tick().then(() => "unexpected success", (error: Error) => error.message);
+      await vi.advanceTimersByTimeAsync(5001);
+      expect(await Promise.race([failed, Promise.resolve("still blocked")])).toBe("Commander recovery listing deadline");
+      await recovery.tick(); expect(d.project).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
   it("joins concurrent ticks to one sweep", async () => {
     const d = dependencies(); const recovery = createCommanderResultRecovery(d as never);
     await Promise.all([recovery.tick(), recovery.tick()]); expect(d.list).toHaveBeenCalledOnce(); expect(d.project).toHaveBeenCalledOnce();

@@ -34,7 +34,13 @@ export function createCommanderResultRecovery(deps: {
 }) {
   let cursor: string | null = null; let running: Promise<void> | null = null;
   async function sweep() {
-    const rows = await deps.list(cursor);
+    let listingTimer: ReturnType<typeof setTimeout> | undefined;
+    let rows: CommanderRecoveryCandidate[];
+    try {
+      rows = await Promise.race([deps.list(cursor), new Promise<never>((_resolve, reject) => {
+        listingTimer = setTimeout(() => reject(new Error("Commander recovery listing deadline")), 5000);
+      })]);
+    } finally { if (listingTimer) clearTimeout(listingTimer); }
     const startedAt = Date.now(); let processed = 0;
     for (const candidate of rows) {
       if (Date.now() - startedAt >= 30000) break;
