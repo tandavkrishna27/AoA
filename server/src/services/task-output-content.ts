@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { companies, issues, jobArtifacts, jobAttempts, jobEvents, jobProjectionReceipts, jobs, taskOutputs, type Db } from "@armyofagents/db";
 import { artifactPreparedPayloadV1Schema, expectedAttemptObjectPrefix } from "@armyofagents/worker-protocol";
-import { submitJobSourceSchema } from "@armyofagents/shared";
+import { loadAcceptedOutputTarget } from "./job-accepted-output-projection.js";
 import type { Readable } from "node:stream";
 import type { StorageProvider } from "../storage/types.js";
 import { runInTenant } from "../db/tenant-context.js";
@@ -47,9 +47,9 @@ export function createTaskOutputContentService(input: { appDb: Db; storage: Stor
             eq(jobProjectionReceipts.status, "applied"), eq(taskOutputs.id, outputId), eq(taskOutputs.companyId, companyId),
             eq(taskOutputs.provider, "aoa_distributed_job"), eq(taskOutputs.type, "artifact"))).limit(1);
         if (!bound) throw missing();
-        const source = submitJobSourceSchema.safeParse(bound.job.sourceIntent);
-        if (!source.success || bound.job.sourceKind !== "task_run" || source.data.kind !== "task_run" ||
-            source.data.issueId !== bound.output.issueId || !bound.output.externalId ||
+        const target = await loadAcceptedOutputTarget(tx, { organizationId, companyId, jobId: bound.job.id })
+          .catch(() => null);
+        if (!target || target.issueId !== bound.output.issueId || !bound.output.externalId ||
             !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bound.output.externalId)) throw missing();
         const [event] = await tx.select().from(jobEvents).where(and(
           eq(jobEvents.organizationId, organizationId), eq(jobEvents.companyId, companyId),

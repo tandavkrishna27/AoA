@@ -895,6 +895,7 @@ async function resetBridgeRows(): Promise<void> {
   await f.admin`DELETE FROM activity_log`;
   await f.admin`DELETE FROM issue_comments`;
   await f.admin`DELETE FROM job_artifacts`;
+  await f.admin`DELETE FROM internal_agent_runs`;
   await f.admin`DELETE FROM issues`;
 }
 
@@ -903,11 +904,25 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     beforeEach(async () => { if (fixture) await resetBridgeRows(); });
 
     async function projected(tenant = TENANT_A, bytes = Buffer.from("founder result bytes"),
-      options: { kind?: "workspace_patch" | "other"; contentType?: string } = {}) {
+      options: { kind?: "workspace_patch" | "other"; contentType?: string; crew?: boolean; late?: boolean; redrive?: boolean } = {}) {
       const kind = options.kind ?? "workspace_patch";
       const contentType = options.contentType ?? "text/plain";
       const issueId = await seedIssue(tenant.companyId);
-      const fence = await seedLeasedAttempt(tenant, taskSourceFor(tenant === TENANT_A ? AGENT_A : AGENT_B, issueId));
+      const agentId = tenant === TENANT_A ? AGENT_A : AGENT_B;
+      const crewRunId = randomUUID();
+      const fence = await seedLeasedAttempt(tenant, options.crew
+        ? { kind: "crew_run", crewRunId }
+        : taskSourceFor(agentId, issueId));
+      if (options.crew) {
+        await guard().admin`INSERT INTO internal_agent_runs
+          (id, company_id, agent_id, trigger_type, trigger_source, related_entity_type, related_entity_id,
+           execution_owner, distributed_job_id, distributed_attempt_id)
+          VALUES (${crewRunId}, ${tenant.companyId}, ${agentId}, 'event', 'task', 'task', ${issueId},
+            'distributed', ${fence.jobId}, ${fence.attemptId})`;
+      }
+      if (options.late) {
+        await guard().admin`UPDATE internal_agent_runs SET status = 'completed' WHERE id = ${crewRunId}`;
+      }
       const identifier = randomUUID();
       const objectKey = expectedAttemptObjectPrefix({ organizationId: tenant.organizationId, jobId: fence.jobId, attempt: 1 }) + "founder.txt";
       const digest = createHash("sha256").update(bytes).digest("hex");
@@ -916,8 +931,21 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
         retention: "standard", declaredSizeBytes: bytes.length, actualSizeBytes: bytes.length,
         declaredSha256: digest, actualSha256: digest, prefixValid: true, tenantValid: true,
       }));
-      const accepted = await acceptWithBridges(fence, [artifactEv(fence, 1, identifier, kind), terminal(fence, 2)]);
-      expect(accepted.result.acceptedEventProjections?.find((p) => p.projectionKind === "output_projection")?.outcome).toBe("applied");
+      const events = [artifactEv(fence, 1, identifier, kind), terminal(fence, 2)];
+      const accepted = await acceptWithBridges(fence, events, options.redrive ? {
+        mutate: (projector) => projector.projectionKind !== "output_projection" ? projector : {
+          ...projector, apply: async (ctx) => { await projector.apply(ctx); throw new Error("output savepoint rollback"); },
+        },
+      } : {});
+      if (options.redrive) {
+        expect(accepted.result.acceptedEventProjections?.find((p) => p.projectionKind === "output_projection")?.outcome).toBe("pending");
+        expect(await count("task_outputs", `issue_id = '${issueId}'`)).toBe(0);
+        const [receipt] = await guard().admin`SELECT id FROM job_projection_receipts WHERE job_id = ${fence.jobId} AND projection_kind = 'output_projection'`;
+        expect(await redrivePendingProjection(guard().app.db, { organizationId: tenant.organizationId, receiptId: receipt!.id })).toMatchObject({ status: "redriven" });
+        expect(await redrivePendingProjection(guard().app.db, { organizationId: tenant.organizationId, receiptId: receipt!.id })).toEqual({ status: "not_pending" });
+      } else {
+        expect(accepted.result.acceptedEventProjections?.find((p) => p.projectionKind === "output_projection")?.outcome).toBe("applied");
+      }
       const [output] = await guard().admin`SELECT id FROM task_outputs WHERE external_id = ${committed.id}`;
       const storage: StorageProvider = {
         id: "s3", putObject: vi.fn(), deleteObject: vi.fn(),
@@ -925,7 +953,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
         getObject: vi.fn(async () => ({ stream: Readable.from([bytes.subarray(0, 3), bytes.subarray(3)]), contentLength: bytes.length, etag: "pinned" })),
       };
       const reader = createTaskOutputContentService({ appDb: guard().app.db, storage });
-      return { issueId, fence, artifactId: committed.id, outputId: output!.id as string, storage, reader, bytes, objectKey };
+      return { issueId, crewRunId, fence, artifactId: committed.id, outputId: output!.id as string, storage, reader, bytes, objectKey };
     }
 
     function appFor(reader: ReturnType<typeof createTaskOutputContentService>, companyId = COMPANY) {
@@ -937,6 +965,70 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       });
       return app;
     }
+
+    it("delivers crew JSON output to its durable task and downloads it after terminal", async () => {
+      const bytes = Buffer.from('{"result":"crew output"}');
+      const p = await projected(TENANT_A, bytes, { crew: true, kind: "other", contentType: "application/json" });
+      const [row] = await guard().admin`SELECT issue_id, created_by_agent_id, created_by_run_id FROM task_outputs WHERE id = ${p.outputId}`;
+      expect(row).toMatchObject({ issue_id: p.issueId, created_by_agent_id: AGENT_A, created_by_run_id: null });
+      const response = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ result: "crew output" });
+      expect(await count("task_outputs", `external_id = '${p.artifactId}'`)).toBe(1);
+    });
+
+    it.each(["foreign_task", "foreign_agent", "job", "owner", "entity_type"])("rejects crew content with invalid durable binding: %s", async (binding) => {
+      const p = await projected(TENANT_A, Buffer.from("crew"), { crew: true });
+      if (binding === "foreign_task") {
+        const foreignIssueId = await seedIssue(COMPANY_B);
+        await guard().admin`UPDATE internal_agent_runs SET related_entity_id = ${foreignIssueId} WHERE id = ${p.crewRunId}`;
+      }
+      if (binding === "foreign_agent") await guard().admin`UPDATE internal_agent_runs SET agent_id = ${AGENT_B} WHERE id = ${p.crewRunId}`;
+      if (binding === "job") await guard().admin`UPDATE internal_agent_runs SET distributed_job_id = ${randomUUID()} WHERE id = ${p.crewRunId}`;
+      if (binding === "owner") await guard().admin`UPDATE internal_agent_runs SET execution_owner = 'legacy' WHERE id = ${p.crewRunId}`;
+      if (binding === "entity_type") await guard().admin`UPDATE internal_agent_runs SET related_entity_type = 'discussion' WHERE id = ${p.crewRunId}`;
+      const response = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(response.status).toBe(404);
+      expect(p.storage.getObject).not.toHaveBeenCalled();
+    });
+
+    it("isolates two crew tenants and keeps earlier output readable after an attempt retry", async () => {
+      const a = await projected(TENANT_A, Buffer.from("tenant A"), { crew: true });
+      const b = await projected(TENANT_B, Buffer.from("tenant B"), { crew: true });
+      await guard().admin`UPDATE internal_agent_runs SET distributed_attempt_id = ${randomUUID()} WHERE id = ${a.crewRunId}`;
+      await guard().admin`UPDATE task_outputs SET metadata = ${guard().admin.json({ crewRunId: b.crewRunId, objectKey: b.objectKey })} WHERE id = ${a.outputId}`;
+      expect((await request(appFor(a.reader)).get(`/api/task-outputs/${a.outputId}/content`)).text).toBe("tenant A");
+      expect((await request(appFor(b.reader, COMPANY_B)).get(`/api/task-outputs/${b.outputId}/content`)).text).toBe("tenant B");
+      const forbidden = await request(appFor(a.reader)).get(`/api/task-outputs/${b.outputId}/content`);
+      expect([403, 404]).toContain(forbidden.status);
+    });
+
+    it.each([false, true])("delivers output for a finished crew run, including projection recovery (redrive=%s)", async (redrive) => {
+      const p = await projected(TENANT_A, Buffer.from("late output"), { crew: true, late: true, redrive });
+      expect(await count("task_outputs", `issue_id = '${p.issueId}'`)).toBe(1);
+      const response = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(response.status).toBe(200);
+      expect(response.text).toBe("late output");
+    });
+
+    it("keeps an output pending until the durable crew handoff binding is available", async () => {
+      const issueId = await seedIssue(COMPANY);
+      const crewRunId = randomUUID();
+      const fence = await seedLeasedAttempt(TENANT_A, { kind: "crew_run", crewRunId });
+      const identifier = randomUUID();
+      await seedCommittedArtifact(fence, identifier);
+      const { result } = await acceptWithBridges(fence, [artifactEv(fence, 1, identifier), terminal(fence, 2)]);
+      expect(result.acceptedEventProjections?.find((p) => p.projectionKind === "output_projection")).toMatchObject({ outcome: "pending" });
+      expect(await count("task_outputs", "true")).toBe(0);
+      await guard().admin`INSERT INTO internal_agent_runs
+        (id, company_id, agent_id, trigger_type, trigger_source, related_entity_type, related_entity_id,
+         execution_owner, distributed_job_id, distributed_attempt_id)
+        VALUES (${crewRunId}, ${COMPANY}, ${AGENT_A}, 'event', 'task', 'task', ${issueId},
+          'distributed', ${fence.jobId}, ${fence.attemptId})`;
+      const [receipt] = await guard().admin`SELECT id FROM job_projection_receipts WHERE job_id = ${fence.jobId} AND projection_kind = 'output_projection'`;
+      expect(await redrivePendingProjection(guard().app.db, { organizationId: ORG, receiptId: receipt!.id })).toMatchObject({ status: "redriven" });
+      expect(await count("task_outputs", `issue_id = '${issueId}'`)).toBe(1);
+    });
 
     it("streams the committed bytes after terminal, expired lease and organization rollout-off, ignoring mutable metadata and URL", async () => {
       const p = await projected();

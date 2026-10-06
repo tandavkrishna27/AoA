@@ -23,6 +23,7 @@ import { recordDistributedShadow } from "../../distributed-shadow-port.js";
 import { getDistributedRolloutPort } from "../../distributed-rollout-port.js";
 import { readDistributedCrewRolloutFlag } from "../../../config/distributed-execution.js";
 import { buildTaskRunBatchWorkload } from "../../task-run-batch-workload.js";
+import { applySandboxOutputRootDirective } from "../../sandbox-output-root.js";
 import { shouldSuppressLegacyExecution } from "../../run-execution-owner.js";
 import { resolveCrewDistributedGate } from "./crew-distributed-gate.js";
 import { buildCrewHandoffMarkerPatch } from "./crew-handoff-marker.js";
@@ -858,7 +859,11 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
           adapterConfig: resolvedConfigRecord,
           // The crew persona is already folded into triggerPrompt by buildTriggerPrompt, so a
           // separate instructions bundle would double-deliver — instructions:null for slice 1.
-          currentTaskMarkdown: triggerPrompt,
+          currentTaskMarkdown: applySandboxOutputRootDirective({
+            adapterType: agent.adapterType,
+            runTargetsSandbox: true,
+            currentTaskMarkdown: triggerPrompt,
+          }),
           instructions: null,
         });
         const crewGate = resolveCrewDistributedGate({

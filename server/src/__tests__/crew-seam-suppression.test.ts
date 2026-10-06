@@ -364,7 +364,7 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
       rolloutState: string;
       source: unknown;
       input?: { command?: unknown };
-      stagedFiles?: ReadonlyArray<{ path: string }>;
+      stagedFiles?: ReadonlyArray<{ path: string; bytes: Uint8Array }>;
     };
     expect(ownerInput.organizationId).toBe(ORG_ID);
     expect(ownerInput.idempotencyKey).toBe(RUN_ID);
@@ -376,6 +376,8 @@ describe("runAoaAgent crew distributed seam — BEHAVIORAL (MIG-006 slice 1b)", 
     expect(ownerInput.stagedFiles).toEqual(
       expect.arrayContaining([expect.objectContaining({ path: expect.stringContaining(".aoa-run-prompt.md") })]),
     );
+    const prompt = ownerInput.stagedFiles!.find((file) => file.path.endsWith(".aoa-run-prompt.md"));
+    expect(Buffer.from(prompt!.bytes).toString("utf8")).toContain("/home/user/aoa-output");
 
     // 1. Legacy execution SUPPRESSED.
     expect(execMock).not.toHaveBeenCalled();

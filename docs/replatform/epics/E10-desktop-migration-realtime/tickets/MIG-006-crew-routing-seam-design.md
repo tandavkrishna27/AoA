@@ -1,9 +1,34 @@
 # MIG-006 — Crew distributed routing seam — design
 
 **Epic:** E10 · **Plan node:** the crew sink cutover (E10-F001 shared prerequisite #1, crew slice)
-**Status:** `design` — terrain-verified at HEAD, **ready-to-TDD**. No production code has been written.
+**Status:** lifecycle routing shipped; task output delivery implemented locally. Crew activation and discussion enrichment remain pending.
 **Authored:** 2026-09-18 (post-E7-1), by terrain re-verification against source on `docs/replatform-program`.
 **Owner:** unowned — this authors the previously-missing MIG-006 ticket (E10-F001 named it as unwritten).
+
+## Current task output delivery — 2026-10-06
+
+Distributed Claude crew workloads now include the existing sandbox output-root directive.
+Accepted committed artifacts resolve their real task and agent from the company-scoped
+`internal_agent_runs` record, requiring distributed ownership and the same durable job.
+The frozen `crew_run` source shape is unchanged. Crew outputs use `task_outputs` with
+`createdByRunId` left null because that column references heartbeat runs; crew identity
+is carried as descriptive metadata, never used as download authority.
+
+The existing founder content endpoint validates the durable crew mapping plus the
+accepted receipt/event, artifact provenance, object prefix, size and checksum. An earlier
+attempt's committed output remains readable after a retry. A missing handoff binding or
+failed projection leaves a pending receipt; the existing bounded re-drive recovers it
+after terminal without inserting duplicate outputs.
+
+This slice delivers files on the **task**. Discussion entry enrichment remains a separate
+follow-up: the restricted `aoa_app` role has no access to `discussions`; no role grant or
+privileged projection bypass was added. Existing terminal run summaries are unchanged.
+Crew MCP authorization is also a follow-up. Crew rollout stays off. Live Anthropic M1b
+validation is deferred by the user's explicit choice to skip the API key; no paid model
+calls or provider substitution are part of these tests. This is M2 preparation, not an
+M2 rollout or a claim that live M1b passed.
+
+The older design and amendments below are retained as history.
 
 > ★★★ **AMENDED 2026-09-18 (post-build) — THE SCOPE BELOW IS SUPERSEDED: this is a crew-distributed
 > LIFECYCLE EPIC, not a "reuse-heavy, two-piece" seam.** Building it surfaced two decisive facts the

@@ -11,8 +11,9 @@
 // (job-output-bridge.ts) and returns the `task_outputs` row id; the SEAM writes the
 // `output_projection` receipt in the same savepoint.
 //
-// WHEN IT IS REGISTERED. Only a `task_run` job has a task to project onto; every other source
-// (commander/crew/one-shot/browser/service) has none, and the JOB-014 contract is "no fabricated
+// WHEN IT IS REGISTERED. `task_run` names its task; `crew_run` resolves its task from the
+// durable company-scoped internal_agent_runs record. Every other source has none, and the
+// JOB-014 contract is "no fabricated
 // task IDs" — so for those sources the projector is simply not registered (the equivalent of the
 // JOB-014 wrapper's `skipped`: nothing written, no receipt). The ingest decides this per batch
 // from the job's SERVER-recorded `jobs.source_intent`, read under the fence the ingest already
@@ -37,6 +38,9 @@ import { and, eq } from "drizzle-orm";
 import {
   jobArtifacts,
   jobs,
+  agents,
+  internalAgentRuns,
+  issues,
   type AcceptEventInput,
   type AcceptedEventProjector,
   type ActiveFenceRequest,
@@ -59,10 +63,11 @@ export class AcceptedOutputProjectionError extends Error {
   }
 }
 
-/** The task a `task_run` job projects onto, from the job's submit-time source. */
+/** The real task resolved from the server-recorded task/crew source. */
 export interface OutputTarget {
   issueId: string;
   assigneeAgentId: string;
+  crewRunId?: string;
 }
 
 /** Everything the projection of ONE accepted `artifact_prepared` event needs. The seam fills it
@@ -78,14 +83,14 @@ export interface AcceptedOutputContext {
   wireEvent: Record<string, unknown>;
 }
 
-/** Read the job's SERVER-recorded source: its task for a `task_run`, `null` for any other source.
+/** Read the job's SERVER-recorded source: task or durable crew task, otherwise `null`.
  * Throws `source_unreadable` when the job is missing or its source does not parse. */
 export async function loadAcceptedOutputTarget(
   db: Db,
   input: { organizationId: string; companyId: string; jobId: string },
 ): Promise<OutputTarget | null> {
   const [job] = await db
-    .select({ sourceIntent: jobs.sourceIntent })
+    .select({ sourceIntent: jobs.sourceIntent, sourceKind: jobs.sourceKind })
     .from(jobs)
     .where(and(
       eq(jobs.organizationId, input.organizationId),
@@ -95,7 +100,20 @@ export async function loadAcceptedOutputTarget(
     .limit(1);
   if (!job) throw new AcceptedOutputProjectionError("source_unreadable");
   const parsed = submitJobSourceSchema.safeParse(job.sourceIntent);
-  if (!parsed.success) throw new AcceptedOutputProjectionError("source_unreadable");
+  if (!parsed.success || parsed.data.kind !== job.sourceKind) throw new AcceptedOutputProjectionError("source_unreadable");
+  if (parsed.data.kind === "crew_run") {
+    // Task identity comes exclusively from the control plane's durable crew run.
+    // Historical outputs remain readable across attempt retries; the job binding is stable.
+    const [run] = await db.select({ issueId: issues.id, agentId: agents.id })
+      .from(internalAgentRuns)
+      .innerJoin(issues, and(eq(issues.id, internalAgentRuns.relatedEntityId), eq(issues.companyId, input.companyId)))
+      .innerJoin(agents, and(eq(agents.id, internalAgentRuns.agentId), eq(agents.companyId, input.companyId)))
+      .where(and(eq(internalAgentRuns.id, parsed.data.crewRunId), eq(internalAgentRuns.companyId, input.companyId),
+        eq(internalAgentRuns.relatedEntityType, "task"), eq(internalAgentRuns.executionOwner, "distributed"),
+        eq(internalAgentRuns.distributedJobId, input.jobId))).limit(1);
+    if (!run) throw new AcceptedOutputProjectionError("source_unreadable");
+    return { issueId: run.issueId, assigneeAgentId: run.agentId, crewRunId: parsed.data.crewRunId };
+  }
   return parsed.data.kind === "task_run"
     ? { issueId: parsed.data.issueId, assigneeAgentId: parsed.data.assigneeAgentId }
     : null;
@@ -144,6 +162,7 @@ export async function applyAcceptedOutputEvent(
       reviewState: "none",
       createdByAgentId: target.assigneeAgentId,
       metadata: {
+        ...(target.crewRunId ? { crewRunId: target.crewRunId } : {}),
         organizationId: ctx.organizationId,
         jobId: ctx.jobId,
         attemptId: ctx.attemptId,
@@ -185,7 +204,7 @@ function artifactOutputProjector(target: OutputTarget | Error): AcceptedEventPro
 
 /**
  * Decide the output registration for ONE ingest batch. Returns `null` — register nothing — when
- * the batch carries no `artifact_prepared` event or the job is not a `task_run` (no task to
+ * the batch carries no `artifact_prepared` event or the source has no real task to
  * project onto). Called inside the ingest's tenant transaction, under the fence it holds; the read
  * runs in its own SAVEPOINT so a failure can never abort the transaction that holds the append —
  * a failed read registers a projector that records every output event of the batch as OWED.
