@@ -127,3 +127,11 @@ Commander confirmation and product approval parity paths remain in force.
 Focused checks passed 37 placement/retirement tests, 15 drain tests, 13 product
 approval parity tests, and 37 Commander approval/recovery tests. No provider call
 or rollout change is part of these checks.
+
+Lifecycle final verification: repository typecheck and build passed. The final
+full suite passed 23,724 tests with 1,915 skipped (three workers on Windows).
+An earlier run hit the existing workspace-runtime child-log timing assertion;
+its isolated rerun passed before the successful full rerun. The new SSE tests
+preserve distributed ownership after partial-delivery errors, and recovery
+listing and retirement each have bounded waits. PR #660 passed all 16 CI checks
+and merged into the replatform branch. Warm VM ownership/resumption is next.
