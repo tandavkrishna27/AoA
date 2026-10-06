@@ -21,9 +21,9 @@ import { publishLiveEvent, publishIssueStatusChanged, threadWorkingAgents, broad
 import { logger } from "../../../middleware/logger.js";
 import { recordDistributedShadow } from "../../distributed-shadow-port.js";
 import { getDistributedRolloutPort } from "../../distributed-rollout-port.js";
-import { readDistributedCrewRolloutFlag } from "../../../config/distributed-execution.js";
+import { readDistributedToolSurfaceFlag, resolveDistributedToolSurface, readDistributedCrewRolloutFlag } from "../../../config/distributed-execution.js";
 import { buildTaskRunBatchWorkload } from "../../task-run-batch-workload.js";
-import { applySandboxOutputRootDirective } from "../../sandbox-output-root.js";
+import { prepareDistributedTaskRunContext } from "../../distributed-task-run-context.js";
 import { shouldSuppressLegacyExecution } from "../../run-execution-owner.js";
 import { resolveCrewDistributedGate } from "./crew-distributed-gate.js";
 import { buildCrewHandoffMarkerPatch } from "./crew-handoff-marker.js";
@@ -853,17 +853,25 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
       const { state: crewRolloutState, organizationId: crewOrganizationId } =
         await crewRolloutPort.resolveRunRolloutState({ companyId: payload.companyId, sourceKind: "crew_run" });
       if (crewOrganizationId) {
+        const toolSurfaceAuthorized = resolveDistributedToolSurface({
+          deploymentArmed: readDistributedToolSurfaceFlag(process.env),
+          organizationToolsEnabled: crewRolloutPort.resolveOrganizationToolSurface?.(crewOrganizationId) ?? false,
+        }).authorized;
+        const crewContext = prepareDistributedTaskRunContext({
+          adapterType: agent.adapterType,
+          companyId: payload.companyId,
+          apiBaseUrl: mcpParams.apiBaseUrl,
+          toolSurfaceAuthorized,
+          currentTaskMarkdown: triggerPrompt,
+        });
         const crewWorkload = buildTaskRunBatchWorkload({
           adapterType: agent.adapterType,
           runtimeCommandSpec,
           adapterConfig: resolvedConfigRecord,
           // The crew persona is already folded into triggerPrompt by buildTriggerPrompt, so a
           // separate instructions bundle would double-deliver — instructions:null for slice 1.
-          currentTaskMarkdown: applySandboxOutputRootDirective({
-            adapterType: agent.adapterType,
-            runTargetsSandbox: true,
-            currentTaskMarkdown: triggerPrompt,
-          }),
+          currentTaskMarkdown: crewContext.currentTaskMarkdown,
+          aoaMcpConfig: crewContext.aoaMcpConfig,
           instructions: null,
         });
         const crewGate = resolveCrewDistributedGate({
@@ -880,6 +888,7 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
             rolloutState: crewRolloutState,
             input: crewGate.workload,
             stagedFiles: crewGate.stagedFiles,
+            toolSurfaceAuthorized,
           });
           if (shouldSuppressLegacyExecution(crewOwner) && crewOwner.owner === "distributed") {
             // The attempt is the terminal authority now: write the durable marker (status

@@ -2,7 +2,7 @@
 //
 // CLI-016 (M1b, founder ruling F10) — the PER-ORGANIZATION tool-surface gate at USE.
 //
-// The dispatch side (heartbeat.ts, the canary block) already withholds the brokered `aoa` MCP
+// The dispatch side (heartbeat and crew runners) already withholds the brokered `aoa` MCP
 // config and its run_jwt bearer from a run whose Organization has not opted in. This is the
 // same decision re-proven per call at `/mcp` authorization, for three reasons:
 //   1. Enabling tools for one tenant must never enable them for another — a gate that exists
@@ -21,11 +21,11 @@ import type { RunCurrencyVerdict } from "./distributed-run-currency.js";
 
 /** The row facts the reader resolves for the SIGNED run id, plus the tenant's armed state. */
 export interface ToolSurfaceUseSnapshot {
-  /** A `heartbeat_runs` row exists for the signed run id. */
+  /** A heartbeat or crew run row exists for the signed run id. */
   readonly runFound: boolean;
-  /** `heartbeat_runs.company_id`. */
+  /** The run row's `company_id`. */
   readonly runCompanyId: string | null;
-  /** `heartbeat_runs.execution_owner` — `"distributed"` only for a handed-off org run. */
+  /** The run row's `execution_owner` — `"distributed"` only for a handed-off org run. */
   readonly executionOwner: string | null;
   /**
    * `resolveDistributedToolSurface(...).authorized` for the run's company's Organization: the
@@ -38,7 +38,7 @@ export interface ToolSurfaceUseSnapshot {
  * Decide whether a run-JWT actor's `/mcp` call is admitted by the per-Organization gate.
  *
  * The order mirrors `classifyRunCurrency`, and so do the two admits:
- *   1. No run row → ADMIT. Not an org distributed run; the DAT-007 fail-open class (crew,
+ *   1. No run row → ADMIT. Not an org distributed run; the DAT-007 fail-open class (unknown or
  *      reaped). A run_jwt is only ever minted for a distributed run row
  *      (`resolveRunJwtValue` throws otherwise), so this admits no distributed bearer.
  *   2. Company mismatch → DENY (defense in depth over the endpoint's own tenant check).

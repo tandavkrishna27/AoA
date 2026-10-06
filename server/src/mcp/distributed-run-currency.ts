@@ -18,7 +18,7 @@
 //
 // SLICE 1 (this file): the PURE classifier only — the security decision, exhaustively
 // unit-tested with plain literals. The DB reader (`createDistributedRunCurrencyResolver`,
-// which runs the bounded `runId -> heartbeat_runs -> job_attempts -> leases ->
+// which runs the bounded `runId -> heartbeat_runs/internal_agent_runs -> job_attempts -> leases ->
 // execution_targets` query) and the `server.ts:446` request-authorization mount land
 // in slice 2, inert behind the flag. Until then this classifier is exercised only by
 // its edge-case suite.
@@ -32,12 +32,11 @@ export type RunCurrencyVerdict = "admit" | "deny";
 /** The row facts the DB reader (slice 2) will hand this classifier, resolved from the
  *  SIGNED `run_id` claim. Kept drizzle-free so the security decision is a pure function
  *  testable without a database. Column provenance:
- *  - `runFound`         — a `heartbeat_runs` row exists for the signed run id (PK).
- *  - `runCompanyId`     — `heartbeat_runs.company_id`.
- *  - `executionOwner`   — `heartbeat_runs.execution_owner`: `null` = local, `"distributed"`
- *                         = handed off to a worker (written ONLY by the org heartbeat
- *                         handoff, never by crew).
- *  - `attemptStatus`    — `job_attempts.status` of `heartbeat_runs.distributed_attempt_id`.
+ *  - `runFound`         — a heartbeat or crew run row exists for the signed run id (PK).
+ *  - `runCompanyId`     — the run row's `company_id`.
+ *  - `executionOwner`   — the run row's `execution_owner`: `null` = local, `"distributed"`
+ *                         = handed off to a worker by the heartbeat or crew handoff.
+ *  - `attemptStatus`    — `job_attempts.status` of the run row's `distributed_attempt_id`.
  *  - `leaseStatus`      — `leases.status` of that attempt's offered/active lease, or null.
  *  - `expiresFresh`     — `leases.expires_at > clock_timestamp()`, computed against a FRESH
  *                         database clock in SQL (never a JS timestamp), matching `renewLease`'s
@@ -65,9 +64,8 @@ const TERMINAL_ATTEMPT_STATUSES: readonly string[] = ["succeeded", "failed", "ca
  * snapshot resolved for its SIGNED `run_id`.
  *
  * The order is load-bearing:
- *   1. No run row → ADMIT (fail-OPEN). Not an org distributed run this gate covers — a
- *      crew run, a forged/expired-but-reaped run — bounded anyway by the JWT's <=48h TTL.
- *      Crew is deliberately out of scope (it never carries `execution_owner="distributed"`).
+ *   1. No run row -> ADMIT (fail-OPEN). Unknown or reaped run, bounded by
+ *      the JWT's <=48h TTL. The reader includes heartbeat and crew run rows.
  *   2. Company mismatch → DENY. Defense-in-depth over the endpoint's own wrong-tenant check.
  *   3. Not distributed (`execution_owner` !== "distributed") → ADMIT. A LOCAL org run under
  *      flag-on has no separable lease to be current against — this is the central guard
@@ -84,7 +82,7 @@ export function classifyRunCurrency(
   companyId: string,
 ): RunCurrencyVerdict {
   // (1) No org distributed run row for this signed run id — not a run this gate covers
-  //     (crew, forged, or reaped). Fail-OPEN; bounded by the JWT's <=48h TTL.
+  //     (unknown or reaped). Fail-OPEN; bounded by the JWT's <=48h TTL.
   if (!snapshot.runFound) return "admit";
   // (2) Defense-in-depth: the run's company must match the URL company.
   if (snapshot.runCompanyId !== companyId) return "deny";

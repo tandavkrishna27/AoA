@@ -28,7 +28,7 @@
 // SEEDING mirrors `distributed-run-currency.integration.test.ts` (DAT-007-S3): hand-inserted
 // rows as the embedded-pg superuser, one fresh leaf chain per case.
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -41,6 +41,8 @@ import { brokeredAoaMcpConfig } from "@armyofagents/adapter-utils";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { createDistributedRunCurrencyResolver } from "../mcp/distributed-run-currency-resolver.js";
 import { createDistributedToolSurfaceUseResolver } from "../mcp/distributed-tool-surface-use-resolver.js";
+import { actorMiddleware } from "../middleware/auth.js";
+import { createExecutionSecretBrokers } from "../services/execution-secret-brokers.js";
 import {
   DISTRIBUTED_EXECUTION_ENABLED_ENV,
   DISTRIBUTED_TOOL_SURFACE_ENABLED_ENV,
@@ -247,7 +249,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       return issueId;
     }
 
-    function toolApp(env: Record<string, string | undefined>, tenant: Tenant, signedRunId: string) {
+    function toolApp(env: Record<string, string | undefined>, tenant: Tenant, signedRunId: string, authenticate = false) {
       const previous = process.env[DISTRIBUTED_EXECUTION_ENABLED_ENV];
       // Production snapshots this deployment flag at route construction; use-side policy
       // still comes from the real resolver's mutable env bag on every request.
@@ -255,7 +257,8 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       try {
         const app = express();
         app.use(express.json());
-        app.use((req, _res, next) => {
+        if (authenticate) app.use(actorMiddleware(db, { deploymentMode: "cloud_auth" }));
+        else app.use((req, _res, next) => {
           req.actor = {
             type: "agent", source: "agent_jwt", companyId: tenant.company,
             agentId: tenant.agent, runId: signedRunId, signedRunId,
@@ -482,6 +485,77 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       }
       env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = JSON.stringify({ organizations: { [TENANT_A.org]: { mode: "canary", workloads: ["*"] } } });
       expect((await call(app)).status).toBe(403);
+    });
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("runs crew task tools through MCP, isolates the company and honors live revocation", async () => {
+      assertSetupOk();
+      const company = randomUUID();
+      const agent = randomUUID();
+      const tenant = { ...TENANT_A, company, agent };
+      await db.execute(sql`INSERT INTO companies (id, organization_id, name, issue_prefix)
+        VALUES (${company}, ${tenant.org}, 'Crew tool test', ${`CR${company.slice(0, 6).toUpperCase()}`})`);
+      await db.execute(sql`INSERT INTO agents (id, company_id, name, kind, status, runtime_config)
+        VALUES (${agent}, ${company}, 'Crew tool test', 'aoa', 'idle',
+          ${JSON.stringify({ aoa: { toolAllowlist: ["get_task", "post_task_comment", "set_task_status"] } })}::jsonb)`);
+      await db.execute(sql`INSERT INTO internal_agent_config (company_id, crew_autonomy_level) VALUES (${company}, 1)`);
+      const taskId = await seedReadableTask(tenant, "Crew MCP task", { status: "in_progress" });
+      const reviewer = `crew-reviewer-${randomUUID()}`;
+      await db.execute(sql`INSERT INTO "user" (id, name, email, created_at, updated_at)
+        VALUES (${reviewer}, 'Crew reviewer', ${`${reviewer}@example.test`}, now(), now())`);
+      await db.execute(sql`INSERT INTO company_memberships (company_id, principal_type, principal_id, status)
+        VALUES (${company}, 'user', ${reviewer}, 'active')`);
+      await db.execute(sql`UPDATE issues SET reviewer_user_id = ${reviewer}, reviewer_source = 'explicit' WHERE id = ${taskId}`);
+      const foreignTaskId = await seedReadableTask(TENANT_B, "Foreign crew task");
+      const runId = await seedDistributedRun(tenant);
+      await db.execute(sql`INSERT INTO internal_agent_runs
+        (id, company_id, agent_id, trigger_type, trigger_source, execution_owner, distributed_job_id, distributed_attempt_id,
+         related_entity_type, related_entity_id)
+        SELECT id, company_id, agent_id, 'event', 'task', execution_owner, distributed_job_id, distributed_attempt_id,
+          'task', ${taskId}::uuid FROM heartbeat_runs WHERE id = ${runId}`);
+      await db.execute(sql`DELETE FROM heartbeat_runs WHERE id = ${runId}`);
+      await db.execute(sql`UPDATE jobs SET source_kind = 'crew_run',
+        source_intent = ${JSON.stringify({ kind: "crew_run", crewRunId: runId })}::jsonb
+        WHERE id = (SELECT distributed_job_id FROM internal_agent_runs WHERE id = ${runId})`);
+      await db.execute(sql`UPDATE issues SET execution_run_id = ${runId} WHERE id = ${taskId}`);
+      const env = armedEnv();
+      vi.stubEnv("AOA_AGENT_JWT_SECRET", "crew-mcp-http-test-signing-secret-32chars");
+      const [run] = await db.execute(sql`SELECT distributed_job_id FROM internal_agent_runs WHERE id = ${runId}`);
+      const token = await createExecutionSecretBrokers(db).resolveRunJwt({ companyId: company,
+        refId: run.distributed_job_id, ownerPrincipalId: agent, handleId: randomUUID() });
+      const app = toolApp(env, tenant, runId, true);
+      const call = (name: string, args: Record<string, unknown>) => request(app)
+        .post(`/api/companies/${company}/mcp`).set("authorization", `Bearer ${token}`)
+        .send({ jsonrpc: "2.0", id: name, method: "tools/call", params: { name, arguments: args } });
+      for (const [name, args] of [
+        ["get_task", { taskId }],
+        ["post_task_comment", { taskId, body: "Crew MCP progress" }],
+        ["set_task_status", { taskId, status: "in_review" }],
+      ] as const) {
+        const response = await call(name, args);
+        expect(response.status, JSON.stringify(response.body)).toBe(200);
+        expect(response.body.error).toBeUndefined();
+        expect(response.body.result.isError, JSON.stringify(response.body)).toBe(false);
+      }
+      const [task] = await db.execute(sql`SELECT status FROM issues WHERE id = ${taskId}`);
+      expect(task.status).toBe("in_review");
+      const [comment] = await db.execute(sql`SELECT author_agent_id FROM issue_comments WHERE issue_id = ${taskId} AND body = 'Crew MCP progress'`);
+      expect(comment.author_agent_id).toBe(agent);
+      const foreign = await call("post_task_comment", { taskId: foreignTaskId, body: "must not write" });
+      expect(foreign.body.result.isError).toBe(true);
+      env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = JSON.stringify({ organizations: { [tenant.org]: { mode: "canary", workloads: ["*"] } } });
+      expect((await call("get_task", { taskId })).status).toBe(403);
+      env[DISTRIBUTED_EXECUTION_ROLLOUT_ENV] = armedRollout();
+      expect((await call("get_task", { taskId })).status).toBe(200);
+      await db.execute(sql`UPDATE leases SET expires_at = clock_timestamp() - interval '1 hour',
+        ack_deadline = clock_timestamp() - interval '2 hours'
+        WHERE attempt_id = (SELECT distributed_attempt_id FROM internal_agent_runs WHERE id = ${runId})`);
+      expect((await call("post_task_comment", { taskId, body: "expired must not write" })
+        .set("x-aoa-run-id", randomUUID())).status).toBe(403);
+      const [forbiddenWrites] = await db.execute(sql`SELECT count(*)::int AS n FROM issue_comments
+        WHERE body IN ('must not write', 'expired must not write')`);
+      expect(forbiddenWrites.n).toBe(0);
     });
 
     it("USE: an EXPIRED lease is denied by the currency gate (same tenant's live run is the control)", async () => {

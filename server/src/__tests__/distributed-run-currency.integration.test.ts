@@ -38,7 +38,7 @@
 // plan-shape pin that every hop is an index probe. Mutants are in
 // docs/replatform/epics/E5-workspaces-secrets/tickets/DAT-007-S3-result.md.
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -49,6 +49,9 @@ import postgres from "postgres";
 import { applyPendingMigrations, createDb, type Db } from "@armyofagents/db";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { createDistributedRunCurrencyResolver } from "../mcp/distributed-run-currency-resolver.js";
+import { createDistributedToolSurfaceUseResolver } from "../mcp/distributed-tool-surface-use-resolver.js";
+import { createExecutionSecretBrokers } from "../services/execution-secret-brokers.js";
+import { verifyLocalAgentJwt } from "../agent-auth-jwt.js";
 
 type EmbeddedPostgresInstance = {
   initialise(): Promise<void>;
@@ -74,7 +77,7 @@ const PROVIDER_HEX64 = "b".repeat(64);
 // (Issue #114); Linux CI is the authoritative gate. Placing the hooks INSIDE the
 // describe means the whole suite (boot included) is skipped on Windows, mirroring
 // job-leasing.integration.test.ts:889/971.
-describe.skipIf(process.platform === "win32")(
+describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")(
   "DAT-007 item #1 — distributed-run currency resolver (real PG)",
   () => {
     let pg: EmbeddedPostgresInstance | null = null;
@@ -322,6 +325,53 @@ describe.skipIf(process.platform === "win32")(
         VALUES (${runId}, ${COMPANY}, ${AGENT})`);
       return runId;
     }
+
+    it.each([
+      { attemptStatus: "running" as const, leaseExpiry: "future" as const, expected: "admit" },
+      { attemptStatus: "running" as const, leaseExpiry: "past" as const, expected: "deny" },
+      { attemptStatus: "expired" as const, leaseExpiry: "future" as const, expected: "deny" },
+    ])("checks distributed crew currency: $attemptStatus / $leaseExpiry", async ({ attemptStatus, leaseExpiry, expected }) => {
+      assertSetupOk();
+      const runId = await seedDistributedRun({ attemptStatus, leaseExpiry });
+      await db.execute(sql`INSERT INTO internal_agent_runs
+        (id, company_id, agent_id, trigger_type, trigger_source, execution_owner, distributed_job_id, distributed_attempt_id)
+        SELECT id, company_id, agent_id, 'event', 'task', execution_owner, distributed_job_id, distributed_attempt_id
+        FROM heartbeat_runs WHERE id = ${runId}`);
+      await db.execute(sql`DELETE FROM heartbeat_runs WHERE id = ${runId}`);
+      const useGate = createDistributedToolSurfaceUseResolver(db, {
+        env: { AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED: "per-organization" },
+        rolloutSource: { resolveOrganizationToolSurface: () => false } as never,
+      });
+      expect(await useGate.resolve({ signedRunId: runId, companyId: COMPANY })).toBe("deny");
+      expect(await createDistributedRunCurrencyResolver(db).resolve({ signedRunId: runId, companyId: COMPANY, agentId: AGENT })).toBe(expected);
+      expect(await createDistributedRunCurrencyResolver(db).resolve({ signedRunId: runId, companyId: TENANT_B.company, agentId: TENANT_B.agent })).toBe("deny");
+    });
+
+    it("mints a crew token from the durable job binding and refuses a different agent", async () => {
+      assertSetupOk();
+      const { runId, jobId } = await seedDistributedChain({ attemptStatus: "running", leaseExpiry: "future" });
+      await db.execute(sql`UPDATE jobs SET source_kind = 'crew_run',
+        source_intent = ${JSON.stringify({ kind: "crew_run", crewRunId: runId })}::jsonb WHERE id = ${jobId}`);
+      await db.execute(sql`INSERT INTO internal_agent_runs
+        (id, company_id, agent_id, trigger_type, trigger_source, execution_owner, distributed_job_id, distributed_attempt_id)
+        SELECT id, company_id, agent_id, 'event', 'task', execution_owner, distributed_job_id, distributed_attempt_id
+        FROM heartbeat_runs WHERE id = ${runId}`);
+      await db.execute(sql`DELETE FROM heartbeat_runs WHERE id = ${runId}`);
+      vi.stubEnv("AOA_AGENT_JWT_SECRET", "crew-tool-access-test-signing-secret-32chars");
+      try {
+        const brokers = createExecutionSecretBrokers(db);
+        const input = { companyId: COMPANY, refId: jobId, ownerPrincipalId: AGENT, handleId: randomUUID() };
+        const jwt = await brokers.resolveRunJwt(input);
+        expect(verifyLocalAgentJwt(jwt)).toMatchObject({ sub: AGENT, company_id: COMPANY, run_id: runId });
+        await expect(brokers.resolveRunJwt({ ...input, ownerPrincipalId: TENANT_B.agent })).rejects.toThrow();
+        await expect(brokers.resolveRunJwt({ ...input, companyId: TENANT_B.company })).rejects.toThrow();
+        await db.execute(sql`UPDATE jobs SET source_intent = ${JSON.stringify({ kind: "crew_run", crewRunId: randomUUID() })}::jsonb WHERE id = ${jobId}`);
+        await expect(brokers.resolveRunJwt(input)).rejects.toThrow();
+        await db.execute(sql`UPDATE jobs SET source_intent = ${JSON.stringify({ kind: "crew_run", crewRunId: runId })}::jsonb WHERE id = ${jobId}`);
+        await db.execute(sql`UPDATE internal_agent_runs SET distributed_job_id = ${randomUUID()} WHERE id = ${runId}`);
+        await expect(brokers.resolveRunJwt(input)).rejects.toThrow();
+      } finally { vi.unstubAllEnvs(); }
+    });
 
     it("ADMIT — live distributed run: active fresh lease, non-terminal attempt, current target", async () => {
       assertSetupOk();
