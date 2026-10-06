@@ -35,8 +35,9 @@ import type {
   SandboxProvider,
   StagedFileRequest,
 } from "@armyofagents/worker-daemon";
-import { createRunOutputCapture, readCommanderWarmRedactionCanaries } from "@armyofagents/worker-daemon";
+import { createRunOutputCapture, readCommanderWarmRedactionCanaries, scrubOutputText } from "@armyofagents/worker-daemon";
 import {
+  EXECUTE_LIVE_STDOUT_KEY,
   EXECUTE_CAPTURE_STDOUT_KEY,
   EXECUTE_STDOUT_TAIL_KEY,
   WireProtocolError,
@@ -56,6 +57,9 @@ import { createReaperMetrics, renderReaperMetrics, type ReaperMetricsCounter } f
 import { classifyOpFailure, formatOpFailure, type OpFailureClassification } from "./op-failure-classification.js";
 
 export interface CreateProviderServerOptions {
+  /** Required for warm creates; ordinary provider operations remain unchanged. */
+  readonly warmCleanupJournal?: import("./warm-cleanup-journal.js").WarmCleanupJournal;
+  readonly isWarmEnabled?: () => boolean;
   readonly provider: SandboxProvider;
   /**
    * The pinned control-plane PUBLIC key (DEP-012 Units B1/B2). When PRESENT, the server
@@ -227,25 +231,49 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
     ctx: ProviderOpContext,
     capability: OwnedLabelsCapability | undefined,
     warmResourceCapability?: unknown,
+    onStdout?: (chunk: string) => void,
   ): Promise<unknown> {
     const deps = warmResourceCapability === undefined ? gateDeps! : { ...gateDeps!, warmResourceCapability };
+    const requireWarmExecution = (sandboxId: string, labels: import("@armyofagents/worker-daemon").ResourceLabels) => {
+      if ((warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(sandboxId, labels)) && !options.isWarmEnabled?.()) {
+        throw new WireProtocolError("warm resource lifecycle unavailable");
+      }
+    };
     switch (op) {
       case "create": {
         // The DISTINCT create-gate (no inspect): verify -> spec-label match -> the
         // durable ledger -> provider.create with a stripped key. NOT gateOwnedOp.
-        return gateCreate(createGateDeps!, args as CreateSandboxSpec, ctx, capability);
+        const spec = args as CreateSandboxSpec;
+        const warm = spec.command === "node" && spec.args?.length === 4 &&
+          spec.args[0] === "/home/user/aoa-commander-warm-v1.cjs" && ["claude", "codex"].includes(spec.args[1]) &&
+          spec.args[2] === "/home/user/aoa-commander-input.json" && spec.args[3] === "/home/user/aoa-output/aoa-one-shot-result.json";
+        if (warm && (!options.isWarmEnabled?.() || !options.warmCleanupJournal || provider.checkpointMode !== "snapshot" ||
+            !provider.advertisedOperations.has("checkpoint") || !provider.advertisedOperations.has("restore"))) {
+          return Promise.reject(new WireProtocolError("warm resource lifecycle unavailable"));
+        }
+        return gateCreate(createGateDeps!, spec, ctx, capability).then((created) => {
+          if (warm) options.warmCleanupJournal!.register(created.sandboxId, created.resourceLabels);
+          return created;
+        });
       }
       case "execute": {
         const input = args as ExecuteInput;
-        return gateOwnedOp(deps, input.sandboxId, ctx, capability, () => executeRelayingStdout(provider, args, ctx));
+        return gateOwnedOp(deps, input.sandboxId, ctx, capability, (detail) => {
+          requireWarmExecution(input.sandboxId, detail.resourceLabels);
+          return executeRelayingStdout(provider, args, ctx, onStdout);
+        });
       }
       case "checkpoint": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.checkpoint(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, (detail) => {
+          requireWarmExecution(sandboxId, detail.resourceLabels); return provider.checkpoint(sandboxId, ctx);
+        });
       }
       case "restore": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.restore(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, (detail) => {
+          requireWarmExecution(sandboxId, detail.resourceLabels); return provider.restore(sandboxId, ctx);
+        });
       }
       case "cancel": {
         const sandboxId = args as string;
@@ -257,11 +285,25 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       }
       case "destroy": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.destroy(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, async (detail) => {
+          const journal = options.warmCleanupJournal;
+          const warm = journal?.isRegistered(sandboxId, detail.resourceLabels);
+          if (warm) journal!.plan(sandboxId, detail.resourceLabels);
+          const result = await provider.destroy(sandboxId, ctx);
+          if (warm && result.cleanupStatus === "success") journal!.confirm(sandboxId, detail.resourceLabels, result.providerOpId);
+          return result;
+        });
       }
       case "reconcile_cleanup": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.reconcileCleanup(sandboxId, ctx));
+        return gateOwnedOp(deps, sandboxId, ctx, capability, async (detail) => {
+          const journal = options.warmCleanupJournal;
+          const warm = journal?.isRegistered(sandboxId, detail.resourceLabels);
+          if (warm) journal!.plan(sandboxId, detail.resourceLabels);
+          const result = await provider.reconcileCleanup(sandboxId, ctx);
+          if (warm && result.cleanupStatus === "success") journal!.confirm(sandboxId, detail.resourceLabels, result.providerOpId);
+          return result;
+        });
       }
       case "inspect": {
         const sandboxId = args as string;
@@ -416,6 +458,21 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       sendJson(res, 200, encodeErrResponse(new WireProtocolError("request stream error")));
     });
     req.on("end", () => {
+      let liveRequested = false;
+      const frame = (encoded: string) => {
+        if (res.writableEnded || res.destroyed) return;
+        if (!res.headersSent) res.writeHead(200, { "content-type": "application/x-ndjson" });
+        if (res.writableLength > 65536) return;
+        res.write(encoded + "\n");
+      };
+      const reply = (encoded: string) => {
+        if (!liveRequested) { sendJson(res, 200, encoded); return; }
+        // The terminal receipt is always appended, even when output backpressure
+        // dropped a live frame. It is small and there is exactly one per request.
+        if (res.writableEnded || res.destroyed) return;
+        if (!res.headersSent) res.writeHead(200, { "content-type": "application/x-ndjson" });
+        res.end(encoded + "\n");
+      };
       void (async () => {
         try {
           // GATED + a gate-required op -> the ownership gate (verify capability -> AM-local
@@ -423,8 +480,10 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
           // ResourceNotAvailableError, caught below and coded back symmetrically.
           if (gated && GATE_REQUIRED_OPS.has(op)) {
             const { args, ctx, capability, warmResourceCapability } = decodeOpRequest(body);
-            const result = await routeGated(op, args, ctx, capability, warmResourceCapability);
-            sendJson(res, 200, encodeOkResponse(result));
+            liveRequested = op === "execute" && isRecordOfUnknown(args) && args[EXECUTE_LIVE_STDOUT_KEY] === true;
+            const result = await routeGated(op, args, ctx, capability, warmResourceCapability,
+              liveRequested ? (chunk) => frame(JSON.stringify({ stdout: chunk })) : undefined);
+            reply(encodeOkResponse(result));
             return;
           }
           // Otherwise a raw handler (create always; execute when ungated). An op with no
@@ -436,8 +495,10 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
             return;
           }
           const { args, ctx } = decodeOpRequest(body);
-          const result = await handler(args, ctx);
-          sendJson(res, 200, encodeOkResponse(result));
+          liveRequested = op === "execute" && isRecordOfUnknown(args) && args[EXECUTE_LIVE_STDOUT_KEY] === true;
+          const result = liveRequested ? await executeRelayingStdout(provider, args, ctx,
+            (chunk) => frame(JSON.stringify({ stdout: chunk }))) : await handler(args, ctx);
+          reply(encodeOkResponse(result));
         } catch (err) {
           // The provider's domain errors (SandboxNotFoundError / SandboxEgressDeniedError /
           // UnsupportedProviderOperation / the uniform ResourceNotAvailableError) + a
@@ -487,16 +548,11 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
             // A logging sink must never turn a coded failure into a crash or a hang.
           }
           if (isModelledWireError(err)) {
-            sendJson(res, 200, encodeErrResponse(err));
+            reply(encodeErrResponse(err));
             return;
           }
-          sendJson(
-            res,
-            200,
-            encodeErrResponse(
-              new WireProtocolError(`adapter-manager provider operation failed (${formatOpFailure(classification)})`),
-            ),
-          );
+          reply(encodeErrResponse(new WireProtocolError(
+            `adapter-manager provider operation failed (${formatOpFailure(classification)})`)));
         }
       })();
     });
@@ -597,23 +653,41 @@ function assertUploadGrantBound(
  * is per REQUEST, so one tenant's run can neither read nor be scrubbed by another's; raw
  * output never crosses the wire (a WRK-018 non-goal), and the daemon scrubs again on arrival.
  */
-async function executeRelayingStdout(provider: SandboxProvider, args: unknown, ctx: ProviderOpContext): Promise<unknown> {
+async function executeRelayingStdout(provider: SandboxProvider, args: unknown, ctx: ProviderOpContext, live?: (chunk: string) => void): Promise<unknown> {
   const requested = args as ExecuteInput & Record<string, unknown>;
   if (requested[EXECUTE_CAPTURE_STDOUT_KEY] !== true) return provider.execute(requested, ctx);
-  const { [EXECUTE_CAPTURE_STDOUT_KEY]: _flag, ...input } = requested;
+  const { [EXECUTE_CAPTURE_STDOUT_KEY]: _flag, [EXECUTE_LIVE_STDOUT_KEY]: _live, ...input } = requested;
   const env = isRecordOfUnknown(input.env) ? input.env : {};
   const canaries = [...Object.values(env).filter((v): v is string => typeof v === "string" && v.length > 0), ...readCommanderWarmRedactionCanaries(env)];
   const capture = createRunOutputCapture({ canaries });
+  let line = ""; let liveChars = 0; let liveClosed = false;
+  const publish = (text: string) => {
+    if (!live || liveClosed || text.length > 65536) return;
+    const scrubbed = scrubOutputText(text, canaries);
+    if (scrubbed !== null) live(scrubbed);
+  };
+  const onStdout = (chunk: string) => {
+    capture.onStdout(chunk);
+    if (!live || liveClosed) return;
+    liveChars += chunk.length;
+    if (liveChars > 1048576) { line = ""; liveClosed = true; return; }
+    line += chunk; let end: number;
+    while ((end = line.indexOf("\n")) >= 0) { publish(line.slice(0, end + 1)); line = line.slice(end + 1); }
+    if (line.length > 65536) { line = ""; liveClosed = true; }
+  };
   let result;
   try {
-    result = await provider.execute({ ...(input as unknown as ExecuteInput), onStdout: capture.onStdout }, ctx);
+    result = await provider.execute({ ...(input as unknown as ExecuteInput), onStdout }, ctx);
   } catch (err) {
     // Close on the failure path too: a chunk the provider delivers late is dropped, not held.
+    liveClosed = true; line = "";
     capture.close();
     throw err;
   }
+  if (line) publish(line);
+  liveClosed = true; line = "";
   const { stdoutTail } = capture.close();
-  return { ...result, [EXECUTE_STDOUT_TAIL_KEY]: stdoutTail };
+  return live ? result : { ...result, [EXECUTE_STDOUT_TAIL_KEY]: stdoutTail };
 }
 
 function isRecordOfUnknown(value: unknown): value is Record<string, unknown> {

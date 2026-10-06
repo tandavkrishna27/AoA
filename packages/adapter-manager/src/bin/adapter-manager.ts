@@ -32,6 +32,7 @@
 
 import { createPublicKey, randomUUID, type KeyObject } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Server } from "node:http";
 import { pathToFileURL } from "node:url";
 
@@ -40,6 +41,9 @@ import type { ProviderOpContext, SandboxProvider } from "@armyofagents/worker-da
 import { createProviderServer, type CreateProviderServerOptions } from "../server.js";
 import { reconcileReaper, type ReaperLogger } from "../reconcile-reaper.js";
 import { makeControlPlaneResolveTruth, TRUTH_SHARED_SECRET_ENV } from "../reaper-truth-client.js";
+import { WarmCleanupJournal } from "../warm-cleanup-journal.js";
+import { createWarmCleanupRecovery } from "../warm-cleanup-recovery.js";
+import { makeWarmResourceAcknowledger, makeWarmResourceResolveTruth } from "../warm-resource-truth-client.js";
 import { accumulateReaperMetrics, createReaperMetrics } from "../reaper-metrics.js";
 import {
   realReaperScheduler,
@@ -59,6 +63,7 @@ export const CONTROL_PLANE_PUBLIC_KEY_FILE_ENV = "AOA_ADAPTER_MANAGER_CONTROL_PL
 /** Directory the β1 durable idempotency ledger persists into. A configured out-of-tree
  * volume in a real deployment; when unset the server defaults to a fresh OS temp dir. */
 export const IDEMPOTENCY_LEDGER_DIR_ENV = "AOA_ADAPTER_MANAGER_IDEMPOTENCY_LEDGER_DIR";
+export const COMMANDER_WARM_ENABLED_ENV = "AOA_DISTRIBUTED_COMMANDER_WARM_ENABLED";
 
 /**
  * The STRUCTURAL shape consumed from the provider package. Declared here so this file can
@@ -72,6 +77,7 @@ export interface ProviderModule {
     readonly transport: unknown;
     readonly templateId?: string;
     readonly scanExportBytes?: unknown;
+    readonly enablePauseResume?: boolean;
   }) => SandboxProvider;
   readonly createRealE2bTransport: () => unknown;
   /**
@@ -128,6 +134,10 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
   const load = deps.loadProviderModule ?? loadProviderModule;
   const readKeyFileBytes = deps.readKeyFileBytes ?? ((p: string) => readFileSync(p));
   const startServer = deps.createProviderServer ?? createProviderServer;
+  const warmEnabled = env[COMMANDER_WARM_ENABLED_ENV]?.trim() === "1";
+  if (warmEnabled && (resolveReaperConfig(env).kind !== "enabled" || !env[IDEMPOTENCY_LEDGER_DIR_ENV]?.trim() || !env[TRUTH_SHARED_SECRET_ENV]?.trim())) {
+    return refused("warm execution requires the authenticated reaper and a configured durable ledger directory");
+  }
 
   // ── 1. Resolve the provider (unset/none/unrecognised/construct-throw ⇒ refuse). ──
   const requested = env[PROVIDER_ENV]?.trim();
@@ -162,6 +172,7 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
       transport,
       templateId: template,
       scanExportBytes: mod.createRunSecretExportScanner(),
+      ...(warmEnabled ? { enablePauseResume: true } : {}),
     });
   } catch (err) {
     return refused(`sandbox provider could not be constructed: ${(err as Error).message}`);
@@ -217,7 +228,12 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
   // BOTH the server's /metrics arm AND the loop below (single event loop ⇒ no race).
   const reaperMetrics = createReaperMetrics();
   const idempotencyLedgerDir = env[IDEMPOTENCY_LEDGER_DIR_ENV]?.trim() || undefined;
-  const server = startServer({ provider, controlPlanePublicKey, idempotencyLedgerDir, reaperMetrics });
+  if (warmEnabled && (provider.checkpointMode !== "snapshot" || !provider.advertisedOperations.has("checkpoint") || !provider.advertisedOperations.has("restore"))) {
+    return refused("warm execution requires actual checkpoint and restore support");
+  }
+  const warmJournal = warmEnabled ? new WarmCleanupJournal(join(idempotencyLedgerDir!, "warm-cleanup")) : undefined;
+  const server = startServer({ provider, controlPlanePublicKey, idempotencyLedgerDir, reaperMetrics,
+    ...(warmJournal ? { warmCleanupJournal: warmJournal, isWarmEnabled: () => env[COMMANDER_WARM_ENABLED_ENV]?.trim() === "1" } : {}) });
   // The staging compose pins PORT (=8090) + a :8090/healthz check; unset ⇒ an ephemeral port.
   server.listen(env.PORT);
 
@@ -234,18 +250,31 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
     // (the CP truth route stays double-gated + inert). The reaper client never rejects, so
     // a mismatch degrades to CP-404 → "unknown", never a mass-reclaim.
     const truthSharedSecret = env[TRUTH_SHARED_SECRET_ENV]?.trim() || undefined;
-    const resolveTruth = makeControlPlaneResolveTruth(
+    const leaseTruth = makeControlPlaneResolveTruth(
       reaperConfig.controlPlaneUrl,
       undefined,
       undefined,
       truthSharedSecret,
     );
+    const resolveTruth = warmJournal ? makeWarmResourceResolveTruth({ baseUrl: reaperConfig.controlPlaneUrl,
+      bearer: truthSharedSecret!, leaseTruth }) : leaseTruth;
     const makeCtx = (): ProviderOpContext => ({
       deadlineMs: Date.now() + reaperConfig.intervalMs,
       idempotencyKey: randomUUID(),
     });
+    const warmRecovery = warmJournal ? createWarmCleanupRecovery({ journal: warmJournal, provider, resolveTruth, makeCtx,
+      acknowledge: makeWarmResourceAcknowledger({ baseUrl: reaperConfig.controlPlaneUrl, bearer: truthSharedSecret! }) }) : undefined;
     const reconcile = async () => {
-      const result = await reconcileReaper({ provider, resolveTruth, makeCtx, now: () => Date.now(), logger });
+      await warmRecovery?.tick();
+      const result = await reconcileReaper({ provider, resolveTruth, makeCtx, now: () => Date.now(), logger,
+        ...(warmJournal ? {
+          beforeCleanup: (summary: import("@armyofagents/worker-daemon").ResourceSummary) => {
+            if (warmJournal.isRegistered(summary.sandboxId, summary.resourceLabels)) warmJournal.plan(summary.sandboxId, summary.resourceLabels);
+          },
+          afterCleanup: (summary: import("@armyofagents/worker-daemon").ResourceSummary, providerOpId: string) => {
+            if (warmJournal.isRegistered(summary.sandboxId, summary.resourceLabels)) warmJournal.confirm(summary.sandboxId, summary.resourceLabels, providerOpId);
+          },
+        } : {}) });
       accumulateReaperMetrics(reaperMetrics, result);
       return result;
     };

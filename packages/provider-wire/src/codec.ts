@@ -299,3 +299,6 @@ function isValidCapability(value: unknown): value is OwnedLabelsCapability {
     typeof labels.deviceGeneration === "number"
   );
 }
+
+/** Opt-in NDJSON stdout frames followed by exactly one ordinary result envelope. */
+export const EXECUTE_LIVE_STDOUT_KEY = "liveStdout";

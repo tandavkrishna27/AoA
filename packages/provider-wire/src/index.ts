@@ -3,6 +3,7 @@
 // networked `SandboxProvider` driver. NOT in `worker-protocol` (this wire is non-frozen).
 
 export {
+  EXECUTE_LIVE_STDOUT_KEY,
   EXECUTE_CAPTURE_STDOUT_KEY,
   EXECUTE_STDOUT_TAIL_KEY,
   WireProtocolError,
