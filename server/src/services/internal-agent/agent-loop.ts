@@ -51,6 +51,8 @@ interface RunSummary {
 }
 
 export type AgentStreamChunk =
+  | { type: "run_rejoined"; runId: string }
+  | { type: "reply_persisted" }
   | { type: "text"; delta: string }
   | { type: "reasoning"; delta: string }
   | { type: "tool_call"; id: string; name: string; input: unknown }
@@ -99,6 +101,8 @@ export interface ChatInput {
    * `provenance.runId`. Optional so non-route callers (proactive/event) compile.
    */
   runId?: string;
+  /** Persisted user-message identity, set by the server conversation loop. */
+  userMessageId?: string;
   /** Client idempotency key; a repeat replays the original turn (see chat()). */
   clientSubmissionId?: string;
   /** Composer attachment asset IDs; text-readable content is delivered to the turn. */
@@ -519,6 +523,7 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           // runtime provider session still needs the resolved persisted ID so
           // it cannot be shared with another Commander conversation.
           conversationId: conversation.id,
+          userMessageId: userMessageId ?? undefined,
           content: assembledContent,
           contextScope: cliContextScope,
           ...(systemContext !== undefined
@@ -531,6 +536,8 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           cliTool: (config as { cliTool?: string | null }).cliTool ?? "claude_cli",
         };
 
+        let completedTurnRunId: string | null = null;
+        let replyAlreadyPersisted = false;
         let accumulatedAssistant = "";
         const REASONING_CAP = 16000;
         let accumulatedReasoning = "";
@@ -550,6 +557,8 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
               // Best-effort; the staleness window is the backstop.
             }
           }
+          if (chunk.type === "reply_persisted") replyAlreadyPersisted = true;
+          if (chunk.type === "done" && chunk.summary.runId) completedTurnRunId = chunk.summary.runId;
           if (chunk.type === "text") accumulatedAssistant += chunk.delta;
           if (chunk.type === "reasoning") {
             // F5: cap accumulation exactly — once at/over cap, stop appending and
@@ -580,7 +589,7 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
 
         const turnProducedReply =
           Boolean(accumulatedAssistant.trim()) || turnToolCalls.length > 0 || Boolean(accumulatedReasoning.trim());
-        if (turnProducedReply) {
+        if (turnProducedReply && !replyAlreadyPersisted) {
           // Assistant replies have no originating page / department-persona
           // context (those describe where the USER was), so we omit them —
           // appendMessage defaults the optional fields to null, matching the
@@ -589,6 +598,7 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           const outputRefs = turnRefs.length > 0 ? mergeOutputRefs([], turnRefs) : undefined;
           await convService.appendMessage(conversation.id, {
             role: "assistant",
+            ...(completedTurnRunId ? { runId: completedTurnRunId } : {}),
             content: accumulatedAssistant,
             // C2 (PR #291 review): back-link the reply to the user turn that
             // produced it so an idempotent retry replays THIS reply, never a

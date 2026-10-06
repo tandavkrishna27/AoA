@@ -73,3 +73,20 @@ remaining M1 code and tests, and M2. This checklist adds no certification gate.
 
 Historical milestone designs contain obsolete starting-state observations; read
 current code before carrying any of those observations forward.
+
+## Commander consumer checkpoint
+
+PR #657 (extraction) and PR #658 (Commander credentials/atomic handoff) are
+merged into the replatform integration branch after required CI passed.
+The Commander consumer now returns accepted output before any legacy acquire,
+rejoins the original paid turn on retry, uses its pinned model rate, records
+estimates once, and persists the assistant reply/run/claim/audit atomically.
+Concurrent reply and cancellation recovery passed real PostgreSQL tests. Recovery
+runs on the existing convergence timer and neither spends nor dispatches.
+Vendor permission bypass respects the current Commander configuration.
+
+The supported new dispatch cohort is ephemeral company API-key Commander turns.
+Warm conversations preserve their existing owner. Warm continuity, live streaming,
+remaining personal/device execution and the final lifecycle reconciliation remain
+open M2 work. This checkpoint does not mark M2 complete. Rollout stays off and
+live Anthropic M1b remains deferred.

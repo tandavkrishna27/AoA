@@ -28,7 +28,8 @@ export function createOneShotExistingOperationReader(appDb: Db) {
 }
 
 /** The immutable accepted ledger, not an untrusted file or worker terminal alone, releases the caller. */
-export function createOneShotDistributedResultReader(appDb: Db, storage: StorageProvider) {
+export function createOneShotDistributedResultReader(appDb: Db, storage: StorageProvider, sourceAuthority?:
+  (tx: Db, job: typeof jobs.$inferSelect, scope: OneShotResultScope) => Promise<boolean>) {
   return async (scope: OneShotResultScope, signal?: AbortSignal): Promise<OneShotResultObservation> => {
     const snapshot = await runInTenant(appDb, scope.organizationId, async (_repos, tx) => {
       const [row] = await tx.select({ job: jobs, attempt: jobAttempts }).from(jobs)
@@ -36,11 +37,15 @@ export function createOneShotDistributedResultReader(appDb: Db, storage: Storage
         .where(and(eq(jobs.organizationId, scope.organizationId), eq(jobs.companyId, scope.companyId), eq(jobs.id, scope.jobId),
           eq(jobAttempts.companyId, scope.companyId), eq(jobAttempts.id, scope.attemptId))).limit(1);
       if (!row) throw new Error("One-shot result source not found");
-      const source = submitJobSourceSchema.safeParse(row.job.sourceIntent);
-      if (!source.success || source.data.kind !== "one_shot" || source.data.operationId !== scope.operationId ||
-        row.job.sourceKind !== "one_shot" || row.job.sourceIdentity !== scope.operationId ||
-        row.job.executorPrincipalKind !== "worker" || row.job.executorPrincipalId !== scope.operationId) {
-        throw new Error("One-shot result source mismatch");
+      if (sourceAuthority) {
+        if (!await sourceAuthority(tx, row.job, scope)) throw new Error("Captured result source mismatch");
+      } else {
+        const source = submitJobSourceSchema.safeParse(row.job.sourceIntent);
+        if (!source.success || source.data.kind !== "one_shot" || source.data.operationId !== scope.operationId ||
+          row.job.sourceKind !== "one_shot" || row.job.sourceIdentity !== scope.operationId ||
+          row.job.executorPrincipalKind !== "worker" || row.job.executorPrincipalId !== scope.operationId) {
+          throw new Error("One-shot result source mismatch");
+        }
       }
       const [latest] = await tx.select({ id: jobAttempts.id }).from(jobAttempts)
         .where(and(eq(jobAttempts.organizationId, scope.organizationId), eq(jobAttempts.jobId, scope.jobId)))

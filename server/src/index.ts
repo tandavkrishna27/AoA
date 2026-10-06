@@ -1414,6 +1414,7 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   });
   const { createCrewResultRecovery } = await import("./services/crew-result-recovery.js");
   const crewResultRecovery = createCrewResultRecovery({ ownerDb: db as any, appDb });
+  let commanderResultRecovery: { tick(): Promise<void> } | undefined;
   const convergenceSweeper = createJobControlSweeper({
     reconciliation: jobReconciliationForCancel,
     listAdmittedOrganizationIds: (page) =>
@@ -1449,6 +1450,7 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
       await revocationFanout.tick();
       // Recovery continues when crew rollout is off, finishing already durable runs.
       await crewResultRecovery.tick();
+      await commanderResultRecovery?.tick();
     } catch (err) {
       logger.warn({ err }, "[mig-002] lease reaper tick failed");
     }
@@ -1652,6 +1654,49 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
       reason: "one-shot result wait deadline", graceful: false,
     }),
   }));
+  const [{ createCommanderDistributedPort, setCommanderDistributedPort },
+    { createCommanderDistributedResultReader, createCommanderExistingTurnReader, createCommanderSourcePreparer },
+    { readDistributedToolSurfaceFlag, resolveDistributedToolSurface },
+    { preflightOneShotCliSpend, recordOneShotCliCost }, { parseCommanderDistributedOutput },
+    { persistCommanderDistributedReply, persistCommanderDistributedFailure }, { createCommanderResultRecovery, createCommanderRecoveryCandidateReader }] = await Promise.all([
+    import("./services/commander-distributed-port.js"), import("./services/commander-distributed-store.js"),
+    import("./config/distributed-execution.js"), import("./services/one-shot-cli-budget.js"),
+    import("./services/commander-distributed-output.js"),
+    import("./services/commander-distributed-reply.js"), import("./services/commander-result-recovery.js"),
+  ]);
+  const commanderRolloutHook = distributedRolloutHook;
+  const commanderRead = createCommanderDistributedResultReader(appDb, oneShotStorage(config));
+  const projectCommanderReply = async (input: import("./services/commander-result-recovery.js").CommanderRecoveryCandidate,
+    result: import("./services/one-shot-distributed-result.js").CapturedOneShotResult) => {
+    const chunks = await parseCommanderDistributedOutput({ result, cliTool: input.cliTool, turnId: input.operationId, model: input.model });
+    const done = chunks.find((chunk) => chunk.type === "done");
+    if (done?.type !== "done") throw new Error("Commander accepted reply has no terminal");
+    if (!result.usageAccepted) await recordOneShotCliCost(db, { companyId: input.companyId, provider: done.summary.provider!, model: input.model,
+      inputTokens: done.summary.tokenUsage.inputTokens, outputTokens: done.summary.tokenUsage.outputTokens,
+      cachedInputTokens: done.summary.tokenUsage.cachedInputTokens, costCents: done.summary.costCents,
+      billingType: "commander_estimate", sourceIdempotencyKey: `commander:${input.companyId}:${input.operationId}` });
+    await persistCommanderDistributedReply(db, { ...input, chunks });
+  };
+  commanderResultRecovery = createCommanderResultRecovery({ list: createCommanderRecoveryCandidateReader(db),
+    read: commanderRead, project: projectCommanderReply,
+    fail: (candidate) => persistCommanderDistributedFailure(db, candidate),
+    onError: (err, candidate) => logger.warn({ err, companyId: candidate.companyId, runId: candidate.operationId }, "Commander reply recovery will retry") });
+
+  setCommanderDistributedPort(createCommanderDistributedPort({
+    rollout: commanderRolloutHook,
+    toolsAuthorized: (organizationId) => resolveDistributedToolSurface({ deploymentArmed: readDistributedToolSurfaceFlag(process.env),
+      organizationToolsEnabled: commanderRolloutHook.resolveOrganizationToolSurface(organizationId) }).authorized,
+    existing: createCommanderExistingTurnReader(db), prepare: createCommanderSourcePreparer(db),
+    preflight: (input) => preflightOneShotCliSpend(db, input),
+    read: commanderRead,
+    cancel: (scope) => jobReconciliationForCancel.requestCancellation({ organizationId: scope.organizationId,
+      companyId: scope.companyId, jobId: scope.jobId, reason: "Commander result wait deadline", graceful: false }),
+    async persistReply(input, scope, result) {
+      if (!input.model) throw new Error("Commander reply model missing");
+      await projectCommanderReply({ ...input, ...scope, model: input.model }, result);
+    },
+  }));
+
 }
 
 if (config.heartbeatSchedulerEnabled) {

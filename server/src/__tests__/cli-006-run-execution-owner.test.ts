@@ -67,6 +67,23 @@ describe("CLI-006 D3 — resolveRunExecutionOwner (one decision, fail-safe to le
     expect(result.attemptId).toBe(ATTEMPT);
   });
 
+  it("requires Commander source handles and preserves the selected connection authority", async () => {
+    const place = vi.fn(async () => ({ disposition: "selected", leaseEligible: true }));
+    const result = await createRunExecutionOwnerResolver(deps({ placement: { place } })).resolve({ ...input,
+      source: { kind: "commander_turn", internalAgentRunId: RUN, conversationId: ISSUE },
+      actor: { kind: "user", id: "actual-user", companyId: COMPANY }, toolSurfaceAuthorized: true });
+    expect(result.owner).toBe("distributed");
+    expect(place.mock.calls[0][0]).toMatchObject({ requireExecutionSecrets: true, toolSurfaceAuthorized: true });
+    expect(place.mock.calls[0][0].mintCredentialAuthority).toBeUndefined();
+  });
+  it("declines Commander dispatch before conversion when its tool surface is disabled", async () => {
+    const convertRunToJob = vi.fn(); const place = vi.fn();
+    const result = await createRunExecutionOwnerResolver(deps({ convert: { convertRunToJob }, placement: { place } })).resolve({ ...input,
+      source: { kind: "commander_turn", internalAgentRunId: RUN, conversationId: ISSUE },
+      actor: { kind: "user", id: "actual-user", companyId: COMPANY }, toolSurfaceAuthorized: false });
+    expect(result.owner).toBe("legacy"); expect(convertRunToJob).not.toHaveBeenCalled(); expect(place).not.toHaveBeenCalled();
+  });
+
   // CLI-007 (E7-F001): the preflight-established Company mint authority is THREADED to
   // placement out of band, so the DAT-008 mint can issue a Company provider_key handle
   // for the canary. It is never derived here and never touches the placement digest.

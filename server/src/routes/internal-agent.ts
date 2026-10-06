@@ -16,6 +16,7 @@ import { assertHumanRole } from "../middleware/rbac.js";
 import { internalAgentChatLimiter } from "../middleware/rate-limit.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { HttpError, badRequest, notFound, forbidden } from "../errors.js";
+import { rejoinCommanderRun } from "../services/commander-rejoin-run.js";
 import { agentLoopService, type RuntimeAttachmentStorage } from "../services/internal-agent/agent-loop.js";
 import { detectCliTool } from "../services/internal-agent/cli-mode.js";
 import { ensureCommanderAgent } from "../services/internal-agent/aoa-agents/ensure-commander.js";
@@ -209,6 +210,8 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
       // round-8 #3: set when chat() signals an idempotent replay / in-progress
       // defer (no CLI run) so the pre-created run row is deleted, not finalized.
       let runSkipped = false;
+      let rejoinedRunId: string | null = null;
+      let completedRunId = run.id;
 
       try {
         const svc = agentLoopService(db, storageService);
@@ -318,6 +321,9 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
                 `event: reasoning\ndata: ${JSON.stringify({ text: chunk.delta })}\n\n`,
               );
               break;
+            case "run_rejoined":
+              rejoinedRunId = chunk.runId;
+              break;
             case "run_skipped":
               // Idempotent replay / in-progress defer — no CLI ran. Suppress the
               // phantom run row (round-8 #3). Not forwarded to the client.
@@ -344,6 +350,9 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
           res.end();
           return;
         }
+
+        if (rejoinedRunId) completedRunId = await rejoinCommanderRun(db, { companyId, userId: actor.actorId,
+          originalRunId: rejoinedRunId, placeholderRunId: run.id, conversationId: req.body.conversationId ?? req.body.contextScope?.conversationId });
 
         // Mark run completed
         const tokenUsage = finalSummary?.tokenUsage ?? null;
@@ -378,15 +387,15 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
           })
           // F6: also scope by companyId for defense-in-depth (id is server-created
           // so this is not an active hole, but matches the repo's company-scoping rule).
-          .where(and(eq(internalAgentRuns.id, run.id), eq(internalAgentRuns.companyId, companyId)));
+          .where(and(eq(internalAgentRuns.id, completedRunId), eq(internalAgentRuns.companyId, companyId)));
 
         // F2: send the LOCALLY-COMPUTED costCents (the value persisted to DB)
         // and a guaranteed-non-null tokenUsage so the wire matches the DB row.
         const donePayload = resolveDonePayload(finalSummary ?? null, costCents);
         res.write(
           `event: done\ndata: ${JSON.stringify({
-            messageId: run.id,
-            runId: run.id,
+            messageId: completedRunId,
+            runId: completedRunId,
             durationMs,
             tokenUsage: donePayload.tokenUsage,
             costCents: donePayload.costCents,

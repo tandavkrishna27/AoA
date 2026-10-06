@@ -27,7 +27,7 @@
 // OUT of this ticket's schema scope.
 
 import { and, eq } from "drizzle-orm";
-import { agents, internalAgentConfig, type Db } from "@armyofagents/db";
+import { agents, internalAgentConfig, internalAgentRuns, type Db } from "@armyofagents/db";
 import type { SubmitJobSource } from "@armyofagents/shared";
 import { computeCostCents, isKnownRateModel } from "./internal-agent/cost-model.js";
 import { inferBillingType } from "./costs.js";
@@ -119,7 +119,14 @@ async function resolveModelForSource(
     }
     case "crew_run":
       return resolveCompanyConfigModel(tx, companyId, true);
-    case "commander_turn":
+    case "commander_turn": {
+      const [run] = await tx.select({ model: internalAgentRuns.model, provider: internalAgentRuns.provider,
+        executionOwner: internalAgentRuns.executionOwner }).from(internalAgentRuns)
+        .where(and(eq(internalAgentRuns.id, source.internalAgentRunId), eq(internalAgentRuns.companyId, companyId))).limit(1);
+      if (run?.executionOwner === "distributed") return run.model && run.provider ? { model: run.model, provider: run.provider } : null;
+      return resolveCompanyConfigModel(tx, companyId, false);
+    }
+
     case "one_shot":
     case "service_reconcile":
     case "browser_request":
