@@ -223,6 +223,10 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
   const gateDeps: OwnedOpGateDeps | null = gated
     ? { provider, controlPlanePublicKey: controlPlanePublicKey!, now, sandboxLock: new KeyedMutex() }
     : null;
+  // Interrupting a command must not wait for that command to finish. These two
+  // ops do not rewrite physical ownership; each still verifies and inspects the
+  // exact resource and rechecks authority at use on its separate shared lane.
+  const interruptLock = new KeyedMutex();
 
   // Route a gate-required op THROUGH the ownership gate (only reachable when gated).
   function routeGated(
@@ -277,11 +281,13 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       }
       case "cancel": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.cancel(sandboxId, ctx));
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true },
+          sandboxId, ctx, capability, () => provider.cancel(sandboxId, ctx));
       }
       case "kill": {
         const sandboxId = args as string;
-        return gateOwnedOp(deps, sandboxId, ctx, capability, () => provider.kill(sandboxId, ctx));
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true },
+          sandboxId, ctx, capability, () => provider.kill(sandboxId, ctx));
       }
       case "destroy": {
         const sandboxId = args as string;
