@@ -13,6 +13,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { runInNewContext } from "node:vm";
 import * as shippedBootDiagnostics from "../m1-shipped-boot.mjs";
 
 import {
@@ -117,7 +118,76 @@ test("M1b driver retains redacted attempt diagnostics before verifier and cleanu
   const usefulWork = source.slice(source.indexOf("async function m1bUsefulWork(state)"), source.indexOf("async function m1bUsefulWork(state)") + 12_000);
   const diagnostics = usefulWork.indexOf("retainM1bAttemptDiagnostics(state,");
   assert.ok(diagnostics >= 0 && diagnostics < usefulWork.indexOf("verify-e7-1-distributed-run.js"));
-  assert.ok(source.includes('writeEvidence(state, "m1b-attempt-diagnostics.json",'));
+  assert.ok(source.includes('file = "m1b-attempt-diagnostics.json"'));
+  assert.ok(source.includes('writeEvidence(state, file, { candidate: state.candidate, ...diagnostics })'));
+});
+
+test("initial journey retains exact failed tenant evidence before a zero-cost exit without dispatching another tenant", async () => {
+  const source = readFileSync(journey, "utf8");
+  const calls = [];
+  const files = new Map();
+  const secret = "journey-diagnostic-private-value";
+  const run = { id: "run-a", status: "failed", error: `API failure ${secret}`, execution_owner: "distributed",
+    distributed_job_id: C, distributed_attempt_id: diagnosticIdentity.attemptId, usage_json: { inputTokens: 0, outputTokens: 0 } };
+  const signals = { usageEvents: [{ eventId: diagnosticRow().eventId, payload: { inputTokens: 0, outputTokens: 0 } }],
+    cost: { events: [{ costCents: 0 }], receipts: [{ status: "applied" }] },
+    failureClassification: { terminalEvents: [{ status: "failed", exit_code: "1" }] } };
+  const state = { candidate: "candidate", mode: "keyed", redact: [secret], tenants: {
+    a: { role: "enabled", organizationId: A, companyId: B }, b: { role: "enabled" }, c: { role: "control" } } };
+  const context = {
+    state, TENANTS: [{ key: "a" }, { key: "b" }, { key: "c" }],
+    dispatchTenant: async (_state, key) => { calls.push(`dispatch:${key}`); return { issue: { id: "issue-a" }, run }; },
+    tenantSignals: () => signals,
+    evaluateShippedBootEvidence: () => ({ pass: false, reasons: ["expected one positive cost row bound to the accepted usage event"] }),
+    buildM1bAttemptDiagnosticsQuery: shippedBootDiagnostics.buildM1bAttemptDiagnosticsQuery,
+    formatM1bAttemptDiagnostics: shippedBootDiagnostics.formatM1bAttemptDiagnostics,
+    REPORT: "", dexec: (_state, _service, query) => {
+      calls.push("diagnostics"); assert.ok(query.includes(diagnosticIdentity.attemptId));
+      return { status: 0, result: { ok: true, rows: [diagnosticRow(), diagnosticRow({ sequence: 3, eventType: "log",
+        payload: { stream: "stdout", message: `CLI API error ${secret}` } })] } };
+    },
+    compose: (_state, args) => {
+      calls.push("verifier"); assert.ok(args.includes(run.id));
+      return { status: 3, stdout: `verdict-json {"ok":false,"capabilityProven":false}\n${secret}`, stderr: "" };
+    },
+    parseVerifierVerdict: () => ({ ok: false, capabilityProven: false }), redactSecrets,
+    writeEvidence: (_state, name, value) => { calls.push(`write:${name}`); files.set(name, redactSecrets(typeof value === "string" ? value : JSON.stringify(value), state.redact)); },
+    fail: (message) => { calls.push("fail"); throw new Error(message); },
+  };
+  const dispatchSource = source.slice(source.indexOf("async function dispatch(state)"), source.indexOf("async function downloadUsefulWork(state,"));
+  const diagnosticSource = source.slice(source.indexOf("function retainM1bAttemptDiagnostics("), source.indexOf("async function m1bUsefulWork(state)"));
+  await assert.rejects(runInNewContext(`${diagnosticSource}\n${dispatchSource}\ndispatch(state)`, context), /expected one positive cost row/);
+  assert.deepEqual(calls.filter((c) => c.startsWith("dispatch:")), ["dispatch:a"]);
+  assert.ok(files.has("journey-tenant-a.json"), "run, accepted usage/cost and classification must survive the assertion failure");
+  const retained = JSON.parse(files.get("journey-tenant-a.json"));
+  assert.equal(retained.run.id, run.id);
+  assert.equal(retained.signals.cost.events[0].costCents, 0);
+  assert.equal(retained.signals.usageEvents[0].eventId, diagnosticRow().eventId);
+  assert.equal(retained.signals.failureClassification.terminalEvents[0].exit_code, "1");
+  assert.equal(retained.auditCostEvidence.pass, false);
+  assert.equal(retained.verifierExit, 3);
+  assert.equal(retained.verdict.ok, false);
+  assert.equal(retained.diagnostics.file, "journey-attempt-a-diagnostics.json");
+  assert.equal(JSON.parse(files.get(retained.diagnostics.file)).events[0].payload.exitCode, 1);
+  assert.ok(files.has("verifier-a.txt"));
+  assert.equal(files.has("m1b-attempt-diagnostics.json"), false, "initial journey must not overwrite useful-work diagnostics");
+  assert.equal([...files.values()].join("\n").includes(secret), false);
+  assert.ok(calls.indexOf("diagnostics") < calls.indexOf("fail"));
+  assert.ok(calls.indexOf("write:verifier-a.txt") < calls.indexOf("fail"));
+});
+
+test("structured journey failure evidence scrubs decoded strings before JSON escaping", () => {
+  const source = readFileSync(journey, "utf8");
+  const writer = source.slice(source.indexOf("function writeEvidence("), source.indexOf("function composeArgs("));
+  const secret = 'private-quote-"-newline-\n-secret';
+  let retained;
+  runInNewContext(`${writer}\nwriteEvidence(state, "journey-tenant-a.json", payload)`, {
+    state: { redact: [secret] }, payload: { run: { error: `CLI refused ${secret}` }, signals: { nested: [secret] } },
+    evidenceDir: () => "unused", path, redactSecrets,
+    writeFileSync: (_file, text) => { retained = JSON.parse(text); },
+  });
+  assert.equal(retained.run.error, "CLI refused [REDACTED]");
+  assert.deepEqual(retained.signals.nested, ["[REDACTED]"]);
 });
 
 test("keyed teardown cancels only declared jobs through the board API before stopping workers", () => {
