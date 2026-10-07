@@ -70,6 +70,7 @@ describe("OperationsSection (JOB-008 operator controls)", () => {
       { id: "b", identifier: "pending", kind: "screenshot", status: "granted", outputId: "pending" },
       { id: "c", identifier: "old", kind: "screenshot", status: "committed", outputId: "old", expiresAt: "2000-01-01T00:00:00Z" },
       { id: "d", identifier: "cookie", kind: "browser_cookie_state", status: "committed", outputId: "cookie" },
+      { id: "e", identifier: "storage", kind: "browser_storage_state", status: "committed", outputId: "storage" },
     ] });
     const user = userEvent.setup(); renderSection();
     await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);

@@ -63,7 +63,7 @@ export async function loadTaskOutputContentArtifact(tx: Db, input: { organizatio
     eq(jobArtifacts.attempt, bound.attempt.attemptNumber), eq(jobArtifacts.identifier, payload.data.artifactId),
     eq(jobArtifacts.status, "committed"), eq(jobArtifacts.id, bound.output.externalId ?? "00000000-0000-0000-0000-000000000000"),
   )).limit(1);
-  if (!row || row.kind !== payload.data.kind || row.kind === "browser_cookie_state" || !row.objectKey || !row.contentType || !row.sha256 ||
+  if (!row || row.kind !== payload.data.kind || ["browser_cookie_state", "browser_storage_state"].includes(row.kind ?? "") || !row.objectKey || !row.contentType || !row.sha256 ||
       !/^[0-9a-f]{64}$/.test(row.sha256) || !Number.isSafeInteger(row.sizeBytes) || row.sizeBytes! < 0 ||
       row.sizeBytes! > DEFAULT_MAX_ARTIFACT_BYTES || row.leaseId !== accepted.leaseId || row.fenceToken !== accepted.fenceToken ||
       (row.sizeBytes === 0 && row.sha256 !== EMPTY_ARTIFACT_SHA256) ||

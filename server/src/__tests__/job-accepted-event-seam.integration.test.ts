@@ -908,7 +908,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     beforeEach(async () => { if (fixture) await resetBridgeRows(); });
 
     async function projected(tenant = TENANT_A, bytes = Buffer.from("founder result bytes"),
-      options: { kind?: "workspace_patch" | "other"; contentType?: string; crew?: boolean; browser?: boolean; late?: boolean; redrive?: boolean } = {}) {
+      options: { kind?: "workspace_patch" | "other" | "browser_cookie_state" | "browser_storage_state"; contentType?: string; crew?: boolean; browser?: boolean; late?: boolean; redrive?: boolean } = {}) {
       const kind = options.kind ?? "workspace_patch";
       const contentType = options.contentType ?? "text/plain";
       const issueId = await seedIssue(tenant.companyId);
@@ -987,6 +987,14 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect((await operations.getJobDetail(ORG, COMPANY, p.fence.jobId))?.artifacts.find(a => a.id === p.artifactId)).toMatchObject({ outputId: p.outputId });
       const response = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
       expect(response.status).toBe(200); expect(response.text).toBe("browser screenshot evidence");
+    });
+
+    it.each(["browser_cookie_state", "browser_storage_state"] as const)("refuses an otherwise valid committed %s output", async kind => {
+      const p = await projected(TENANT_A, Buffer.from("restricted session state"), { browser: true, kind });
+      await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toMatchObject({ status: 404 });
+      expect(p.storage.getObject).not.toHaveBeenCalled();
+      const operations = createJobOperationsService({ appDb: guard().app.db, operatorDb: guard().app.db });
+      expect((await operations.getJobDetail(ORG, COMPANY, p.fence.jobId))?.artifacts.find(a => a.id === p.artifactId)).not.toHaveProperty("outputId");
     });
 
     it.each(["foreign_task", "foreign_company", "wrong_job", "owner", "trigger", "receipt", "receipt_digest", "output_task", "output_artifact", "pending", "quarantine", "expired", "cookie"])("refuses browser evidence content and links after %s corruption", async (kind) => {

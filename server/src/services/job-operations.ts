@@ -276,7 +276,7 @@ export function createJobOperationsService(input: {
           .limit(JOB_DETAIL_ARTIFACT_LIMIT + 1);
         const artifactsTruncated = artifactPage.length > JOB_DETAIL_ARTIFACT_LIMIT;
         const artifacts: Array<typeof artifactPage[number] & { outputId?: string }> = artifactPage.slice(0, JOB_DETAIL_ARTIFACT_LIMIT);
-        const linkable = artifacts.filter(a => a.status === "committed" && a.kind !== "browser_cookie_state" &&
+        const linkable = artifacts.filter(a => a.status === "committed" && !["browser_cookie_state", "browser_storage_state"].includes(a.kind ?? "") &&
           a.applyStatus !== "conflict_quarantined" && (!a.expiresAt || a.expiresAt.getTime() > Date.now()));
         if (linkable.length) {
           const candidates = await tx.select({ outputId: taskOutputs.id, artifactId: taskOutputs.externalId })
