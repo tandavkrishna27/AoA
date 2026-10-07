@@ -191,7 +191,7 @@ export interface AwaitApprovalInput {
   readonly intent: BrowserApprovalIntent;
   /** Wall-clock budget for a decision to arrive. */
   readonly timeoutMs: number;
-  readonly delay: Delay;
+  readonly delay?: Delay;
 }
 
 /**
@@ -212,6 +212,7 @@ export async function awaitApprovalDecision(input: AwaitApprovalInput): Promise<
   // must not be able to impersonate the deadline, and reference identity makes that impossible.
   const TIMED_OUT: { readonly timedOut: true } = { timedOut: true };
   let decision: BrowserPermissionDecision | typeof TIMED_OUT;
+  let timer: ReturnType<typeof setTimeout> | undefined;
 
   // ★★★ A BELIEF THIS CODE USED TO DEFEND AGAINST, MEASURED AND FOUND FALSE. An earlier version
   // added `void Promise.allSettled([...])` here, reasoning that `Promise.race` settles once, so a
@@ -229,7 +230,9 @@ export async function awaitApprovalDecision(input: AwaitApprovalInput): Promise<
   try {
     decision = await Promise.race<BrowserPermissionDecision | typeof TIMED_OUT>([
       input.resolver(input.intent),
-      input.delay(input.timeoutMs).then(() => TIMED_OUT),
+      (input.delay ? input.delay(input.timeoutMs) : new Promise<void>(resolve => {
+        timer = setTimeout(resolve, input.timeoutMs);
+      })).then(() => TIMED_OUT),
     ]);
   } catch (error) {
     return {
@@ -237,6 +240,10 @@ export async function awaitApprovalDecision(input: AwaitApprovalInput): Promise<
       reason: "resolver_failed",
       detail: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    // A settled decision must not leave its losing deadline alive: the guest
+    // process otherwise remains running after context close/session_completed.
+    if (timer !== undefined) clearTimeout(timer);
   }
   if (typeof decision !== "string") {
     return {
