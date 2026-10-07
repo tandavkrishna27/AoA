@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
     byTable: {} as Record<string, Array<Record<string, unknown>>>,
     /** BRW-003d-4 — every `.limit(n)` the service asked the DB for, by table. */
     limits: {} as Record<string, number[]>,
+    predicates: {} as Record<string, { sql: string; params: unknown[] }>,
   },
 }));
 
@@ -56,6 +57,7 @@ vi.mock("../services/tenant-admission.js", () => ({
 // map filters real column refs by output key.
 vi.mock("../db/tenant-context.js", async () => {
   const { getTableName } = await import("drizzle-orm");
+  const { PgDialect } = await import("drizzle-orm/pg-core");
   // BRW-003d-4 — `orderBy` is CHAINABLE HERE BUT DOES NOT SORT, on purpose.
   //
   // getJobDetail gained .orderBy(); without this the fake throws "orderBy is not a
@@ -81,11 +83,28 @@ vi.mock("../db/tenant-context.js", async () => {
   const makeTx = (orgId: string) => ({
     select: (projection: Record<string, unknown>) => ({
       from: (table: unknown) => ({
-        where: () => {
+        where: (predicate: unknown) => {
           const name = getTableName(table as never);
-          const src = (h.state.byTable[name] ?? []).filter(
+          h.state.predicates[name] = new PgDialect().sqlToQuery(predicate as never);
+          let src = (h.state.byTable[name] ?? []).filter(
             (r) => !("organizationId" in r) || r.organizationId === orgId,
           );
+          // Evaluate the new receipt/decision predicates over hostile fixtures;
+          // compiled Drizzle SQL also remains asserted below independently.
+          if (name === "job_projection_receipts" || name === "agent_runtime_decisions") {
+            const compiled = h.state.predicates[name];
+            const camel = (column: string) => column.replace(/_([a-z])/g, (_m, letter: string) => letter.toUpperCase());
+            src = src.filter((row) => {
+              for (const match of compiled.sql.matchAll(/"[^"]+"\."([^"]+)" = \$(\d+)/g)) {
+                if (row[camel(match[1])] !== compiled.params[Number(match[2]) - 1]) return false;
+              }
+              for (const match of compiled.sql.matchAll(/"[^"]+"\."([^"]+)" in \(([^)]+)\)/g)) {
+                const allowed = [...match[2].matchAll(/\$(\d+)/g)].map((p) => compiled.params[Number(p[1]) - 1]);
+                if (!allowed.includes(row[camel(match[1])])) return false;
+              }
+              return true;
+            });
+          }
           const cols = Object.keys(projection);
           const rows = src.map((r) => Object.fromEntries(cols.map((c) => [c, r[c]])));
           return query(rows, name);
@@ -265,6 +284,7 @@ function makeApp(actor: unknown) {
 beforeEach(() => {
   h.state.canOrg = true;
   h.state.limits = {};
+  h.state.predicates = {};
   h.state.byTable = {
     jobs: [fullJob()],
     job_attempts: [fullAttempt()],
@@ -315,6 +335,50 @@ describe("JOB-008 operator controls — authority", () => {
 });
 
 describe("JOB-008 operator controls — redaction by projection", () => {
+  it("browser permissions resolve through applied tenant/company/job receipts with bounded safe metadata", async () => {
+    h.state.byTable.jobs = [fullJob({ workloadType: "browser_session" })];
+    h.state.byTable.job_projection_receipts = [{ organizationId: ORG, companyId: COMPANY, jobId: JOB,
+      targetAggregateId: "decision-1", projectionKind: "runtime_decision", aggregateKind: "agent_runtime_decisions", status: "applied" }];
+    h.state.byTable.agent_runtime_decisions = [{ id: "decision-1", companyId: COMPANY, title: "Open browser site", kind: "permission",
+      status: "shown", expiresAt: "2026-01-02T00:00:00Z", adapterType: "browser_runtime", nonce: "secret-nonce", promptText: "secret-prompt",
+      adapterSessionParams: { secret: "credential" }, networkTarget: "https://example.com" }];
+    const res = await request(makeApp(boardAdmin)).get(`/api/organizations/${ORG}/companies/${COMPANY}/jobs/${JOB}`);
+    expect(res.status).toBe(200);
+    expect(res.body.runtimeDecisions).toEqual([{ id: "decision-1", title: "Open browser site", kind: "permission", status: "shown", expiresAt: "2026-01-02T00:00:00Z" }]);
+    const receipt = h.state.predicates.job_projection_receipts;
+    expect(receipt.sql).toContain('"organization_id"'); expect(receipt.sql).toContain('"company_id"'); expect(receipt.sql).toContain('"job_id"');
+    expect(receipt.params).toEqual(expect.arrayContaining([ORG, COMPANY, JOB, "runtime_decision", "agent_runtime_decisions", "applied"]));
+    const decision = h.state.predicates.agent_runtime_decisions;
+    expect(decision.sql).toContain('"company_id"'); expect(decision.sql).toContain('"id"');
+    expect(decision.params).toEqual(expect.arrayContaining([COMPANY, "decision-1", "browser_runtime", "permission"]));
+    expect(h.state.limits.job_projection_receipts[0]).toBeGreaterThan(0);
+    expect(h.state.limits.agent_runtime_decisions[0]).toBeGreaterThan(0);
+    expect(JSON.stringify(res.body.runtimeDecisions)).not.toMatch(/secret|nonce|networkTarget|adapterSession/);
+  });
+  it("a browser job with no applied decision receipts returns no permissions", async () => {
+    h.state.byTable.jobs = [fullJob({ workloadType: "browser_session" })];
+    const res = await request(makeApp(boardAdmin)).get(`/api/organizations/${ORG}/companies/${COMPANY}/jobs/${JOB}`);
+    expect(res.body.runtimeDecisions).toEqual([]);
+    expect(h.state.predicates.agent_runtime_decisions).toBeUndefined();
+  });
+  it("excludes unrelated company/job, pending receipts and other aggregate kinds", async () => {
+    h.state.byTable.jobs = [fullJob({ workloadType: "browser_session" })];
+    const receipt = { organizationId: ORG, companyId: COMPANY, jobId: JOB, targetAggregateId: "decision-good",
+      projectionKind: "runtime_decision", aggregateKind: "agent_runtime_decisions", status: "applied" };
+    h.state.byTable.job_projection_receipts = [receipt,
+      { ...receipt, companyId: "other-company", targetAggregateId: "decision-other" },
+      { ...receipt, jobId: "other-job", targetAggregateId: "decision-other" },
+      { ...receipt, organizationId: OTHER_ORG, targetAggregateId: "decision-other" },
+      { ...receipt, status: "pending", targetAggregateId: "decision-other" },
+      { ...receipt, aggregateKind: "approvals", targetAggregateId: "decision-other" },
+      { ...receipt, projectionKind: "product_approval", targetAggregateId: "decision-other" }];
+    const decision = { id: "decision-good", companyId: COMPANY, title: "Bound permission", adapterType: "browser_runtime",
+      kind: "permission", status: "shown", expiresAt: null };
+    h.state.byTable.agent_runtime_decisions = [decision, { ...decision, id: "decision-other" },
+      { ...decision, companyId: "other-company" }, { ...decision, kind: "work_question" }, { ...decision, adapterType: "claude_local" }];
+    const res = await request(makeApp(boardAdmin)).get(`/api/organizations/${ORG}/companies/${COMPANY}/jobs/${JOB}`);
+    expect(res.body.runtimeDecisions).toEqual([{ id: "decision-good", title: "Bound permission", kind: "permission", status: "shown", expiresAt: null }]);
+  });
 
   it("BRW-003d-4 asks the DATABASE for a bounded page, not just a bounded response", async () => {
     // ★ A surviving mutant is why this exists. Deleting `.limit()` from the

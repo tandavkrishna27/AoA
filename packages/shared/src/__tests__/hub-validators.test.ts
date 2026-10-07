@@ -34,6 +34,10 @@ function baseDetail() {
 }
 
 describe("runtimeDecisionDetailSchema.options", () => {
+  it("reads a native browser permission without manufacturing an agent adapter", () => {
+    expect(runtimeDecisionDetailSchema.safeParse({ ...baseDetail(), adapterType: "browser_runtime", agentId: null, runId: null,
+      kind: "permission", timeoutPolicy: "deny", options: null }).success).toBe(true);
+  });
   it("accepts options carrying optional description + rationale (typed)", () => {
     const parsed = runtimeDecisionDetailSchema.parse({
       ...baseDetail(),

@@ -177,6 +177,9 @@ export interface JobArtifactSummary {
 }
 
 export interface JobDetail {
+  /** Durable native browser permissions, linked through applied tenant projection receipts. */
+  runtimeDecisions?: Array<{ id: string; title: string; kind: string; status: string; expiresAt: string | Date | null }>;
+  runtimeDecisionsTruncated?: boolean;
   job: JobSummary;
   attempts: AttemptSummary[];
   leases: LeaseSummary[];

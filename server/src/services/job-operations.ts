@@ -23,13 +23,15 @@
 // calls JOB-007 `revokeExecutionTarget`. The operator cancel path is JOB-006's existing
 // `worker-control.ts` route (reused, not duplicated here — see routes/job-control.ts).
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import {
   jobs,
   jobAttempts,
   leases,
   jobEvents,
   jobArtifacts,
+  jobProjectionReceipts,
+  agentRuntimeDecisions,
   workers,
   type DrainOutcome,
   type Db,
@@ -153,6 +155,14 @@ const ARTIFACT_SUMMARY_COLUMNS = {
  */
 export const JOB_DETAIL_EVENT_LIMIT = 500;
 export const JOB_DETAIL_ARTIFACT_LIMIT = 200;
+export const JOB_DETAIL_RUNTIME_DECISION_LIMIT = 100;
+const RUNTIME_DECISION_SUMMARY_COLUMNS = {
+  id: agentRuntimeDecisions.id,
+  title: agentRuntimeDecisions.title,
+  kind: agentRuntimeDecisions.kind,
+  status: agentRuntimeDecisions.status,
+  expiresAt: agentRuntimeDecisions.expiresAt,
+} as const;
 
 const WORKER_SUMMARY_COLUMNS = {
   id: workers.id,
@@ -265,6 +275,30 @@ export function createJobOperationsService(input: {
         const artifactsTruncated = artifactPage.length > JOB_DETAIL_ARTIFACT_LIMIT;
         const artifacts = artifactPage.slice(0, JOB_DETAIL_ARTIFACT_LIMIT);
 
+        // Native runtime decisions have no jobId or organizationId. Only an
+        // applied projection receipt under this exact tenant/company/job can
+        // bind one. Never infer ownership from a caller-provided decision ID.
+        let runtimeDecisions: Array<Record<string, unknown>> = [];
+        let runtimeDecisionsTruncated = false;
+        if (job.workloadType === "browser_session") {
+          const receipts = await tx.select({ targetAggregateId: jobProjectionReceipts.targetAggregateId })
+            .from(jobProjectionReceipts)
+            .where(and(eq(jobProjectionReceipts.organizationId, organizationId), eq(jobProjectionReceipts.companyId, companyId),
+              eq(jobProjectionReceipts.jobId, jobId), eq(jobProjectionReceipts.projectionKind, "runtime_decision"),
+              eq(jobProjectionReceipts.aggregateKind, "agent_runtime_decisions"), eq(jobProjectionReceipts.status, "applied")))
+            .orderBy(desc(jobProjectionReceipts.createdAt), desc(jobProjectionReceipts.id))
+            .limit(JOB_DETAIL_RUNTIME_DECISION_LIMIT + 1);
+          runtimeDecisionsTruncated = receipts.length > JOB_DETAIL_RUNTIME_DECISION_LIMIT;
+          const ids = [...new Set(receipts.slice(0, JOB_DETAIL_RUNTIME_DECISION_LIMIT).map((receipt) => receipt.targetAggregateId))];
+          if (ids.length) {
+            runtimeDecisions = await tx.select(RUNTIME_DECISION_SUMMARY_COLUMNS).from(agentRuntimeDecisions)
+              .where(and(eq(agentRuntimeDecisions.companyId, companyId), inArray(agentRuntimeDecisions.id, ids),
+                eq(agentRuntimeDecisions.adapterType, "browser_runtime"), eq(agentRuntimeDecisions.kind, "permission")))
+              .orderBy(desc(agentRuntimeDecisions.createdAt), desc(agentRuntimeDecisions.id))
+              .limit(JOB_DETAIL_RUNTIME_DECISION_LIMIT);
+          }
+        }
+
         // Truncation is REPORTED, never silent: an operator reading the last row of
         // a silently-truncated list concludes the job ended there.
         return {
@@ -275,6 +309,8 @@ export function createJobOperationsService(input: {
           eventsTruncated,
           artifacts,
           artifactsTruncated,
+          runtimeDecisions,
+          runtimeDecisionsTruncated,
         } as unknown as JobDetail;
       });
     },

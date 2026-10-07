@@ -158,7 +158,7 @@ export const runtimeDecisionDetailSchema = z
      */
     agentId: z.string().uuid().nullable(),
     runId: z.string().uuid().nullable(),
-    adapterType: z.enum(AGENT_ADAPTER_TYPES),
+    adapterType: z.union([z.enum(AGENT_ADAPTER_TYPES), z.literal("browser_runtime")]),
     adapterSessionId: z.string().nullable(),
     kind: z.enum(RUNTIME_DECISION_KINDS),
     status: z.enum(RUNTIME_DECISION_STATUSES),
