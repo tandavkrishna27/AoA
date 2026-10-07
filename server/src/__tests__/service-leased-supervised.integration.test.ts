@@ -326,13 +326,26 @@ integration("E9 service leased + supervised (keyless)", () => {
   async function superviseOffer(offer: LeaseOfferV1, workloadClass: "service" | "batch"): Promise<WorkerEventV1[]> {
     const events: WorkerEventV1[] = [];
     const sink = { emit(event: WorkerEventV1) { events.push(event); } };
+    // Give the renewable sandbox a real cleanup window. A one-second TTL is
+    // shorter than the sixty-second teardown reserve and must refuse execution.
+    // Observe a deterministic application exit instead of ending via TTL expiry.
+    const transport = new MockE2bTransport();
+    const readProcessStatus = transport.processStatus.bind(transport);
+    let runningReads = 0;
+    transport.processStatus = async (sandboxId, handle) => {
+      const observation = await readProcessStatus(sandboxId, handle);
+      if (observation.state === "running" && ++runningReads > 2) {
+        return { state: "exited", exitCode: 0, signal: null };
+      }
+      return observation;
+    };
     const supervisor = createSupervisor({
-      provider: new E2bSandboxProvider({ transport: new MockE2bTransport() }),
+      provider: new E2bSandboxProvider({ transport }),
       identity: { targetId: TARGET, deviceGeneration: 1 },
       eventSink: sink,
       redactionCanaries: [],
       now: () => Date.now(),
-      opDeadlineMs: 1000,
+      opDeadlineMs: 120_000,
       serviceHealthTickMs: 20,
     });
     await supervisor.accept({
