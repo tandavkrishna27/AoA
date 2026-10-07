@@ -74,6 +74,8 @@ export interface ToolContext {
   effectiveAutonomy?: number | null;
   /** Current Commander conversation id, when available. */
   conversationId?: string | null;
+  /** Authenticated Commander JWT turn, separate from conversation/run headers. */
+  commanderTurnId?: string | null;
   /** Current internal agent run id, when available. */
   runId?: string | null;
   /** Trusted tool-boundary identity. Never accepted from model tool arguments. */

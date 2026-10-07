@@ -131,13 +131,20 @@ export function resolveCommanderToolPolicy(
     | "runtimeApprovalsEnabled"
   >,
 ): CommanderToolPolicyDecision {
-  const permission = getCommanderPermission(
+  const permission = tool.name === "request_browser_session" && ctx.enabledCapabilities.includes("browser_use")
+    ? ctx.commanderToolPermissions?.[tool.name] ?? { enabled: true, minimumRole: "team_member" as const, requireConfirmation: false }
+    : getCommanderPermission(
     tool.name,
     ctx.commanderToolPermissions,
   );
   const requiresApproval =
     ctx.runtimeApprovalsEnabled !== false &&
     (tool.requiresConfirmation || permission.requireConfirmation);
+
+  if (tool.name === "request_browser_session" && !ctx.enabledCapabilities.includes("browser_use")) {
+    return { allowed: false, enabled: permission.enabled, requiresApproval, minimumRole: permission.minimumRole,
+      error: "CAPABILITY_DISABLED", summary: "Commander browser_use capability is disabled" };
+  }
 
   const baseDecision = authorizeToolInvocation(
     tool,

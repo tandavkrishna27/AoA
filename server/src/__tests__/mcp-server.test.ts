@@ -61,6 +61,7 @@ import { mcpServerRoutes } from "../mcp/server.js";
 
 function buildApp(options?: {
   actor?: Record<string, unknown>;
+  currency?: "allow" | "deny";
   resolveScope?: (
     companyId: string,
     actor: { source: string; userId: string },
@@ -110,6 +111,8 @@ function buildApp(options?: {
   app.use(
     "/api",
     mcpServerRoutes({} as any, {
+      resolveDistributedRunCurrency: vi.fn().mockResolvedValue(options?.currency ?? "allow"),
+      resolveDistributedToolSurfaceAtUse: vi.fn().mockResolvedValue("allow"),
       companiesSvc: {
         getById: vi.fn().mockResolvedValue({
           id: "company-1",
@@ -169,6 +172,30 @@ function buildApp(options?: {
     permissionsSvc,
   };
 }
+
+describe("reserved governed browser surface", () => {
+  const actor = { type: "commander", source: "commander_jwt", userId: "human", companyId: "company-1", userRole: "team_member", conversationId: "conversation", signedRunId: "signed-turn" };
+  it.each(["resources/list", "resources/read", "prompts/list"])("does not expose %s", async (method) => {
+    const { app } = buildApp({ actor });
+    const res = await request(app).post("/api/companies/company-1/browser-mcp").send({ jsonrpc: "2.0", id: 1, method });
+    expect(res.body.error.code).toBe(-32601);
+  });
+  it("does not expose other AoA tools", async () => {
+    const { app } = buildApp({ actor });
+    const res = await request(app).post("/api/companies/company-1/browser-mcp").send({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "create_task", arguments: {} } });
+    expect(res.body.error.code).toBe(-32601);
+  });
+  it("rejects stale signed turns even when deployment is off", async () => {
+    const { app } = buildApp({ actor, currency: "deny" });
+    const res = await request(app).post("/api/companies/company-1/browser-mcp").send({ jsonrpc: "2.0", id: 1, method: "ping" });
+    expect(res.status).toBe(403);
+  });
+  it("does not accept caller run headers as signed authority", async () => {
+    const { app } = buildApp({ actor: { ...actor, signedRunId: undefined } });
+    const res = await request(app).post("/api/companies/company-1/browser-mcp").set("x-aoa-run-id", "signed-turn").send({ jsonrpc: "2.0", id: 1, method: "ping" });
+    expect(res.status).toBe(403);
+  });
+});
 
 describe("mcp server routes", () => {
   it("rejects unauthenticated MCP requests", async () => {

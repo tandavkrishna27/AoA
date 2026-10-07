@@ -68,7 +68,7 @@ export const toolAllowedActors: Record<string, McpActorType[]> = {
   // commander cannot call it.
   "ask_human": ["agent"],
   "ask_founder": ["agent"],
-  "request_browser_session": ["agent"],
+  "request_browser_session": ["agent", "commander"],
 };
 
 export const TOOL_DEFINITIONS = [

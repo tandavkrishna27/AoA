@@ -250,6 +250,7 @@ function protocolAuthActor(req: Request) {
       companyId: req.actor.companyId ?? null,
       keyId: null,
       source: "commander" as const,
+      commanderTurnId: req.actor.signedRunId ?? null,
       agentId: null,
       runId: req.actor.conversationId ?? null,
     };
@@ -451,7 +452,8 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
     res.json(await mcpSvc.listClients(companyId));
   });
 
-  router.post("/companies/:companyId/mcp", async (req, res) => {
+  router.post(["/companies/:companyId/mcp", "/companies/:companyId/browser-mcp"], async (req, res) => {
+    const browserSurface = req.path.endsWith("/browser-mcp");
     const companyId = req.params.companyId as string;
     const requestBody = req.body as { id?: unknown; method?: unknown; params?: unknown };
     const actor = protocolAuthActor(req);
@@ -470,6 +472,7 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
 
     try {
       const { actor: protocolActor, company } = await ensureProtocolAccess(db, req, companyId, companiesSvc);
+      if (browserSurface && (protocolActor.source !== "commander" || !req.actor.signedRunId)) throw forbidden("Commander turn authentication required");
 
       // DAT-007 item #1 — fence-bound run-JWT currency gate (Option B, per-call). Runs at the
       // request-authorization seam so it dominates BOTH tool-dispatch paths plus tools/list and
@@ -480,7 +483,7 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
       if (distributedExecutionEnabled && protocolActor.source === "commander" && !req.actor.signedRunId) {
         throw forbidden(MCP_CROSS_COMPANY_FORBIDDEN_MSG);
       }
-      if (distributedExecutionEnabled && (protocolActor.source === "agent" || protocolActor.source === "commander") && req.actor.signedRunId) {
+      if ((distributedExecutionEnabled || browserSurface) && (protocolActor.source === "agent" || protocolActor.source === "commander") && req.actor.signedRunId) {
         const verdict = await resolveDistributedRunCurrency({
           signedRunId: req.actor.signedRunId,
           companyId,
@@ -527,6 +530,7 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
             userId: protocolActor.userId,
             userRole: (req.actor.userRole as string | undefined) ?? "team_member",
             conversationId: protocolActor.runId ?? "",
+            commanderTurnId: req.actor.signedRunId ?? null,
           });
         }
         if (!protocolActor.agentId || !protocolActor.runId) {
@@ -544,6 +548,9 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
         ? deps.resolveScope(companyId, scopeActor)
         : resolveUserScope(db, company.id, scopeActor));
       const method = typeof requestBody.method === "string" ? requestBody.method : "";
+      if (browserSurface && !["initialize", "ping", "notifications/initialized", "tools/list", "tools/call"].includes(method)) {
+        res.json(jsonRpcError(requestBody.id ?? null, -32601, "Method not found")); return;
+      }
       const clientInfo =
         initializeSchema.safeParse(requestBody.params).success
           ? initializeSchema.parse(requestBody.params).clientInfo
@@ -708,6 +715,9 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
           protocolActor.source === "commander"
         ) {
           const brokerCtx = await resolveBrokerContextForActor();
+          if (browserSurface) {
+            res.json(jsonRpcResult(requestBody.id ?? null, { tools: buildToolListResponse(filterAuthorizedToolsForContext(brokerRegistry.filter(tool => tool.name === "request_browser_session"), brokerCtx)) })); return;
+          }
           // U10: plugin tools are host-resident (reached only through this
           // broker) and agent-only, so they're appended here — the same
           // run-scoped branch that already serves the internal tool
@@ -734,6 +744,7 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
 
       if (method === "tools/call") {
         const params = callToolSchema.parse(requestBody.params);
+        if (browserSurface && params.name !== "request_browser_session") { res.json(jsonRpcError(requestBody.id ?? null, -32601, "Tool not found")); return; }
         const args = params.arguments ?? {};
 
         // U10: plugin tools (host-resident worker, dispatched via the

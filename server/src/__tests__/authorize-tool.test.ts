@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { authorizeToolInvocation } from "../services/internal-agent/authorize-tool.js";
+import { authorizeToolInvocation, resolveCommanderToolPolicy } from "../services/internal-agent/authorize-tool.js";
 import type { AgentTool } from "../services/internal-agent/types.js";
 
 function fakeTool(overrides: Partial<AgentTool>): AgentTool {
@@ -14,6 +14,13 @@ function fakeTool(overrides: Partial<AgentTool>): AgentTool {
     ...overrides,
   };
 }
+
+it("requires browser_use even with an explicit enabled Commander tool override", () => {
+  const tool = fakeTool({ name: "request_browser_session", category: "coordination" });
+  const ctx = { userRole: "team_member", enabledCapabilities: [], commanderToolPermissions: { request_browser_session: { enabled: true, minimumRole: "team_member" as const, requireConfirmation: false } } };
+  expect(resolveCommanderToolPolicy(tool, ctx)).toMatchObject({ allowed: false, error: "CAPABILITY_DISABLED" });
+  expect(resolveCommanderToolPolicy(tool, { ...ctx, enabledCapabilities: ["browser_use"] }).allowed).toBe(true);
+});
 
 describe("authorizeToolInvocation — role gate", () => {
   it("allows founder to invoke a founder-required tool", () => {

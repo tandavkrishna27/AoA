@@ -10,6 +10,13 @@ const baseParams = {
 };
 
 describe("buildMcpConfig: browser_use capability", () => {
+  it("uses a narrow authenticated governed endpoint only for explicit brokered Commander selection", () => {
+    const config = buildMcpConfig({ ...baseParams, enabledCapabilities: ["browser_use"], actorType: "commander", brokered: true,
+      apiBaseUrl: "https://control.example/api", governedBrowser: true });
+    expect(config.mcpServers.playwright).toMatchObject({ type: "http", url: "https://control.example/api/companies/c1/browser-mcp" });
+    expect(JSON.stringify(config.mcpServers.playwright)).not.toMatch(/npx|playwright\/mcp|cdp|refresh_token/i);
+    expect(buildMcpConfig({ ...baseParams, enabledCapabilities: [], actorType: "commander", brokered: true, apiBaseUrl: "https://control.example/api", governedBrowser: true }).mcpServers).not.toHaveProperty("playwright");
+  });
   it("does NOT include playwright server when browser_use is absent", () => {
     const config = buildMcpConfig({
       ...baseParams,

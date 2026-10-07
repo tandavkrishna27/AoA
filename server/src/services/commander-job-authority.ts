@@ -17,7 +17,9 @@ async function loadAuthority(db: Db, input: { companyId: string; jobId: string; 
   const [row] = await db.select({ job: jobs, organizationId: companies.organizationId }).from(jobs)
     .innerJoin(companies, eq(companies.id, jobs.companyId)).where(and(eq(jobs.id, input.jobId), eq(jobs.companyId, input.companyId),
       eq(jobs.organizationId, companies.organizationId), ...(input.organizationId ? [eq(jobs.organizationId, input.organizationId)] : []))).limit(1);
-  if (!row || !row.organizationId || row.job.sourceKind !== "commander_turn" || row.job.requesterPrincipalKind !== "user") return null;
+  if (!row || !row.organizationId || row.job.sourceKind !== "commander_turn" ||
+    !["user", "founder", "team_lead", "team_member"].includes(row.job.requesterPrincipalKind) ||
+    row.job.authenticatedPrincipalKind !== "user" || row.job.authenticatedPrincipalId !== row.job.requesterPrincipalId) return null;
   const parsed = submitJobSourceSchema.safeParse(row.job.sourceIntent);
   if (!parsed.success || parsed.data.kind !== "commander_turn") return null;
   const source = parsed.data;

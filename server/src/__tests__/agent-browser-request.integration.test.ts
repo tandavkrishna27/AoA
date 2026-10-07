@@ -6,11 +6,13 @@ import { canonicalizeJsonV1 } from "@armyofagents/worker-protocol";
 import { workerHelloV1Schema } from "@armyofagents/worker-protocol";
 import { type Db } from "@armyofagents/db";
 import { setupJobControlFixture, ORG, COMPANY, WORKER, TARGET, workerHello, WORKER_PROFILE_HASH, sha256, type JobControlFixture } from "./helpers/job-control-fixture.js";
-import { createAgentBrowserRequestService, resolveBrowserChildCredentialBinding } from "../services/agent-browser-request.js";
+import { createAgentBrowserRequestService, createCommanderBrowserRequestService, resolveBrowserChildCredentialBinding } from "../services/agent-browser-request.js";
 import { createJobPlacementService } from "../services/job-placement.js";
 import { createJobReconciliationService } from "../services/job-reconciliation.js";
 import { runInTenant } from "../db/tenant-context.js";
 import { createLocalDiskStorageProvider } from "../storage/local-disk-provider.js";
+import { submitJobWithinTenant } from "../services/job-submission.js";
+import { loadCommanderJobAuthority } from "../services/commander-job-authority.js";
 import { parseDistributedNetworkPolicies } from "../config/distributed-network-policies.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -29,12 +31,29 @@ let ownerClient: ReturnType<typeof postgres>;
 let storageRoot: string;
 let parent: Awaited<ReturnType<JobControlFixture["activateLease"]>>;
 
-function service(enabled = true) {
+function serviceInput(enabled = true) {
   const placement = createJobPlacementService({ appDb: fixture.app.db, operatorDb: fixture.operator.db, deploymentMode: "local_trusted", deploymentEnabled: true,
     resolveOrganizationPolicy: () => ({ enabled: true, mode: "active" }), resolveWorkloadPolicy: () => true,
     resolveCredentialBinding: (input) => resolveBrowserChildCredentialBinding(fixture.app.db, fixture.operator.db, input) });
-  return createAgentBrowserRequestService({ appDb: fixture.app.db, identityDb: ownerDb, registryDb: fixture.operator.db,
-    storage: createLocalDiskStorageProvider(storageRoot), enabled: async () => enabled, place: (input) => placement.place(input) });
+  return { appDb: fixture.app.db, identityDb: ownerDb, registryDb: fixture.operator.db,
+    storage: createLocalDiskStorageProvider(storageRoot), enabled: async () => enabled, place: (input: Parameters<typeof placement.place>[0]) => placement.place(input) };
+}
+function service(enabled = true) { return createAgentBrowserRequestService(serviceInput(enabled)); }
+const commanderUser = "human-browser-commander";
+const conversationId = "a6000000-0000-4000-8000-0000000000b1";
+async function commanderParent() {
+  await fixture.admin`DELETE FROM internal_agent_messages WHERE conversation_id=${conversationId}`;
+  await fixture.admin`DELETE FROM internal_agent_conversations WHERE id=${conversationId}`;
+  await fixture.admin`DELETE FROM internal_agent_runs WHERE id=${RUN}`;
+  await fixture.admin`INSERT INTO "user"(id,name,email,email_verified,created_at,updated_at) VALUES(${commanderUser},'Commander browser fixture','commander-browser@example.test',true,now(),now()) ON CONFLICT(id) DO NOTHING`;
+  await fixture.admin`INSERT INTO organization_memberships(organization_id,user_id,role,status) VALUES(${ORG},${commanderUser},'member','active') ON CONFLICT(organization_id,user_id) DO UPDATE SET status='active'`;
+  await fixture.admin`INSERT INTO company_memberships(company_id,principal_type,principal_id,status) VALUES(${COMPANY},'user',${commanderUser},'active') ON CONFLICT(company_id,principal_type,principal_id) DO UPDATE SET status='active'`;
+  await fixture.admin`INSERT INTO internal_agent_conversations(id,company_id,user_id,status) VALUES(${conversationId},${COMPANY},${commanderUser},'active')`;
+  await fixture.admin`INSERT INTO internal_agent_runs(id,company_id,user_id,agent_id,trigger_type,trigger_source,status,provider,execution_owner,distributed_job_id,distributed_attempt_id) VALUES(${RUN},${COMPANY},${commanderUser},NULL,'conversation','conversation','running','openai','distributed',${parent.seeded.jobId},${parent.seeded.attemptId})`;
+  await fixture.admin`INSERT INTO internal_agent_messages(id,conversation_id,role,content,run_id) VALUES(${randomUUID()},${conversationId},'user','Browse fixture',${RUN})`;
+  await fixture.admin`INSERT INTO internal_agent_config(company_id,enabled_capabilities) VALUES(${COMPANY},${fixture.admin.json(['browser_use'])}) ON CONFLICT(company_id) DO UPDATE SET enabled_capabilities=EXCLUDED.enabled_capabilities`;
+  await fixture.admin`UPDATE jobs SET source_kind='commander_turn',source_identity=${RUN},source_intent=${fixture.admin.json({kind:'commander_turn',internalAgentRunId:RUN,conversationId})},requester_principal_kind='team_member',requester_principal_id=${commanderUser},authenticated_principal_kind='user',authenticated_principal_id=${commanderUser},executor_principal_kind='sandbox',executor_principal_id=${RUN} WHERE id=${parent.seeded.jobId}`;
+  return { companyId: COMPANY, userId: commanderUser, turnId: RUN, conversationId };
 }
 
 describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")("agent browser producer on serving PostgreSQL roles", () => {
@@ -55,7 +74,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     await fixture.admin`DELETE FROM heartbeat_runs WHERE id=${RUN}`;
     await fixture.admin`DELETE FROM internal_agent_runs WHERE trigger_source='browser_request'`;
     await fixture.admin`UPDATE organizations SET concurrency_cap=10 WHERE id=${ORG}`;
-    await fixture.admin`UPDATE execution_targets SET registered_profile=${fixture.admin.json(originalTarget)}, registered_profile_hash=${sha256(canonicalizeJsonV1(originalTarget))} WHERE id=${TARGET}`;
+    await fixture.admin`UPDATE execution_targets SET device_generation=1,registered_profile=${fixture.admin.json(originalTarget)}, registered_profile_hash=${sha256(canonicalizeJsonV1(originalTarget))} WHERE id=${TARGET}`;
     await fixture.admin`UPDATE workers SET profile_snapshot=${fixture.admin.json(workerHello())}, profile_hash=${WORKER_PROFILE_HASH}, status='active', last_seen_at=now() WHERE id=${WORKER}`;
     parent = await fixture.activateLease(710);
     const hello = { ...workerHello(), reportedCapabilities: ["workload.batch", "workload.browser_session", "sandbox.process_isolated", "sandbox.filtered_egress"], capacity: { ...workerHello().capacity, browserSessionSlots: 2 } };
@@ -90,6 +109,41 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     expect(JSON.stringify(result)).not.toMatch(/credential|endpoint|cdp|fence|https:/i);
     expect((await service().request(actor, request)).jobId).toBe(result.jobId);
     await expect(service().request(actor, {...request,urls:["https://example.com/other"]})).rejects.toMatchObject({status:409});
+  });
+  it("admits the human-owned Commander parent with no synthetic agent or task", async () => {
+    const actor = await commanderParent();
+    const result = await createCommanderBrowserRequestService(serviceInput()).request(actor, request);
+    const [job] = await fixture.admin`SELECT policy_snapshot,requester_principal_kind,requester_principal_id FROM jobs WHERE id=${result.jobId}`;
+    expect(job).toMatchObject({requester_principal_kind:'team_member',requester_principal_id:commanderUser});
+    expect(job.policy_snapshot.browserPreparation).toMatchObject({schemaVersion:2,principalKind:'commander',agentId:null,issueId:null,userId:commanderUser,conversationId,runId:RUN,networkPolicy:policy,parentLeaseId:parent.identity.leaseId});
+    expect((await fixture.admin`SELECT agent_id,user_id FROM internal_agent_runs WHERE id=${result.browserRequestId}`)[0]).toEqual({agent_id:null,user_id:commanderUser});
+    expect(JSON.stringify(result)).not.toMatch(/credential|endpoint|cdp|fence|https:/i);
+  });
+  it("reads an actual user-submitted Commander parent and refuses spoofed principal scope", async () => {
+    await commanderParent();
+    const submitted = await runInTenant(fixture.app.db, ORG, (repos, tx) => submitJobWithinTenant(repos, {
+      organizationId: ORG, companyId: COMPANY, principal: { kind: "user", id: commanderUser, role: "team_member" },
+      command: { idempotencyKey: "actual-commander-parent", source: { kind: "commander_turn", internalAgentRunId: RUN, conversationId }, input: {} },
+    }, tx));
+    expect(await loadCommanderJobAuthority(ownerDb, { companyId: COMPANY, jobId: submitted.jobId })).toMatchObject({ userId: commanderUser, turnId: RUN, conversationId });
+    await fixture.admin`UPDATE jobs SET authenticated_principal_kind='agent' WHERE id=${submitted.jobId}`;
+    expect(await loadCommanderJobAuthority(ownerDb, { companyId: COMPANY, jobId: submitted.jobId })).toBeNull();
+    await fixture.admin`UPDATE jobs SET authenticated_principal_kind='user',requester_principal_kind='system' WHERE id=${submitted.jobId}`;
+    expect(await loadCommanderJobAuthority(ownerDb, { companyId: COMPANY, jobId: submitted.jobId })).toBeNull();
+  });
+  it.each(['wrong-turn','wrong-user','wrong-conversation','removed-membership','disabled-capability','expired-parent','credentials','policy-ceiling','target-generation','missing-worker-capability','spoofed-principal'])('refuses Commander %s', async (fault) => {
+    const actor = await commanderParent();
+    if(fault==='wrong-turn')actor.turnId=randomUUID();
+    if(fault==='wrong-user')actor.userId='other-human';
+    if(fault==='wrong-conversation')actor.conversationId=randomUUID();
+    if(fault==='removed-membership')await fixture.admin`UPDATE company_memberships SET status='inactive' WHERE company_id=${COMPANY} AND principal_id=${commanderUser}`;
+    if(fault==='disabled-capability')await fixture.admin`UPDATE internal_agent_config SET enabled_capabilities='[]' WHERE company_id=${COMPANY}`;
+    if(fault==='expired-parent')await fixture.admin`UPDATE leases SET ack_deadline=now()-interval '2 seconds',expires_at=now()-interval '1 second' WHERE id=${parent.identity.leaseId}`;
+    if(fault==='target-generation')await fixture.admin`UPDATE execution_targets SET device_generation=device_generation+1 WHERE id=${TARGET}`;
+    if(fault==='missing-worker-capability')await fixture.admin`UPDATE workers SET profile_snapshot=${fixture.admin.json(workerHello())} WHERE id=${WORKER}`;
+    if(fault==='spoofed-principal')await fixture.admin`UPDATE jobs SET authenticated_principal_kind='agent' WHERE id=${parent.seeded.jobId}`;
+    await expect(createCommanderBrowserRequestService(serviceInput()).request(actor,{...request,...(fault==='policy-ceiling'?{urls:['https://unapproved.example/']}:{ }),...(fault==='credentials'?{sessionBindingId:randomUUID()}:{})})).rejects.toThrow();
+    expect((await fixture.admin`SELECT count(*)::int AS n FROM jobs WHERE source_kind='browser_request'`)[0].n).toBe(0);
   });
   it.each(["missing-run","wrong-agent","no-task","terminal-parent","missing-policy","missing-control-plane","wrong-task","missing-capability","expired-fence","cross-company"])("fails closed for %s", async (fault) => {
     let callActor = { ...actor };
