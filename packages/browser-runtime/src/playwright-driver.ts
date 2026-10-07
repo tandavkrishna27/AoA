@@ -19,6 +19,7 @@
 // And `downloadsPath` is a STAGING area, not a sink: Playwright deletes its contents when the
 // context closes. Durability comes from `saveAs`, which the orchestrator calls before close.
 import { chromium, type BrowserContext, type Download } from "playwright";
+import { copyFile } from "node:fs/promises";
 import type { BrowserDriver, BrowserPage, DownloadHandle } from "./run-session.js";
 import type { BrowserLaunchOptions } from "./launch-guard.js";
 import { browserOriginAllowed, type BrowserNetworkConfig } from "./egress-proxy.js";
@@ -119,6 +120,7 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
 
       const page = context.pages()[0] ?? (await context.newPage());
       const video = options.videoDir === undefined ? null : page.video();
+      let finishedVideoPath: string | undefined;
 
       // GRACEFUL-CANCELLATION TEARDOWN, and the measured reason it is not sufficient.
       //
@@ -154,7 +156,10 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
       };
 
       return {
-        ...(video ? { video: { saveAs: (target: string) => video.saveAs(target) } } : {}),
+        ...(video ? { video: { saveAs: async (target: string) => {
+          if (!finishedVideoPath) throw new Error("Browser video evidence unavailable");
+          await copyFile(finishedVideoPath, target);
+        } } } : {}),
         ...(launchOptions.recordTrace ? { stopTracing: (target: string) => context.tracing.stop({ path: target }) } : {}),
         async navigate(url: string) {
           // The waiter is ARMED BEFORE the navigation, deliberately. The `download` event can
@@ -198,8 +203,17 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
           // fixed ordering of saveAs before close.
           detach();
           closed = true;
-          if (session) await context.clearCookies().finally(() => context.close());
-          else await context.close();
+          try {
+            if (session) await context.clearCookies();
+            if (video) {
+              // A persistent context owns its browser. Context close destroys
+              // the artifact channel, so flush the page and capture its guest
+              // file path while that channel is live. Evidence is copied only
+              // after context close, as required by session orchestration.
+              await page.close();
+              finishedVideoPath = await video.path();
+            }
+          } finally { await context.close(); }
         },
       };
     },

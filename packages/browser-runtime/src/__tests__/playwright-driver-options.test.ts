@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 const fake = vi.hoisted(() => ({ launch: vi.fn(), traceStart: vi.fn(async () => {}), traceStop: vi.fn(async () => {}),
-  close: vi.fn(async () => {}), saveVideo: vi.fn(async () => {}) }));
+  close: vi.fn(async () => {}), pageClose:vi.fn(async()=>{}), videoPath:vi.fn(async()=>'/video/completed.webm'), copyVideo:vi.fn(async()=>{}) }));
 vi.mock("playwright", () => ({ chromium: { launchPersistentContext: fake.launch } }));
+vi.mock('node:fs/promises',async original=>({...await original<typeof import('node:fs/promises')>(),copyFile:fake.copyVideo}));
 import { createPlaywrightDriver } from "../playwright-driver.js";
 import { fixtureNetwork } from "./network-fixture.js";
 
 function context() {
-  const page = { on: vi.fn(), video: () => ({ saveAs: fake.saveVideo }) };
-  return { pages: () => [page], on: vi.fn(), close: fake.close, tracing: { start: fake.traceStart, stop: fake.traceStop } };
+  const page = { on: vi.fn(), close:fake.pageClose, video: () => ({ path:fake.videoPath }) };
+  return { pages: () => [page], newPage:vi.fn(async()=>page), on: vi.fn(), close: fake.close, tracing: { start: fake.traceStart, stop: fake.traceStop } };
 }
 describe("guest Playwright settings and persistence", () => {
   it("injects scoped session before navigation and refuses trace, cancellation or late lease loss", async () => {
@@ -54,7 +55,7 @@ describe("guest Playwright settings and persistence", () => {
     expect(denied).toHaveBeenCalledTimes(6); await page.close();
   });
   it("maps frozen browser settings and exposes trace/video persistence to session orchestration", async () => {
-    fake.launch.mockResolvedValueOnce(context());
+    const ctx=context();fake.launch.mockResolvedValueOnce(ctx);
     const page = await createPlaywrightDriver({ userDataDir: "/profile", downloadsStagingPath: "/staging", videoDir: "/video" }).launch({
       chromiumSandbox: true, viewport: { width: 1000, height: 700 }, locale: "en-GB", timezoneId: "Asia/Kolkata", recordTrace: true });
     expect(fake.launch).toHaveBeenLastCalledWith("/profile", expect.objectContaining({ viewport: { width: 1000, height: 700 },
@@ -62,7 +63,8 @@ describe("guest Playwright settings and persistence", () => {
     expect(fake.traceStart).toHaveBeenCalledWith({ screenshots: true, snapshots: true });
     await page.stopTracing!("/output/trace.zip"); await page.close(); await page.video!.saveAs("/output/video.webm");
     expect(fake.traceStop).toHaveBeenCalledWith({ path: "/output/trace.zip" });
-    expect(fake.saveVideo).toHaveBeenCalledWith("/output/video.webm");
+    expect(fake.pageClose).toHaveBeenCalled();expect(fake.videoPath).toHaveBeenCalled();
+    expect(fake.copyVideo).toHaveBeenCalledWith('/video/completed.webm',"/output/video.webm");
   });
   it("does not expose unrequested recording and closes guest browser if trace startup fails", async () => {
     fake.launch.mockResolvedValueOnce(context());
@@ -71,5 +73,14 @@ describe("guest Playwright settings and persistence", () => {
     fake.close.mockClear(); fake.launch.mockResolvedValueOnce(context()); fake.traceStart.mockRejectedValueOnce(new Error("trace failed"));
     await expect(createPlaywrightDriver({ userDataDir: "/profile", downloadsStagingPath: "/staging" }).launch({ chromiumSandbox: true, recordTrace: true })).rejects.toThrow("trace failed");
     expect(fake.close).toHaveBeenCalledOnce();
+  });
+  it.each(['page','video','context'] as const)('surfaces %s close failure and still attempts context teardown',async fault=>{
+    fake.close.mockClear();fake.pageClose.mockClear();fake.videoPath.mockClear();fake.copyVideo.mockClear();
+    const ctx=context();fake.launch.mockResolvedValueOnce(ctx);
+    if(fault==='page')fake.pageClose.mockRejectedValueOnce(new Error('page close failed'));
+    if(fault==='video')fake.videoPath.mockRejectedValueOnce(new Error('video flush failed'));
+    if(fault==='context')fake.close.mockRejectedValueOnce(new Error('context close failed'));
+    const page=await createPlaywrightDriver({userDataDir:'/profile',downloadsStagingPath:'/staging',videoDir:'/video'}).launch({chromiumSandbox:true});
+    await expect(page.close()).rejects.toThrow();expect(fake.close).toHaveBeenCalledOnce();expect(fake.copyVideo).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,7 @@
 //
 // The driver is injected, so "the navigation never happened" is an observed absence from a
 // call log rather than an inference from a return value.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   awaitApprovalDecision,
   buildApprovalIntent,
@@ -83,6 +83,30 @@ function deps(driver: BrowserDriver, requestApproval?: ApprovalResolver, delayMs
 const grant = (d: BrowserPermissionDecision): ApprovalResolver => async () => d;
 /** A resolver that NEVER settles, so only the deadline can decide. */
 const never: ApprovalResolver = () => new Promise<BrowserPermissionDecision>(() => {});
+
+describe('settled approval timer lifecycle',()=>{
+  it('retains the full default deadline while approval is pending',async()=>{
+    vi.useFakeTimers();
+    try {
+      const {driver}=recordingDriver();const {delay:_delay,...production}=deps(driver,never);
+      let settled=false;const result=runBrowserSession({...BASE,requireApproval:true,approvalTimeoutMs:60000},production).then(value=>{settled=true;return value;});
+      await vi.advanceTimersByTimeAsync(59999);expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);expect(await result).toMatchObject({ok:false,reason:'approval_refused'});
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {vi.useRealTimers();}
+  });
+  it.each(['allow_once','deny','throw'] as const)('clears the production deadline after %s',async decision=>{
+    vi.useFakeTimers();
+    try {
+      const {driver}=recordingDriver();
+      const input=deps(driver,async()=>{if(decision==='throw')throw new Error('channel closed');return decision;});
+      const {delay:_delay,...production}=input;
+      const result=await runBrowserSession({...BASE,requireApproval:true,approvalTimeoutMs:60000},production);
+      expect(result.ok).toBe(decision==='allow_once');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {vi.useRealTimers();}
+  });
+});
 
 describe("BRW-004 D5 — a browser prompt accepts allow_once and nothing else", () => {
   it("allow_once proceeds", () => {

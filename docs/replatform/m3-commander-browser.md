@@ -52,3 +52,24 @@ operation changes. Initial orphan cases and a scan-to-update renewal race were
 observed RED, then fixed. Focused checks passed 87 tests, including 20 real
 PostgreSQL cases; individual server types passed. Fresh review found no actionable
 issue. Full integration checks remain pending.
+
+### Keyless governed journey
+
+The serving PostgreSQL producer fixture now authenticates a real signed Commander turn through the reserved browser MCP route, ignores a spoofed run header, exposes only the browser request tool, creates and places a human-owned child, and obtains an actual worker lease/ACK. Accepted guest intents project native owner approvals and durable receipts. The native bridge answers `allow_once`; authenticated renewal carries the matched control and scoped encrypted credential grant. Atomic redemption delivers only the cookie mailbox reply to the staged guest.
+
+The opt-in guest variant executes the exact control-plane-staged CJS runner/config/package bytes in real Chromium. A local HTTPS issuer and authenticated page prove scoped cookie injection before navigation. The fixture asserts the public DNS answer and exact public IP, port, Host and SNI before translating the dial to its local TLS server. Filesystem mount translation and fixture certificate trust are test-only; Windows also supplies a synthetic `/proc` table, which establishes no Windows containment claim. OAuth is a keyless external seam retaining actual human/connector/parent currentness checks. The fixture store computes its checksum from actual stored bytes; production `local_disk` still cannot mint distributed transfer grants or supply commit checksum proof.
+
+Requested video bytes are committed by the real fenced artifact service and reappear with status/expiry in operator reconnect detail. Captured Chromium/ffmpeg descendants must be gone before control-plane evidence upload. Cookie objects remain encrypted in storage, are redeemed once and deleted, and never enter ordinary evidence detail. Parent cancellation queues the child's durable cancel and refuses further credential issuance; this fixture does not establish live provider sandbox destruction.
+
+The journey exposed two guest lifecycle defects. Settled approval deadlines retained a timer after `session_completed`; the production helper now clears its own timer on allow, refusal and rejection while retaining the full pending deadline. Closing a persistent context also closed the video artifact channel; the driver now flushes the page and obtains only the trusted Playwright-generated guest path before closing the context, then copies the finished video after teardown. Driver teardown failures propagate and context close is always attempted. No caller-supplied video source is accepted.
+
+The existing Linux browser CI lane runs both normal control-plane and opt-in guest variants and explicitly verifies that both executed. Local reproduction: set `AOA_RUN_WIN_INTEGRATION=1` on Windows and `AOA_RUN_BROWSER_TESTS=1`, build `@armyofagents/browser-runtime`, then run `pnpm exec vitest run server/src/__tests__/agent-browser-request.integration.test.ts`. This proves local governed wiring. Production application-cookie issuer compatibility, verified provider egress and live provider destruction remain prerequisites; capability advertisement, rollout and the host browser path are unchanged.
+
+Journey verification: 62 focused tests passed, including both real PostgreSQL journey variants and the staged Chromium guest. A continuous retained descendant census captures late renderers and nested helpers; Windows creation timestamps reject stale-parent PID reuse, and final process identities use creation time on Windows or /proc start ticks on Linux. The lifecycle/census group passed 56 tests. Individual server and guest type checks passed; recursive checks are performed by the integration owner.
+
+Integrated journey verification: recursive workspace types and full build passed.
+Five focused files passed 99 tests with zero skips, including actual PostgreSQL
+and the production-equivalent staged Chromium guest. The review's late-descendant
+census finding and stale-parent PID reuse regression were observed RED before
+their fixes. Citation integrity passes. Full normal suite and normal Linux PR CI
+are pending before program integration; no production conformance is claimed.
