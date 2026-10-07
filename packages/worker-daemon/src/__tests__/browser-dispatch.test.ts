@@ -38,6 +38,7 @@ describe("browser dispatch prerequisites", () => {
     handoff.offer.job.extensions.push({ namespace: "com.armyofagents.browser/session-binding", schemaVersion: 1, critical: false,
       value: { bindingId, origin: "https://example.com", policyDigest: handoff.offer.job.networkPolicy.digest } });
     const fake = createFakeSandboxProvider(), sink = collectingSink();
+    const pendingWindows: Array<number | null> = [];
     let finish!: () => void, delivered = 0;
     const gate = new Promise<void>(resolve => { finish = resolve; });
     const provider = { ...fake, browserNetworkPolicyMode: "verified_default_deny" as const,
@@ -52,7 +53,8 @@ describe("browser dispatch prerequisites", () => {
         return fake.execute({ ...args[0], onStdout: undefined }, args[1]);
       } };
     const supervisor = createSupervisor({ provider, browserSelfModel: await makeSelfModel(), identity: SUPERVISOR_IDENTITY,
-      eventSink: sink, redactionCanaries: [], resolveStagedFiles: async () => [BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH].map((path, index) => ({ path, grant: {
+      eventSink: sink, redactionCanaries: [], onBrowserDecisionPending: (_leaseId, until) => { pendingWindows.push(until); },
+      resolveStagedFiles: async () => [BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH].map((path, index) => ({ path, grant: {
         protocolVersion: 1, operation: "download", method: "GET", artifactId: `artifact-${index}`, objectKey: `key-${index}`,
         expectedSha256: "a".repeat(64), maxBytes: 10, url: "https://store.example/get", headers: {}, issuedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 60000).toISOString(), redaction: "secret" } })) });
@@ -60,6 +62,7 @@ describe("browser dispatch prerequisites", () => {
     await waitFor(() => sink.events.some(event => event.eventType === "runtime_decision_requested"));
     const event = sink.events.find(event => event.eventType === "runtime_decision_requested")!;
     const request = event.payload as import("@armyofagents/worker-protocol").PermissionRuntimeDecisionRequestV1;
+    expect(pendingWindows.at(-1)).toBe(Date.parse(request.expiresAt));
     const grant = { requestId, bindingId, policyDigest: handoff.offer.job.networkPolicy.digest, grant: {
       protocolVersion: 1 as const, operation: "download" as const, method: "GET" as const, artifactId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       objectKey: `organizations/${event.organizationId}/jobs/${event.jobId}/attempts/${event.attempt}/browser-session/${requestId}`,
@@ -76,9 +79,11 @@ describe("browser dispatch prerequisites", () => {
         decidedBy: { principalType: "user", principalId: "founder" }, decidedAt: new Date().toISOString(),
         idempotencyKey: "88888888-8888-4888-8888-888888888888", decision: "allow_once" } });
     await supervisor.applyBrowserDecision!(command);
+    expect(pendingWindows.at(-1)).toBe(Date.parse(request.expiresAt));
     await supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant]);
     await supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant]);
     expect(delivered).toBe(1);
+    expect(pendingWindows.at(-1)).toBeNull();
     finish(); await running;
     await expect(supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant])).rejects.toThrow();
   });

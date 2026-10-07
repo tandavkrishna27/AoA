@@ -330,6 +330,14 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
   // the boot gate refuses if neither). `materializeRunSecrets` is always present here, so the
   // makeRunProvider⟹materializeRunSecrets pairing (supervisor fail-fast F5) is satisfied.
   const supervisor = makeSupervisor({
+    onBrowserDecisionPending: (leaseId, untilMs) => {
+      try { driver.requestControlPolling?.(leaseId, untilMs); }
+      catch {
+        // Closing a run can race its renewal completion. A failed nudge never
+        // grants authority or replaces the normal lease-loss/cancellation path.
+        if (untilMs !== null) deps.logger?.warn({ leaseId }, "worker: pending browser control polling unavailable");
+      }
+    },
     browserSelfModel: deps.self,
     provider: deps.provider,
     makeRunProvider: deps.makeRunProvider,
