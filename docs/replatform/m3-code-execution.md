@@ -58,3 +58,27 @@ workspace typechecking passes. The standard full suite passes with 23,949 tests
 and 1,932 environment skips; the focused PostgreSQL group executes without skips.
 The full workspace build passes. Browser execution and service residuals
 remain open; this checkpoint does not close M3.
+
+## Browser approval implementation checkpoint
+
+The staged browser guest can wait for a bounded decision through a private
+mailbox. Its worker controller scrubs prompt text, binds the request to the full
+run identity and matches the returned frozen decision before delivering it.
+Concurrent replay delivers a decision once; cancellation closes pending requests.
+The sandbox delivery helper uses effect authority and publishes complete decision
+metadata atomically. Browser credentials and endpoints do not cross that helper.
+
+Accepted browser permission events now create an immutable runtime decision in
+the accepted-event transaction. Reusing an approval ID cannot change its nonce or
+scope. The bridge returns the original request revision and the same prompt hash,
+fixing a mismatch that previously rejected legitimate human decisions.
+
+Full workspace typechecking and build pass. The full test suite passes across
+four sequential shards: 23,972 tests with 1,935 environment skips. Two earlier
+unsharded runs hit native Node allocation failures on this machine. Focused
+browser, worker and existing runtime-decision regressions also pass.
+
+The guest mailbox, worker controller and delivery helper are not yet composed
+into actual browser dispatch. Browser capability remains absent. Network
+enforcement, credential materialization, reconnect/UI, agent/Commander sources,
+and service residuals remain open. Anthropic live verification stays deferred.

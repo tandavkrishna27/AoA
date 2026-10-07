@@ -1863,7 +1863,7 @@ export interface AcceptEventBatchInput {
 }
 
 /** E3-D-ACC — the receipt kinds a seam projector may own. */
-export type AcceptedEventProjectionKind = "authoritative_cost" | "activity_audit" | "output_projection";
+export type AcceptedEventProjectionKind = "authoritative_cost" | "activity_audit" | "output_projection" | "runtime_decision";
 
 /**
  * E3-D-ACC — ONE registration on the accepted-event seam.

@@ -22,7 +22,7 @@
     },
     "packages/browser-runtime": {
       "mode": "floor",
-      "count": 11
+      "count": 13
     },
     "packages/db": {
       "mode": "floor",
@@ -58,7 +58,7 @@
     },
     "packages/worker-daemon": {
       "mode": "pinned",
-      "count": 179
+      "count": 181
     },
     "packages/worker-keystore": {
       "mode": "pinned",
@@ -78,7 +78,7 @@
     },
     "server": {
       "mode": "floor",
-      "count": 1607
+      "count": 1608
     },
     "tests": {
       "mode": "pinned",

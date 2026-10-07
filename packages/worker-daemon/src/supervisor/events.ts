@@ -23,6 +23,7 @@ import {
   type ArtifactPreparedPayloadV1,
   type LogPayloadV1,
   type NetworkDeniedPayloadV1,
+  type PermissionRuntimeDecisionRequestV1,
   type ProgressPayloadV1,
   type ServiceHealthPayloadV1,
   type TerminalEventStatus,
@@ -170,6 +171,13 @@ export class EventSequencer {
    * inside it. */
   attemptStarted(sandboxId: string): Promise<WorkerEventV1> {
     return this.#emit("attempt_started", { sandboxId });
+  }
+
+  /** A browser action waits for a matched control result. The caller constructs
+   * the request hash from scrubbed prompt fields; this path applies the usual
+   * per-run redaction, event digest, sequence and durable sink. */
+  runtimeDecisionRequested(input: PermissionRuntimeDecisionRequestV1): Promise<WorkerEventV1> {
+    return this.#emit("runtime_decision_requested", input);
   }
 
   /** `network_denied` — a governed egress attempt was refused. WRK-005's

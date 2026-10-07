@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { EventSequencer, quantiseExtensionNumbers } from "../supervisor/events.js";
 import type { WorkerEventV1 } from "@armyofagents/worker-protocol";
+import { createBrowserApprovalController } from "../supervisor/browser-approval.js";
 
 // BRW-003d-3 — the PRODUCER half.
 //
@@ -47,6 +48,18 @@ function sequencer() {
 }
 
 describe("BRW-003d-3 producer — browserObservation", () => {
+  it("sequences a browser approval through the frozen event producer", async () => {
+    const { seq, emitted } = sequencer();
+    const now = Date.parse("2026-01-01T00:00:00.000Z");
+    const controller = createBrowserApprovalController({ identity, now: () => now, deadlineAt: now + 60_000,
+      scrubText: (text) => text, deliver: async () => {}, emit: async (request) => { await seq.runtimeDecisionRequested(request); } });
+    await controller.request({ type: "approval_requested", requestId: "77777777-7777-4777-8777-777777777777",
+      expiresAt: new Date(now + 30_000).toISOString(), intent: { action: "navigate", title: "Open site", summary: null,
+        networkTarget: "https://example.com", riskClass: "network_egress" } });
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].eventType).toBe("runtime_decision_requested");
+    expect(emitted[0].seq).toBe(1);
+  });
   it("emits an event the FROZEN contract accepts", async () => {
     const { seq, emitted } = sequencer();
     await seq.browserObservation({ artifactIds: [], url: "https://ex.com/p", title: "P" });

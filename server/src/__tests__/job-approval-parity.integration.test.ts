@@ -15,14 +15,21 @@ import {
   matchRuntimeDecisionResultToRequestV1,
   productApprovalAuthorizesActionV1,
   runtimeDecisionResultV1Schema,
+  permissionRuntimeDecisionRequestV1Schema,
+  canonicalEventDigestInputV1,
+  eventUploadOperationRequestV1Schema,
 } from "@armyofagents/worker-protocol";
 import type { SubmitJobSource } from "@armyofagents/shared";
 import {
   setupJobControlFixture,
   COMPANY,
+  auth,
+  sha256,
   type JobControlFixture,
 } from "./helpers/job-control-fixture.js";
-import { jobApprovalBridge, type BridgeActor } from "../services/job-approval-bridge.js";
+import { jobApprovalBridge, buildRuntimeDecisionRequestBody, type BridgeActor } from "../services/job-approval-bridge.js";
+import { createJobEventIngestService } from "../services/job-events.js";
+import { runtimeDecisionPromptHash } from "../services/agent-runtime-decisions.js";
 
 const ENABLED_ENV = { AOA_DISTRIBUTED_EXECUTION_ENABLED: "true" } as const;
 const AGENT = "a6000000-0000-4000-8000-0000000000a1";
@@ -117,6 +124,9 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect(await count("agent_runtime_decisions", `run_id = '${runId}'`)).toBe(1);
       expect(await count("job_projection_receipts", `projection_kind = 'runtime_decision'`)).toBe(1);
 
+      const [original] = await fixture!.admin`SELECT expires_at FROM agent_runtime_decisions WHERE id = ${first.aggregateId!}`;
+      const originalRequest = buildRuntimeDecisionRequestBody(open.runtimeDecision, first.aggregateId!, new Date(original.expires_at).toISOString());
+
       // RESOLVE (allow): flips the receipt applied + queues ONE runtime_decision_result.
       const resolved = await bridge().resolveGovernedDecision({
         source: TASK_SOURCE, actor, fence, idempotencyKey: idem,
@@ -132,15 +142,47 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       // The queued E1 result binds to the request the server minted.
       const [ctrl] = await fixture!.admin`SELECT command FROM job_control_commands WHERE command_kind = 'runtime_decision_result' LIMIT 1`;
       const result = runtimeDecisionResultV1Schema.parse((ctrl as { command: Record<string, unknown> }).command.result);
-      const [row] = await fixture!.admin`SELECT id, nonce, prompt_hash, source_revision, expires_at, timeout_policy FROM agent_runtime_decisions WHERE id = ${first.aggregateId!}`;
-      const r = row as { id: string; nonce: string; prompt_hash: string; source_revision: number; expires_at: Date; timeout_policy: string };
-      const request = {
-        decisionKind: "work_question" as const,
-        requestId: r.id, nonce: r.nonce, requestDigest: r.prompt_hash,
-        schemaVersion: 1, sourceRevision: r.source_revision,
-        expiresAt: new Date(r.expires_at).toISOString(), timeoutPolicy: r.timeout_policy,
-      };
-      expect(matchRuntimeDecisionResultToRequestV1(request as never, result)).toEqual({ ok: true });
+      expect(matchRuntimeDecisionResultToRequestV1(originalRequest as never, result)).toEqual({ ok: true });
+    });
+
+    it("[browser] accepted worker approval preserves request identity through the human result", async () => {
+      guard(); const { identity: fence } = await fixture!.activateLease(20);
+      const browserSource = { ...BROWSER_SOURCE, browserRequestId: randomUUID() };
+      await fixture!.admin`UPDATE jobs SET workload_type = 'browser_session', source_kind = 'browser_request', source_identity = ${browserSource.browserRequestId}, source_intent = ${fixture!.admin.json(browserSource)} WHERE id = ${fence.jobId}`;
+      const title = "Open https://example.com";
+      const request = permissionRuntimeDecisionRequestV1Schema.parse({ decisionKind: "permission", requestId: randomUUID(), nonce: randomUUID(),
+        requestDigest: runtimeDecisionPromptHash({ kind: "permission", title, summary: null, promptText: null, command: null }),
+        schemaVersion: 1, sourceRevision: 0, expiresAt: new Date(Date.now() + 60_000).toISOString(), title, summary: null,
+        timeoutPolicy: "deny", defaultDecision: null, toolName: "browser.navigate", command: null, cwd: null, path: null,
+        networkTarget: "https://example.com", riskClass: "network_egress" });
+      const delivery = { organizationId: fence.organizationId, companyId: fence.companyId, workerId: fence.workerId,
+        jobId: fence.jobId, attempt: fence.attemptNumber, leaseId: fence.leaseId, fenceToken: fence.fence };
+      const event = { ...delivery, protocolVersion: 1, eventId: randomUUID(), seq: 1, eventType: "runtime_decision_requested",
+        occurredAt: new Date().toISOString(), extensions: [], payload: request };
+      const wire = { ...event, eventDigest: sha256(canonicalEventDigestInputV1(event as never)) };
+      const upload = () => eventUploadOperationRequestV1Schema.parse({ protocolVersion: 1, correlationId: randomUUID(), issuedAt: new Date().toISOString(),
+        nonce: randomUUID(), audience: "worker_run", idempotencyKey: randomUUID(), body: { protocolVersion: 1, ...delivery, events: [wire] } });
+      const ingest = createJobEventIngestService({ appDb: fixture!.app.db });
+      expect((await ingest.ingest({ auth: auth(randomUUID()), request: upload() })).ack.status).toBe("accepted");
+      const [row] = await fixture!.admin`SELECT id, company_id, agent_id, run_id FROM agent_runtime_decisions WHERE id = ${request.requestId}`;
+      expect(row).toMatchObject({ id: request.requestId, company_id: COMPANY, agent_id: null, run_id: null });
+      await ingest.ingest({ auth: auth(randomUUID()), request: upload() });
+      expect(await count("agent_runtime_decisions", `id = '${request.requestId}'`)).toBe(1);
+      // A second accepted event may not retarget the first approval's identity.
+      const conflictingRequest = { ...request, nonce: randomUUID() };
+      const conflictingEvent = { ...event, eventId: randomUUID(), seq: 2, payload: conflictingRequest };
+      const conflictingWire = { ...conflictingEvent, eventDigest: sha256(canonicalEventDigestInputV1(conflictingEvent as never)) };
+      const conflictingUpload = eventUploadOperationRequestV1Schema.parse({ ...upload(), correlationId: randomUUID(),
+        nonce: randomUUID(), idempotencyKey: randomUUID(), body: { protocolVersion: 1, ...delivery, events: [conflictingWire] } });
+      expect((await ingest.ingest({ auth: auth(randomUUID()), request: conflictingUpload })).ack.status).toBe("accepted");
+      const [unchanged] = await fixture!.admin`SELECT nonce, source_revision FROM agent_runtime_decisions WHERE id = ${request.requestId}`;
+      expect(unchanged).toMatchObject({ nonce: request.nonce, source_revision: 0 });
+      await bridge().resolveGovernedDecision({ source: browserSource, actor, fence, idempotencyKey: randomUUID(), runtimeDecision: {
+        decisionId: request.requestId, nonce: request.nonce, expectedSourceRevision: 0, kind: "permission", decision: "allow_once", actorUserId: USER,
+      } });
+      const [ctrl] = await fixture!.admin`SELECT command FROM job_control_commands WHERE command_kind = 'runtime_decision_result' LIMIT 1`;
+      const result = runtimeDecisionResultV1Schema.parse(ctrl.command.result);
+      expect(matchRuntimeDecisionResultToRequestV1(request, result)).toEqual({ ok: true });
     });
 
     it("[runtime] browser_request: a permission DENY resolves to an E1 result carrying deny", async () => {

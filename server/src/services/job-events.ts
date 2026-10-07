@@ -72,6 +72,7 @@ import {
 } from "./job-accepted-usage-pricing.js";
 import { flushDeferredBudgetSignals, type DeferredBudgetSignals } from "./job-budget-cost-bridge.js";
 import { createAcceptedActivityAuditProjector } from "./job-accepted-activity-audit.js";
+import { createAcceptedBrowserApprovalProjector } from "./job-accepted-browser-approval.js";
 import { resolveAcceptedOutputProjector } from "./job-accepted-output-projection.js";
 import { publishActivity, type PreparedActivityEvent } from "./activity-log.js";
 
@@ -222,6 +223,7 @@ export function createJobEventIngestService(input: {
         createAcceptedActivityAuditProjector({
           onPreparedActivity: (eventId, prepared) => { owedActivityPublishes.set(eventId, prepared); },
         }),
+        createAcceptedBrowserApprovalProjector(),
       ];
 
       // ★ DE-03, replay-rejection conjunct — the refusal below THROWS out of
