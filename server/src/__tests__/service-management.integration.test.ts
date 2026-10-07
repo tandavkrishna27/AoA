@@ -165,6 +165,8 @@ async function attemptStatuses(jobId: string) {
 }
 
 async function clearServiceState(): Promise<void> {
+  await f().admin`DELETE FROM cost_events`;
+  await f().admin`DELETE FROM budget_policies`;
   await f().admin`DELETE FROM activity_log`;
   await f().admin`DELETE FROM job_outbox`;
   await f().admin`DELETE FROM job_control_commands`;
@@ -453,11 +455,40 @@ suite("SVC-007 — creating a service, and the loop it unblocks", () => {
     expect(before!.generation).toBe(1);
     expect(before!.definition).toEqual(DEFINITION);
     expect(before!.liveInstance).toBeNull();
+    expect(before).toMatchObject({ recovery: { action: "restart" },
+      checkpoint: { restoreArtifactId: null, latest: null }, companyBudget: null,
+      instanceHistory: [], historyLimit: 20 });
 
     await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId });
     const after = await readService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId });
     expect(after!.liveInstance).toMatchObject({ status: "pending", generation: 1 });
     expect(after!.liveInstance!.jobId).not.toBeNull();
+    expect(after!.instanceHistory).toHaveLength(1);
+    expect(after!.instanceHistory[0]).toMatchObject({ status: "pending", generation: 1, terminalizedBy: null });
+
+    const checkpointId = randomUUID();
+    await f().admin`INSERT INTO job_artifacts
+      (organization_id, job_id, identifier, attempt, object_key, sha256, size_bytes, content_type, kind, sensitivity, status)
+      VALUES (${ORG}, ${after!.liveInstance!.jobId}, ${checkpointId}, 1, 'private-checkpoint-storage-key', ${"a".repeat(64)}, 12,
+        'application/json', 'service_checkpoint', 'restricted', 'committed')`;
+    // Stored bytes alone are not recovery state: the source needs a witnessed exit.
+    expect((await readService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId }))!.checkpoint.latest).toBeNull();
+    await f().admin`UPDATE service_instances SET status = 'stopped', terminalized_by = 'worker_stopped'
+      WHERE id = ${after!.liveInstance!.serviceInstanceId}`;
+    await f().admin`INSERT INTO budget_policies (company_id, scope_type, scope_id, amount_cents)
+      VALUES (${COMPANY}, 'company', ${COMPANY}, 500), (${OTHER_COMPANY}, 'company', ${OTHER_COMPANY}, 9000)`;
+    await f().admin`INSERT INTO cost_events (company_id, provider, model, cost_cents, occurred_at)
+      VALUES (${COMPANY}, 'test', 'test', 123, clock_timestamp()), (${OTHER_COMPANY}, 'test', 'test', 9999, clock_timestamp()),
+        (${COMPANY}, 'test', 'test', 456, date_trunc('month', clock_timestamp()) - interval '1 day')`;
+    const rich = await readService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId });
+    expect(rich!.checkpoint.latest).toMatchObject({ artifactId: checkpointId, generation: 1, available: true });
+    expect(rich!.companyBudget).toEqual({ amountCents: 500, observedCents: 123, hardStopEnabled: true, status: "ok" });
+    expect(JSON.stringify(rich)).not.toContain("private-checkpoint-storage-key");
+    expect(JSON.stringify(rich)).not.toContain("fenceToken");
+    await f().admin`UPDATE job_artifacts SET expires_at = clock_timestamp() - interval '1 second' WHERE identifier = ${checkpointId}`;
+    expect((await readService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId }))!.checkpoint.latest!.available).toBe(false);
+    await f().admin`UPDATE cost_events SET cost_cents = 500 WHERE company_id = ${COMPANY} AND occurred_at > date_trunc('month', clock_timestamp())`;
+    expect((await readService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId }))!.companyBudget!.status).toBe("hard_stop");
 
     const listed = await listServices(f().app.db, {
       organizationId: ORG, companyId: COMPANY, afterServiceId: null, limit: 100,
@@ -474,6 +505,20 @@ suite("SVC-007 — creating a service, and the loop it unblocks", () => {
     expect(await listServices(f().app.db, {
       organizationId: OTHER_ORG, companyId: OTHER_COMPANY, afterServiceId: null, limit: 100,
     })).toEqual([]);
+  }, 120_000);
+
+  it("bounds recovery history to the latest 20 instances without inventing process exits", async () => {
+    const serviceId = (await create({ desiredState: "paused" }))!.serviceId;
+    for (let i = 0; i < 23; i++) {
+      await f().admin`INSERT INTO service_instances (organization_id, company_id, service_id, generation, status, created_at, updated_at)
+        VALUES (${ORG}, ${COMPANY}, ${serviceId}, 1, 'lost', clock_timestamp() + ${i} * interval '1 second', clock_timestamp())`;
+    }
+    const view = await readService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId });
+    expect(view!.instanceHistory).toHaveLength(20);
+    expect(view!.historyLimit).toBe(20);
+    expect(view!.instanceHistory.every((instance) => instance.terminalizedBy === null)).toBe(true);
+    expect(view!.instanceHistory[0]!.createdAt.getTime()).toBeGreaterThan(view!.instanceHistory[19]!.createdAt.getTime());
+    expect(view!.recovery).toEqual({ action: "restart" });
   }, 120_000);
 
   // ── T10 — the backstop's precondition is a DATABASE fact ───────────────────────────────

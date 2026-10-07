@@ -42,6 +42,7 @@ import {
   type JobControlFixture,
 } from "./helpers/job-control-fixture.js";
 import { runInTenant } from "../db/tenant-context.js";
+import { readServiceRecoveryView } from "../services/service-recovery-view.js";
 import { createJobEventIngestService } from "../services/job-events.js";
 import { decideServiceProjection } from "../services/service-health-projection.js";
 import { SERVICE_CRASH_POLICY } from "../services/service-crash-recovery.js";
@@ -442,6 +443,12 @@ suite("SVC-003 — service events project onto the instance row, under the fence
       organizationId: ORG, companyId: COMPANY, serviceId: SERVICE,
     })).toEqual({ action: "none", reason: "crash_backoff" });
     expect(await liveInstanceIds(SERVICE)).toEqual([]);
+    const recoveryView = await runInTenant(f().app.db, ORG, (_repos, tx) => readServiceRecoveryView(tx, {
+      organizationId: ORG, companyId: COMPANY, serviceId: SERVICE, generation: 1, restoreArtifactId: null,
+    }));
+    expect(recoveryView.recovery.action).toBe("wait");
+    expect(recoveryView.instanceHistory).toHaveLength(1);
+    expect(recoveryView.instanceHistory[0]).toMatchObject({ status: "stopped", terminalizedBy: "worker_stopped" });
     await f().admin`UPDATE job_events SET created_at = clock_timestamp() - ${SERVICE_CRASH_POLICY.initialDelayMs + 1000} * interval '1 millisecond'
       WHERE organization_id = ${ORG} AND company_id = ${COMPANY} AND job_id = ${seeded.jobId} AND event_id = ${stopEvent.eventId}`;
 

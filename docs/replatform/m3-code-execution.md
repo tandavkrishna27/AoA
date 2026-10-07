@@ -164,8 +164,11 @@ The browser teardown suite now executes the production-equivalent staged guest
 bundle and requires real HTTPS fixture navigation before killing the runner.
 The full browser package passes locally on Windows: 179 tests, with seven
 platform skips. Linux retains real kernel socket measurement and its cancellation
-cases require normal PR CI. Normal PR CI must pass before merging into the
-program branch. This is not M3 closure.
+cases passed in normal Linux PR CI: 185 browser tests, with one Windows-only
+skip. PR #679 merged into the program branch at ebea76dd65 after all 16 checks
+passed. Its first shard had an unrelated workspace navigation test failure;
+the unchanged file passed locally and the same CI job passed on rerun.
+This is not M3 closure.
 
 Browser exposure remains off until the provider supplies verified default-deny
 attestation. The accepted BRW-008 decision retains the Commander host path until

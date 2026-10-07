@@ -64,6 +64,8 @@
 
 import { randomUUID } from "node:crypto";
 import type { Db, TenantRepositories } from "@armyofagents/db";
+import type { ServiceRecoveryMetadata } from "@armyofagents/shared";
+import { readServiceRecoveryView } from "./service-recovery-view.js";
 import {
   SERVICE_DESIRED_STATES,
   canTransitionServiceDesiredState,
@@ -675,7 +677,7 @@ export async function setServiceDesiredState(
   return result;
 }
 
-export interface ServiceView {
+export interface ServiceView extends ServiceRecoveryMetadata<Date> {
   serviceId: string;
   desiredState: string;
   generation: number;
@@ -697,13 +699,10 @@ export interface ServiceView {
  * The operator's read of one service: desired state, current generation, that generation's
  * immutable definition, and the live instance if there is one.
  *
- * ★ WHAT IT IS NOT. E9's gate names a view of "desired state, generation, active instance,
- * health, checkpoint, budget, and restart history". This delivers the first three, plus
- * health only in the sense that `service_instances.status` IS the projected health SVC-003a
- * writes. Checkpoint, budget and restart history are NOT here: no checkpoint is storable
- * (SVC-004), no per-service budget exists (spend is attributed per job), and no restart has
- * ever happened because SVC-002 converges once and replacement is driven by the projection.
- * Listed so a shipped read surface is not mistaken for a delivered gate item.
+ * Recovery metadata includes bounded durable instance history, the witnessed-crash
+ * verdict, committed checkpoint metadata and the company budget governing admission.
+ * It exposes neither checkpoint bytes nor storage/fence authority. Budget usage is
+ * explicitly company-scoped; there is no synthetic per-service allocation.
  *
  * `definition` is `null` when the current generation has no row — impossible for a service
  * this file created, and possible for one an earlier hand-inserted row left behind. A `null`
@@ -714,7 +713,7 @@ export async function readService(
   input: { organizationId: string; companyId: string; serviceId: string },
 ): Promise<ServiceView | null> {
   assertAdmissibleOrganization(input.organizationId);
-  return runInTenantReadOnly(appDb, input.organizationId, async (repos) => {
+  return runInTenantReadOnly(appDb, input.organizationId, async (repos, tx) => {
     const service = await repos.jobControl.findServiceForCompany(input);
     if (!service) return null;
     // Sequential, not `Promise.all`: both reads run on the ONE connection this transaction
@@ -731,10 +730,13 @@ export async function readService(
       organizationId: input.organizationId,
       serviceId: input.serviceId,
     });
+    const restore = generation?.definition.checkpointRestore as { manifestArtifactId?: unknown } | undefined;
     return {
       ...service,
       definition: generation?.definition ?? null,
       liveInstance,
+      ...await readServiceRecoveryView(tx, { ...input, generation: service.generation,
+        restoreArtifactId: typeof restore?.manifestArtifactId === "string" ? restore.manifestArtifactId : generation?.checkpointArtifactId ?? null }),
     };
   });
 }
