@@ -15,7 +15,7 @@ export const handleBrowserSessionRequest: ToolHandler = async (ctx, args) => {
 };
 
 export const BROWSER_SESSION_TOOL_PARAMETERS = { type: "object" as const, additionalProperties: false,
-  properties: { idempotencyKey: { type: "string" }, urls: { type: "array", minItems: 1, maxItems: 16, items: { type: "string" } },
+  properties: { idempotencyKey: { type: "string" }, sessionBindingId:{type:"string",format:"uuid"},urls: { type: "array", minItems: 1, maxItems: 16, items: { type: "string" } },
     options: { type: "object", additionalProperties: false, properties: {
       viewport: { type: "object", properties: { width: { type: "integer" }, height: { type: "integer" } }, required: ["width", "height"] },
       locale: { type: "string" }, timezone: { type: "string" }, recordTrace: { type: "boolean" }, recordVideo: { type: "boolean" }, maxSessionSeconds: { type: "integer" },

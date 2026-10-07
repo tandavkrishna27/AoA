@@ -3,6 +3,7 @@ import { z } from "zod";
 import { canonicalizeJsonV1, networkPolicyV1Schema, type NetworkPolicyV1 } from "@armyofagents/worker-protocol";
 import { normalizeBrowserJobInput } from "./browser-job-config.js";
 import { resolveBrowserControlPlaneDenyCidrs } from "../config/distributed-network-policies.js";
+import {browserSessionBindingSchema,type BrowserSessionBinding} from "../config/browser-session-bindings.js";
 
 export const BROWSER_DISPATCH_NAMESPACE = "com.armyofagents.browser/dispatch";
 export const BROWSER_RUNTIME_ROOT = "/home/user/.aoa/browser-runtime";
@@ -22,6 +23,7 @@ function safeNavigationUrl(value: string): boolean {
 
 export const browserSessionRequestSchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(128),
+  sessionBindingId:z.string().uuid().optional(),
   urls: z.array(z.string().max(2048).refine(safeNavigationUrl, "public HTTPS URL without credentials required")).min(1).max(16),
   options: z.object({
     viewport: z.object({ width: z.number().int().min(320).max(3840), height: z.number().int().min(240).max(2160) }).strict().optional(),
@@ -50,6 +52,7 @@ export const browserPreparationSchema = z.object({
   profileHash: z.string().regex(/^[0-9a-f]{64}$/), providerConstraintHash: z.string().regex(/^[0-9a-f]{64}$/),
   targetProfileHash: z.string().regex(/^[0-9a-f]{64}$/),
   networkPolicy: z.custom<NetworkPolicyV1>((value) => networkPolicyV1Schema.safeParse(value).success),
+  sessionBinding:browserSessionBindingSchema.optional(),
 }).strict();
 export type BrowserPreparation = z.infer<typeof browserPreparationSchema>;
 
@@ -63,7 +66,7 @@ export function browserDispatchExtension(preparation: BrowserPreparation) {
     value: { runnerPath: BROWSER_RUNNER_PATH, configPath: BROWSER_CONFIG_PATH, networkPolicy: preparation.networkPolicy } };
 }
 
-export function buildBrowserRunnerConfig(request: BrowserSessionRequest, policy: NetworkPolicyV1, controlPlaneDenyCidrs: string[] = []) {
+export function buildBrowserRunnerConfig(request: BrowserSessionRequest, policy: NetworkPolicyV1, controlPlaneDenyCidrs: string[] = [], sessionBinding?:BrowserSessionBinding) {
   if (!parseAuthoritativeBrowserPolicy(policy)) throw new Error("parent network policy unavailable");
   for (const value of request.urls) {
     const url = new URL(value);
@@ -77,8 +80,11 @@ export function buildBrowserRunnerConfig(request: BrowserSessionRequest, policy:
   const normalized = normalizeBrowserJobInput(request.options ?? {});
   if (!normalized.ok) throw new Error(`invalid browser options: ${normalized.reason}`);
   const workload = normalized.value;
+  if (sessionBinding) sessionBinding = browserSessionBindingSchema.parse(sessionBinding);
+  if(Boolean(request.sessionBindingId)!==Boolean(sessionBinding) || (sessionBinding && (sessionBinding.bindingId!==request.sessionBindingId || workload.recordTrace || request.urls.some(url=>new URL(url).origin!==sessionBinding.origin)))) throw new Error("scoped browser session binding refused");
   const config = {
     networkPolicy: policy, controlPlaneDenyCidrs: validatedCidrs,
+    ...(sessionBinding?{sessionCredential:{bindingId:sessionBinding.bindingId,origin:sessionBinding.origin,cookieName:sessionBinding.cookieName}}:{}),
     userDataDir: "/home/user/.aoa/browser-profile", downloadsStagingPath: "/home/user/.aoa/browser-downloads",
     downloadRoot: "/home/user/aoa-output", approvalDirectory: "/home/user/.aoa/browser-approvals",
     requireApproval: true, approvalTimeoutMs: Math.min(60_000, workload.maxSessionSeconds * 1000),

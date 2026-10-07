@@ -853,11 +853,13 @@ export interface JobControlRepository {
     companyId: string;
     jobId: string;
     handle: string;
-    refKind: "provider_key" | "company_secret" | "run_jwt";
+    refKind: "provider_key" | "company_secret" | "run_jwt" | "connector_oauth";
     refId: string;
-    materialization: "env";
-    usePolicy: "sandbox_local_only";
-    envTarget: string;
+    materialization: "env" | "proxy";
+    usePolicy: "sandbox_local_only" | "fence_proxy";
+    envTarget: string | null;
+    destination?: string;
+    activeFence?: ActiveFenceRequest;
     /** Pinned version selector for `ref_id`; null = latest. */
     refVersion: string | null;
     boundTargetGeneration: number | null;
@@ -4909,6 +4911,15 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
     },
 
     async insertExecutionSecretHandle(input) {
+      if (input.refKind === "connector_oauth") {
+        if (input.materialization !== "proxy" || input.usePolicy !== "fence_proxy" || input.envTarget !== null || !input.destination || !input.activeFence ||
+          input.activeFence.organizationId !== input.organizationId || input.activeFence.companyId !== input.companyId || input.activeFence.jobId !== input.jobId || input.boundTargetGeneration !== input.activeFence.targetGeneration) {
+          throw new Error("invalid connector proxy handle mint");
+        }
+        await guardActiveFence(input.activeFence);
+      } else if (input.materialization !== "env" || input.usePolicy !== "sandbox_local_only" || !input.envTarget || input.destination || input.activeFence) {
+        throw new Error("invalid sandbox handle mint");
+      }
       // Idempotent per (organization, job, ref_kind, ref_id) over ACTIVE rows. A
       // placement replay must not mint a second handle for the same reference: the
       // envelope would then carry two handles for one env var, and the frozen
@@ -4939,7 +4950,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         // A `sandbox_local_only` handle may NEVER bind a network destination — the
         // resolver re-checks this, and minting one would be the coercion DAT-004's
         // own review already had to fix once.
-        destination: null,
+        destination: input.refKind === "connector_oauth" ? input.destination! : null,
         boundTargetGeneration: input.boundTargetGeneration,
         ownerPrincipalKind: input.ownerPrincipalKind,
         ownerPrincipalId: input.ownerPrincipalId,

@@ -551,7 +551,7 @@ function buildJobEnvelope(input: {
     // stages nothing rather than rejecting the offer. No staged files ⇒ `[]`, byte-identical
     // to every envelope built before this existed.
     extensions: [ ...(input.stagedInput.length > 0 ? [stagedInputExtension(input.stagedInput)] : []),
-      ...(browserPreparation ? [browserDispatchExtension(browserPreparation)] : []) ],
+      ...(browserPreparation ? [browserDispatchExtension(browserPreparation),...(browserPreparation.sessionBinding?[{namespace:"com.armyofagents.browser/session-binding",schemaVersion:1,critical:false,value:{bindingId:browserPreparation.sessionBinding.bindingId,origin:browserPreparation.sessionBinding.origin,policyDigest:browserPreparation.networkPolicy.digest}}]:[])] : []) ],
     workloadType: input.job.workloadType,
     workload: input.job.input,
   };

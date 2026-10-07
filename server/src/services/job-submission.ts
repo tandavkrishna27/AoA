@@ -45,6 +45,7 @@ import { readDistributedExecutionDeploymentFlag } from "../config/distributed-ex
 import type { AdmissionDenialSink } from "./worker-admission-denial-audit.js";
 import { parseBrowserPreparation, type BrowserPreparation } from "./browser-runtime-preparation.js";
 import { resolveDistributedNetworkPolicy, resolveBrowserControlPlaneDenyCidrs } from "../config/distributed-network-policies.js";
+import {resolveBrowserSessionBindings} from "../config/browser-session-bindings.js";
 
 export interface AuthenticatedJobPrincipal {
   kind: "user" | "agent" | "mcp" | "commander" | "local_board" | "system";
@@ -164,7 +165,7 @@ export async function submitJobWithinTenant(
     version: 1,
     sourceKind: input.command.source.kind,
     ...(input.trustedBrowserPreparation ? { browserPreparation: input.trustedBrowserPreparation } : {}),
-    ...(configuredNetworkPolicy ? { networkPolicy: configuredNetworkPolicy, controlPlaneDenyCidrs: resolveBrowserControlPlaneDenyCidrs() } : {}),
+    ...(configuredNetworkPolicy ? { networkPolicy: configuredNetworkPolicy, controlPlaneDenyCidrs: resolveBrowserControlPlaneDenyCidrs(), browserSessionBindings:resolveBrowserSessionBindings(input.organizationId,input.companyId) } : {}),
   };
   const policyHash = digest(policySnapshot);
   const requirements = {

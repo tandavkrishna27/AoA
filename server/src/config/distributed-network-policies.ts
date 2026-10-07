@@ -19,7 +19,7 @@ const configuredPolicySchema = z.object({ policyId: z.string().min(1).max(200), 
     .refine((rules) => rules.every((rule) => rule.host.includes(".") && ![".localhost", ".local", ".internal"].some((suffix) => rule.host.endsWith(suffix))), "public DNS rule required") }).strict();
 const policiesSchema = z.record(z.string().uuid(), z.record(z.string().uuid(), configuredPolicySchema));
 
-function rejectDuplicateJsonKeys(raw: string): void {
+export function rejectDuplicateJsonKeys(raw: string): void {
   // JSON.parse has already checked syntax. Tokenize strings as single tokens so
   // escaped quotes and braces in strings cannot masquerade as structural keys.
   const tokens = raw.match(/"(?:\\.|[^"\\])*"|[{}\[\]:,]|[^{}\[\]:,\s]+/g) ?? [];

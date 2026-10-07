@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
-import { companies, heartbeatRuns, internalAgentRuns, issues, jobs, leases, workers, executionTargets, type Db } from "@armyofagents/db";
+import { companies, heartbeatRuns, internalAgentRuns, issues, jobs, leases, workers, executionTargets, companyMcpConnectors,companyMcpConnectorAgents,type Db } from "@armyofagents/db";
 import { workerHelloV1Schema } from "@armyofagents/worker-protocol";
 import { runInTenant } from "../db/tenant-context.js";
 import { HttpError } from "../errors.js";
 import type { StorageProvider } from "../storage/types.js";
 import { browserSessionRequestSchema, buildBrowserRunnerConfig, parseAuthoritativeBrowserPolicy, parseBrowserPreparation, type BrowserPreparation } from "./browser-runtime-preparation.js";
 import { browserRuntimeInputFiles } from "./browser-runtime-bundle.js";
+import { getBrowserSessionCredentialPort } from "./browser-session-credentials.js";
 import { stageJobInputFiles } from "./job-input-staging.js";
 import { submitJobWithinTenant } from "./job-submission.js";
 import { budgetService } from "./budgets.js";
@@ -15,6 +16,7 @@ import { normalizePlacementRegistryTarget } from "./execution-target-resolver.js
 import type { JobPlacementServiceDependencies } from "./job-placement.js";
 import type { PreparedActivityEvent } from "./activity-log.js";
 import type { AdmissionDenialSink } from "./worker-admission-denial-audit.js";
+import {browserSessionBindingSchema} from "../config/browser-session-bindings.js";
 
 export interface AgentBrowserRequestActor { companyId: string; agentId: string; runId: string; runKind?: "heartbeat" | "internal_agent" }
 export interface AgentBrowserRequestResult { browserRequestId: string; jobId: string; attemptId: string; status: "queued"; replayed: boolean }
@@ -112,11 +114,23 @@ export function createAgentBrowserRequestService(input: {
           !target.registeredProfile.capabilityCeiling.includes("workload.browser_session") || !target.registeredProfile.capabilityCeiling.includes("sandbox.filtered_egress")) refusal("Browser target enforcement unavailable");
       const policy = parseAuthoritativeBrowserPolicy(parent.policySnapshot.networkPolicy);
       if (!policy) refusal("Authoritative parent network policy unavailable");
-      const { workload, config } = buildBrowserRunnerConfig(request, policy, Array.isArray(parent.policySnapshot.controlPlaneDenyCidrs) ? parent.policySnapshot.controlPlaneDenyCidrs as string[] : []);
+      const bindings=Array.isArray(parent.policySnapshot.browserSessionBindings)?parent.policySnapshot.browserSessionBindings:[];
+      const selected=request.sessionBindingId?bindings.map(binding=>browserSessionBindingSchema.safeParse(binding)).find(binding=>binding.success&&binding.data.bindingId===request.sessionBindingId):null;
+      const sessionBinding=selected?.success?selected.data:undefined;
+      if(request.sessionBindingId) {
+        if (!getBrowserSessionCredentialPort()) refusal("Scoped browser session broker unavailable");
+        try { await getBrowserSessionCredentialPort()!.assertReady(); } catch { refusal("Scoped browser session encryption unavailable"); }
+        if(!sessionBinding)refusal("Trusted browser session binding unavailable");
+        const [connector]=await input.identityDb.select({id:companyMcpConnectors.id}).from(companyMcpConnectors)
+          .innerJoin(companyMcpConnectorAgents,and(eq(companyMcpConnectorAgents.connectorId,companyMcpConnectors.id),eq(companyMcpConnectorAgents.companyId,actor.companyId),eq(companyMcpConnectorAgents.agentId,actor.agentId)))
+          .where(and(eq(companyMcpConnectors.id,sessionBinding.connectorId),eq(companyMcpConnectors.companyId,actor.companyId),eq(companyMcpConnectors.status,"active"),eq(companyMcpConnectors.source,"catalog")));
+        if(!connector)refusal("Agent browser connector authority unavailable");
+      }
+      const { workload, config } = buildBrowserRunnerConfig(request, policy, Array.isArray(parent.policySnapshot.controlPlaneDenyCidrs) ? parent.policySnapshot.controlPlaneDenyCidrs as string[] : [],sessionBinding);
       const preparation: BrowserPreparation = { schemaVersion: 1, requestDigest: createHash("sha256").update(JSON.stringify(request)).digest("hex"),
         runId: actor.runId, agentId: actor.agentId, issueId: issue.id, parentJobId: parent.id, parentAttemptId: run.distributedAttemptId, parentLeaseId: lease.id,
         targetId: lease.targetId, targetAuthorityKey: lease.targetAuthorityKey, targetGeneration: lease.targetGeneration,
-        profileHash: lease.profileHash, targetProfileHash: target.profileHash, providerConstraintHash: lease.providerConstraintHash, networkPolicy: policy };
+        profileHash: lease.profileHash, targetProfileHash: target.profileHash, providerConstraintHash: lease.providerConstraintHash, networkPolicy: policy,...(sessionBinding?{sessionBinding}:{}) };
       await tx.insert(internalAgentRuns).values({ id: browserRequestId, companyId: actor.companyId, agentId: actor.agentId,
         triggerType: "sub_agent", triggerSource: "browser_request", status: "running", relatedEntityType: "task", relatedEntityId: issue.id }).onConflictDoNothing();
       const response = await submitJobWithinTenant(repos, { organizationId, companyId: actor.companyId, principal: { kind: "agent", id: actor.agentId },

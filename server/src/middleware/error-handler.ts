@@ -7,6 +7,7 @@ import {
   marketplaceErrorResponse,
 } from "../services/marketplace-http-contract.js";
 import { serializeSafeError } from "../services/safe-error.js";
+import { isBrowserSessionCredentialPath } from "./http-log-policy.js";
 import {
   isEnrollmentWorkerControlPath,
   sendWorkerProtocolError,
@@ -31,6 +32,11 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ) {
+  if (isBrowserSessionCredentialPath(req.originalUrl)) {
+    res.setHeader("Cache-Control", "no-store");
+    res.status(403).json({error:"Browser session grant refused"});
+    return;
+  }
   if (isEnrollmentWorkerControlPath(req.originalUrl) || (res.locals as { workerProtocolV1?: boolean }).workerProtocolV1 === true) {
     const status = err && typeof err === "object"
       ? Number((err as { status?: unknown; statusCode?: unknown }).status ??

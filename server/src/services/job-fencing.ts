@@ -159,7 +159,8 @@ export function createJobLeaseRenewalService(input: {
       // drained on the pool handle in the `.finally`.
       const fenceGuardDenial = createFenceGuardDenialSink();
 
-      return runInTenant(input.appDb, renewInput.auth.organizationId, async (repos) => {
+      let browserContext: import("./worker-fence-context.js").ResolvedFenceContext | undefined;
+      const response = await runInTenant(input.appDb, renewInput.auth.organizationId, async (repos) => {
         const databaseNow = await repos.jobControl.currentDatabaseTime();
         await repos.workerEnrollment.cleanupExpiredProofs(databaseNow, 100);
         await repos.jobControl.cleanupExpiredOperationReceipts(databaseNow, 100);
@@ -306,6 +307,7 @@ export function createJobLeaseRenewalService(input: {
             { fenceIdentity: renewFence, authorityNow, leaseDeadline: new Date(String(body.expiresAt)) },
             { controlPlaneSigningKey, shortTtlMs: ownedLabelsCapabilityTtlMs },
           );
+          browserContext = { fenceIdentity: renewFence, companyId: renewFence.companyId, authorityNow, leaseDeadline: new Date(String(body.expiresAt)) };
           return leaseRenewOperationResponseV1Schema.parse({
             protocolVersion: 1,
             correlationId: request.correlationId,
@@ -338,6 +340,15 @@ export function createJobLeaseRenewalService(input: {
             operation: "lease_renew",
           });
         });
+      // The renewal transaction is committed before any connector exchange. A
+      // fresh fence lock in the broker protects each later effect without
+      // consuming the device proof again or blocking cancellation during HTTP.
+      if (browserContext && response.outcome === "renewed" && !response.body.cancelRequested) {
+        const { browserSessionCredentialGrantExtensions } = await import("./browser-session-credentials.js");
+        const extensions = await browserSessionCredentialGrantExtensions(renewInput.auth, request.body, browserContext);
+        if (extensions.length) return leaseRenewOperationResponseV1Schema.parse({ ...response, body: { ...response.body, extensions: [...(response.body.extensions ?? []), ...extensions] } });
+      }
+      return response;
     },
   };
 }

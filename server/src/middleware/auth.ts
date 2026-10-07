@@ -8,6 +8,7 @@ import { tenantIsolationEnforced } from "../config/deployment-mode.js";
 import type { DeploymentMode } from "@armyofagents/shared";
 import type { BetterAuthSessionResult } from "../auth/better-auth.js";
 import { logger } from "./logger.js";
+import { isBrowserSessionCredentialPath } from "./http-log-policy.js";
 import { hasActiveCloudMembership } from "../services/upgrade-socket-authorization.js";
 
 function hashToken(token: string) {
@@ -86,6 +87,10 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
     req.actor = useEscapeHatch
       ? { type: "board", userId: "local-board", isInstanceAdmin: true, source: "local_implicit" }
       : { type: "none", source: "none" };
+    // This dedicated native secret-broker response authenticates its signed,
+    // one-use grant and live fence in the handler. Do not resolve board cookies
+    // or log bearer query authority through unrelated session failures.
+    if (isBrowserSessionCredentialPath(req.originalUrl)) { next(); return; }
 
     const runIdHeader = req.header("x-aoa-run-id") ?? req.header("x-paperclip-run-id");
 
