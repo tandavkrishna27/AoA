@@ -59,6 +59,7 @@ import {
 import type { RunCanaryCoordinator } from "./run-canaries.js";
 import { createCommanderLiveOutput } from "./commander-live-output.js";
 import { labelsEqual } from "./provider.js";
+import { serviceCheckpointWasStaged } from "./service-checkpoint.js";
 import { RUN_OUTPUT_DROPPED_METRIC, createRunOutputCapture, scrubOutputText } from "./run-output.js";
 import { ENV_PROBE_DEFAULT_DEADLINE_MS, ENV_PROBE_ERROR_CODES, envProbeLogMessage, runEnvProbe } from "./env-probe.js";
 import { PROVIDER_AUTH_ENV_TARGETS } from "../lease/secret-redemption.js";
@@ -267,7 +268,7 @@ export interface SupervisorDeps {
    */
   readonly resolveExportArtifacts?: (input: {
     handoff: LeaseHandoff;
-    exec: ExecuteResult;
+    exec: Pick<ExecuteResult, "exitCode">;
     /**
      * CLI-012 (E5-D07) — THE PER-RUN SANDBOX VIEW, additive on DAT-009-3c's `{handoff, exec}`.
      *
@@ -815,6 +816,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     if (run.serviceJobDeadlineAt !== null && run.provider.sandboxLifetimeMode === "renewable") {
       run.sandboxExpiresAt = sandboxLifetimeStartedAt + run.opDeadlineMs;
     }
+    let stagedCheckpointPaths: readonly string[] = [];
     emitOp("create", "success");
 
     if (run.cancelled) {
@@ -920,6 +922,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
           if (browserPolicy && (wrote.stagedPaths.length !== staged.length || staged.some((file) => !wrote.stagedPaths.includes(file.path)))) {
             throw new Error("browser staging acknowledgement mismatch");
           }
+          stagedCheckpointPaths = wrote.stagedPaths;
           emitOp("stage_files", "success");
         } catch (err) {
           // FAIL CLOSED. Running the agent without the files the control plane meant it to
@@ -1009,6 +1012,15 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         await escalateCleanup(run, "service_workload_invalid");
         return;
       }
+      if (!serviceCheckpointWasStaged(workload, handoff.offer.job.extensions, stagedCheckpointPaths)) {
+        await events.terminal({ status: "failed", exitCode: null, errorCode: "service_checkpoint_unavailable", errorMessage: null });
+        await escalateCleanup(run, "service_checkpoint_unavailable");
+        return;
+      }
+      if (workload.checkpointArtifactId !== null) {
+        await events.serviceCheckpointRestored({ serviceId: workload.serviceId, serviceInstanceId: workload.serviceInstanceId,
+          generation: workload.generation, artifactId: workload.checkpointArtifactId });
+      }
       const outcome = await runServiceLifecycle({
         workload,
         sandboxId: created.sandboxId,
@@ -1035,6 +1047,19 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         },
       });
       run.serviceStop = null;
+      // Only a witnessed completed/exit outcome may export application state.
+      // The existing window retains the owned fence, capability and teardown budget.
+      if (!run.cancelled && outcome.escalate === null &&
+          (outcome.status === "succeeded" || outcome.errorCode === "service_exited") &&
+          deps.resolveExportArtifacts && deps.exportArtifacts) {
+        const producer = deps.resolveExportArtifacts;
+        const prepared = await runExportWindow(handoff, run, created.sandboxId, { exitCode: outcome.exitCode },
+          async (input) => (await producer(input)).filter((request) =>
+            /^\/home\/user\/aoa-output\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\.json$/.test(request.path)
+          ).slice(0, 16).map((request) => ({ ...request, kind: "service_checkpoint", contentType: "application/json" })),
+          deps.exportArtifacts);
+        for (const artifact of prepared) await events.artifactPrepared(artifact);
+      }
       await events.terminal({
         status: outcome.status,
         exitCode: outcome.exitCode,
@@ -1294,7 +1319,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     handoff: LeaseHandoff,
     run: ActiveRun,
     sandboxId: string,
-    exec: ExecuteResult,
+    exec: Pick<ExecuteResult, "exitCode">,
     resolveExportArtifacts: NonNullable<SupervisorDeps["resolveExportArtifacts"]>,
     exportArtifacts: ArtifactExportSequencer,
   ): Promise<readonly ArtifactPreparedPayloadV1[]> {

@@ -31,14 +31,39 @@ company mismatch, generation separation and timestamp/replay stability. Windows
 integration requires `AOA_RUN_WIN_INTEGRATION=1`; temporary PG data is under
 `D:\AoA-test-temp`. Full workspace verification is owned by the M3 integration run.
 
-Portable checkpoint recovery remains open. `checkpointArtifactId` is an input
-pointer, and the service supervisor does not consume it. The reconciler refuses
-new placement with `checkpoint_recovery_unavailable` when this pointer is non-null,
-so requested recovery cannot silently start without restored state. Provider checkpoint and
-restore operations currently pause/resume an opaque provider resource. There is
-no service contract that exports checkpoint bytes into committed artifact storage,
-binds their verified hash and generation to an approved service checkpoint, then
-downloads and imports those bytes into a replacement sandbox before process start.
-Neither a local disk snapshot nor the opaque provider snapshot reference proves
-the accepted store-to-provider recovery requirement. Corrupt/old-generation
-checkpoint rejection and successful portable restore therefore remain unclaimed.
+## Portable application-file recovery
+
+The original application explicitly writes regular JSON state files under
+`/home/user/aoa-output` before stopping. A witnessed completed/exit outcome exports
+these through the existing fenced artifact window before terminal and sandbox
+teardown; unconfirmed stop and closed ownership do not export. Existing capability,
+redaction and teardown headroom limits apply. Export is best effort; approval only
+accepts committed artifacts. This does not capture arbitrary process memory.
+
+The board's existing authorized generation-roll operation accepts `checkpointFiles`
+with `sourceJobId`, `sourceAttempt`, `sourceGeneration`, and up to 16
+`files: [{artifactId, path}]` references. `path` is a relative regular JSON path.
+The server verifies the stopped source instance's company/service/generation,
+committed artifact expiry, actual object size and SHA-256, and rejects state that
+changes under the existing secret redactor. Each file is at most 1 MiB and the
+manifest's state total is at most 8 MiB. It creates a committed manifest in the
+same transaction as the immutable next-generation definition and its audit.
+`checkpointRestore` may instead identify an already committed verified manifest;
+the two inputs are mutually exclusive. Raw legacy checkpoint pointers remain
+fail-closed without this binding.
+
+The reconciler re-verifies all bytes and copies state to the new attempt's object
+prefix, committing staged pointers atomically with the submitted job. The provider
+imports files to `/tmp/aoa-service-state/{serviceId}/{path}` before process start.
+The daemon requires the generation-specific staging marker and successful receipt
+before emitting restored or starting the process. Applications must read those
+files explicitly. Destination ancestor symlinks, traversal, corrupt/missing bytes,
+expired artifacts, company mismatch and unapproved source generations are refused.
+Local-disk-only storage is not accepted as portable authority.
+
+Focused verification includes real PostgreSQL and actual filesystem object bytes
+behind the portable store interface, provider destination guards, stage-before-start
+supervisor behavior, and witnessed export ordering. These tests make no claim of a
+live S3/E2B deployment certification. Full workspace checks remain serialized by
+the M3 integration owner. Automatic periodic checkpoint scheduling and arbitrary
+memory snapshots are outside this application-file contract.

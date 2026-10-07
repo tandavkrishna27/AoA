@@ -246,6 +246,10 @@ export interface RollServiceGenerationResult {
 }
 
 export interface RollServiceGenerationInput {
+  checkpointFiles?: import("./service-checkpoint.js").ServiceCheckpointFiles;
+  checkpointUploads?: string[];
+  checkpointRestore?: import("./service-checkpoint.js").ServiceCheckpointRestore;
+  checkpointStorage?: import("../storage/types.js").StorageProvider;
   organizationId: string;
   companyId: string;
   serviceId: string;
@@ -308,6 +312,21 @@ export async function rollServiceGenerationWithinTenant(
 
   const from = service.generation;
   const to = from + 1;
+  let checkpointRestore: Record<string, unknown> | undefined;
+  if (input.checkpointRestore || input.checkpointFiles) {
+    const { serviceCheckpointRestoreSchema, materializeServiceCheckpoint, serviceCheckpointStorage, commitServiceCheckpointManifest, ServiceCheckpointRefused } = await import("./service-checkpoint.js");
+    if (input.checkpointRestore && input.checkpointFiles) throw new ServiceCheckpointRefused("ambiguous_checkpoint");
+    const store = input.checkpointStorage ?? serviceCheckpointStorage();
+    const approved = input.checkpointFiles
+      ? await commitServiceCheckpointManifest(repos, audit.tx, store, { organizationId: input.organizationId,
+          companyId: input.companyId, serviceId: input.serviceId, generation: from }, input.checkpointFiles,
+          input.checkpointUploads ?? [], await repos.jobControl.currentDatabaseTime())
+      : serviceCheckpointRestoreSchema.parse(input.checkpointRestore);
+    await materializeServiceCheckpoint(audit.tx, store, {
+      organizationId: input.organizationId, companyId: input.companyId, serviceId: input.serviceId, generation: from,
+    }, approved, await repos.jobControl.currentDatabaseTime());
+    checkpointRestore = { ...approved, approvedGeneration: to };
+  }
 
   // (1) The IMMUTABLE definition for the new generation. Same repository method SVC-007a uses
   // for generation 1, so there is ONE writer of `service_generations` rather than two ideas of
@@ -321,12 +340,14 @@ export async function rollServiceGenerationWithinTenant(
       command: input.definition.command,
       args: input.definition.args,
       gracefulStopSeconds: input.definition.gracefulStopSeconds,
+      ...(checkpointRestore ? { checkpointRestore } : {}),
     },
     createdBy: input.createdBy,
   });
   // `null` is a 23505 against `service_generations_service_generation_uq`, absorbed by that
   // method's SAVEPOINT so this transaction is still usable. Under the row lock it means a
   // concurrent roll already minted N+1.
+  if (!minted && input.checkpointFiles) throw new (await import("./service-checkpoint.js")).ServiceCheckpointRefused("generation_exists");
   if (!minted) return { verdict: { outcome: "generation_exists", generation: to }, drain: null };
 
   // (2) THE BUMP. The writer `services.generation` has never had.
@@ -336,6 +357,7 @@ export async function rollServiceGenerationWithinTenant(
     serviceId: input.serviceId,
     expectedGeneration: from,
   });
+  if (!bumped && input.checkpointFiles) throw new (await import("./service-checkpoint.js")).ServiceCheckpointRefused("generation_conflict");
   if (!bumped) return { verdict: { outcome: "conflict", expected: from }, drain: null };
 
   const verdict: RollServiceGenerationVerdict = {
@@ -446,8 +468,16 @@ export async function rollServiceGeneration(
   // transaction and published only once it has committed. A mid-transaction throw exits
   // `runInTenant` and never reaches the publish, so a rollback announces nothing.
   const published: PreparedActivityEvent[] = [];
-  const result = await runInTenant(deps.appDb, input.organizationId, (repos, tx) =>
-    rollServiceGenerationWithinTenant(repos, input, { tx, actor: input.actor, published }));
+  const uploadedKeys: string[] = [];
+  const storage = input.checkpointFiles ? input.checkpointStorage ?? (await import("./service-checkpoint.js")).serviceCheckpointStorage() : input.checkpointStorage;
+  let result: RollServiceGenerationResult;
+  try {
+    result = await runInTenant(deps.appDb, input.organizationId, (repos, tx) =>
+      rollServiceGenerationWithinTenant(repos, { ...input, checkpointStorage: storage, checkpointUploads: uploadedKeys }, { tx, actor: input.actor, published }));
+  } catch (error) {
+    if (storage) await Promise.allSettled(uploadedKeys.map((objectKey) => storage.deleteObject({ objectKey })));
+    throw error;
+  }
   publishServiceControlActivity(published);
   return result;
 }

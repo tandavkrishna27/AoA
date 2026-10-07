@@ -19,6 +19,7 @@ import {
   setServiceDesiredState,
 } from "../services/service-management.js";
 import { rollServiceGeneration } from "../services/service-generation-rollout.js";
+import { serviceCheckpointRestoreSchema, serviceCheckpointFilesSchema } from "../services/service-checkpoint.js";
 import {
   SERVICE_CREATE_ACTION,
   SERVICE_DESIRED_STATE_ACTION,
@@ -65,6 +66,8 @@ const rollServiceGenerationBodySchema = z
   .object({
     definition: z.unknown(),
     reason: z.string().min(1).max(1000),
+    checkpointRestore: serviceCheckpointRestoreSchema.optional(),
+    checkpointFiles: serviceCheckpointFilesSchema.optional(),
   })
   .strict();
 
@@ -620,6 +623,8 @@ export function jobControlRoutes(opts: { db: Db; appDb: Db; operatorDb: Db }) {
         const body = rollServiceGenerationBodySchema.parse(req.body) as {
           definition: unknown;
           reason: string;
+          checkpointFiles?: import("../services/service-checkpoint.js").ServiceCheckpointFiles;
+          checkpointRestore?: import("../services/service-checkpoint.js").ServiceCheckpointRestore;
         };
         // The SAME normalizer the create route uses, so a definition that could not be created
         // cannot be rolled to either — including the control-plane-owned fields
@@ -639,6 +644,8 @@ export function jobControlRoutes(opts: { db: Db; appDb: Db; operatorDb: Db }) {
             serviceId,
             definition: definition.value,
             reason: body.reason,
+            checkpointRestore: body.checkpointRestore,
+            checkpointFiles: body.checkpointFiles,
             createdBy: operatorUserId(req),
             // SVC-005a / DE-12 conjunct 3c — WHO the durable `activity_log` row attributes this
             // roll to. `assertOrgAdmin` above has already refused any caller without a board

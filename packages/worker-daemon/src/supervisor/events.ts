@@ -336,6 +336,10 @@ export class EventSequencer {
     return this.#emit("service_instance_lost", { ...serviceRef(input), reason: truncateUtf16Safe(input.reason, 1000) });
   }
 
+  serviceCheckpointRestored(input: ServiceInstanceRef & { artifactId: string }): Promise<WorkerEventV1> {
+    return this.#emit("service_checkpoint_restored", { ...serviceRef(input), artifactId: input.artifactId });
+  }
+
   /** The terminal attempt event (succeeded/failed/cancelled/expired). */
   terminal(input: {
     status: TerminalEventStatus;

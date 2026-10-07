@@ -72,6 +72,9 @@ import { readServiceCrashRecovery } from "./service-crash-recovery.js";
 import { setServiceDesiredStateWithinTenant } from "./service-management.js";
 import { publishServiceControlActivity } from "./service-control-audit.js";
 import type { PreparedActivityEvent } from "./activity-log.js";
+import { materializeServiceCheckpoint, serviceCheckpointRestoreSchema, serviceCheckpointStorage, stageServiceCheckpointFilesWithinTenant, ServiceCheckpointRefused } from "./service-checkpoint.js";
+import type { StorageProvider } from "../storage/types.js";
+import type { StagedInputFile } from "./job-input-staging.js";
 
 /**
  * Fixed, never-rotate namespace UUID for deriving a service reconciliation's identity
@@ -177,6 +180,7 @@ export interface ReconcileServiceInput {
   organizationId: string;
   companyId: string;
   serviceId: string;
+  checkpointStorage?: StorageProvider;
 }
 
 /**
@@ -220,6 +224,7 @@ export async function reconcileServiceWithinTenant(
   // pool handle after this transaction rolls back. Optional so a direct caller is unchanged.
   denialSink?: AdmissionDenialSink,
   published: PreparedActivityEvent[] = [],
+  checkpointUploads: { storage: StorageProvider | null; keys: string[] } = { storage: null, keys: [] },
 ): Promise<ServiceReconcileOutcome> {
   // 1 + 2: serialize concurrent passes into a wait, then PIN desired_state AND generation
   // for the whole transaction so a concurrent SVC-005 generation bump cannot land between
@@ -248,7 +253,7 @@ export async function reconcileServiceWithinTenant(
   if (!generation) return { action: "none", reason: "no_generation" };
   // A pointer without store-to-provider materialization is not a restore. Refuse
   // placement rather than silently start a fresh process with requested state lost.
-  if (generation.checkpointArtifactId !== null) {
+  if (generation.checkpointArtifactId !== null && generation.definition.checkpointRestore === undefined) {
     return { action: "none", reason: "checkpoint_recovery_unavailable" };
   }
 
@@ -308,6 +313,34 @@ export async function reconcileServiceWithinTenant(
     return { action: "none", reason: "crash_loop_paused" };
   }
 
+  let checkpointArtifactId = generation.checkpointArtifactId;
+  let checkpointFiles: StagedInputFile[] = [];
+  if (generation.definition.checkpointRestore !== undefined) {
+    if (!generation.definition.checkpointRestore || typeof generation.definition.checkpointRestore !== "object" || Array.isArray(generation.definition.checkpointRestore)) {
+      throw new ServiceCheckpointRefused("approval_binding_invalid");
+    }
+    const binding = generation.definition.checkpointRestore as Record<string, unknown>;
+    const { approvedGeneration, ...source } = binding;
+    if (approvedGeneration !== service.generation) throw new ServiceCheckpointRefused("approval_generation_mismatch");
+    const approved = serviceCheckpointRestoreSchema.parse(source);
+    if (approved.sourceGeneration !== service.generation - 1 ||
+        (checkpointArtifactId !== null && checkpointArtifactId !== approved.manifestArtifactId)) {
+      throw new ServiceCheckpointRefused("source_generation_mismatch");
+    }
+    const storage = input.checkpointStorage ?? serviceCheckpointStorage();
+    checkpointUploads.storage = storage;
+    checkpointFiles = await materializeServiceCheckpoint(tx, storage, {
+      organizationId: input.organizationId, companyId: input.companyId, serviceId: input.serviceId,
+      generation: approved.sourceGeneration,
+    }, approved, await repos.jobControl.currentDatabaseTime());
+    checkpointArtifactId = approved.manifestArtifactId;
+    checkpointFiles.push({
+      path: `/tmp/aoa-service-state/${input.serviceId}/.aoa-checkpoint-${checkpointArtifactId}-${service.generation}.json`,
+      bytes: Buffer.from(JSON.stringify({ version: 1, serviceId: input.serviceId, generation: service.generation,
+        sourceGeneration: approved.sourceGeneration, manifestArtifactId: checkpointArtifactId, manifestSha256: approved.manifestSha256 })),
+    });
+  }
+
   // 5: mint the instance FIRST, because the frozen workload carries `serviceInstanceId` and
   // the derived idempotency identity is a function of it. RANDOM, not derived: a
   // deterministic id keyed on (service, generation) would make SVC-004's replacement
@@ -361,7 +394,7 @@ export async function reconcileServiceWithinTenant(
           generation: service.generation,
           command,
           args,
-          checkpointArtifactId: generation.checkpointArtifactId,
+          checkpointArtifactId,
           gracefulStopSeconds,
         },
       },
@@ -369,6 +402,13 @@ export async function reconcileServiceWithinTenant(
     tx,
     denialSink,
   );
+
+  if (checkpointFiles.length > 0) {
+    await stageServiceCheckpointFilesWithinTenant(repos, tx, checkpointUploads.storage!, {
+      organizationId: input.organizationId, companyId: input.companyId,
+      jobId: submitted.jobId, attemptId: submitted.attemptId,
+    }, checkpointFiles, checkpointUploads.keys);
+  }
 
   // 6b: attribute the instance to the job serving it, still inside this transaction. Without
   // this the instance row is unattributable and SVC-003 has nothing to fence against.
@@ -429,12 +469,18 @@ export async function reconcileService(
   // No-op when nothing was captured; never throws.
   const denialSink: AdmissionDenialSink = { intent: null };
   const published: PreparedActivityEvent[] = [];
+  const checkpointUploads: { storage: StorageProvider | null; keys: string[] } = { storage: null, keys: [] };
+  let committed = false;
   try {
     const result = await runInTenant(appDb, input.organizationId, (repos, tx) =>
-      reconcileServiceWithinTenant(repos, tx, input, denialSink, published));
+      reconcileServiceWithinTenant(repos, tx, input, denialSink, published, checkpointUploads));
+    committed = true;
     publishServiceControlActivity(published);
     return result;
   } catch (error) {
+    for (const objectKey of committed ? [] : checkpointUploads.keys) {
+      await checkpointUploads.storage?.deleteObject({ objectKey }).catch(() => undefined);
+    }
     if (quotaDenied(error)) return { action: "none", reason: "quota_denied" };
     if (invalidDefinition(error)) return { action: "none", reason: "invalid_definition" };
     throw error;

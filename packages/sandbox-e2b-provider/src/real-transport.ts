@@ -50,6 +50,7 @@ import {
 } from "./transport.js";
 import { isE2bFileNotFound, isE2bNotFound, shellJoin } from "./real-transport-helpers.js";
 import { filesOnlyFromListing, type ListingEntry } from "./list-dir-contract.js";
+import { assertCheckpointDestination } from "./checkpoint-destination.js";
 
 /** Loose facade over the version-sensitive `e2b` SDK surface (keyed lane only). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -511,6 +512,9 @@ export class RealE2bTransport implements E2bTransport {
 
   async writeFiles(sandboxId: string, files: readonly E2bStagedFile[]): Promise<void> {
     const sandbox = await this.#sdk.connect(sandboxId, { apiKey: this.#apiKey });
+    for (const file of files) {
+      await assertCheckpointDestination(file.path, (path) => sandbox.files.getInfo(path));
+    }
     for (const file of files) {
       // `sandbox.files.write(path, data)` accepts bytes; a Buffer view keeps the
       // e2b SDK's Node upload path happy without copying the underlying data.
