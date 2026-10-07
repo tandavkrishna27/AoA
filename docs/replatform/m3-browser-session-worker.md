@@ -1,0 +1,11 @@
+# M3 scoped browser session delivery
+
+The trusted lease extension `com.armyofagents.browser/session-binding` has schema version 1, `critical: false`, and exactly `{ bindingId, origin, policyDigest }`. The worker requires a unique binding and the digest of the enforceable browser network policy. The guest supplies only its matched binding, digest, request UUID and expiry.
+
+The worker emits the existing permission decision with tool `browser.session_credentials`, risk `credential_use`, title `Use scoped browser session`, summary equal to the policy digest, nonce equal to the binding UUID, and network target equal to the trusted origin. Its prompt hash uses the existing server-compatible recipe. A matched control command for the same seven-part run identity must allow once before credential delivery becomes eligible. Denial, expiry, cancellation, lease loss or closure refuses credential activation.
+
+The renewal extension `com.armyofagents.browser/session-credential-grants` has schema version 1, `critical: false`, and exactly `{ grants: [{ requestId, bindingId, policyDigest, grant }] }`, with at most one entry. `grant` uses the existing frozen download-grant schema, empty headers, at most 8192 bytes and a native one-use secret-broker URL. Ordinary artifact downloads retain their existing transport and readability rules. Malformed optional grants are reported and cannot activate credentials.
+
+The supervisor requires the previously allowed request, exact binding, policy, origin, request expiry and the current job-attempt object prefix. Delivery uses the dedicated owned interrupt port, so the running guest cannot block its own credential mailbox. The provider receives grant metadata; cookie bytes do not enter worker protocol messages. Concurrent and repeated deliveries coalesce, and a successful delivery consumes local eligibility. The control-plane broker must independently recheck the live child fence when issuing and redeeming the grant.
+
+The optional provider port refuses when unavailable. This code does not advertise verified provider-wide egress or enable browser rollout. Focused tests exercise the real supervisor and renewal driver, allow-once, denial, wrong binding, duplicate grant and closure. Full integrated verification remains required before release.

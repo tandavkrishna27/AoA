@@ -27,6 +27,7 @@ import { browserDispatchRefusal, readBrowserNetworkPolicy, BROWSER_CONFIG_PATH, 
 import { createBrowserApprovalController, type BrowserApprovalController } from "./browser-approval.js";
 import { deliverBrowserApproval } from "./browser-approval-delivery.js";
 import { createBrowserOutput } from "./browser-output.js";
+import { createBrowserSessionGrantConsumer, readBrowserSessionBinding, type BrowserSessionGrant } from "./browser-session-grants.js";
 import type { WorkerSelfModel } from "../poll/capacity.js";
 import { readStagedInputPointers } from "../lease/staged-input.js";
 import type { ControlCommandV1 } from "@armyofagents/worker-protocol";
@@ -328,6 +329,7 @@ export type SupervisorRunStatus = "succeeded" | "failed" | "cancelled" | "create
 
 export interface Supervisor extends SupervisorSeam {
   applyBrowserDecision?(command: ControlCommandV1): Promise<void>;
+  applyBrowserSessionGrants?(leaseId: string, grants: readonly BrowserSessionGrant[]): Promise<void>;
   onAuthorityRenewed(leaseId: string, capability: OwnedLabelsCapabilityLike): void;
   accept(handoff: LeaseHandoff): Promise<void>;
   /** Cancel a live run: withdraw effect authority and escalate cleanup on its
@@ -399,6 +401,7 @@ const GRACEFUL_STOP_MARGIN_MS = 5_000;
 
 export function createSupervisor(deps: SupervisorDeps): Supervisor {
   const browserControllers = new Map<string, BrowserApprovalController>();
+  const browserCredentialConsumers = new Map<string, ReturnType<typeof createBrowserSessionGrantConsumer>>();
   // DEP-011 Slice 2a — FAIL FAST at construction (review F4/F5):
   //  (a) EXACTLY one of `provider`/`makeRunProvider` may be set — both is a misconfig
   //      (which authority does `buildRun` build?).
@@ -503,6 +506,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
    * resource(s). Idempotent per run. */
   async function escalateCleanup(run: ActiveRun, reason: string): Promise<void> {
     browserControllers.get(run.leaseId)?.close();
+    browserCredentialConsumers.get(run.leaseId)?.close();
     run.effect.withdraw();
     if (run.cleanedUp) return;
 
@@ -1095,6 +1099,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       ? createCommanderLiveOutput({ canaries: runCanaries,
           emit: (message) => events.log({ stream: "stdout", level: "info", message }) }) : null;
     const execStartedAt = now();
+    const browserSessionBinding = browserPolicy ? readBrowserSessionBinding(handoff.offer.job.extensions, browserPolicy.digest) : null;
     const browserController = browserPolicy ? createBrowserApprovalController({
       identity: { organizationId: handoff.offer.job.organizationId, companyId: handoff.offer.job.companyId,
         workerId: handoff.offer.workerId, jobId: handoff.offer.job.jobId, attempt: handoff.offer.job.attempt,
@@ -1102,8 +1107,19 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       scrubText: (text) => scrubOutputText(text, runCanaries),
       emit: async (request) => { await events.runtimeDecisionRequested(request); },
       deliver: (response) => deliverBrowserApproval({ effect: run.effect, sandboxId: created.sandboxId, response, now, ctx: run.makeCtx() }),
+      ...(browserSessionBinding ? { credentialBinding: browserSessionBinding, deliverCredential: async () => {} } : {}),
     }) : null;
     if (browserController) browserControllers.set(run.leaseId, browserController);
+    if (browserController && browserSessionBinding) browserCredentialConsumers.set(run.leaseId, createBrowserSessionGrantConsumer({
+      binding: browserSessionBinding, objectPrefix: `organizations/${handoff.offer.job.organizationId}/jobs/${handoff.offer.job.jobId}/attempts/${handoff.offer.job.attempt}/`,
+      now, isActive: () => !run.cancelled && run.effect.isActive(),
+      approved: (requestId) => browserController.approvedCredential(requestId), consume: (requestId) => browserController.consumeCredential(requestId),
+      deliver: async (requestId, grant) => {
+        const result = await withDeadline(run.effect.deliverBrowserCredential({ sandboxId: created.sandboxId, requestId, grant },
+          { ...run.makeCtx(), deadlineMs: Math.min(5000, run.opDeadlineMs) }), 5000);
+        if (result === TIMEOUT || !result.delivered) throw new Error("browser credential delivery unavailable");
+      },
+    }));
     let browserSessionCompleted = false;
     let browserSessionFailed = false;
     const browserOutput = browserController ? createBrowserOutput({ receive: async (message) => {
@@ -1119,6 +1135,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         await events.networkDenied({ destinationClass: parsed.data.destinationClass, reason: "Browser egress policy denied destination" });
       }
       else if (value.type === "approval_requested") await browserController.request(message);
+      else if (value.type === "session_credentials_requested") await browserController.requestCredentials(message);
       else if (["session_started", "session_completed", "session_failed"].includes(String(value.type))) {
         if (value.type === "session_completed") browserSessionCompleted = true;
         if (value.type === "session_failed") browserSessionFailed = true;
@@ -1639,6 +1656,11 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
   }
 
   const supervisor: Supervisor = {
+    async applyBrowserSessionGrants(leaseId, grants) {
+      const consumer = browserCredentialConsumers.get(leaseId);
+      if (!consumer) { if (grants.length) throw new Error("browser credential run unavailable"); return; }
+      for (const grant of grants) await consumer.apply(grant);
+    },
     async applyBrowserDecision(command) {
       const controller = browserControllers.get(command.leaseId);
       if (!controller) throw new Error("browser approval run unavailable");
@@ -1691,6 +1713,8 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       } finally {
         browserControllers.get(run.leaseId)?.close();
         browserControllers.delete(run.leaseId);
+        browserCredentialConsumers.get(run.leaseId)?.close();
+        browserCredentialConsumers.delete(run.leaseId);
         run.effect.withdraw();
         runs.delete(run.leaseId);
       }

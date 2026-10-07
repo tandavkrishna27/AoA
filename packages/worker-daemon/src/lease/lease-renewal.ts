@@ -69,6 +69,7 @@ import {
 } from "./control-commands.js";
 import { sendControlAck } from "./control-ack.js";
 import { readRenewedOwnedLabelsCapability } from "./renewed-owned-labels-capability.js";
+import { readBrowserSessionGrants, type BrowserSessionGrant } from "../supervisor/browser-session-grants.js";
 import type { OwnedLabelsCapabilityLike } from "./owned-labels-capability.js";
 import {
   ControlPlaneTransportError,
@@ -127,6 +128,8 @@ export type RenewAttempt =
       readonly controlFault: boolean;
       readonly capability?: OwnedLabelsCapabilityLike | null;
       readonly capabilityFault?: boolean;
+      readonly browserSessionGrants?: readonly BrowserSessionGrant[];
+      readonly browserSessionGrantFault?: boolean;
     }
   | { readonly kind: "rejected"; readonly code: string }
   | { readonly kind: "terminal"; readonly reason: "unauthorized" | "target_revoked" }
@@ -249,6 +252,10 @@ function classifyRenewResponse(response: WorkerOperationHttpResponse): RenewAtte
       try { capability = readRenewedOwnedLabelsCapability(parsed.data.body.extensions); }
       catch { capabilityFault = true; }
       let control: ControlCommandDelivery | null = null;
+      let browserSessionGrants: BrowserSessionGrant[] = [];
+      let browserSessionGrantFault = false;
+      try { browserSessionGrants = readBrowserSessionGrants(parsed.data.body.extensions ?? []); }
+      catch { browserSessionGrantFault = true; }
       let controlFault = false;
       try {
         control = readControlCommandDelivery(parsed.data.body.extensions);
@@ -270,6 +277,8 @@ function classifyRenewResponse(response: WorkerOperationHttpResponse): RenewAtte
         controlFault,
         capability,
         capabilityFault,
+        browserSessionGrants,
+        browserSessionGrantFault,
       };
     }
     return { kind: "rejected", code: parsed.data.reason };
@@ -339,6 +348,7 @@ export function createRealRenewalSchedule(): RenewalSchedule {
  * this (it extends `SupervisorSeam` and exposes `cancel`/`onLeaseLost`). */
 export interface RenewalSupervisor extends SupervisorSeam {
   onAuthorityRenewed?(leaseId: string, capability: OwnedLabelsCapabilityLike): void;
+  applyBrowserSessionGrants?(leaseId: string, grants: readonly BrowserSessionGrant[]): Promise<void>;
   cancel(leaseId: string, reason?: string): Promise<void> | void;
   onLeaseLost(leaseId: string): Promise<void> | void;
 }
@@ -864,6 +874,12 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
         reschedule(state);
         if (!attempt.controlFault && attempt.control) {
           await applyControlDelivery(state, session, attempt.control);
+        }
+        if (!state.terminated && !attempt.browserSessionGrantFault && attempt.browserSessionGrants?.length && deps.supervisor.applyBrowserSessionGrants) {
+          try { await deps.supervisor.applyBrowserSessionGrants(state.leaseId, attempt.browserSessionGrants); }
+          catch { deps.logger?.warn({ leaseId: state.leaseId }, "lease-renewal: browser credential delivery refused"); }
+        } else if (attempt.browserSessionGrantFault) {
+          deps.logger?.warn({ leaseId: state.leaseId }, "lease-renewal: browser credential grant malformed");
         }
         return;
       }

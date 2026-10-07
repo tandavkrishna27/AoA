@@ -26,13 +26,32 @@ export function createBrowserApprovalController(input: {
   scrubText(text: string): string | null;
   emit(request: PermissionRuntimeDecisionRequestV1): Promise<void>;
   deliver(response: { requestId: string; decision: string; expiresAt: string }): Promise<void>;
+  credentialBinding?: { bindingId: string; origin: string; policyDigest: string };
+  deliverCredential?(request: PermissionRuntimeDecisionRequestV1): Promise<void>;
 }) {
   let closed = false;
   let count = 0;
   const pending = new Map<string, { request: PermissionRuntimeDecisionRequestV1; fingerprint: string }>();
   const delivered = new Map<string, string>();
   const delivering = new Map<string, { fingerprint: string; completion: Promise<void> }>();
-  return {
+  const approvedCredentials = new Map<string, PermissionRuntimeDecisionRequestV1>();
+  const controller = {
+    approvedCredential(requestId: string): PermissionRuntimeDecisionRequestV1 | null {
+      const request = approvedCredentials.get(requestId);
+      return !closed && request && input.now() < Date.parse(request.expiresAt) ? request : null;
+    },
+    consumeCredential(requestId: string): void { approvedCredentials.delete(requestId); },
+    async requestCredentials(message: unknown): Promise<PermissionRuntimeDecisionRequestV1> {
+      const binding = input.credentialBinding;
+      if (!binding || !input.deliverCredential || !record(message) ||
+          !exactKeys(message, ["type", "bindingId", "policyDigest", "requestId", "expiresAt"]) ||
+          message.type !== "session_credentials_requested" || message.bindingId !== binding.bindingId || message.policyDigest !== binding.policyDigest) {
+        throw new Error("invalid browser credential intent");
+      }
+      return controller.request({ type: "approval_requested", requestId: message.requestId, expiresAt: message.expiresAt,
+        intent: { action: "session_credentials", title: "Use scoped browser session", summary: binding.policyDigest,
+          networkTarget: binding.origin, riskClass: "credential_use" } });
+    },
     async request(message: unknown): Promise<PermissionRuntimeDecisionRequestV1> {
       if (closed) throw new Error("browser approval run closed");
       if (!record(message) || !exactKeys(message, ["type", "requestId", "expiresAt", "intent"]) ||
@@ -40,10 +59,10 @@ export function createBrowserApprovalController(input: {
           typeof message.expiresAt !== "string" || !record(message.intent)) throw new Error("invalid browser approval intent");
       const intent = message.intent;
       if (!exactKeys(intent, ["action", "title", "summary", "networkTarget", "riskClass"]) ||
-          (intent.action !== "navigate" && intent.action !== "download") || typeof intent.title !== "string" ||
+          (intent.action !== "navigate" && intent.action !== "download" && intent.action !== "session_credentials") || typeof intent.title !== "string" ||
           !(intent.summary === null || typeof intent.summary === "string") ||
           !(intent.networkTarget === null || typeof intent.networkTarget === "string") ||
-          intent.riskClass !== (intent.action === "navigate" ? "network_egress" : "download")) {
+          intent.riskClass !== (intent.action === "navigate" ? "network_egress" : intent.action === "download" ? "download" : "credential_use")) {
         throw new Error("invalid browser approval intent");
       }
       const title = input.scrubText(intent.title);
@@ -52,7 +71,11 @@ export function createBrowserApprovalController(input: {
       if (title === null || (intent.summary !== null && summary === null) || (intent.networkTarget !== null && networkTarget === null)) {
         throw new Error("unusable browser approval intent");
       }
-      if (intent.action === "navigate") {
+      const credential = intent.action === "session_credentials";
+      if (credential && (!input.credentialBinding || !input.deliverCredential ||
+          title !== "Use scoped browser session" || summary !== input.credentialBinding.policyDigest ||
+          networkTarget !== input.credentialBinding.origin)) throw new Error("invalid browser credential binding");
+      if (intent.action === "navigate" || credential) {
         let destination: URL;
         try { destination = new URL(networkTarget ?? ""); } catch { throw new Error("invalid browser approval destination"); }
         if (destination.protocol !== "https:" || destination.origin !== networkTarget) throw new Error("invalid browser approval destination");
@@ -71,7 +94,7 @@ export function createBrowserApprovalController(input: {
       // test. Hash only scrubbed bytes; the event sequencer scrubs them again.
       const requestDigest = createHash("sha256").update(JSON.stringify({ kind: "permission", title, summary, promptText: null, command: null })).digest("hex");
       const request = permissionRuntimeDecisionRequestV1Schema.parse({
-        decisionKind: "permission", requestId: message.requestId, nonce: randomUUID(), requestDigest,
+        decisionKind: "permission", requestId: message.requestId, nonce: credential ? input.credentialBinding!.bindingId : randomUUID(), requestDigest,
         schemaVersion: 1, sourceRevision: 0, expiresAt: new Date(expiry).toISOString(), title, summary,
         timeoutPolicy: "deny", defaultDecision: null, toolName: `browser.${intent.action}`, command: null,
         cwd: null, path: null, networkTarget, riskClass: intent.riskClass,
@@ -103,18 +126,28 @@ export function createBrowserApprovalController(input: {
       const request = pending.get(command.result.requestId)?.request;
       if (!request || !matchRuntimeDecisionResultToRequestV1(request, command.result).ok ||
           input.now() >= Date.parse(request.expiresAt)) throw new Error("browser approval result mismatch");
-      const completion = input.deliver({ requestId: request.requestId, decision: command.result.decision, expiresAt: request.expiresAt });
+      const completion = request.toolName === "browser.session_credentials"
+        ? command.result.decision === "allow_once" && input.deliverCredential
+          ? input.deliverCredential(request)
+          : Promise.resolve()
+        : input.deliver({ requestId: request.requestId, decision: command.result.decision, expiresAt: request.expiresAt });
       delivering.set(request.requestId, { fingerprint, completion });
       try {
         await completion;
-        if (!closed) delivered.set(request.requestId, fingerprint);
+        if (!closed) {
+          delivered.set(request.requestId, fingerprint);
+          if (request.toolName === "browser.session_credentials" && command.result.decision === "allow_once") {
+            approvedCredentials.set(request.requestId, request);
+          }
+        }
         pending.delete(request.requestId);
       } finally {
         delivering.delete(request.requestId);
       }
     },
-    close(): void { closed = true; pending.clear(); delivered.clear(); },
+    close(): void { closed = true; pending.clear(); delivered.clear(); approvedCredentials.clear(); },
   };
+  return controller;
 }
 
 export type BrowserApprovalController = ReturnType<typeof createBrowserApprovalController>;

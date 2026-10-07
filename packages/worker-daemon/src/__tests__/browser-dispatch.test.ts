@@ -32,6 +32,56 @@ function browser(paths: string[] = []) {
 }
 
 describe("browser dispatch prerequisites", () => {
+  it("delivers a session grant only after the real supervisor receives matched allow-once", async () => {
+    const handoff = browser([BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH]);
+    const bindingId = "99999999-9999-4999-8999-999999999999", requestId = "77777777-7777-4777-8777-777777777777";
+    handoff.offer.job.extensions.push({ namespace: "com.armyofagents.browser/session-binding", schemaVersion: 1, critical: false,
+      value: { bindingId, origin: "https://example.com", policyDigest: handoff.offer.job.networkPolicy.digest } });
+    const fake = createFakeSandboxProvider(), sink = collectingSink();
+    let finish!: () => void, delivered = 0;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    const provider = { ...fake, browserNetworkPolicyMode: "verified_default_deny" as const,
+      create: async (...args: Parameters<typeof fake.create>) => ({ ...await fake.create(...args), browserNetworkPolicyDigest: args[0].browserNetworkPolicy?.digest }),
+      stageFiles: async (_id: string, files: readonly { path: string }[]) => ({ stagedPaths: files.map(file => file.path) }),
+      deliverBrowserCredential: async () => { delivered++; return { providerOpId: "credential", delivered: true as const }; },
+      execute: async (...args: Parameters<typeof fake.execute>) => {
+        args[0].onStdout?.(JSON.stringify({ type: "session_credentials_requested", requestId, bindingId,
+          policyDigest: handoff.offer.job.networkPolicy.digest, expiresAt: new Date(Date.now() + 30000).toISOString() }) + "\n");
+        await gate;
+        args[0].onStdout?.(JSON.stringify({ type: "session_completed", savedDownloads: [] }) + "\n");
+        return fake.execute({ ...args[0], onStdout: undefined }, args[1]);
+      } };
+    const supervisor = createSupervisor({ provider, browserSelfModel: await makeSelfModel(), identity: SUPERVISOR_IDENTITY,
+      eventSink: sink, redactionCanaries: [], resolveStagedFiles: async () => [BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH].map((path, index) => ({ path, grant: {
+        protocolVersion: 1, operation: "download", method: "GET", artifactId: `artifact-${index}`, objectKey: `key-${index}`,
+        expectedSha256: "a".repeat(64), maxBytes: 10, url: "https://store.example/get", headers: {}, issuedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60000).toISOString(), redaction: "secret" } })) });
+    const running = supervisor.accept(handoff);
+    await waitFor(() => sink.events.some(event => event.eventType === "runtime_decision_requested"));
+    const event = sink.events.find(event => event.eventType === "runtime_decision_requested")!;
+    const request = event.payload as import("@armyofagents/worker-protocol").PermissionRuntimeDecisionRequestV1;
+    const grant = { requestId, bindingId, policyDigest: handoff.offer.job.networkPolicy.digest, grant: {
+      protocolVersion: 1 as const, operation: "download" as const, method: "GET" as const, artifactId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      objectKey: `organizations/${event.organizationId}/jobs/${event.jobId}/attempts/${event.attempt}/browser-session/${requestId}`,
+      expectedSha256: "a".repeat(64), maxBytes: 100, url: "https://cp.example/api/worker-control/browser-session-credentials/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?grant=opaque",
+      headers: {}, issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 10000).toISOString(), redaction: "secret" as const } };
+    await expect(supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant])).rejects.toThrow();
+    expect(delivered).toBe(0);
+    const command = controlCommandV1Schema.parse({ protocolVersion: 1, audience: "control_channel", organizationId: event.organizationId,
+      companyId: event.companyId, workerId: event.workerId, jobId: event.jobId, attempt: event.attempt, leaseId: event.leaseId,
+      fenceToken: event.fenceToken, commandId: "88888888-8888-4888-8888-888888888888", commandSeq: 1,
+      idempotencyKey: "88888888-8888-4888-8888-888888888888", issuedAt: new Date().toISOString(), nonce: "control-nonce", commandKind: "runtime_decision_result",
+      result: { decisionKind: "permission", requestId, nonce: request.nonce, requestDigest: request.requestDigest,
+        schemaVersion: 1, sourceRevision: request.sourceRevision, expiresAt: request.expiresAt, timeoutPolicy: "deny",
+        decidedBy: { principalType: "user", principalId: "founder" }, decidedAt: new Date().toISOString(),
+        idempotencyKey: "88888888-8888-4888-8888-888888888888", decision: "allow_once" } });
+    await supervisor.applyBrowserDecision!(command);
+    await supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant]);
+    await supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant]);
+    expect(delivered).toBe(1);
+    finish(); await running;
+    await expect(supervisor.applyBrowserSessionGrants!(handoff.leaseId, [grant])).rejects.toThrow();
+  });
   it("requires control-plane staged runner and config", () => {
     expect(browserDispatchRefusal(browser())).toBe("browser_staging_invalid");
     expect(browserDispatchRefusal(browser([BROWSER_RUNNER_PATH]))).toBe("browser_staging_invalid");
