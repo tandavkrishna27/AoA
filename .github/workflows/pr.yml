@@ -1763,12 +1763,10 @@ jobs:
           echo "apparmor_restrict_unprivileged_userns: $before -> $after"
           echo "kernel: $(uname -r) | $(. /etc/os-release && echo "$PRETTY_NAME")"
 
-      # The teardown tests spawn `dist/runner.js` as a real process, so the package must be
-      # COMPILED before they run. Without this they fail in ~30ms with a missing module, which
-      # is exactly how they failed on the first CI run of this lane.
-      # Include workspace dependencies: the egress policy imports the frozen worker-protocol
-      # package, whose exported declarations do not exist yet in a clean checkout.
-      - name: Build the runtime (the teardown tests spawn dist/runner.js)
+      # Teardown bundles the compiled entry using production guest staging:
+      # CJS runner.js + commonjs package marker, with only Playwright external.
+      # Build workspace dependencies for the frozen protocol declarations too.
+      - name: Build the runtime for bundled guest teardown
         run: pnpm --filter @armyofagents/browser-runtime... build
 
       # AOA_RUN_BROWSER_TESTS is what un-skips the *.browser.test.ts suites. Without it they
