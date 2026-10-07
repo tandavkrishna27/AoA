@@ -73,6 +73,7 @@ const startedAt = Date.now();`.trim())
   .replace('.filter(Boolean))].sort', String.raw`.concat(historicalCanaries.flatMap((value) => [value, ...value.split(/\r?\n|\r/)]))
   .filter(Boolean))].sort`);
 export interface CommanderDistributedInvocationInput {
+  governedBrowserEnabled?: boolean;
   companyId: string; turnId: string; cliTool: string; content: string;
   /** Internal dispatch choice after verified warm placement; absent preserves the existing capture bytes. */
   distributedWarm?: boolean;
@@ -90,9 +91,11 @@ export function buildCommanderDistributedInvocation(input: CommanderDistributedI
   try { base = new URL(input.apiBaseUrl); } catch { return null; }
   if (!["https:", "http:"].includes(base.protocol) || base.username || base.password || base.search || base.hash) return null;
   const url = `${input.apiBaseUrl.replace(/\/$/, "")}/companies/${input.companyId}/mcp`;
+  const browserUrl = `${input.apiBaseUrl.replace(/\/$/, "")}/companies/${input.companyId}/browser-mcp`;
   const codex = input.cliTool === "codex";
   const args = codex ? ["exec", "--json", ...(input.vendorCliBypassEnabled === false ? [] : ["--dangerously-bypass-approvals-and-sandbox"]),
     "-c", `mcp_servers.aoa.url=${JSON.stringify(url)}`, "-c", 'mcp_servers.aoa.bearer_token_env_var="AOA_API_KEY"',
+    ...(input.governedBrowserEnabled ? ["-c", `mcp_servers.playwright.url=${JSON.stringify(browserUrl)}`, "-c", 'mcp_servers.playwright.bearer_token_env_var="AOA_API_KEY"'] : []),
     ...(input.model ? ["--model", input.model] : []), "-"] : ["--print", "--verbose", "--output-format", "stream-json",
     "--include-partial-messages", ...(input.vendorCliBypassEnabled === false ? [] : ["--dangerously-skip-permissions"]), "--mcp-config", MCP_PATH, "--strict-mcp-config",
     ...(input.model ? ["--model", input.model] : []), ...(input.systemContext ? ["--system-prompt-file", INSTRUCTIONS_PATH] : [])];
@@ -104,7 +107,7 @@ export function buildCommanderDistributedInvocation(input: CommanderDistributedI
       stdinContent: codex && input.systemContext ? `${input.systemContext}\n\n${input.content}` : input.content,
       timeoutMs: input.timeoutMs }), "application/json")];
   if (!codex) {
-    stagedFiles.push(file(MCP_PATH, JSON.stringify({ mcpServers: { aoa: { type: "http", url,
+    stagedFiles.push(file(MCP_PATH, JSON.stringify({ mcpServers: { ...(input.governedBrowserEnabled ? { playwright: { type: "http", url: browserUrl, headers: { Authorization: "Bearer ${AOA_API_KEY}" } } } : {}), aoa: { type: "http", url,
       headers: { Authorization: "Bearer ${AOA_API_KEY}" } } } }), "application/json"));
     if (input.systemContext) stagedFiles.push(file(INSTRUCTIONS_PATH, input.systemContext, "text/markdown"));
   }

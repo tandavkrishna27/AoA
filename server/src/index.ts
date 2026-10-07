@@ -1274,7 +1274,7 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   // Placement is what makes an attempt lease-eligible, so composing it is what
   // arms the canary. Everything here stays inert until an Organization is set to
   // `mode: "canary"` in AOA_DISTRIBUTED_EXECUTION_ROLLOUT.
-  const { createAgentBrowserRequestService, setAgentBrowserRequestPort, resolveBrowserChildCredentialBinding } = await import("./services/agent-browser-request.js");
+  const { createAgentBrowserRequestService, setAgentBrowserRequestPort, createCommanderBrowserRequestService, setCommanderBrowserRequestPort, resolveBrowserChildCredentialBinding } = await import("./services/agent-browser-request.js");
   const credentialRouting = createDrizzleJobCredentialRoutingResolver(db, resolveCliAuthTopology({
     deploymentMode: config.deploymentMode, deploymentExposure: config.deploymentExposure,
   }));
@@ -1301,13 +1301,15 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   if (configuredBrowserBindings(process.env[browserBindingsEnv]).size > 0 && browserSessionOrigin?.startsWith("https://") && browserSessionSigningKey && browserSessionSigningKey.length >= 32) {
     setBrowserSessionCredentialPort(createBrowserSessionCredentialBroker({ appDb, identityDb: db, storage: browserStorage(config), publicOrigin: browserSessionOrigin, signingKey: browserSessionSigningKey }));
   }
-  setAgentBrowserRequestPort(createAgentBrowserRequestService({
+  const browserRequestServiceInput = {
     appDb, identityDb: db, registryDb: distributedExecutionDatabases.operatorDb, storage: browserStorage(config),
-    enabled: async (organizationId) => ["active", "canary"].includes(rolloutSource.resolveRunRolloutState({
+    enabled: async (organizationId: string) => ["active", "canary"].includes(rolloutSource.resolveRunRolloutState({
       deploymentMode: config.deploymentMode, organizationId, workloadType: "browser_session", sourceKind: "browser_request",
     })),
-    place: (request) => placementService.place(request),
-  }));
+    place: (request: Parameters<typeof placementService.place>[0]) => placementService.place(request),
+  };
+  setAgentBrowserRequestPort(createAgentBrowserRequestService(browserRequestServiceInput));
+  setCommanderBrowserRequestPort(createCommanderBrowserRequestService(browserRequestServiceInput));
   const ownerResolver = createRunExecutionOwnerResolver({
     resolveRunRolloutState: ({ organizationId, workloadType }) =>
       rolloutSource.resolveRunRolloutState({

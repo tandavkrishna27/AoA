@@ -3,6 +3,13 @@ import { companies, companyMemberships, internalAgentConversations, internalAgen
 import { submitJobSourceSchema } from "@armyofagents/shared";
 import { resolveUserRole } from "../mcp/tools/scope.js";
 
+/** User admission stores the requester role; authentication stores the user identity. */
+export function commanderJobHasHumanOwner(job: Pick<typeof jobs.$inferSelect,
+  "requesterPrincipalKind" | "requesterPrincipalId" | "authenticatedPrincipalKind" | "authenticatedPrincipalId">): boolean {
+  return ["user", "founder", "team_lead", "team_member"].includes(job.requesterPrincipalKind) &&
+    job.authenticatedPrincipalKind === "user" && job.authenticatedPrincipalId === job.requesterPrincipalId;
+}
+
 /** Shared trusted source read for routing and at-use Commander credential/JWT redemption. */
 export async function loadCommanderJobAuthority(db: Db, input: { companyId: string; jobId: string; organizationId?: string }) {
   return loadAuthority(db, input, true);
@@ -17,7 +24,8 @@ async function loadAuthority(db: Db, input: { companyId: string; jobId: string; 
   const [row] = await db.select({ job: jobs, organizationId: companies.organizationId }).from(jobs)
     .innerJoin(companies, eq(companies.id, jobs.companyId)).where(and(eq(jobs.id, input.jobId), eq(jobs.companyId, input.companyId),
       eq(jobs.organizationId, companies.organizationId), ...(input.organizationId ? [eq(jobs.organizationId, input.organizationId)] : []))).limit(1);
-  if (!row || !row.organizationId || row.job.sourceKind !== "commander_turn" || row.job.requesterPrincipalKind !== "user") return null;
+  if (!row || !row.organizationId || row.job.sourceKind !== "commander_turn" ||
+    !commanderJobHasHumanOwner(row.job)) return null;
   const parsed = submitJobSourceSchema.safeParse(row.job.sourceIntent);
   if (!parsed.success || parsed.data.kind !== "commander_turn") return null;
   const source = parsed.data;

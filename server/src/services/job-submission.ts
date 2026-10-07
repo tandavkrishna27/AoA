@@ -243,7 +243,9 @@ export async function submitJobWithinTenant(
         } else if (source.kind === "browser_request") {
           if (input.trustedBrowserPreparation && (!parseBrowserPreparation(input.trustedBrowserPreparation) ||
               input.trustedBrowserPreparation.parentJobId !== source.parentJobId ||
-              input.principal.kind !== "agent" || input.trustedBrowserPreparation.agentId !== input.principal.id)) throw denial();
+              (input.trustedBrowserPreparation.schemaVersion === 1
+                ? input.principal.kind !== "agent" || input.trustedBrowserPreparation.agentId !== input.principal.id
+                : input.principal.kind !== "user" || input.trustedBrowserPreparation.userId !== input.principal.id))) throw denial();
           executionPrincipal = await repos.jobControl.internalRunSourceIsAdmitted({
             companyId: input.companyId,
             runId: source.browserRequestId,

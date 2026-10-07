@@ -43,7 +43,7 @@ export function parseAuthoritativeBrowserPolicy(raw: unknown): NetworkPolicyV1 |
   return createHash("sha256").update(canonicalizeJsonV1(body)).digest("hex") === digest ? parsed.data : null;
 }
 
-export const browserPreparationSchema = z.object({
+const agentBrowserPreparationSchema = z.object({
   schemaVersion: z.literal(1),
   requestDigest: z.string().regex(/^[0-9a-f]{64}$/),
   runId: z.string().uuid(), agentId: z.string().uuid(), issueId: z.string().uuid(),
@@ -54,6 +54,10 @@ export const browserPreparationSchema = z.object({
   networkPolicy: z.custom<NetworkPolicyV1>((value) => networkPolicyV1Schema.safeParse(value).success),
   sessionBinding:browserSessionBindingSchema.optional(),
 }).strict();
+export const browserPreparationSchema = z.discriminatedUnion("schemaVersion", [agentBrowserPreparationSchema,
+  agentBrowserPreparationSchema.extend({ schemaVersion: z.literal(2),
+    principalKind: z.literal("commander"), userId: z.string().min(1).max(256), conversationId: z.string().uuid(),
+    agentId: z.null(), issueId: z.null() }).strict()]);
 export type BrowserPreparation = z.infer<typeof browserPreparationSchema>;
 
 export function parseBrowserPreparation(raw: unknown): BrowserPreparation | null {

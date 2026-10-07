@@ -7,6 +7,18 @@ import { buildCommanderDistributedInvocation, COMMANDER_INPUT_PATH, COMMANDER_RU
 const base = { companyId: "c1000000-0000-4000-8000-000000000001", turnId: "c2000000-0000-4000-8000-000000000001", cliTool: "claude_cli", content: "literal $(secret) `text`; prompt", systemContext: "history and instructions", model: "claude-sonnet-4-6", apiBaseUrl: "https://aoa.example/api", timeoutMs: 240000 };
 function text(files: {path: string; bytes: Uint8Array}[], path: string) { return new TextDecoder().decode(files.find((file) => file.path === path)!.bytes); }
 describe("Commander distributed invocation", () => {
+  it("selects only the narrow governed browser HTTP surface without staging bearer bytes", () => {
+    const claude = buildCommanderDistributedInvocation({ ...base, governedBrowserEnabled: true })!;
+    const mcp = JSON.parse(text(claude.stagedFiles, "/home/user/.aoa-commander-mcp.json"));
+    expect(mcp.mcpServers.playwright).toEqual({ type: "http", url: `${base.apiBaseUrl}/companies/${base.companyId}/browser-mcp`, headers: { Authorization: "Bearer ${AOA_API_KEY}" } });
+    const codex = buildCommanderDistributedInvocation({ ...base, cliTool: "codex", governedBrowserEnabled: true })!;
+    const input = JSON.parse(text(codex.stagedFiles, COMMANDER_INPUT_PATH));
+    expect(input.args).toContain(`mcp_servers.playwright.url="${base.apiBaseUrl}/companies/${base.companyId}/browser-mcp"`);
+    expect(input.args).toContain('mcp_servers.playwright.bearer_token_env_var="AOA_API_KEY"');
+    expect(JSON.stringify(mcp)).not.toContain("npx");
+    const legacy = buildCommanderDistributedInvocation(base)!;
+    expect(JSON.parse(text(legacy.stagedFiles, "/home/user/.aoa-commander-mcp.json")).mcpServers.playwright).toBeUndefined();
+  });
   it("stages Claude prompt, instructions and HTTP tool configuration without credentials or prompt argv", () => {
     const built = buildCommanderDistributedInvocation(base)!;
     expect(built.workload.command).toBe("node"); expect(built.workload.args.join(" ")).not.toContain(base.content);

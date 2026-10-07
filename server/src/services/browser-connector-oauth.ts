@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   companyMcpConnectors,
   companyMcpConnectorAgents,
+  companies, companyMemberships, organizationMemberships,
   type Db,
 } from "@armyofagents/db";
 import { secretService } from "./secrets.js";
@@ -15,34 +16,31 @@ import {
   resolveConnectorToken,
 } from "./mcp-connector-token-refresh.js";
 
+export type BrowserConnectorScope = { companyId: string; connectorId: string } &
+  ({ agentId: string; userId?: never } | { userId: string; origin: string; agentId?: never }) & { assertAuthorityCurrent?: () => Promise<void> };
+
+async function readConnector(db: Db, input: BrowserConnectorScope) {
+  if (Boolean(input.agentId) === Boolean(input.userId)) throw new Error("browser connector principal unavailable");
+  let query = db.select({ id: companyMcpConnectors.id, companyId: companyMcpConnectors.companyId,
+    status: companyMcpConnectors.status, source: companyMcpConnectors.source, serverName: companyMcpConnectors.serverName,
+    catalogEntryId: companyMcpConnectors.catalogEntryId, oauthPolicyVersion: companyMcpConnectors.oauthPolicyVersion,
+    transport: companyMcpConnectors.transport, url: companyMcpConnectors.url,
+    secretRef: companyMcpConnectors.secretRef }).from(companyMcpConnectors).$dynamic();
+  if (input.userId) {
+    query = query.innerJoin(companies, eq(companies.id, companyMcpConnectors.companyId))
+      .innerJoin(companyMemberships, and(eq(companyMemberships.companyId, input.companyId), eq(companyMemberships.principalType, "user"), eq(companyMemberships.principalId, input.userId), eq(companyMemberships.status, "active")))
+      .innerJoin(organizationMemberships, and(eq(organizationMemberships.organizationId, companies.organizationId), eq(organizationMemberships.userId, input.userId), eq(organizationMemberships.status, "active"), inArray(organizationMemberships.role, ["owner", "admin", "member"])));
+  } else {
+    query = query.innerJoin(companyMcpConnectorAgents, and(eq(companyMcpConnectorAgents.connectorId, companyMcpConnectors.id), eq(companyMcpConnectorAgents.companyId, input.companyId), eq(companyMcpConnectorAgents.agentId, input.agentId!)));
+  }
+  return query.where(and(eq(companyMcpConnectors.id, input.connectorId), eq(companyMcpConnectors.companyId, input.companyId))).then(rows => rows[0]);
+}
+
 export async function assertBrowserConnectorCurrent(
   db: Db,
-  input: { companyId: string; connectorId: string; agentId: string }
+  input: BrowserConnectorScope
 ) {
-  const [connector] = await db
-    .select({
-      status: companyMcpConnectors.status,
-      source: companyMcpConnectors.source,
-      serverName: companyMcpConnectors.serverName,
-      catalogEntryId: companyMcpConnectors.catalogEntryId,
-      oauthPolicyVersion: companyMcpConnectors.oauthPolicyVersion,
-      secretRef: companyMcpConnectors.secretRef,
-    })
-    .from(companyMcpConnectors)
-    .innerJoin(
-      companyMcpConnectorAgents,
-      and(
-        eq(companyMcpConnectorAgents.connectorId, companyMcpConnectors.id),
-        eq(companyMcpConnectorAgents.companyId, input.companyId),
-        eq(companyMcpConnectorAgents.agentId, input.agentId)
-      )
-    )
-    .where(
-      and(
-        eq(companyMcpConnectors.id, input.connectorId),
-        eq(companyMcpConnectors.companyId, input.companyId)
-      )
-    );
+  const connector = await readConnector(db, input);
   if (
     !connector ||
     connector.status !== "active" ||
@@ -53,48 +51,19 @@ export async function assertBrowserConnectorCurrent(
     isMcpConnectorBlocked(connector.serverName)
   )
     throw new Error("browser connector authority unavailable");
-  requireOAuthProviderPolicy(
+  const policy = requireOAuthProviderPolicy(
     connector.catalogEntryId,
     connector.oauthPolicyVersion
   );
+  if (input.userId && (input.origin !== new URL(policy.resourceUrl).origin || connector.transport !== "http" || connector.url !== policy.resourceUrl)) throw new Error("browser connector origin refused");
 }
 
 /** CP-only connector OAuth broker. The generic sandbox-local resolver remains
  * denied; this entrypoint is used only after scoped browser fence/permission checks. */
 export function createBrowserConnectorOAuthResolver(db: Db) {
-  return async (input: {
-    companyId: string;
-    connectorId: string;
-    agentId: string;
-  }): Promise<string> => {
-    const read = async () =>
-      db
-        .select({
-          id: companyMcpConnectors.id,
-          companyId: companyMcpConnectors.companyId,
-          status: companyMcpConnectors.status,
-          source: companyMcpConnectors.source,
-          serverName: companyMcpConnectors.serverName,
-          catalogEntryId: companyMcpConnectors.catalogEntryId,
-          oauthPolicyVersion: companyMcpConnectors.oauthPolicyVersion,
-          secretRef: companyMcpConnectors.secretRef,
-        })
-        .from(companyMcpConnectors)
-        .innerJoin(
-          companyMcpConnectorAgents,
-          and(
-            eq(companyMcpConnectorAgents.connectorId, companyMcpConnectors.id),
-            eq(companyMcpConnectorAgents.companyId, input.companyId),
-            eq(companyMcpConnectorAgents.agentId, input.agentId)
-          )
-        )
-        .where(
-          and(
-            eq(companyMcpConnectors.id, input.connectorId),
-            eq(companyMcpConnectors.companyId, input.companyId)
-          )
-        )
-        .then((rows) => rows[0]);
+  return async (input: BrowserConnectorScope): Promise<string> => {
+    if (input.userId && typeof input.assertAuthorityCurrent !== "function") throw new Error("browser human fence authority unavailable");
+    const read = () => readConnector(db, input);
     const connector = await read();
     if (
       !connector ||
@@ -110,7 +79,9 @@ export function createBrowserConnectorOAuthResolver(db: Db) {
       connector.catalogEntryId,
       connector.oauthPolicyVersion
     );
+    if (input.userId && (input.origin !== new URL(policy.resourceUrl).origin || connector.transport !== "http" || connector.url !== policy.resourceUrl)) throw new Error("browser connector origin refused");
     const assertRefreshAllowed = async () => {
+      await input.assertAuthorityCurrent?.();
       const current = await read();
       if (
         !current ||
@@ -120,6 +91,7 @@ export function createBrowserConnectorOAuthResolver(db: Db) {
         current.catalogEntryId !== policy.entryId ||
         current.oauthPolicyVersion !== policy.version ||
         current.serverName !== connector.serverName ||
+        (input.userId && (current.transport !== connector.transport || current.url !== connector.url)) ||
         isMcpConnectorBlocked(current.serverName)
       )
         throw new Error("browser connector authority changed");

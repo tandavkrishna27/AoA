@@ -2,6 +2,13 @@ import { HttpError } from "../../errors.js";
 import { err, ok, type ToolHandler } from "./types.js";
 
 export const handleBrowserSessionRequest: ToolHandler = async (ctx, args) => {
+  if (ctx.actor.source === "commander") {
+    if (!ctx.actor.commanderTurnId || !ctx.actor.runId || ctx.actor.companyId !== ctx.companyId) return err(403, -32003, "Commander browser authority unavailable");
+    try {
+      const { requestCommanderBrowserSession } = await import("../../services/agent-browser-request.js");
+      return ok(await requestCommanderBrowserSession({ companyId: ctx.companyId, userId: ctx.actor.userId, turnId: ctx.actor.commanderTurnId, conversationId: ctx.actor.runId }, args));
+    } catch { return err(503, -32009, "Governed browser execution is unavailable"); }
+  }
   if (ctx.actor.source !== "agent" || !ctx.actor.agentId || !ctx.actor.runId || ctx.actor.companyId !== ctx.companyId) {
     return err(403, -32003, "Browser requests require an authenticated active agent task run");
   }

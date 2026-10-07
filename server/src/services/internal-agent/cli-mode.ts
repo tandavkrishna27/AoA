@@ -168,6 +168,8 @@ export async function detectCliTool(tool: string): Promise<CLIDetectionResult> {
 // ── MCP Config Builder ────────────────────────────────────────────────────────
 
 export interface McpConfigParams {
+  /** Trusted CP selection; requests still require live verified browser authority. */
+  governedBrowser?: boolean;
   companyId: string;
   userId: string;
   userRole: string;
@@ -346,7 +348,10 @@ export function buildMcpConfig(params: McpConfigParams): McpConfig {
     : buildMcpBridgeSpec(params);
   const reserved: Record<string, McpConfigServerEntry> = { aoa: aoaEntry };
   if (params.enabledCapabilities?.includes("browser_use")) {
-    reserved.playwright = {
+    reserved.playwright = params.governedBrowser && params.brokered && params.actorType === "commander" ? {
+      ...brokeredAoaHttpEntry({ apiBaseUrl: params.apiBaseUrl, companyId: params.companyId }),
+      url: `${params.apiBaseUrl!.replace(/\/$/, "")}/companies/${params.companyId}/browser-mcp`,
+    } : {
       command: "npx",
       args: [PLAYWRIGHT_MCP_PACKAGE, "--headless"],
       env: {},
@@ -971,6 +976,7 @@ export function cliModeService(db: Db) {
           userRole: params.userRole, conversationId, messageId: commanderMessageId, turnId: commanderTurnId,
           cliTool: commanderCliTool, content: params.rawContent ?? params.content, systemContext: params.systemContext,
           model, vendorCliBypassEnabled: config.vendorCliBypassEnabled ?? true,
+          governedBrowserEnabled: process.env.AOA_COMMANDER_GOVERNED_BROWSER === "true" && params.enabledCapabilities.includes("browser_use"),
           warmConversation: experimental?.warmCommanderConversations !== false,
           apiBaseUrl: resolveCommanderApiBaseUrl(), timeoutMs: 240000 }, emit));
         const delivered: AgentStreamChunk[] = [];

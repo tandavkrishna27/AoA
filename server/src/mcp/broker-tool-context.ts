@@ -245,6 +245,7 @@ export async function resolveBrokerToolContext(
 }
 
 export interface ResolveCommanderBrokerToolContextInput {
+  commanderTurnId?: string | null;
   db: Db;
   companyId: string;
   userId: string;
@@ -290,6 +291,7 @@ export async function resolveCommanderBrokerToolContext(
     toolAllowlist: [],
     actorType: "commander",
     conversationId,
+    commanderTurnId: input.commanderTurnId ?? null,
     commanderToolPermissions:
       (config?.commanderToolPermissions as CommanderToolPermissions | null | undefined) ?? null,
     runtimeApprovalsEnabled: config?.runtimeApprovalsEnabled ?? true,

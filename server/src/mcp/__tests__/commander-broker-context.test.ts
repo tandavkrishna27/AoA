@@ -13,6 +13,12 @@ function dbReturning(row: unknown) {
 }
 
 describe("resolveCommanderBrokerToolContext", () => {
+  it("keeps signed turn identity separate from the conversation", async () => {
+    const ctx = await resolveCommanderBrokerToolContext({ db: dbReturning(null) as never, companyId: "c1", userId: "u1", userRole: "founder", conversationId: "conversation", commanderTurnId: "signed-turn" });
+    expect(ctx.commanderTurnId).toBe("signed-turn");
+    expect(ctx.conversationId).toBe("conversation");
+    expect(ctx.runId).toBeUndefined();
+  });
   it("builds a commander ToolContext with NO agents-row lookup", async () => {
     const ctx = await resolveCommanderBrokerToolContext({
       db: dbReturning({

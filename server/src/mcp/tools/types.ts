@@ -39,6 +39,7 @@ export type McpUserScope =
  * the calling agent without trusting a caller-supplied parameter.
  */
 export type ProtocolActor = {
+  commanderTurnId?: string | null;
   userId: string;
   companyId: string | null;
   keyId: string | null;
