@@ -641,6 +641,11 @@ const listAdmittedOrganizationIds = distributedExecutionDatabases
   : undefined;
 
 if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
+  const { parseDistributedNetworkPolicies, resolveBrowserControlPlaneDenyCidrs, DISTRIBUTED_NETWORK_POLICIES_ENV } = await import("./config/distributed-network-policies.js");
+  parseDistributedNetworkPolicies(process.env[DISTRIBUTED_NETWORK_POLICIES_ENV]);
+  const { parseBrowserSessionBindings, BROWSER_SESSION_BINDINGS_ENV } = await import("./config/browser-session-bindings.js");
+  parseBrowserSessionBindings(process.env[BROWSER_SESSION_BINDINGS_ENV]);
+  resolveBrowserControlPlaneDenyCidrs();
   // DAT-007 item #1 precondition: the /mcp run-JWT currency resolver reads FORCE-RLS'd
   // leases/job_attempts on this primary owner pool. Refuse to arm distributed execution unless
   // the primary role bypasses RLS, or the resolver would read zero rows and deny every
@@ -1269,6 +1274,10 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
   // Placement is what makes an attempt lease-eligible, so composing it is what
   // arms the canary. Everything here stays inert until an Organization is set to
   // `mode: "canary"` in AOA_DISTRIBUTED_EXECUTION_ROLLOUT.
+  const { createAgentBrowserRequestService, setAgentBrowserRequestPort, resolveBrowserChildCredentialBinding } = await import("./services/agent-browser-request.js");
+  const credentialRouting = createDrizzleJobCredentialRoutingResolver(db, resolveCliAuthTopology({
+    deploymentMode: config.deploymentMode, deploymentExposure: config.deploymentExposure,
+  }));
   const placementService = createJobPlacementService({
     appDb,
     operatorDb: distributedExecutionDatabases.operatorDb,
@@ -1281,10 +1290,24 @@ if (config.distributedExecutionEnabled && distributedExecutionDatabases) {
     // permissive test closure.
     resolveOrganizationPolicy: rolloutSource.resolveOrganizationPolicy,
     resolveWorkloadPolicy: rolloutSource.resolveWorkloadPolicy,
-    resolveCredentialBinding: createDrizzleJobCredentialRoutingResolver(db, resolveCliAuthTopology({
-      deploymentMode: config.deploymentMode, deploymentExposure: config.deploymentExposure,
-    })),
+    resolveCredentialBinding: (request) => request.sourceKind === "browser_request"
+      ? resolveBrowserChildCredentialBinding(appDb, distributedExecutionDatabases!.operatorDb, request) : credentialRouting(request),
   });
+  const { createStorageProviderFromConfig: browserStorage } = await import("./storage/provider-registry.js");
+  const { createBrowserSessionCredentialBroker, setBrowserSessionCredentialPort } = await import("./services/browser-session-credentials.js");
+  const browserSessionOrigin = config.authPublicBaseUrl ? new URL(config.authPublicBaseUrl).origin : undefined;
+  const browserSessionSigningKey = process.env.BETTER_AUTH_SECRET || process.env.AOA_AGENT_JWT_SECRET;
+  const { parseBrowserSessionBindings: configuredBrowserBindings, BROWSER_SESSION_BINDINGS_ENV: browserBindingsEnv } = await import("./config/browser-session-bindings.js");
+  if (configuredBrowserBindings(process.env[browserBindingsEnv]).size > 0 && browserSessionOrigin?.startsWith("https://") && browserSessionSigningKey && browserSessionSigningKey.length >= 32) {
+    setBrowserSessionCredentialPort(createBrowserSessionCredentialBroker({ appDb, identityDb: db, storage: browserStorage(config), publicOrigin: browserSessionOrigin, signingKey: browserSessionSigningKey }));
+  }
+  setAgentBrowserRequestPort(createAgentBrowserRequestService({
+    appDb, identityDb: db, registryDb: distributedExecutionDatabases.operatorDb, storage: browserStorage(config),
+    enabled: async (organizationId) => ["active", "canary"].includes(rolloutSource.resolveRunRolloutState({
+      deploymentMode: config.deploymentMode, organizationId, workloadType: "browser_session", sourceKind: "browser_request",
+    })),
+    place: (request) => placementService.place(request),
+  }));
   const ownerResolver = createRunExecutionOwnerResolver({
     resolveRunRolloutState: ({ organizationId, workloadType }) =>
       rolloutSource.resolveRunRolloutState({

@@ -83,7 +83,7 @@ describe("per-op port mirror (DEP-019)", () => {
 
   it.each([
     ["ResourceLabels", { organizationId: "o", targetId: "t", workerId: "w", jobId: "j", attempt: 1, leaseId: "l", deviceGeneration: 2 }],
-    ["CreateResult", { sandboxId: "s", providerOpId: "p", resourceLabels: {} }],
+    ["CreateResult", { browserNetworkPolicyDigest: undefined, sandboxId: "s", providerOpId: "p", resourceLabels: {} }],
     ["ExecuteResult", { providerOpId: "p", exitCode: 0, signal: null, timedOut: false, stdoutRef: "a", stderrRef: "b" }],
   ])("the %s shape this package mirrors has exactly the daemon's field names", (name, mirrored) => {
     const daemonFields = readonlyFields(interfaceBody(name as string)).sort();
@@ -100,6 +100,8 @@ describe("per-op port mirror (DEP-019)", () => {
       env: { ANTHROPIC_API_KEY: "sk-test" },
       workloadType: "batch",
     }, { deadlineMs: 1000, idempotencyKey: "k1" });
+    expect(created).not.toHaveProperty("browserNetworkPolicyDigest");
+    expect(port.browserNetworkPolicyMode).toBeUndefined();
     const inspected = await port.inspect!.call(port, (created as { sandboxId: string }).sandboxId, {
       deadlineMs: 1000,
       idempotencyKey: "k2",

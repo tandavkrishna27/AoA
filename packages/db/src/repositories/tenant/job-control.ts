@@ -853,11 +853,13 @@ export interface JobControlRepository {
     companyId: string;
     jobId: string;
     handle: string;
-    refKind: "provider_key" | "company_secret" | "run_jwt";
+    refKind: "provider_key" | "company_secret" | "run_jwt" | "connector_oauth";
     refId: string;
-    materialization: "env";
-    usePolicy: "sandbox_local_only";
-    envTarget: string;
+    materialization: "env" | "proxy";
+    usePolicy: "sandbox_local_only" | "fence_proxy";
+    envTarget: string | null;
+    destination?: string;
+    activeFence?: ActiveFenceRequest;
     /** Pinned version selector for `ref_id`; null = latest. */
     refVersion: string | null;
     boundTargetGeneration: number | null;
@@ -2086,6 +2088,45 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
   // attempt is `attempt_terminal`; a non-active or freshly-expired lease is
   // `stale_fence`. The shared pure predicate `isActiveFence` is the final authority
   // on admission; `classifyFence` supplies the closed refusal code.
+  async function cancelBrowserChildren(parent: { organizationId: string; companyId: string; jobId: string }, reason: string): Promise<void> {
+    // A producer holds the parent fence while inserting a child and limits active
+    // children to 32. Parent cancellation/terminal/expiry holds that same fence.
+    const children = await tx.select({ id: jobs.id }).from(jobs).where(and(
+      eq(jobs.organizationId, parent.organizationId), eq(jobs.companyId, parent.companyId), eq(jobs.sourceKind, "browser_request"),
+      sql`${jobs.policySnapshot}->'browserPreparation'->>'parentJobId' = ${parent.jobId}`,
+      inArray(jobs.status, ["queued", "running", "cancel_requested"]))).orderBy(asc(jobs.id)).limit(32);
+    for (const child of children) await repository.requestCancellation({ ...parent, jobId: child.id, reason, graceful: false,
+      commandId: child.id, now: new Date() });
+  }
+  async function finishBrowserRequest(input: { organizationId: string; companyId: string; jobId: string }, terminalStatus: string): Promise<void> {
+    const [job] = await tx.select({sourceKind:jobs.sourceKind,sourceIdentity:jobs.sourceIdentity}).from(jobs).where(and(
+      eq(jobs.organizationId,input.organizationId),eq(jobs.companyId,input.companyId),eq(jobs.id,input.jobId)));
+    if (job?.sourceKind !== "browser_request") return;
+    await tx.update(internalAgentRuns).set({status:terminalStatus === "succeeded" ? "completed" : terminalStatus === "cancelled" ? "cancelled" : "failed"})
+      .where(and(eq(internalAgentRuns.id,job.sourceIdentity),eq(internalAgentRuns.companyId,input.companyId),
+        eq(internalAgentRuns.triggerSource,"browser_request"),eq(internalAgentRuns.distributedJobId,input.jobId),eq(internalAgentRuns.status,"running")));
+  }
+
+  async function assertBrowserParentCurrent(request: { organizationId: string; companyId: string; jobId: string }): Promise<void> {
+    const [job] = await tx.select({ sourceKind: jobs.sourceKind, policy: jobs.policySnapshot }).from(jobs).where(and(
+      eq(jobs.organizationId, request.organizationId), eq(jobs.companyId, request.companyId), eq(jobs.id, request.jobId)));
+    if (job?.sourceKind !== "browser_request") return;
+    if (!job.policy.browserPreparation) throw new JobFenceError("stale_fence");
+    const preparation = job.policy.browserPreparation as Record<string, unknown>;
+    if (typeof preparation.parentLeaseId !== "string" || typeof preparation.parentJobId !== "string" || typeof preparation.parentAttemptId !== "string" ||
+        typeof preparation.targetId !== "string" || typeof preparation.targetAuthorityKey !== "string" || typeof preparation.targetGeneration !== "number" ||
+        typeof preparation.profileHash !== "string" || typeof preparation.providerConstraintHash !== "string") throw new JobFenceError("stale_fence");
+    // No parent row lock: child fence writers must not reverse the global lock
+    // order against the parent->child cancellation cascade.
+    const [parent] = await tx.select({ id: leases.id }).from(leases).innerJoin(jobs, eq(jobs.id, leases.jobId)).innerJoin(jobAttempts, eq(jobAttempts.id, leases.attemptId)).where(and(
+      eq(leases.organizationId, request.organizationId), eq(leases.companyId, request.companyId),
+      eq(leases.id, preparation.parentLeaseId), eq(leases.jobId, preparation.parentJobId), eq(leases.attemptId, preparation.parentAttemptId),
+      eq(leases.targetId, preparation.targetId), eq(leases.targetAuthorityKey, preparation.targetAuthorityKey), eq(leases.targetGeneration, preparation.targetGeneration),
+      eq(leases.profileHash, preparation.profileHash), eq(leases.providerConstraintHash, preparation.providerConstraintHash),
+      eq(leases.status, "active"), eq(jobs.status, "running"), eq(jobAttempts.status, "running"), gt(leases.expiresAt, sql`clock_timestamp()`)));
+    if (!parent) throw new JobFenceError("stale_fence");
+  }
+
   async function guardActiveFence(
     request: ActiveFenceRequest,
   ): Promise<{ lease: Lease; attempt: JobAttempt }> {
@@ -2156,6 +2197,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
     if (refusal) throw new JobFenceError(refusal);
     // Defense in depth: the shared predicate must agree with the classification.
     if (!isActiveFence(snapshot)) throw new JobFenceError("stale_fence");
+    await assertBrowserParentCurrent(request);
     return { lease: row.lease, attempt: row.attempt };
   }
 
@@ -2204,6 +2246,8 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobAttempts.id, fence.attemptId),
         notInArray(jobAttempts.status, [...TERMINAL_ATTEMPT_STATUSES]),
       ));
+      await cancelBrowserChildren(fence, "parent_terminal");
+      await finishBrowserRequest(fence, projection.transition.terminalStatus);
     }
     await tx.insert(jobProjectionReceipts).values({
       organizationId: fence.organizationId,
@@ -4294,6 +4338,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
     },
 
     async activateLeaseAck(input) {
+      await assertBrowserParentCurrent(input);
       const [lease] = await tx.update(leases).set({
         status: "active",
         activatedAt: sql`clock_timestamp()`,
@@ -4866,6 +4911,15 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
     },
 
     async insertExecutionSecretHandle(input) {
+      if (input.refKind === "connector_oauth") {
+        if (input.materialization !== "proxy" || input.usePolicy !== "fence_proxy" || input.envTarget !== null || !input.destination || !input.activeFence ||
+          input.activeFence.organizationId !== input.organizationId || input.activeFence.companyId !== input.companyId || input.activeFence.jobId !== input.jobId || input.boundTargetGeneration !== input.activeFence.targetGeneration) {
+          throw new Error("invalid connector proxy handle mint");
+        }
+        await guardActiveFence(input.activeFence);
+      } else if (input.materialization !== "env" || input.usePolicy !== "sandbox_local_only" || !input.envTarget || input.destination || input.activeFence) {
+        throw new Error("invalid sandbox handle mint");
+      }
       // Idempotent per (organization, job, ref_kind, ref_id) over ACTIVE rows. A
       // placement replay must not mint a second handle for the same reference: the
       // envelope would then carry two handles for one env var, and the frozen
@@ -4896,7 +4950,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         // A `sandbox_local_only` handle may NEVER bind a network destination — the
         // resolver re-checks this, and minting one would be the coercion DAT-004's
         // own review already had to fix once.
-        destination: null,
+        destination: input.refKind === "connector_oauth" ? input.destination! : null,
         boundTargetGeneration: input.boundTargetGeneration,
         ownerPrincipalKind: input.ownerPrincipalKind,
         ownerPrincipalId: input.ownerPrincipalId,
@@ -5110,6 +5164,8 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobAttempts.status, attempt.status),
       )).returning();
       if (!row) throw new JobFenceError("attempt_terminal");
+      await cancelBrowserChildren(input, "browser_parent_terminal");
+      await finishBrowserRequest(input, input.terminalStatus);
       // JOB-007: the attempt reached a terminal state — release its capacity slot.
       await releaseAttemptCapacitySlot({ organizationId: input.organizationId, attemptId: input.attemptId });
       return row;
@@ -5340,8 +5396,11 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
       )).for("update").limit(1);
       if (!job) return { status: "not_found", command: null };
       if ((JOB_TERMINAL_STATUSES as readonly string[]).includes(job.status)) {
+        await cancelBrowserChildren(input, "browser_parent_terminal");
         return { status: "job_terminal", command: null };
       }
+
+      await cancelBrowserChildren(input, "browser_parent_cancelled");
 
       const lease = liveLease;
       if (!lease || !attempt || !lease.workerId || !lease.attemptNumber) {
@@ -5373,6 +5432,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
           notInArray(jobs.status, [...JOB_TERMINAL_STATUSES]),
         ));
         // JOB-007: this directly-finalized attempt is terminal → release its slot.
+        await finishBrowserRequest(input, "cancelled");
         if (attempt) {
           await releaseAttemptCapacitySlot({ organizationId: input.organizationId, attemptId: attempt.id });
         }
@@ -5658,6 +5718,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         )).returning({ id: leases.id });
         if (!revoked) continue;
         result.revoked += 1;
+        await cancelBrowserChildren({ organizationId: input.organizationId, companyId: job.companyId, jobId: job.id }, "browser_parent_lease_lost");
         // DEP-009: capture whether this attempt HELD an Organization capacity slot
         // BEFORE the release flips it to 'released'. Only a genuinely-held slot is
         // transferred to the retry successor (below) — a never-claimed ('unclaimed')

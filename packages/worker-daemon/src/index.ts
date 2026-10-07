@@ -480,6 +480,10 @@ export type {
   StagedFileRequest,
   StageFilesResult,
   SandboxLifetimeResult,
+  BrowserDecisionDeliveryInput,
+  BrowserDecisionDeliveryResult,
+  BrowserCredentialDeliveryInput,
+  BrowserCredentialDeliveryResult,
   // CLI-012 (ruling F7) — the provider-side METADATA-ONLY output-enumeration capability.
   SandboxEnumerationMode,
   SandboxOutputEntry,
@@ -562,6 +566,8 @@ export type {
 } from "./supervisor/service-lifecycle.js";
 
 export { createSupervisor } from "./supervisor/supervisor.js";
+export { BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH, BROWSER_DISPATCH_NAMESPACE,
+  readBrowserNetworkPolicy, browserDispatchRefusal } from "./supervisor/browser-dispatch.js";
 export type {
   Supervisor,
   SupervisorDeps,
@@ -831,3 +837,5 @@ export type {
 
 export { buildWorkspacePatch, WorkspacePatchError } from "./patch/index.js";
 export type { BuildWorkspacePatchInput, BuildWorkspacePatchResult } from "./patch/index.js";
+export { readBrowserDecisionDelivery } from "./supervisor/browser-decision.js";
+export { readBrowserCredentialDelivery } from "./supervisor/browser-credential.js";

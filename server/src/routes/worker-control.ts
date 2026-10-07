@@ -1,5 +1,6 @@
 import type { KeyObject } from "node:crypto";
 import { Router, type Request } from "express";
+import { browserSessionCredentialRoutes } from "./browser-session-credentials.js";
 import type { Db } from "@armyofagents/db";
 import {
   issueWorkerEnrollmentCodeSchema,
@@ -110,6 +111,7 @@ export function workerControlRoutes(opts: {
   controlPlaneSigningKey?: KeyObject;
 }) {
   const router = Router();
+  router.use(browserSessionCredentialRoutes());
   const orgAccess = organizationAccessService(opts.db);
   const enrollment = createWorkerEnrollmentService({
     appDb: opts.appDb,

@@ -35,7 +35,7 @@ import type {
   SandboxProvider,
   StagedFileRequest,
 } from "@armyofagents/worker-daemon";
-import { createRunOutputCapture, readCommanderWarmRedactionCanaries, scrubOutputText } from "@armyofagents/worker-daemon";
+import { readBrowserCredentialDelivery, readBrowserDecisionDelivery, createRunOutputCapture, readCommanderWarmRedactionCanaries, scrubOutputText } from "@armyofagents/worker-daemon";
 import {
   EXECUTE_LIVE_STDOUT_KEY,
   EXECUTE_CAPTURE_STDOUT_KEY,
@@ -48,6 +48,7 @@ import {
   decodeProcessStart,
   decodeProcessStatus,
   decodeProcessSignal,
+  decodeBrowserDecisionDelivery,
 } from "@armyofagents/provider-wire/codec";
 import type { OwnedLabelsCapability } from "@armyofagents/provider-wire";
 import { EXPORT_TEARDOWN_RESERVE_MS } from "@armyofagents/worker-daemon";
@@ -142,6 +143,8 @@ const GATE_REQUIRED_OPS: ReadonlySet<string> = new Set([
   // server 404s it, matching the B2 teardown ops, because it carries a bearer grant.
   "stage_files",
   "renew_lifetime",
+  "browser_decision",
+  "browser_credential",
   "start_process",
   "process_status",
   "signal_process",
@@ -326,6 +329,29 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       }
       case "list":
         return gateList(deps, args as ListInput, ctx, capability);
+      case "browser_decision": {
+        const delivery = readBrowserDecisionDelivery(args, now());
+        if (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new WireProtocolError("invalid browser decision deadline");
+        const deadlineAt = Math.min(now() + Math.min(ctx.deadlineMs, 5000), Date.parse(delivery.response.expiresAt));
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true }, delivery.sandboxId, ctx, capability,
+          async (detail, remainingMs) => {
+            if (warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(delivery.sandboxId, detail.resourceLabels) ||
+                !provider.deliverBrowserDecision || !remainingMs || remainingMs <= 0) throw new WireProtocolError("browser decision delivery unavailable");
+            const validated = readBrowserDecisionDelivery(delivery, now());
+            return decodeBrowserDecisionDelivery(await provider.deliverBrowserDecision(validated, { ...ctx, deadlineMs: remainingMs }));
+          }, deadlineAt);
+      }
+      case "browser_credential": {
+        const delivery = readBrowserCredentialDelivery(args, now());
+        if (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new WireProtocolError("invalid browser credential deadline");
+        const deadlineAt = Math.min(now() + Math.min(ctx.deadlineMs, 5000), Date.parse(delivery.grant.expiresAt));
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true }, delivery.sandboxId, ctx, capability,
+          async (detail, remainingMs, assertActive) => {
+            if (warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(delivery.sandboxId, detail.resourceLabels) ||
+                !provider.deliverBrowserCredential || !remainingMs || remainingMs <= 0) throw new WireProtocolError("browser credential delivery unavailable");
+            return decodeBrowserDecisionDelivery(await provider.deliverBrowserCredential(readBrowserCredentialDelivery(delivery, now()), { ...ctx, deadlineMs: remainingMs, assertActive }));
+          }, deadlineAt);
+      }
       case "start_process":
       case "process_status":
       case "signal_process": {
@@ -486,6 +512,9 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
   }
 
   return createServer((req, res) => {
+    const operationAbort = new AbortController();
+    req.on("aborted", () => operationAbort.abort());
+    res.on("close", () => { if (!res.writableEnded) operationAbort.abort(); });
     // A socket/stream error must never become an uncaught exception (process crash).
     res.on("error", () => {});
 
@@ -541,7 +570,7 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
           if (gated && GATE_REQUIRED_OPS.has(op)) {
             const { args, ctx, capability, warmResourceCapability } = decodeOpRequest(body);
             liveRequested = op === "execute" && isRecordOfUnknown(args) && args[EXECUTE_LIVE_STDOUT_KEY] === true;
-            const result = await routeGated(op, args, ctx, capability, warmResourceCapability,
+            const result = await routeGated(op, args, { ...ctx, signal: operationAbort.signal }, capability, warmResourceCapability,
               liveRequested ? (chunk) => frame(JSON.stringify({ stdout: chunk })) : undefined);
             reply(encodeOkResponse(result));
             return;

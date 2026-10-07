@@ -33,24 +33,86 @@
 // counts OUR browser and never a developer's other Chrome.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFile, spawn } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:https";
+import { createRequire } from "node:module";
+import { build } from "esbuild";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { startFixtureSite, type FixtureSite } from "../fixture-site.js";
+import { fixtureNetwork } from "./network-fixture.js";
 
 const execFileAsync = promisify(execFile);
 const RUN = process.env.AOA_RUN_BROWSER_TESTS === "1";
 const suite = describe.skipIf(!RUN);
 
-let site: FixtureSite;
+let site: { origin: string; close(): Promise<void> };
 let base: string;
+let runnerJs: string;
+let fixturePreload: string;
+let heldRequests = 0;
 
 beforeAll(async () => {
   if (!RUN) return;
-  site = await startFixtureSite();
   base = mkdtempSync(join(tmpdir(), "brw002-teardown-"));
+  const server = createServer({
+    cert: readFileSync(new URL("../../../../docker/d1/certs/public.crt", import.meta.url)),
+    key: readFileSync(new URL("../../../../docker/d1/certs/private.key", import.meta.url)),
+  }, (_req, res) => {
+    heldRequests++;
+    res.writeHead(200, { "content-type": "text/html" });
+    res.write("<!doctype html><title>held</title><body>holding");
+  });
+  const sockets = new Set<import("node:net").Socket>();
+  server.on("connection", (socket) => { sockets.add(socket); socket.once("close", () => sockets.delete(socket)); });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("fixture bind failed");
+  site = { origin: `https://allowed.example:${address.port}`, close: async () => {
+    for (const socket of sockets) socket.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  } };
+  // Match production staging: built guest entry, bundled CJS, only Playwright
+  // external, runner.js and its own commonjs package marker for the CLI guard.
+  const bundle = await build({ entryPoints: [fileURLToPath(new URL("../../dist/runner.js", import.meta.url))],
+    bundle: true, platform: "node", target: "node22", format: "cjs", external: ["playwright"], write: false, logLevel: "silent" });
+  expect(bundle.outputFiles).toHaveLength(1);
+  expect(bundle.outputFiles[0]!.contents.length).toBeLessThanOrEqual(1024 * 1024);
+  runnerJs = join(base, "runner.js");
+  writeFileSync(runnerJs, bundle.outputFiles[0]!.contents);
+  writeFileSync(join(base, "package.json"), '{"type":"commonjs"}');
+  fixturePreload = join(base, "fixture.cjs");
+  // Test-process-only public DNS/pinned dial and fixture certificate trust seams.
+  // Neither private destination exemptions nor unsafe launch args enter config.
+  writeFileSync(fixturePreload, `
+    const assert = require('node:assert/strict');
+    const dns = require('node:dns/promises');
+    dns.lookup = (host, options) => {
+      assert.equal(host, 'allowed.example');
+      assert.equal(options.all, true);
+      return Promise.resolve([{address:'93.184.216.34',family:4}]);
+    };
+    const net = require('node:net');
+    const connect = net.connect;
+    net.connect = (options, ...rest) => {
+      assert.equal(options.host, '93.184.216.34');
+      assert.equal(options.port, ${address.port});
+      return connect({...options,host:'127.0.0.1'}, ...rest);
+    };
+    // This synthetic Windows-only table lets a lifecycle fixture reach its
+    // navigation. It establishes no Windows containment claim. Linux reads the
+    // real kernel tables, and launch argument guards run unchanged everywhere.
+    if (process.platform === 'win32') {
+      const fs = require('node:fs/promises');
+      const readFile = fs.readFile;
+      fs.readFile = (path, ...args) => path === '/proc/net/tcp' || path === '/proc/net/tcp6'
+        ? Promise.resolve('sl local_address rem_address st\\n') : readFile(path, ...args);
+    }
+    const {chromium} = require(${JSON.stringify(createRequire(import.meta.url).resolve("playwright"))});
+    const launch = chromium.launchPersistentContext.bind(chromium);
+    chromium.launchPersistentContext = (profile, options) => launch(profile, {...options,args:[...(options.args || []),'--ignore-certificate-errors']});
+  `);
 });
 afterAll(async () => {
   if (!RUN) return;
@@ -99,6 +161,7 @@ const windowsOnly = describe.skipIf(!RUN || process.platform !== "win32");
 
 /** Start a real runner process on the slow page; a running timer makes a survivor visible. */
 async function startSession(name: string) {
+  const requestsBefore = heldRequests;
   const dir = mkdtempSync(join(base, name + "-"));
   const profile = join(dir, "profile");
   const root = join(dir, "root");
@@ -109,23 +172,30 @@ async function startSession(name: string) {
       downloadRoot: root,
       userDataDir: profile,
       downloadsStagingPath: join(dir, "staging"),
+      ...fixtureNetwork([{ scheme: "https", host: "allowed.example", port: Number(new URL(site.origin).port) }]),
       steps: [{ action: "navigate", url: site.origin + "/hold" }],
       launch: { headless: true, chromiumSandbox: true, args: [] },
     }),
   );
-  const runnerJs = fileURLToPath(new URL("../../dist/runner.js", import.meta.url));
   // ★ stdio was "ignore", which made every startup failure UNDIAGNOSABLE. When the browser
   // does not appear, the assertion can only say "the browser never started, so this test
   // would prove nothing" - correct, and completely unactionable, because the one process
   // that knows why was told to discard its output. The reap path in this file already
   // applies the opposite principle (it dumps a `ps` listing so a failure distinguishes
   // "slow" from "never"); the startup path did not.
-  const child = spawn(process.execPath, [runnerJs, join(dir, "session.json")], {
+  const child = spawn(process.execPath, ["--require", fixturePreload, runnerJs, join(dir, "session.json")], {
     stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, NODE_PATH: fileURLToPath(new URL("../../node_modules", import.meta.url)) },
   });
   const output: string[] = [];
   child.stdout?.on("data", (chunk: unknown) => output.push(String(chunk)));
   child.stderr?.on("data", (chunk: unknown) => output.push(String(chunk)));
+  const navigating = await waitFor(async () => heldRequests > requestsBefore, 30_000);
+  if (!navigating) {
+    child.kill("SIGKILL");
+    await killLeftovers(profile);
+  }
+  expect(navigating, `runner never reached the HTTPS hold fixture: ${output.join("")}`).toBe(true);
   return { profile, child, output };
 }
 
@@ -146,30 +216,7 @@ async function killLeftovers(profile: string): Promise<void> {
 
 linuxOnly("BRW-002 (c) — a GRACEFUL cancellation reaps the browser", () => {
   it("closes the browser when the runner receives SIGTERM", async () => {
-    const dir = mkdtempSync(join(base, "sigterm-"));
-    const profile = join(dir, "profile");
-    const root = join(dir, "root");
-    mkdirSync(root, { recursive: true });
-    writeFileSync(
-      join(dir, "session.json"),
-      JSON.stringify({
-        downloadRoot: root,
-        userDataDir: profile,
-        downloadsStagingPath: join(dir, "staging"),
-        steps: [{ action: "navigate", url: `${site.origin}/hold` }],
-        launch: { headless: true, chromiumSandbox: true, args: [] },
-      }),
-    );
-
-    const runnerJs = fileURLToPath(new URL("../../dist/runner.js", import.meta.url));
-    // Same capture as `startSession` below, for the same reason: a startup failure here
-    // would otherwise be reported with no way to find out why.
-    const child = spawn(process.execPath, [runnerJs, join(dir, "session.json")], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const output: string[] = [];
-    child.stdout?.on("data", (chunk: unknown) => output.push(String(chunk)));
-    child.stderr?.on("data", (chunk: unknown) => output.push(String(chunk)));
+    const { profile, child, output } = await startSession("sigterm");
     try {
       const started = await waitFor(async () => (await processesMentioning(profile)) > 0, 30_000);
       if (!started) {
@@ -184,6 +231,7 @@ ${output.join("") || "(none)"}`);
       expect(reaped, "the browser survived a graceful cancellation").toBe(true);
     } finally {
       child.kill("SIGKILL");
+      await killLeftovers(profile);
     }
   }, 90_000);
 });
@@ -264,10 +312,10 @@ suite("BRW-002 (c) — the runner reports failure rather than exiting silently",
   it("emits a typed failure event and a non-zero exit for an unreadable config", async () => {
     // An exit code alone loses the reason; an event alone lets a failed session look
     // successful to a caller that only checks the code. Both are asserted.
-    const runnerJs = fileURLToPath(new URL("../../dist/runner.js", import.meta.url));
     const { code, out } = await new Promise<{ code: number | null; out: string }>((resolve) => {
       const child = spawn(process.execPath, [runnerJs, join(base, "does-not-exist.json")], {
         stdio: ["ignore", "pipe", "ignore"],
+        env: { ...process.env, NODE_PATH: fileURLToPath(new URL("../../node_modules", import.meta.url)) },
       });
       let out = "";
       child.stdout.on("data", (d) => (out += String(d)));
@@ -292,15 +340,16 @@ suite("BRW-002 (c) — the runner reports failure rather than exiting silently",
         downloadRoot: root,
         userDataDir: join(dir, "profile"),
         downloadsStagingPath: join(dir, "staging"),
+        ...fixtureNetwork(),
         steps: [],
         // The single-dash spelling that was REPRODUCIBLY BYPASSED before the allow-list.
         launch: { headless: true, chromiumSandbox: true, args: ["-remote-debugging-port=9333"] },
       }),
     );
 
-    const runnerJs = fileURLToPath(new URL("../../dist/runner.js", import.meta.url));
     const { code, out } = await new Promise<{ code: number | null; out: string }>((resolve) => {
-      const child = spawn(process.execPath, [runnerJs, configPath], { stdio: ["ignore", "pipe", "ignore"] });
+      const child = spawn(process.execPath, [runnerJs, configPath], { stdio: ["ignore", "pipe", "ignore"],
+        env: { ...process.env, NODE_PATH: fileURLToPath(new URL("../../node_modules", import.meta.url)) } });
       let out = "";
       child.stdout.on("data", (d) => (out += String(d)));
       child.on("close", (code) => resolve({ code, out }));

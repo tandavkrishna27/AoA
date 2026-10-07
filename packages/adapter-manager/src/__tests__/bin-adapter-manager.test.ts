@@ -48,7 +48,7 @@ function fakeProviderModule() {
   const record: {
     transportCreated: number;
     scannersCreated: number;
-    ctorOptions?: { transport: unknown; templateId?: string; scanExportBytes?: unknown; enablePauseResume?: boolean };
+    ctorOptions?: { transport: unknown; templateId?: string; scanExportBytes?: unknown; enablePauseResume?: boolean; browserCredentialControlPlaneOrigin?: string };
   } = {
     transportCreated: 0,
     scannersCreated: 0,
@@ -103,6 +103,20 @@ function makeDeps(over: Partial<AdapterManagerDeps> & { keyBytes?: Buffer | (() 
 }
 
 describe("bootAdapterManager — the happy path", () => {
+  it("pins credential redemption to the native configured control-plane origin", async () => {
+    const { deps, record } = makeDeps();
+    expect((await bootAdapterManager({ ...deps, env: { ...deps.env, [CONTROL_PLANE_URL_ENV]: "https://control.example/api" } })).kind).toBe("listening");
+    expect(record.ctorOptions?.browserCredentialControlPlaneOrigin).toBe("https://control.example");
+  });
+
+  it("leaves credential redemption disabled without a trusted HTTPS control-plane origin", async () => {
+    for (const configured of [undefined, "http://control.example", "https://user:pass@control.example"]) {
+      const { deps, record } = makeDeps();
+      await bootAdapterManager({ ...deps, env: { ...deps.env, [CONTROL_PLANE_URL_ENV]: configured } });
+      expect(record.ctorOptions?.browserCredentialControlPlaneOrigin).toBeUndefined();
+    }
+  });
+
   it("passes an exact E2B build selector to the provider", async () => {
     const selector = "tpl_immutable:12345678-1234-4234-8234-123456789abc";
     const { deps, record } = makeDeps();

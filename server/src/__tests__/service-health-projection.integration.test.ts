@@ -44,6 +44,7 @@ import {
 import { runInTenant } from "../db/tenant-context.js";
 import { createJobEventIngestService } from "../services/job-events.js";
 import { decideServiceProjection } from "../services/service-health-projection.js";
+import { SERVICE_CRASH_POLICY } from "../services/service-crash-recovery.js";
 import { reconcileService } from "../services/service-reconciler.js";
 
 let fixture: JobControlFixture | null = null;
@@ -424,14 +425,25 @@ suite("SVC-003 — service events project onto the instance row, under the fence
     expect(await statusOf(first)).toBe("healthy");
 
     // The observed exit — emitted directly from `healthy`, with no `stopping` in between.
-    const stop = await ingestDirect(identity, [
-      event(offer, 4, "service_instance_stopped", { ...ref(first), exitCode: 0 }),
-    ]);
+    const stopEvent = event(offer, 4, "service_instance_stopped", { ...ref(first), exitCode: 0 });
+    const stop = await ingestDirect(identity, [stopEvent]);
     expect(stop.projections).toEqual([
       { outcome: "applied", fromStatus: "healthy", toStatus: "stopped" },
     ]);
     expect(await statusOf(first)).toBe("stopped");
     expect(await liveInstanceIds(SERVICE)).toEqual([]);
+
+    // A spontaneous witnessed exit receives SVC-004 backoff even for exit code 0.
+    // Use the database-clock fixture pattern from the reconciler suite to avoid
+    // wall-clock sleeps and timing-sensitive assertions on slow CI.
+    await f().admin`UPDATE job_events SET created_at = clock_timestamp() + interval '1 minute'
+      WHERE organization_id = ${ORG} AND company_id = ${COMPANY} AND job_id = ${seeded.jobId} AND event_id = ${stopEvent.eventId}`;
+    expect(await reconcileService(f().app.db, {
+      organizationId: ORG, companyId: COMPANY, serviceId: SERVICE,
+    })).toEqual({ action: "none", reason: "crash_backoff" });
+    expect(await liveInstanceIds(SERVICE)).toEqual([]);
+    await f().admin`UPDATE job_events SET created_at = clock_timestamp() - ${SERVICE_CRASH_POLICY.initialDelayMs + 1000} * interval '1 millisecond'
+      WHERE organization_id = ${ORG} AND company_id = ${COMPANY} AND job_id = ${seeded.jobId} AND event_id = ${stopEvent.eventId}`;
 
     const outcome = await reconcileService(f().app.db, {
       organizationId: ORG, companyId: COMPANY, serviceId: SERVICE,

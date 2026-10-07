@@ -393,6 +393,17 @@ function emptyOutputProvider(): SandboxProvider {
 // --- 1. both lanes receive the sequencer AND the producer ---------------------------------------
 
 describe("DAT-009-3d/CLI-012 — composeDispatchRuntime passes BOTH halves to the supervisor", () => {
+  it("browser exports activate trace, video and download retention classifications", async () => {
+    const { composed } = await composeLane({ lane: "desktop", provider: exportingProvider(), client: recordingClient().client,
+      store: sessionStore().store, sink: collectingSink() });
+    const handoff = handoffFor(TENANT_A, "desktop");
+    (handoff.offer.job as { workloadType: string }).workloadType = "browser_session";
+    const requests = await composed.resolveExportArtifacts!({ handoff, exec: { exitCode: 0 } as never,
+      enumerate: async () => ["session-trace.zip", "session-video.webm", "report.pdf"].map((name) => ({
+        path: `/home/user/aoa-output/${name}`, sizeBytes: 10, symlink: false,
+      })) });
+    expect(requests.map((request) => request.kind)).toEqual(["playwright_trace", "browser_video", "download"]);
+  });
   it.each<Lane>(["desktop", "container"])("★ %s lane: exportArtifacts AND resolveExportArtifacts are composed", async (lane) => {
     const provider = exportingProvider();
     const { composed } = await composeLane({

@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createLeaseRenewalDriver, type ControlCommandHandlers } from "../lease/lease-renewal.js";
 import { CONTROL_EXTENSION_NAMESPACE, OVERSIZED_FOR_RENEW_CHANNEL } from "../lease/control-commands.js";
 import { createMetrics } from "../metrics/metrics.js";
+import { readBrowserSessionGrants } from "../supervisor/browser-session-grants.js";
 
 import type { FakeControlPlane } from "./support/fake-control-plane.js";
 import { enrollFixtureWorker } from "./support/poll-fixtures.js";
@@ -93,6 +94,7 @@ async function fireNextTimer(): Promise<void> {
 }
 
 interface DriverCase {
+  readonly sessionGrants: unknown[];
   readonly renewedAuthorities: unknown[];
   readonly drains: (string | null)[];
   readonly log: string[];
@@ -107,6 +109,7 @@ async function makeDriverCase(options: { handlers?: boolean } = {}): Promise<Dri
   const proxies = spyProxyFactory(log);
   const drains: (string | null)[] = [];
   const renewedAuthorities: unknown[] = [];
+  const sessionGrants: unknown[] = [];
   const metrics = createMetrics();
   const handlers: ControlCommandHandlers = {
     drain: (reason) => {
@@ -118,17 +121,33 @@ async function makeDriverCase(options: { handlers?: boolean } = {}): Promise<Dri
     session: staticSessionProvider(session),
     key,
     identity: RENEWAL_IDENTITY,
-    supervisor: { ...sup.supervisor, onAuthorityRenewed: (_leaseId: string, capability: unknown) => { renewedAuthorities.push(capability); log.push("authority:renewed"); } },
+    supervisor: { ...sup.supervisor, onAuthorityRenewed: (_leaseId: string, capability: unknown) => { renewedAuthorities.push(capability); log.push("authority:renewed"); },
+      applyBrowserSessionGrants: async (_leaseId, grants) => { sessionGrants.push(...grants); } },
     schedule: scheduler,
     makeFenceProxy: proxies.factory,
     metrics,
     tuning: { leadMs: 20_000 },
     ...(options.handlers === false ? {} : { controlHandlers: () => handlers }),
   });
-  return { drains, renewedAuthorities, log, metrics, driver };
+  return { drains, renewedAuthorities, sessionGrants, log, metrics, driver };
 }
 
 describe("renewed effect authority delivery", () => {
+  it.each([false, true])("delivers bounded session grant metadata only when readable (malformed=%s)", async malformed => {
+    const c = await makeDriverCase();
+    const expiresAt = scheduler.now() + 300_000;
+    const entry = { requestId: uuid(70), bindingId: uuid(71), policyDigest: "a".repeat(64), grant: {
+      protocolVersion: 1, operation: "download", method: "GET", artifactId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", objectKey: "organizations/org/jobs/job/attempts/1/browser-session/request",
+      expectedSha256: "a".repeat(64), maxBytes: 100, url: "https://cp.example/api/worker-control/browser-session-credentials/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa?grant=opaque",
+      headers: {}, issuedAt: new Date(scheduler.now()).toISOString(), expiresAt: new Date(expiresAt).toISOString(), redaction: "secret" } };
+    if (!malformed) expect(readBrowserSessionGrants([{ namespace: "com.armyofagents.browser/session-credential-grants", schemaVersion: 1, critical: false, value: { grants: [entry] } }])).toEqual([entry]);
+    fake.enqueueRenew({ kind: "renewed", expiresAt: new Date(expiresAt).toISOString(), extensions: [
+      { namespace: "com.armyofagents.browser/session-credential-grants", schemaVersion: 1, critical: false, value: { grants: malformed ? [{ ...entry, extra: "forbidden" }] : [entry] } },
+    ] });
+    void c.driver.accept(makeRenewalHandoff({ windowMs: 100_000 }));
+    await fireNextTimer();
+    expect(c.sessionGrants).toEqual(malformed ? [] : [entry]);
+  });
   it("applies a capability from a fresh successful renewal to the live supervisor", async () => {
     const c = await makeDriverCase();
     const expiresAt = scheduler.now() + 300_000;

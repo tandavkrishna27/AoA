@@ -8,8 +8,21 @@ vi.mock("../playwright-driver.js", () => ({ createPlaywrightDriver: () => ({
 }) }));
 vi.mock("../listening-ports.js", () => ({ readListeningPorts: async () => [], listeningPortDelta: () => [] }));
 import { runFromConfig, type RunnerConfig } from "../runner.js";
+import { fixtureNetwork } from "./network-fixture.js";
 
 describe("guest runner approval composition", () => {
+  it("refuses absent network authority before a browser operation", async () => {
+    calls.navigate.mockClear(); calls.close.mockClear();
+    await expect(runFromConfig({ launch: { chromiumSandbox: true }, steps: [] } as unknown as RunnerConfig)).rejects.toThrow();
+    expect(calls.navigate).not.toHaveBeenCalled(); expect(calls.close).not.toHaveBeenCalled();
+  });
+  it("refuses credential trace recording before a browser operation", async () => {
+    calls.navigate.mockClear(); calls.close.mockClear();
+    await expect(runFromConfig({ ...fixtureNetwork(), launch: { chromiumSandbox: true, recordTrace: true }, steps: [],
+      sessionCredential: { bindingId: "92c68644-99e1-4db9-8515-c09a6eea1fbd", origin: "https://allowed.example", cookieName: "__Host-session" } } as RunnerConfig))
+      .rejects.toThrow("Browser session credentials refused");
+    expect(calls.navigate).not.toHaveBeenCalled(); expect(calls.close).not.toHaveBeenCalled();
+  });
   it.each(["allow_once", "deny"] as const)("waits for %s before navigation", async (decision) => {
     calls.navigate.mockClear(); calls.close.mockClear();
     const directory = await mkdtemp(join(tmpdir(), "aoa-runner-approval-"));
@@ -28,6 +41,7 @@ describe("guest runner approval composition", () => {
     });
     try {
       const config: RunnerConfig & { approvalDirectory: string } = {
+        ...fixtureNetwork(),
         userDataDir: join(directory, "profile"), downloadsStagingPath: join(directory, "staging"),
         downloadRoot: join(directory, "downloads"), steps: [{ action: "navigate", url: "https://example.com" }],
         launch: { chromiumSandbox: true }, requireApproval: true, approvalTimeoutMs: 1000, approvalDirectory: directory,
@@ -48,7 +62,7 @@ describe("guest runner approval composition", () => {
       listenersDuring = [process.listenerCount("SIGTERM"), process.listenerCount("SIGINT")];
     });
     try {
-      const result = await runFromConfig({ userDataDir: join(directory, "profile"), downloadsStagingPath: join(directory, "staging"),
+      const result = await runFromConfig({ ...fixtureNetwork(), userDataDir: join(directory, "profile"), downloadsStagingPath: join(directory, "staging"),
         downloadRoot: join(directory, "downloads"), steps: [{ action: "navigate", url: "https://example.com" }],
         launch: { chromiumSandbox: true }, requireApproval: false });
       expect(result.ok).toBe(true);

@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, isNotNull, or, sql } from "drizzle-orm";
 import { activityLog, jobArtifacts, jobs, type Db } from "@armyofagents/db";
 import { expectedAttemptObjectPrefix } from "@armyofagents/worker-protocol";
 import { runInTenant } from "../db/tenant-context.js";
@@ -28,15 +28,17 @@ export function createBrowserArtifactRetention(input: {
   ownerDb: Db; appDb: Db; storage: StorageProvider;
   onError?(error: unknown): void;
 }) {
+  const credentialObject = and(eq(jobArtifacts.kind, "browser_cookie_state"), sql`${jobArtifacts.identifier} LIKE 'browser-session-credential:%'`, inArray(jobArtifacts.status, ["pending", "expired"]), isNotNull(jobArtifacts.objectKey));
+  const credentialDue = or(eq(jobArtifacts.status, "expired"), sql`${jobArtifacts.expiresAt} <= clock_timestamp()`, sql`EXISTS (SELECT 1 FROM jobs j WHERE j.id = ${jobArtifacts.jobId} AND j.organization_id = ${jobArtifacts.organizationId} AND j.status IN ('cancel_requested','succeeded','failed','cancelled','dead_letter'))`);
   let cursor: string | null = null;
   let running: Promise<BrowserRetentionReport> | null = null;
   const sweep = async (): Promise<BrowserRetentionReport> => {
     const rows = await input.ownerDb.transaction(async (tx) => {
       await tx.execute(sql`select set_config('statement_timeout', '5000ms', true)`);
       return tx.select({ id: jobArtifacts.id, organizationId: jobArtifacts.organizationId })
-        .from(jobArtifacts).where(and(eq(jobArtifacts.status, "committed"),
+        .from(jobArtifacts).where(and(or(and(eq(jobArtifacts.status, "committed"),
           inArray(jobArtifacts.kind, [...BROWSER_ARTIFACT_KINDS]),
-          sql`(${jobArtifacts.expiresAt} < clock_timestamp() OR (${jobArtifacts.expiresAt} IS NULL AND ${jobArtifacts.committedAt} IS NOT NULL))`,
+          sql`(${jobArtifacts.expiresAt} < clock_timestamp() OR (${jobArtifacts.expiresAt} IS NULL AND ${jobArtifacts.committedAt} IS NOT NULL))`),and(credentialObject,credentialDue)),
           cursor ? gt(jobArtifacts.id, cursor) : undefined))
         .orderBy(asc(jobArtifacts.id)).limit(32);
     });
@@ -54,7 +56,7 @@ export function createBrowserArtifactRetention(input: {
             .from(jobArtifacts).innerJoin(jobs, and(eq(jobs.id, jobArtifacts.jobId),
               eq(jobs.organizationId, jobArtifacts.organizationId)))
             .where(and(eq(jobArtifacts.id, candidate.id), eq(jobArtifacts.organizationId, candidate.organizationId),
-              eq(jobArtifacts.status, "committed"), inArray(jobArtifacts.kind, [...BROWSER_ARTIFACT_KINDS])))
+              or(and(eq(jobArtifacts.status, "committed"), inArray(jobArtifacts.kind, [...BROWSER_ARTIFACT_KINDS])),and(credentialObject,credentialDue))))
             .limit(1).for("update", { of: jobArtifacts, skipLocked: true });
           if (!row) return "skipped";
           const artifact = row.artifact;
@@ -68,6 +70,16 @@ export function createBrowserArtifactRetention(input: {
             entityType: "job_artifact", entityId: artifact.id,
             details: { jobId: artifact.jobId, kind: artifact.kind, retention: artifact.retention },
           }); };
+          if (artifact.identifier.startsWith("browser-session-credential:") && artifact.kind === "browser_cookie_state" && artifact.status != null && ["pending", "expired"].includes(artifact.status)) {
+            await boundedDelete(input.storage, artifact.objectKey);
+            // A hashless placeholder can still have an in-flight awaited put.
+            // Keep its durable tombstone so a late write is deleted again. The
+            // writer clears this pointer only after its own put has settled and
+            // compensating deletion succeeds.
+            await tx.update(jobArtifacts).set({status:"expired",objectKey:artifact.sha256 ? null : artifact.objectKey,updatedAt:sql`clock_timestamp()`}).where(and(eq(jobArtifacts.id,artifact.id),eq(jobArtifacts.organizationId,candidate.organizationId),inArray(jobArtifacts.status,["pending","expired"])));
+            await audit("browser.session_credential.expired");
+            return "expired";
+          }
           if (artifact.expiresAt == null) {
             const seconds = browserArtifactLifetimeSeconds(artifact.kind);
             if (seconds == null || !artifact.committedAt) return "refused";

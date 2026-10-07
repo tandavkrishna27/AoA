@@ -88,7 +88,7 @@ function harness() {
     openStore: (async (o: unknown) => { order.push("openStore"); captured.storeOpts = o; return { close: () => {}, __store: true } as never; }) as never,
     makeSink: ((d: { store: unknown; kek: unknown }) => { order.push("makeSink"); captured.sinkStore = d.store; captured.sinkKek = d.kek; return sinkSentinel; }) as never,
     makeDrain: ((d: { kek: unknown }) => { order.push("makeDrain"); captured.drainKek = d.kek; return { recover: () => { order.push("recover"); return 0; }, start: () => { order.push("drainStart"); }, stop: () => {}, drainOnce: async () => ({}), flush: async () => {} } as never; }) as never,
-    makeSupervisor: ((d: { eventSink: unknown; redactionCanaries: unknown; observeRun?: unknown; opDeadlineMs?: unknown }) => { order.push("makeSupervisor"); captured.supEventSink = d.eventSink; captured.redactionCanaries = d.redactionCanaries; captured.observeRun = d.observeRun; captured.opDeadlineMs = d.opDeadlineMs; captured.envProbe = (d as { envProbe?: unknown }).envProbe; captured.hasEnvProbeKey = "envProbe" in (d as object); return supSentinel; }) as never,
+    makeSupervisor: ((d: { eventSink: unknown; redactionCanaries: unknown; observeRun?: unknown; opDeadlineMs?: unknown }) => { order.push("makeSupervisor"); captured.supEventSink = d.eventSink; captured.redactionCanaries = d.redactionCanaries; captured.observeRun = d.observeRun; captured.opDeadlineMs = d.opDeadlineMs; captured.pendingControl = (d as { onBrowserDecisionPending?: unknown }).onBrowserDecisionPending; captured.envProbe = (d as { envProbe?: unknown }).envProbe; captured.hasEnvProbeKey = "envProbe" in (d as object); return supSentinel; }) as never,
     makeDriver: ((d: { eventSink: unknown; supervisor: unknown; schedule: unknown; controlHandlers?: unknown }) => { order.push("makeDriver"); captured.driverEventSink = d.eventSink; captured.driverSupervisor = d.supervisor; captured.driverSchedule = d.schedule; captured.driverControlHandlers = d.controlHandlers; return driverSentinel; }) as never,
     makePollLoop: ((d: { supervisor: unknown; self: unknown; measure: unknown }) => { order.push("makePollLoop"); captured.pollSupervisor = d.supervisor; captured.pollSelf = d.self; captured.pollMeasure = d.measure; captured.pollRun = () => { order.push("pollRun"); }; return { ...pollSentinel, run: async () => { order.push("pollRun"); return { kind: "stopped" }; } } as never; }) as never,
     makeSchedule: (() => ({ __schedule: true }) as never) as never,
@@ -116,6 +116,16 @@ async function compose(extra?: Partial<ComposeDispatchRuntimeDeps>) {
 }
 
 describe("composeDispatchRuntime — the composition wiring", () => {
+  it("routes pending browser decisions into the renewal-driver port and clears them", async () => {
+    const { captured, driverSentinel } = await compose();
+    const calls: Array<[string, number | null]> = [];
+    Object.assign(driverSentinel, { requestControlPolling: (leaseId: string, until: number | null) => { calls.push([leaseId, until]); } });
+    const pending = captured.pendingControl as (leaseId: string, until: number | null) => void;
+    pending("lease", 30000); pending("lease", null);
+    expect(calls).toEqual([["lease", 30000], ["lease", null]]);
+    Object.assign(driverSentinel, { requestControlPolling: () => { throw new Error("closed"); } });
+    expect(() => pending("lease", null)).not.toThrow();
+  });
   it("★ the poll loop leases through the RENEWAL DRIVER, not the raw supervisor", async () => {
     const { captured, driverSentinel, runtime } = await compose();
     expect(captured.pollSupervisor).toBe(driverSentinel);
@@ -405,15 +415,10 @@ describe("composeDispatchRuntime — JOB-015 control-command handlers", () => {
     expect(order.indexOf("makeDriver")).toBeGreaterThan(-1);
   });
 
-  it("★ `result` is deliberately ABSENT — §5's disclosed gap, pinned in code", async () => {
-    // The two governance result kinds have no applier (E8/BRW-004 + E9/SVC-001 own them).
-    // The daemon must compose NOTHING for them rather than a stub that ACKs: an ACKed but
-    // unapplied command clears `ack_status` forever and reproduces this ticket's own
-    // finding. If a future commit composes `result`, this test reds and its author has to
-    // decide deliberately whether §5 is still true.
+  it("result handler is composed and refuses unsupported governance commands", async () => {
     const { captured } = await compose();
     const handlers = (captured.driverControlHandlers as () => Record<string, unknown>)();
-    expect(handlers.result).toBeUndefined();
-    expect(Object.keys(handlers)).toEqual(["drain"]);
+    expect(handlers.result).toBeTypeOf("function");
+    await expect((handlers.result as (command: unknown) => Promise<void>)({ commandKind: "product_approval_result" })).rejects.toThrow("unsupported governance result");
   });
 });

@@ -26,6 +26,64 @@ function setup() {
 }
 
 describe("fenced browser approval controller", () => {
+  it("uses a trusted credential binding and requires a matched allow-once decision", async () => {
+    const requests: PermissionRuntimeDecisionRequestV1[] = [];
+    const deliverCredential = vi.fn(async () => {});
+    const binding = { bindingId: identity.companyId, origin: "https://example.com", policyDigest: "a".repeat(64) };
+    const controller = createBrowserApprovalController({ identity, now: () => now, deadlineAt: now + 120_000,
+      scrubText: (text) => text, emit: async (request) => { requests.push(request); }, deliver: async () => {},
+      credentialBinding: binding, deliverCredential });
+    const intent = { type: "session_credentials_requested", bindingId: binding.bindingId, policyDigest: binding.policyDigest, requestId: message.requestId, expiresAt: message.expiresAt };
+    await expect(controller.requestCredentials({ ...intent, origin: "https://evil.example" })).rejects.toThrow();
+    await expect(controller.requestCredentials({ ...intent, bindingId: identity.workerId })).rejects.toThrow();
+    await controller.requestCredentials(intent);
+    expect(requests[0]).toMatchObject({ nonce: binding.bindingId, summary: binding.policyDigest,
+      toolName: "browser.session_credentials", networkTarget: binding.origin, riskClass: "credential_use" });
+    const command = setup().command(requests[0]);
+    await controller.apply(command);
+    expect(deliverCredential).toHaveBeenCalledWith(requests[0]);
+    expect(controller.approvedCredential(message.requestId)).toEqual(requests[0]);
+    await controller.apply(command);
+    expect(deliverCredential).toHaveBeenCalledTimes(1);
+    controller.consumeCredential(message.requestId);
+    expect(controller.approvedCredential(message.requestId)).toBeNull();
+  });
+
+  it("refuses credential intents when no trusted binding is composed", async () => {
+    const ctx = setup();
+    await expect(ctx.controller.requestCredentials({ type: "session_credentials_requested", bindingId: identity.companyId, policyDigest: "a".repeat(64),
+      requestId: message.requestId, expiresAt: message.expiresAt })).rejects.toThrow();
+    expect(ctx.requests).toHaveLength(0);
+  });
+
+  it("does not deliver a credential when the matched decision is deny", async () => {
+    const requests: PermissionRuntimeDecisionRequestV1[] = [];
+    const deliverCredential = vi.fn(async () => {});
+    const controller = createBrowserApprovalController({ identity, now: () => now, deadlineAt: now + 120_000,
+      scrubText: (text) => text, emit: async (request) => { requests.push(request); }, deliver: async () => {},
+      credentialBinding: { bindingId: identity.companyId, origin: "https://example.com", policyDigest: "a".repeat(64) }, deliverCredential });
+    await controller.requestCredentials({ type: "session_credentials_requested", bindingId: identity.companyId, policyDigest: "a".repeat(64),
+      requestId: message.requestId, expiresAt: message.expiresAt });
+    const command = setup().command(requests[0]);
+    if (command.commandKind === "runtime_decision_result" && command.result.decisionKind === "permission") command.result.decision = "deny";
+    await controller.apply(command);
+    expect(deliverCredential).not.toHaveBeenCalled();
+    expect(controller.approvedCredential(message.requestId)).toBeNull();
+  });
+  it.each(["agent", "service", "system"] as const)("refuses matched %s allow-once as nonhuman", async principalType => {
+    const requests: PermissionRuntimeDecisionRequestV1[] = [];
+    const deliverCredential = vi.fn(async () => {});
+    const controller = createBrowserApprovalController({ identity, now: () => now, deadlineAt: now + 120_000,
+      scrubText: text => text, emit: async request => { requests.push(request); }, deliver: async () => {},
+      credentialBinding: { bindingId: identity.companyId, origin: "https://example.com", policyDigest: "a".repeat(64) }, deliverCredential });
+    await controller.requestCredentials({ type: "session_credentials_requested", bindingId: identity.companyId,
+      policyDigest: "a".repeat(64), requestId: message.requestId, expiresAt: message.expiresAt });
+    const command = setup().command(requests[0]);
+    if (command.commandKind === "runtime_decision_result") command.result.decidedBy = { principalType, principalId: "other" };
+    await expect(controller.apply(command)).rejects.toThrow("human");
+    expect(deliverCredential).not.toHaveBeenCalled();
+    expect(controller.approvedCredential(message.requestId)).toBeNull();
+  });
   it("emits a scrubbed frozen request once and delivers its matched decision", async () => {
     const ctx = setup();
     await ctx.controller.request({ ...message, intent: { ...message.intent, title: "credential-canary" } });

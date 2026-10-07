@@ -68,6 +68,13 @@ import {
 // SVC-005a — the cross-generation placement fence's pure classifier. The reconciler consults
 // it; the rollout writer that makes a second generation possible lives in the same module.
 import { findBlockingPredecessor } from "./service-generation-rollout.js";
+import { readServiceCrashRecovery } from "./service-crash-recovery.js";
+import { setServiceDesiredStateWithinTenant } from "./service-management.js";
+import { publishServiceControlActivity } from "./service-control-audit.js";
+import type { PreparedActivityEvent } from "./activity-log.js";
+import { materializeServiceCheckpoint, serviceCheckpointRestoreSchema, serviceCheckpointStorage, stageServiceCheckpointFilesWithinTenant, ServiceCheckpointRefused } from "./service-checkpoint.js";
+import type { StorageProvider } from "../storage/types.js";
+import type { StagedInputFile } from "./job-input-staging.js";
 
 /**
  * Fixed, never-rotate namespace UUID for deriving a service reconciliation's identity
@@ -142,6 +149,9 @@ export type ServiceReconcileNoneReason =
   | "instance_present"
   /** Organization budget hard-stop or concurrency cap; the transaction rolled back whole. */
   | "quota_denied"
+  | "crash_backoff"
+  | "crash_loop_paused"
+  | "checkpoint_recovery_unavailable"
   /**
    * ★★★ SVC-005a — THE GENERATION ROLLOUT FENCE REFUSED THIS PLACEMENT. An instance of a
    * PREVIOUS generation ended without a witness — a clock condemned it, or its author is
@@ -170,6 +180,7 @@ export interface ReconcileServiceInput {
   organizationId: string;
   companyId: string;
   serviceId: string;
+  checkpointStorage?: StorageProvider;
 }
 
 /**
@@ -212,6 +223,8 @@ export async function reconcileServiceWithinTenant(
   // so a `capacity` refusal captures its intent for {@link reconcileService} to drain on a
   // pool handle after this transaction rolls back. Optional so a direct caller is unchanged.
   denialSink?: AdmissionDenialSink,
+  published: PreparedActivityEvent[] = [],
+  checkpointUploads: { storage: StorageProvider | null; keys: string[] } = { storage: null, keys: [] },
 ): Promise<ServiceReconcileOutcome> {
   // 1 + 2: serialize concurrent passes into a wait, then PIN desired_state AND generation
   // for the whole transaction so a concurrent SVC-005 generation bump cannot land between
@@ -238,6 +251,11 @@ export async function reconcileServiceWithinTenant(
     generation: service.generation,
   });
   if (!generation) return { action: "none", reason: "no_generation" };
+  // A pointer without store-to-provider materialization is not a restore. Refuse
+  // placement rather than silently start a fresh process with requested state lost.
+  if (generation.checkpointArtifactId !== null && generation.definition.checkpointRestore === undefined) {
+    return { action: "none", reason: "checkpoint_recovery_unavailable" };
+  }
 
   // 4: OBSERVED state. NON-TERMINAL, not `healthy` — see the repository docstring.
   const live = await repos.jobControl.countNonTerminalInstances({
@@ -280,6 +298,47 @@ export async function reconcileServiceWithinTenant(
   // that braces, so a future widening of the query cannot admit a witnessed row by accident.
   if (findBlockingPredecessor(unwitnessed) !== null) {
     return { action: "none", reason: "predecessor_generation_unwitnessed" };
+  }
+
+  // SVC-004: the database clock and terminal history survive control-plane
+  // restarts. The parent lock serializes both this verdict and its replacement.
+  const recovery = await readServiceCrashRecovery(tx, {
+    ...input, generation: service.generation,
+  }, await repos.jobControl.currentDatabaseTime());
+  if (recovery.action === "wait") return { action: "none", reason: "crash_backoff" };
+  if (recovery.action === "pause") {
+    await setServiceDesiredStateWithinTenant(repos, {
+      ...input, desiredState: "paused", reason: "Witnessed service exit limit reached in the ten-minute crash window",
+    }, { tx, actor: { actorType: "system", actorId: "service-reconciler" }, published });
+    return { action: "none", reason: "crash_loop_paused" };
+  }
+
+  let checkpointArtifactId = generation.checkpointArtifactId;
+  let checkpointFiles: StagedInputFile[] = [];
+  if (generation.definition.checkpointRestore !== undefined) {
+    if (!generation.definition.checkpointRestore || typeof generation.definition.checkpointRestore !== "object" || Array.isArray(generation.definition.checkpointRestore)) {
+      throw new ServiceCheckpointRefused("approval_binding_invalid");
+    }
+    const binding = generation.definition.checkpointRestore as Record<string, unknown>;
+    const { approvedGeneration, ...source } = binding;
+    if (approvedGeneration !== service.generation) throw new ServiceCheckpointRefused("approval_generation_mismatch");
+    const approved = serviceCheckpointRestoreSchema.parse(source);
+    if (approved.sourceGeneration !== service.generation - 1 ||
+        (checkpointArtifactId !== null && checkpointArtifactId !== approved.manifestArtifactId)) {
+      throw new ServiceCheckpointRefused("source_generation_mismatch");
+    }
+    const storage = input.checkpointStorage ?? serviceCheckpointStorage();
+    checkpointUploads.storage = storage;
+    checkpointFiles = await materializeServiceCheckpoint(tx, storage, {
+      organizationId: input.organizationId, companyId: input.companyId, serviceId: input.serviceId,
+      generation: approved.sourceGeneration,
+    }, approved, await repos.jobControl.currentDatabaseTime());
+    checkpointArtifactId = approved.manifestArtifactId;
+    checkpointFiles.push({
+      path: `/tmp/aoa-service-state/${input.serviceId}/.aoa-checkpoint-${checkpointArtifactId}-${service.generation}.json`,
+      bytes: Buffer.from(JSON.stringify({ version: 1, serviceId: input.serviceId, generation: service.generation,
+        sourceGeneration: approved.sourceGeneration, manifestArtifactId: checkpointArtifactId, manifestSha256: approved.manifestSha256 })),
+    });
   }
 
   // 5: mint the instance FIRST, because the frozen workload carries `serviceInstanceId` and
@@ -335,7 +394,7 @@ export async function reconcileServiceWithinTenant(
           generation: service.generation,
           command,
           args,
-          checkpointArtifactId: generation.checkpointArtifactId,
+          checkpointArtifactId,
           gracefulStopSeconds,
         },
       },
@@ -343,6 +402,13 @@ export async function reconcileServiceWithinTenant(
     tx,
     denialSink,
   );
+
+  if (checkpointFiles.length > 0) {
+    await stageServiceCheckpointFilesWithinTenant(repos, tx, checkpointUploads.storage!, {
+      organizationId: input.organizationId, companyId: input.companyId,
+      jobId: submitted.jobId, attemptId: submitted.attemptId,
+    }, checkpointFiles, checkpointUploads.keys);
+  }
 
   // 6b: attribute the instance to the job serving it, still inside this transaction. Without
   // this the instance row is unattributable and SVC-003 has nothing to fence against.
@@ -402,10 +468,19 @@ export async function reconcileService(
   // written inside the transaction the single-transaction composition exists to roll back.
   // No-op when nothing was captured; never throws.
   const denialSink: AdmissionDenialSink = { intent: null };
+  const published: PreparedActivityEvent[] = [];
+  const checkpointUploads: { storage: StorageProvider | null; keys: string[] } = { storage: null, keys: [] };
+  let committed = false;
   try {
-    return await runInTenant(appDb, input.organizationId, (repos, tx) =>
-      reconcileServiceWithinTenant(repos, tx, input, denialSink));
+    const result = await runInTenant(appDb, input.organizationId, (repos, tx) =>
+      reconcileServiceWithinTenant(repos, tx, input, denialSink, published, checkpointUploads));
+    committed = true;
+    publishServiceControlActivity(published);
+    return result;
   } catch (error) {
+    for (const objectKey of committed ? [] : checkpointUploads.keys) {
+      await checkpointUploads.storage?.deleteObject({ objectKey }).catch(() => undefined);
+    }
     if (quotaDenied(error)) return { action: "none", reason: "quota_denied" };
     if (invalidDefinition(error)) return { action: "none", reason: "invalid_definition" };
     throw error;

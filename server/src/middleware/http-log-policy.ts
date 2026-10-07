@@ -34,6 +34,9 @@ function normalizePath(url: string): string {
   const pathname = trimmed.split("?")[0]?.trim() ?? "/";
   return pathname.length > 0 ? pathname : "/";
 }
+export function isBrowserSessionCredentialPath(url:string|undefined):boolean {
+  return Boolean(url && /^(?:\/api)?\/worker-control\/browser-session-credentials\/[^/]+$/.test(normalizePath(url)));
+}
 
 const PAYLOAD_OMITTED_PATHS = [
   /^(?:\/api)?\/organizations\/[^/]+\/companies\/[^/]+\/jobs$/,
@@ -50,6 +53,7 @@ export function shouldOmitHttpRequestPayload(
   method: string | undefined,
   url: string | undefined,
 ): boolean {
+  if (isBrowserSessionCredentialPath(url)) return true;
   if (method?.toUpperCase() !== "POST" || !url) return false;
   const pathname = normalizePath(url);
   return PAYLOAD_OMITTED_PATHS.some((pattern) => pattern.test(pathname));
@@ -58,6 +62,7 @@ export function shouldOmitHttpRequestPayload(
 export function isSensitiveWorkerControlPath(url: string | undefined): boolean {
   if (!url) return false;
   const pathname = normalizePath(url);
+  if (isBrowserSessionCredentialPath(url)) return true;
   return /^(?:\/api)?\/(?:worker-control\/enroll|execution-targets\/heartbeat)$/.test(pathname);
 }
 

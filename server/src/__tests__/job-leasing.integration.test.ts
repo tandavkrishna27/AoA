@@ -35,6 +35,7 @@ import { admitAttemptCapacity } from "../services/org-concurrency.js";
 import { sql } from "drizzle-orm";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { settleAllClaimers } from "./helpers/settle-all-claimers.js";
+import { stageBrowserCandidate } from "./helpers/browser-staged-candidate.js";
 import { runInTenant } from "../db/tenant-context.js";
 import { createJobControlRepository } from "../../../packages/db/src/repositories/tenant/job-control.js";
 import type { Db } from "../../../packages/db/src/client.js";
@@ -521,6 +522,9 @@ integration("JOB-003 atomic poll/offer and ready hints", () => {
         ${placement.providerHash}, 'primary', 'target_selected', ${placement.mode},
         ${placement.leaseEligible}, ${"6".repeat(64)}, ${"6".repeat(64)}, clock_timestamp(),
         ${availableAt}, ${availableAt})`;
+    if (workloadType === "browser_session") {
+      await stageBrowserCandidate(admin, { organizationId, jobId, targetId: placement.targetId });
+    }
     if (input.outbox !== false) {
       await admin`INSERT INTO job_outbox
         (id, organization_id, company_id, job_id, attempt_id, kind, status, payload, available_at)

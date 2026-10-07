@@ -330,6 +330,15 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
   // the boot gate refuses if neither). `materializeRunSecrets` is always present here, so the
   // makeRunProvider⟹materializeRunSecrets pairing (supervisor fail-fast F5) is satisfied.
   const supervisor = makeSupervisor({
+    onBrowserDecisionPending: (leaseId, untilMs) => {
+      try { driver.requestControlPolling?.(leaseId, untilMs); }
+      catch {
+        // Closing a run can race its renewal completion. A failed nudge never
+        // grants authority or replaces the normal lease-loss/cancellation path.
+        if (untilMs !== null) deps.logger?.warn({ leaseId }, "worker: pending browser control polling unavailable");
+      }
+    },
+    browserSelfModel: deps.self,
     provider: deps.provider,
     makeRunProvider: deps.makeRunProvider,
     identity,
@@ -338,7 +347,15 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
     materializeRunSecrets,
     resolveStagedFiles,
     exportArtifacts,
-    resolveExportArtifacts,
+    resolveExportArtifacts: async (input) => {
+      const requests = await resolveExportArtifacts(input);
+      if (input.handoff.offer.job.workloadType !== "browser_session") return requests;
+      // Browser state remains outside the output root. These classifications
+      // activate server-owned browser retention; no bytes cross the worker.
+      return requests.map((request) => ({ ...request, kind:
+        request.path === "/home/user/aoa-output/session-trace.zip" ? "playwright_trace" :
+        request.path === "/home/user/aoa-output/session-video.webm" ? "browser_video" : "download" }));
+    },
     canaryCoordinator,
     observeRun: createUsageObserver({
       metrics: deps.metrics,
@@ -389,12 +406,13 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
     // already running. A `drain` command therefore does exactly what an operator drain
     // and a rolling shutdown do, through the same code.
     //
-    // `result` is deliberately ABSENT. Nothing in the daemon applies a
-    // `product_approval_result` / `runtime_decision_result` yet — E8/BRW-004 owns the
-    // browser-side applier — so those kinds are counted `control_command{outcome=
-    // "unhandled"}` and stay pending for redelivery. That is the honest state; a stub
-    // that ACKed them would clear the queue and hide the gap.
+    // Only matched browser runtime decisions can be applied. Other result kinds
+    // reject and remain pending rather than being acknowledged without effect.
     controlHandlers: () => ({
+      result: async (command) => {
+        if (command.commandKind !== "runtime_decision_result" || !supervisor.applyBrowserDecision) throw new Error("unsupported governance result");
+        await supervisor.applyBrowserDecision(command);
+      },
       drain: () => {
         deps.logger?.info({ reason: "control_command" }, "worker: drain requested by the control plane");
         pollLoop.stopLeasing();

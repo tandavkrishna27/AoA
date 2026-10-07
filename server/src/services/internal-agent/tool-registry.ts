@@ -97,6 +97,7 @@ import { approvalTools } from "./tools/approval-tools.js";
 // Company-scoped in-tool (getById/listComments have no company filter).
 import { getHeartbeatContextTool } from "./tools/heartbeat-context-tool.js";
 import { askFounderCompatibilityTool, askHumanTool } from "./tools/ask-human-tool.js";
+import { browserSessionTool } from "./tools/browser-session-tool.js";
 
 export function createToolRegistry(): AgentTool[] {
   return [
@@ -192,6 +193,7 @@ export function createToolRegistry(): AgentTool[] {
     // (query category, team_member role, company-scoped in-tool).
     getHeartbeatContextTool,
     askHumanTool,
+    browserSessionTool,
     askFounderCompatibilityTool,
   ];
 }

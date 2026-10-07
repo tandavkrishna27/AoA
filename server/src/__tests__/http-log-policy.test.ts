@@ -6,6 +6,13 @@ import {
 } from "../middleware/http-log-policy.js";
 
 describe("shouldOmitHttpRequestPayload", () => {
+  it("removes one-use browser secret grant query and headers on success and refusal",()=>{
+    const path="/api/worker-control/browser-session-credentials/123";
+    for(const method of ["GET","HEAD","POST"]){
+      expect(shouldOmitHttpRequestPayload(method,path+"?grant=bearer-secret")).toBe(true);
+      expect(safeHttpLogUrl(method,path+"?grant=bearer-secret")).toBe(path);
+    }
+  });
   it("omits distributed job and credential-bearing worker-control payloads from HTTP logs", () => {
     const path = "/api/organizations/org-1/companies/company-1/jobs";
     expect(shouldOmitHttpRequestPayload("POST", `${path}?trace=1`)).toBe(true);

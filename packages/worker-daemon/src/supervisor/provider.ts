@@ -155,6 +155,22 @@ export interface SandboxLifetimeResult {
   readonly expiresAt: number;
 }
 
+export interface BrowserDecisionDeliveryInput {
+  readonly sandboxId: string;
+  readonly response: Pick<import("@armyofagents/worker-protocol").PermissionRuntimeDecisionResultV1, "requestId" | "decision" | "expiresAt">;
+}
+export interface BrowserDecisionDeliveryResult {
+  readonly providerOpId: string;
+  readonly delivered: true;
+}
+
+export interface BrowserCredentialDeliveryInput {
+  readonly sandboxId: string;
+  readonly requestId: string;
+  readonly grant: import("@armyofagents/worker-protocol").ArtifactDownloadGrantV1;
+}
+export type BrowserCredentialDeliveryResult = BrowserDecisionDeliveryResult;
+
 /**
  * One file to stage: WHERE it goes inside the sandbox, and a GRANT that redeems to its bytes.
  *
@@ -385,11 +401,17 @@ export function hashResourceLabels(labels: ResourceLabels): string {
  * double-apply (lost-response replay).
  */
 export interface ProviderOpContext {
+  /** Local operation lifetime; never serialized into the provider wire envelope. */
+  readonly signal?: AbortSignal;
+  /** Host-local current authority check immediately before publishing an effect. */
+  readonly assertActive?: () => void;
   readonly deadlineMs: number;
   readonly idempotencyKey: string;
 }
 
 export interface CreateSandboxSpec {
+  /** Browser-only: provider must enforce this policy before creating the guest. */
+  readonly browserNetworkPolicy?: import("@armyofagents/worker-protocol").NetworkPolicyV1;
   readonly resourceLabels: ResourceLabels;
   /** The TENANT command — it runs INSIDE the sandbox, never in the worker. */
   readonly command: string;
@@ -399,6 +421,8 @@ export interface CreateSandboxSpec {
 }
 
 export interface CreateResult {
+  /** Exact policy installed before guest creation; absent is a refusal for browser runs. */
+  readonly browserNetworkPolicyDigest?: string;
   readonly sandboxId: string;
   readonly providerOpId: string;
   readonly resourceLabels: ResourceLabels;
@@ -647,6 +671,12 @@ export function deriveStopVerdict(observation: ProcessObservation): "stopped" | 
  * implement this port later without changing it.
  */
 export interface SandboxProvider {
+  /** Redeem native session bytes provider-side and publish to the fixed private mailbox. */
+  deliverBrowserCredential?(input: BrowserCredentialDeliveryInput, ctx: ProviderOpContext): Promise<BrowserCredentialDeliveryResult>;
+  /** Fixed browser approval mailbox operation; unavailable providers refuse it. */
+  deliverBrowserDecision?(input: BrowserDecisionDeliveryInput, ctx: ProviderOpContext): Promise<BrowserDecisionDeliveryResult>;
+  /** Only a provider with measured enforcement may expose this local capability. */
+  readonly browserNetworkPolicyMode?: "verified_default_deny";
   /** Local credential refresh on an existing ownership binding. This is not a
    * provider wire operation and never re-resolves secrets. */
   refreshAuthority?(capability: unknown): void;

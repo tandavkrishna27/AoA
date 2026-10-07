@@ -30,6 +30,10 @@
  * `LaunchOptions` — deliberately not imported, so this package stays dependency-free and the
  * guard can run anywhere (including on the host, before a runner is staged). */
 export interface BrowserLaunchOptions {
+  readonly viewport?: { readonly width: number; readonly height: number };
+  readonly locale?: string;
+  readonly timezoneId?: string;
+  readonly recordTrace?: boolean;
   readonly headless?: boolean;
   /** Playwright pushes `--no-sandbox` unless this is exactly `true` (chromium.js:295-296). */
   readonly chromiumSandbox?: boolean;

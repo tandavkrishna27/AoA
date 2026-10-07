@@ -11,6 +11,7 @@
 // rollback writes nothing, and park_run ends the attempt + queues the compute-release.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { randomUUID } from "node:crypto";
+import { stageBrowserCandidate } from "./helpers/browser-staged-candidate.js";
 import {
   matchRuntimeDecisionResultToRequestV1,
   productApprovalAuthorizesActionV1,
@@ -23,6 +24,10 @@ import type { SubmitJobSource } from "@armyofagents/shared";
 import {
   setupJobControlFixture,
   COMPANY,
+  ORG,
+  TARGET,
+  pollRequest,
+  ackRequest,
   auth,
   sha256,
   type JobControlFixture,
@@ -146,9 +151,17 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     });
 
     it("[browser] accepted worker approval preserves request identity through the human result", async () => {
-      guard(); const { identity: fence } = await fixture!.activateLease(20);
-      const browserSource = { ...BROWSER_SOURCE, browserRequestId: randomUUID() };
+      guard(); const { identity: parent } = await fixture!.activateLease(20);
+      await fixture!.admin`UPDATE jobs SET status = 'running' WHERE id = ${parent.jobId}`;
+      await fixture!.admin`UPDATE job_attempts SET status = 'running' WHERE id = ${parent.attemptId}`;
+      const seeded = await fixture!.seedPlacedJob(21);
+      const polled = await fixture!.leasing.poll({ auth: auth("browser-child-poll"), request: pollRequest("browser-child-poll") });
+      if (polled.outcome !== "offer") throw new Error("expected child offer");
+      await fixture!.leasing.ack({ auth: auth("browser-child-ack"), request: ackRequest(polled.body) });
+      const fence = fixture!.fenceIdentity(seeded, polled.body);
+      const browserSource = { ...BROWSER_SOURCE, browserRequestId: randomUUID(), parentJobId: parent.jobId };
       await fixture!.admin`UPDATE jobs SET workload_type = 'browser_session', source_kind = 'browser_request', source_identity = ${browserSource.browserRequestId}, source_intent = ${fixture!.admin.json(browserSource)} WHERE id = ${fence.jobId}`;
+      await stageBrowserCandidate(fixture!.admin, { organizationId: ORG, jobId: fence.jobId, targetId: TARGET, parent });
       const title = "Open https://example.com";
       const request = permissionRuntimeDecisionRequestV1Schema.parse({ decisionKind: "permission", requestId: randomUUID(), nonce: randomUUID(),
         requestDigest: runtimeDecisionPromptHash({ kind: "permission", title, summary: null, promptText: null, command: null }),

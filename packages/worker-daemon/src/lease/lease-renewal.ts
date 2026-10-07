@@ -69,6 +69,7 @@ import {
 } from "./control-commands.js";
 import { sendControlAck } from "./control-ack.js";
 import { readRenewedOwnedLabelsCapability } from "./renewed-owned-labels-capability.js";
+import { readBrowserSessionGrants, type BrowserSessionGrant } from "../supervisor/browser-session-grants.js";
 import type { OwnedLabelsCapabilityLike } from "./owned-labels-capability.js";
 import {
   ControlPlaneTransportError,
@@ -127,6 +128,8 @@ export type RenewAttempt =
       readonly controlFault: boolean;
       readonly capability?: OwnedLabelsCapabilityLike | null;
       readonly capabilityFault?: boolean;
+      readonly browserSessionGrants?: readonly BrowserSessionGrant[];
+      readonly browserSessionGrantFault?: boolean;
     }
   | { readonly kind: "rejected"; readonly code: string }
   | { readonly kind: "terminal"; readonly reason: "unauthorized" | "target_revoked" }
@@ -249,6 +252,10 @@ function classifyRenewResponse(response: WorkerOperationHttpResponse): RenewAtte
       try { capability = readRenewedOwnedLabelsCapability(parsed.data.body.extensions); }
       catch { capabilityFault = true; }
       let control: ControlCommandDelivery | null = null;
+      let browserSessionGrants: BrowserSessionGrant[] = [];
+      let browserSessionGrantFault = false;
+      try { browserSessionGrants = readBrowserSessionGrants(parsed.data.body.extensions ?? []); }
+      catch { browserSessionGrantFault = true; }
       let controlFault = false;
       try {
         control = readControlCommandDelivery(parsed.data.body.extensions);
@@ -270,6 +277,8 @@ function classifyRenewResponse(response: WorkerOperationHttpResponse): RenewAtte
         controlFault,
         capability,
         capabilityFault,
+        browserSessionGrants,
+        browserSessionGrantFault,
       };
     }
     return { kind: "rejected", code: parsed.data.reason };
@@ -339,6 +348,7 @@ export function createRealRenewalSchedule(): RenewalSchedule {
  * this (it extends `SupervisorSeam` and exposes `cancel`/`onLeaseLost`). */
 export interface RenewalSupervisor extends SupervisorSeam {
   onAuthorityRenewed?(leaseId: string, capability: OwnedLabelsCapabilityLike): void;
+  applyBrowserSessionGrants?(leaseId: string, grants: readonly BrowserSessionGrant[]): Promise<void>;
   cancel(leaseId: string, reason?: string): Promise<void> | void;
   onLeaseLost(leaseId: string): Promise<void> | void;
 }
@@ -422,6 +432,9 @@ export interface LeaseRenewalDriver extends SupervisorSeam {
   activeRenewalCount(): number;
   /** The fence-close proxy bound to `leaseId` (governed effects route through it). */
   proxyFor(leaseId: string): GovernedEffectAuthority | undefined;
+  /** Bounded one-second renew polling while a runtime control is pending. Null
+   * restores the normal schedule; this never extends a guest or lease deadline. */
+  requestControlPolling?(leaseId: string, untilMs: number | null): void;
 }
 
 /** How the driver observed the lease liveness (drives both metrics). */
@@ -453,6 +466,8 @@ interface LeaseState {
    * un-ACKed command twice, so the second pass is skipped: nothing was ACKed, the rows
    * stay pending, and the next renewal redelivers them. */
   controlApplying: boolean;
+  controlPollingUntilMs: number | null;
+  renewing: boolean;
 }
 
 const NOOP_SINK: WorkerEventSink = { emit: () => {} };
@@ -504,12 +519,16 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
   }
 
   function reschedule(state: LeaseState): void {
-    if (stopped || state.terminated) return;
+    if (stopped || state.terminated || state.renewing) return;
     if (state.timer !== null) {
       schedule.clearTimer(state.timer);
       state.timer = null;
     }
-    const fireAt = state.expiresAtMs - state.leadMs;
+    const now = schedule.now();
+    if (state.controlPollingUntilMs !== null && state.controlPollingUntilMs <= now) state.controlPollingUntilMs = null;
+    const normal = state.expiresAtMs - state.leadMs;
+    const fireAt = state.controlPollingUntilMs === null ? normal :
+      Math.min(normal, now + 1000, state.controlPollingUntilMs, state.expiresAtMs);
     const delay = Math.max(0, fireAt - schedule.now());
     state.timer = schedule.setTimer(() => driveRenewal(state), delay);
   }
@@ -746,6 +765,14 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
   }
 
   async function driveRenewal(state: LeaseState): Promise<void> {
+    if (stopped || state.terminated || state.renewing) return;
+    clearTimer(state);
+    state.renewing = true;
+    let ownsRenewal = true;
+    const releaseRenewal = (): void => {
+      if (!ownsRenewal) return;
+      ownsRenewal = false; state.renewing = false;
+    };
     // The renewal timer is fire-and-forget (`void fn()`), so an UNEXPECTED throw from the
     // renew flow (e.g. a mid-body-stream network error surfaced by `response.text()`, a
     // device-proof signing failure, or a schema parse error) would otherwise become an
@@ -753,7 +780,7 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
     // fence-close proxy OPEN (defense-in-depth defeated) and the supervisor un-escalated.
     // Fail closed — any unclassified failure is treated as lease loss.
     try {
-      await driveRenewalInner(state);
+      await driveRenewalInner(state, releaseRenewal);
     } catch (err) {
       deps.logger?.error(
         { leaseId: state.leaseId, err },
@@ -768,10 +795,10 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
             ),
         );
       }
-    }
+    } finally { releaseRenewal(); }
   }
 
-  async function driveRenewalInner(state: LeaseState): Promise<void> {
+  async function driveRenewalInner(state: LeaseState, releaseRenewal: () => void): Promise<void> {
     if (stopped || state.terminated) return;
     // Pre-POST monotonic expiry check: a late timer (sleep/resume) never trusts a
     // later renew — the worker's `observedAt` cannot authorize expiry.
@@ -861,9 +888,18 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
         // SLOW control plane strand a healthy lease — the opposite of what
         // `ackControl`'s "best-effort, never a lease loss" contract promises. The timer
         // fires off `expiresAtMs`, so arming it here schedules exactly the same instant.
+        // Release only the network renewal phase. Control apply/ACK retains its
+        // existing separate gate, so a slow ACK cannot strand the next renewal.
+        releaseRenewal();
         reschedule(state);
         if (!attempt.controlFault && attempt.control) {
           await applyControlDelivery(state, session, attempt.control);
+        }
+        if (!state.terminated && !attempt.browserSessionGrantFault && attempt.browserSessionGrants?.length && deps.supervisor.applyBrowserSessionGrants) {
+          try { await deps.supervisor.applyBrowserSessionGrants(state.leaseId, attempt.browserSessionGrants); }
+          catch { deps.logger?.warn({ leaseId: state.leaseId }, "lease-renewal: browser credential delivery refused"); }
+        } else if (attempt.browserSessionGrantFault) {
+          deps.logger?.warn({ leaseId: state.leaseId }, "lease-renewal: browser credential grant malformed");
         }
         return;
       }
@@ -933,6 +969,8 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
       recoveries: 0,
       controlMemory: createControlReceiverMemory(),
       controlApplying: false,
+      controlPollingUntilMs: null,
+      renewing: false,
     };
     leases.set(handoff.leaseId, state);
     reschedule(state);
@@ -940,6 +978,15 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
   }
 
   return {
+    requestControlPolling(leaseId, untilMs): void {
+      const state = leases.get(leaseId); const now = schedule.now();
+      if (stopped || !state || state.terminated || !state.proxy.isActive() || now >= state.expiresAtMs ||
+          (untilMs !== null && (typeof untilMs !== "number" || !Number.isFinite(untilMs) || untilMs <= now))) {
+        throw new Error("runtime control polling unavailable");
+      }
+      state.controlPollingUntilMs = untilMs === null ? null : Math.min(untilMs, now + 300_000, state.expiresAtMs);
+      reschedule(state);
+    },
     accept(handoff: LeaseHandoff): Promise<void> {
       const state = registerLease(handoff);
       const settle = Promise.resolve<void>(deps.supervisor.accept(handoff) as void | Promise<void>);

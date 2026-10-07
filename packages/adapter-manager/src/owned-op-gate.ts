@@ -126,7 +126,7 @@ export async function gateOwnedOp<R>(
   sandboxId: string,
   ctx: ProviderOpContext,
   capability: OwnedLabelsCapability | undefined,
-  dispatch: (detail: InspectResult, remainingMs?: number) => Promise<R>,
+  dispatch: (detail: InspectResult, remainingMs?: number, assertActive?: () => void) => Promise<R>,
   /**
    * DAT-009-3e (Codex P1, PR #557) — an OPTIONAL ABSOLUTE ms-epoch deadline for the LOCKED section:
    * the ownership inspection AND the dispatch.
@@ -214,7 +214,10 @@ export async function gateOwnedOp<R>(
       // ★ The dispatch's budget is RE-MEASURED here (Codex P1, seventh round): the inspection above
       // has already spent part of the window, and handing the provider the pre-inspection figure
       // would give it a timer that outlives this section's own bound.
-      return dispatch(detail, opDeadlineAtMs === undefined ? undefined : opDeadlineAtMs - now());
+      return dispatch(detail, opDeadlineAtMs === undefined ? undefined : opDeadlineAtMs - now(), () => {
+        if (ctx.signal?.aborted || budgetFired || (opDeadlineAtMs !== undefined && opDeadlineAtMs <= now())) throw new ResourceNotAvailableError();
+        requireWarmAuthorityAtUse();
+      });
     })();
     return remainingMs === undefined
       ? locked

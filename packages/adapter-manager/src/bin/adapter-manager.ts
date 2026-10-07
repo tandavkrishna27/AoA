@@ -40,7 +40,7 @@ import type { ProviderOpContext, SandboxProvider } from "@armyofagents/worker-da
 
 import { createProviderServer, type CreateProviderServerOptions } from "../server.js";
 import { reconcileReaper, type ReaperLogger } from "../reconcile-reaper.js";
-import { makeControlPlaneResolveTruth, TRUTH_SHARED_SECRET_ENV } from "../reaper-truth-client.js";
+import { makeControlPlaneResolveTruth, CONTROL_PLANE_URL_ENV, TRUTH_SHARED_SECRET_ENV } from "../reaper-truth-client.js";
 import { WarmCleanupJournal } from "../warm-cleanup-journal.js";
 import { createWarmCleanupRecovery } from "../warm-cleanup-recovery.js";
 import { makeWarmResourceAcknowledger, makeWarmResourceResolveTruth } from "../warm-resource-truth-client.js";
@@ -78,6 +78,7 @@ export interface ProviderModule {
     readonly templateId?: string;
     readonly scanExportBytes?: unknown;
     readonly enablePauseResume?: boolean;
+    readonly browserCredentialControlPlaneOrigin?: string;
   }) => SandboxProvider;
   readonly createRealE2bTransport: () => unknown;
   /**
@@ -153,6 +154,14 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
   if (template === undefined || template === "") {
     return refused(`${PROVIDER_ENV}=e2b requires ${TEMPLATE_ENV} to name a sandbox template`);
   }
+  // Native host configuration pins credential redemption independently of worker grants.
+  let browserCredentialControlPlaneOrigin: string | undefined;
+  try {
+    const configured = new URL(env[CONTROL_PLANE_URL_ENV]?.trim() ?? "");
+    if (configured.protocol === "https:" && !configured.username && !configured.password) {
+      browserCredentialControlPlaneOrigin = configured.origin;
+    }
+  } catch { /* Missing/invalid configuration leaves credential delivery disabled. */ }
   let provider: SandboxProvider;
   try {
     const mod = await load();
@@ -171,6 +180,7 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
     provider = new mod.E2bSandboxProvider({
       transport,
       templateId: template,
+      browserCredentialControlPlaneOrigin,
       scanExportBytes: mod.createRunSecretExportScanner(),
       ...(warmEnabled ? { enablePauseResume: true } : {}),
     });

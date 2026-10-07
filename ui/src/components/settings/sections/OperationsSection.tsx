@@ -9,10 +9,13 @@ import type {
   WorkerSummary,
 } from "@armyofagents/shared";
 import { useCompany } from "@/context/CompanyContext";
+import { taskOutputsApi } from "@/api/task-outputs";
 import { jobControlApi } from "@/api/job-control";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { RuntimeDecisionContent } from "@/components/hub/RuntimeDecisionPanel";
+import { ServiceOperationsPanel } from "./ServiceOperationsPanel";
 
 // Fixed operator reasons — the mutations require a bounded reason and this settings
 // surface does not collect free text (the audit trail records the operator + action).
@@ -84,10 +87,12 @@ function errorMessage(err: unknown): string {
 }
 
 function JobDetailPanel({ organizationId, companyId, jobId }: { organizationId: string; companyId: string; jobId: string }) {
+  const queryClient = useQueryClient();
   const detail = useQuery({
     queryKey: queryKeys.jobControl.job(organizationId, companyId, jobId),
     queryFn: () => jobControlApi.getJob(organizationId, companyId, jobId),
     enabled: true,
+    refetchOnReconnect: "always",
   });
 
   if (detail.isLoading) {
@@ -101,6 +106,29 @@ function JobDetailPanel({ organizationId, companyId, jobId }: { organizationId: 
 
   return (
     <div className="space-y-3 border-t border-border-soft bg-muted/20 px-4 py-3">
+      <DetailGroup label="Evidence" empty={(data.artifacts ?? []).length === 0 ? "No evidence." : undefined}>
+        {(data.artifacts ?? []).map((artifact) => (
+          <div key={artifact.id} className="rounded border border-border-soft p-2 text-xs">
+            <div className="flex flex-wrap gap-2"><span className="font-medium">{artifact.identifier}</span>
+              <span>{artifact.kind ?? "Artifact"}</span><span>{artifact.status ?? "Unknown"}</span></div>
+            <div className="mt-1 text-muted-foreground">{artifact.sizeBytes == null ? "Size unavailable" : `${artifact.sizeBytes} bytes`}
+              {artifact.expiresAt ? ` · Expires ${new Date(artifact.expiresAt).toISOString()}` : ""}</div>
+            {artifact.outputId && artifact.status === "committed" && !["browser_cookie_state", "browser_storage_state"].includes(artifact.kind ?? "") &&
+              artifact.applyStatus !== "conflict_quarantined" && (!artifact.expiresAt || new Date(artifact.expiresAt).getTime() > Date.now())
+              ? <a className="mt-1 inline-block underline" href={taskOutputsApi.contentUrl(artifact.outputId)}>Open evidence</a> : null}
+          </div>
+        ))}
+      </DetailGroup>
+      {data.artifactsTruncated ? <p className="text-xs text-muted-foreground">Evidence list is truncated.</p> : null}
+      {data.job.workloadType === "browser_session" ? <DetailGroup label="Browser permissions"
+        empty={(data.runtimeDecisions ?? []).length === 0 ? "No browser permissions." : undefined}>
+        {(data.runtimeDecisions ?? []).map((decision) => <div key={decision.id}>
+          <div className="text-sm font-medium">{decision.title}</div>
+          <RuntimeDecisionContent companyId={companyId} decisionId={decision.id} browserPermission
+            onAnswered={() => queryClient.invalidateQueries({ queryKey: queryKeys.jobControl.job(organizationId, companyId, jobId) })} />
+        </div>)}
+      </DetailGroup> : null}
+      {data.runtimeDecisionsTruncated ? <p className="text-xs text-muted-foreground">Permission list is truncated.</p> : null}
       <DetailGroup label="Attempts" empty={data.attempts.length === 0 ? "No attempts." : undefined}>
         {data.attempts.map((a: AttemptSummary) => (
           <div key={a.id} className="flex items-center gap-2 text-xs">
@@ -167,6 +195,7 @@ export function OperationsSection() {
     if (!enabled) return;
     queryClient.invalidateQueries({ queryKey: queryKeys.jobControl.jobs(organizationId!, selectedCompanyId!) });
     queryClient.invalidateQueries({ queryKey: queryKeys.jobControl.workers(organizationId!) });
+    queryClient.invalidateQueries({ queryKey: ["agent-runtime-decisions", selectedCompanyId!] });
   };
 
   const cancelMutation = useMutation({
@@ -234,7 +263,7 @@ export function OperationsSection() {
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Inspect durable job, attempt, lease, and worker status, and invoke cancel, drain, and revoke.
-            Live catch-up is unavailable until realtime ships — use Refresh to pull the latest state.
+            Refresh to reconnect to saved status, browser evidence, and permission requests.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={refetchAll} disabled={isFetching}>
@@ -313,6 +342,7 @@ export function OperationsSection() {
         )}
       </section>
 
+      <ServiceOperationsPanel key={`${organizationId}:${selectedCompanyId}`} organizationId={organizationId!} companyId={selectedCompanyId!} />
       {/* ── Workers ── */}
       <section className="space-y-3">
         <h3 className="text-base font-semibold">Workers</h3>

@@ -105,6 +105,14 @@ function renderPanel(item: HubItemListRow) {
 }
 
 describe("RuntimeDecisionPanel", () => {
+  it("shows browser expiry and blocks an expired persisted permission", async () => {
+    detailSpy.mockResolvedValueOnce(permissionDetail({ adapterType: "browser_runtime", agentId: null, runId: null,
+      expiresAt: "2026-01-01T00:00:00Z", allowRunEligible: true }));
+    renderPanel(runtimeDecisionItem());
+    expect(await screen.findByRole("button", { name: /allow once/i })).toBeDisabled();
+    expect(screen.getByText(/Expires 2026-01-01/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /equivalent actions/ })).not.toBeInTheDocument();
+  });
   beforeEach(() => {
     detailSpy.mockReset();
     answerSpy.mockReset();

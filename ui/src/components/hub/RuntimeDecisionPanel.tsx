@@ -12,16 +12,22 @@ type RuntimeDecisionOption = NonNullable<RuntimeDecisionDetail["options"]>[numbe
 };
 
 export function RuntimeDecisionPanel({ item }: { item: HubItemListRow }) {
+  return <RuntimeDecisionContent companyId={item.companyId} decisionId={item.sourceId} />;
+}
+
+export function RuntimeDecisionContent({ companyId, decisionId, browserPermission = false, onAnswered }: {
+  companyId: string; decisionId: string | null; browserPermission?: boolean; onAnswered?: () => void | Promise<unknown>;
+}) {
   const queryClient = useQueryClient();
   const [answerText, setAnswerText] = useState("");
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
-  const decisionId = item.sourceId;
   const detailQuery = useQuery({
     queryKey: decisionId
-      ? queryKeys.agentRuntimeDecisions.detail(item.companyId, decisionId)
-      : ["agent-runtime-decisions", item.companyId, "missing"],
-    queryFn: () => agentRuntimeDecisionsApi.detail(item.companyId, decisionId!),
+      ? queryKeys.agentRuntimeDecisions.detail(companyId, decisionId)
+      : ["agent-runtime-decisions", companyId, "missing"],
+    queryFn: () => agentRuntimeDecisionsApi.detail(companyId, decisionId!),
     enabled: Boolean(decisionId),
+    refetchOnReconnect: "always",
   });
   const detail = detailQuery.data;
   useEffect(() => {
@@ -30,16 +36,17 @@ export function RuntimeDecisionPanel({ item }: { item: HubItemListRow }) {
   }, [detail?.id, detail?.sourceRevision]);
   const answerMutation = useMutation({
     mutationFn: (payload: Parameters<typeof agentRuntimeDecisionsApi.answer>[2]) =>
-      agentRuntimeDecisionsApi.answer(item.companyId, decisionId!, payload),
+      agentRuntimeDecisionsApi.answer(companyId, decisionId!, payload),
     onSuccess: async () => {
       await Promise.all([
         decisionId
           ? queryClient.invalidateQueries({
-              queryKey: queryKeys.agentRuntimeDecisions.detail(item.companyId, decisionId),
+              queryKey: queryKeys.agentRuntimeDecisions.detail(companyId, decisionId),
             })
           : Promise.resolve(),
-        queryClient.invalidateQueries({ queryKey: ["hub-items", item.companyId] }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.hubItems.counts(item.companyId) }),
+        queryClient.invalidateQueries({ queryKey: ["hub-items", companyId] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.hubItems.counts(companyId) }),
+        Promise.resolve(onAnswered?.()),
       ]);
     },
   });
@@ -60,6 +67,7 @@ export function RuntimeDecisionPanel({ item }: { item: HubItemListRow }) {
 
   const disabled =
     answerMutation.isPending ||
+    (detail.expiresAt != null && Date.parse(detail.expiresAt) <= Date.now()) ||
     (detail.status !== "created" && detail.status !== "shown" && detail.status !== "relay_failed");
   const options = (detail.options ?? []) as RuntimeDecisionOption[];
   const canSubmitQuestion = Boolean(answerText.trim() || selectedValue);
@@ -101,12 +109,13 @@ export function RuntimeDecisionPanel({ item }: { item: HubItemListRow }) {
         <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-text">{detail.promptText}</p>
       ) : null}
       <RuntimeDecisionFacts detail={detail} />
+      {detail.expiresAt ? <p className="mt-3 text-xs text-muted-foreground">Expires {detail.expiresAt}</p> : null}
       {detail.kind === "permission" ? (
         <div className="mt-4 grid gap-2">
           <Button type="button" size="sm" disabled={disabled} onClick={() => submitPermission("allow_once")}>
             Allow once
           </Button>
-          {detail.allowRunEligible ? (
+          {detail.allowRunEligible && !browserPermission && detail.adapterType !== "browser_runtime" ? (
             <Button type="button" size="sm" variant="secondary" disabled={disabled} onClick={() => submitPermission("allow_run")}>
               Allow equivalent actions for this run
             </Button>

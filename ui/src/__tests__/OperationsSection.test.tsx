@@ -30,6 +30,9 @@ vi.mock("@/api/job-control", () => ({
     revokeWorker: vi.fn(),
   },
 }));
+vi.mock("@/api/service-control", () => ({ serviceControlApi: { list: vi.fn().mockResolvedValue([]) } }));
+const decisions = vi.hoisted(() => ({ detail: vi.fn(), answer: vi.fn() }));
+vi.mock("@/api/agent-runtime-decisions", () => ({ agentRuntimeDecisionsApi: decisions }));
 
 import { jobControlApi } from "@/api/job-control";
 
@@ -49,6 +52,7 @@ function renderSection() {
 }
 
 beforeEach(() => {
+  decisions.detail.mockReset(); decisions.answer.mockReset();
   mockCompany = { selectedCompanyId: CID, selectedCompany: { organizationId: OID } };
   for (const key of Object.keys(mocked)) mocked[key]!.mockReset();
   mocked.listJobs!.mockResolvedValue([{ id: JOB, status: "queued", workloadType: "batch", createdAt: "2026-01-01T00:00:00Z" }]);
@@ -60,6 +64,41 @@ beforeEach(() => {
 });
 
 describe("OperationsSection (JOB-008 operator controls)", () => {
+  it("links only committed unexpired evidence to the existing task output content route", async () => {
+    mocked.getJob!.mockResolvedValue({ job: { id: JOB, status: "succeeded" }, attempts: [], leases: [], events: [], artifacts: [
+      { id: "a", identifier: "ready", kind: "screenshot", status: "committed", outputId: "output/a", expiresAt: "2099-01-01T00:00:00Z" },
+      { id: "b", identifier: "pending", kind: "screenshot", status: "granted", outputId: "pending" },
+      { id: "c", identifier: "old", kind: "screenshot", status: "committed", outputId: "old", expiresAt: "2000-01-01T00:00:00Z" },
+      { id: "d", identifier: "cookie", kind: "browser_cookie_state", status: "committed", outputId: "cookie" },
+      { id: "e", identifier: "storage", kind: "browser_storage_state", status: "committed", outputId: "storage" },
+    ] });
+    const user = userEvent.setup(); renderSection();
+    await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);
+    expect(await screen.findByRole("link", { name: "Open evidence" })).toHaveAttribute("href", "/api/task-outputs/output%2Fa/content");
+    expect(screen.getAllByRole("link", { name: "Open evidence" })).toHaveLength(1);
+  });
+
+  it("reconnects to durable browser evidence and answers native permission without run-wide choices", async () => {
+    const user = userEvent.setup();
+    const data = { job: { id: JOB, status: "running", workloadType: "browser_session" }, attempts: [], leases: [], events: [],
+      artifacts: [{ id: "artifact-1", identifier: "screenshot-1", kind: "screenshot", status: "expired", sizeBytes: 42,
+        expiresAt: "2026-01-02T00:00:00Z" }], runtimeDecisions: [{ id: "decision-1", title: "Open example", status: "created", kind: "permission" }] };
+    mocked.getJob!.mockResolvedValue(data);
+    decisions.detail.mockResolvedValue({ id: "decision-1", title: "Open example", kind: "permission", status: "shown", adapterType: "browser_runtime",
+      sourceRevision: 3, nonce: "nonce-browser", summary: "Navigate to example", toolName: "browser.navigate", networkTarget: "https://example.com",
+      allowRunEligible: true, expiresAt: "2099-01-01T00:00:00Z" });
+    decisions.answer.mockResolvedValue({ status: "relayed" });
+    renderSection(); await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);
+    expect(await screen.findByText("screenshot-1")).toBeInTheDocument();
+    expect(screen.getByText("expired")).toBeInTheDocument();
+    expect(screen.getByText(/2026-01-02/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Allow once" }));
+    expect(decisions.answer).toHaveBeenCalledWith(CID, "decision-1", { kind: "permission", decision: "allow_once", expectedSourceRevision: 3, nonce: "nonce-browser" });
+    expect(screen.queryByRole("button", { name: /equivalent actions/ })).not.toBeInTheDocument();
+    const before = decisions.detail.mock.calls.length;
+    await user.click(screen.getByRole("button", { name: /^Refresh$/ }));
+    await waitFor(() => expect(decisions.detail.mock.calls.length).toBeGreaterThan(before));
+  });
   it("renders job + worker status pills for each state", async () => {
     mocked.listJobs!.mockResolvedValue([
       { id: "j1", status: "queued", createdAt: "2026-01-01T00:00:00Z" },
@@ -160,7 +199,7 @@ describe("OperationsSection (JOB-008 operator controls)", () => {
     renderSection();
     await screen.findByText(/queued/i);
     expect(mocked.listJobs).toHaveBeenCalledTimes(1);
-    await user.click(await screen.findByRole("button", { name: /refresh/i }));
+    await user.click(await screen.findByRole("button", { name: /^refresh$/i }));
     await waitFor(() => expect(mocked.listJobs).toHaveBeenCalledTimes(2));
   });
 
@@ -177,7 +216,7 @@ describe("OperationsSection (JOB-008 operator controls)", () => {
     await screen.findByText(/queued/i);
     await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);
     await waitFor(() => expect(mocked.getJob).toHaveBeenCalledTimes(1));
-    await user.click(await screen.findByRole("button", { name: /refresh/i }));
+    await user.click(await screen.findByRole("button", { name: /^refresh$/i }));
     // The open JobDetailPanel query must refetch too (its key is prefixed by the jobs key).
     await waitFor(() => expect(mocked.getJob).toHaveBeenCalledTimes(2));
   });

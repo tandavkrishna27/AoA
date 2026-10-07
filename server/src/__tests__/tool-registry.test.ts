@@ -23,7 +23,7 @@ const mockCtx: ToolContext = {
 
 describe("Tool Registry", () => {
   describe("createToolRegistry", () => {
-    it("returns all 79 tools", () => {
+    it("returns all 88 tools including the governed browser request", () => {
       // Task C2 batch 1 (T15) added 7 thread+query tools to the 40 prior tools:
       // thread.listEntries, thread.setIntent, thread.postScopeProposal,
       // thread.updateSummary, thread.createLink, get_thread_summary,
@@ -64,8 +64,10 @@ describe("Tool Registry", () => {
       // Unified team roster added 1 query tool:
       // query_team_roster (humans + org agents + readable hierarchy).
       // Plan 3 B2: +5 approval tools + get_heartbeat_context.
+      // BRW-007 added the governed active-task browser request tool.
       const tools = createToolRegistry();
-      expect(tools).toHaveLength(87);
+      expect(tools).toHaveLength(88);
+      expect(tools.map((tool) => tool.name)).toContain("request_browser_session");
     });
 
     it("every tool has required fields", () => {

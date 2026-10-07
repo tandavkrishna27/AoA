@@ -94,7 +94,8 @@ export const EXECUTE_STDOUT_TAIL_KEY = "stdoutTail";
 export function encodeOpRequest(args: unknown, ctx: ProviderOpContext, capability?: OwnedLabelsCapability, warmResourceCapability?: unknown): string {
   // The capability key is emitted ONLY when present, so a create request (no
   // capability) is byte-identical to the Unit-A `{ args, ctx }` body.
-  const envelope: OpRequestEnvelope = capability === undefined ? { args, ctx } : { args, ctx, capability };
+  const wireCtx = { deadlineMs: ctx.deadlineMs, idempotencyKey: ctx.idempotencyKey };
+  const envelope: OpRequestEnvelope = capability === undefined ? { args, ctx: wireCtx } : { args, ctx: wireCtx, capability };
   return JSON.stringify(warmResourceCapability === undefined ? envelope : { ...envelope, warmResourceCapability });
 }
 
@@ -342,4 +343,11 @@ export function decodeProcessSignal(value: unknown): ProcessSignalResult {
   const accepted = record.accepted;
   if (accepted !== "accepted" && accepted !== "refused" && accepted !== "unsupported") throw new WireProtocolError("invalid process acknowledgement");
   return { providerOpId: processText(record.providerOpId), accepted, observation: processObservation(record.observation) };
+}
+
+/** Only bounded acknowledgement metadata may leave the provider. */
+export function decodeBrowserDecisionDelivery(value: unknown): import("@armyofagents/worker-daemon").BrowserDecisionDeliveryResult {
+  const record = processRecord(value);
+  if (record.delivered !== true) throw new WireProtocolError("invalid browser decision acknowledgement");
+  return { providerOpId: processText(record.providerOpId), delivered: true };
 }
