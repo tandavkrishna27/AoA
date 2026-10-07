@@ -47,6 +47,7 @@ export interface ArtifactSweepCandidate {
 export type SweepRefusal =
   | "grant_still_redeemable"
   | "committed"
+  | "expired"
   | "committed_sibling_exists"
   | "quarantined"
   | "no_expiry_recorded"
@@ -77,6 +78,9 @@ export function sweepRefusalIsActionable(reason: SweepRefusal): boolean {
 export function isSweepEligible(candidate: ArtifactSweepCandidate, now: Date): SweepDecision {
   // Terminal states first: neither is an orphan, and DAT-006 owns quarantine.
   if (candidate.status === "committed") return { eligible: false, reason: "committed" };
+  // Retention leaves the identity behind after deleting bytes. It is not an
+  // upload orphan, and its deliberately absent key is not an operator alarm.
+  if (candidate.status === "expired") return { eligible: false, reason: "expired" };
   if (candidate.status === "quarantined") return { eligible: false, reason: "quarantined" };
   // ★ The intent SURVIVES its own commit (disjoint partial-unique keys), and both rows
   // name the same object. Sweeping here would delete a committed artifact's bytes.

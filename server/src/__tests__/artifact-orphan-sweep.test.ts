@@ -64,6 +64,12 @@ describe("DAT-009 slice 2 — sweep eligibility", () => {
     expect(r).toEqual({ eligible: false, reason: "committed" });
   });
 
+  it("does not resweep an expired artifact tombstone or report it as actionable", () => {
+    const result = isSweepEligible(candidate({ status: "expired", objectKey: null }), NOW);
+    expect(result).toEqual({ eligible: false, reason: "expired" });
+    if (!result.eligible) expect(sweepRefusalIsActionable(result.reason)).toBe(false);
+  });
+
   it("never sweeps a quarantined artifact — DAT-006 owns those", () => {
     const r = isSweepEligible(candidate({ status: "quarantined" }), NOW);
     expect(r).toEqual({ eligible: false, reason: "quarantined" });

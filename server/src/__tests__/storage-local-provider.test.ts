@@ -75,4 +75,13 @@ describe("local disk storage provider", () => {
     await service.deleteObject("company-1", stored.objectKey);
     await expect(service.getObject("company-1", stored.objectKey)).rejects.toMatchObject({ status: 404 });
   });
+
+  it("reports failed deletion rather than certifying that bytes disappeared", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "aoa-storage-delete-"));
+    tempRoots.push(root);
+    await fs.mkdir(path.join(root, "not-a-file"));
+    const provider = createLocalDiskStorageProvider(root);
+    await expect(provider.deleteObject({ objectKey: "not-a-file" })).rejects.toBeDefined();
+    expect((await fs.stat(path.join(root, "not-a-file"))).isDirectory()).toBe(true);
+  });
 });

@@ -20,6 +20,7 @@
 import type { Db } from "@armyofagents/db";
 import { DEFAULT_MAX_ARTIFACT_BYTES } from "./artifact-size-ceiling.js";
 import { resolveGrantTtlSeconds } from "./artifact-grant-ttl.js";
+import { browserArtifactLifetimeSeconds } from "./browser-artifact-expiry.js";
 import { JobFenceError as DbJobFenceError, type JobFenceErrorCode } from "@armyofagents/db";
 import {
   artifactTransferGrantOperationRequestV1Schema,
@@ -342,10 +343,22 @@ export function createArtifactTransferGrantService(input: {
         if (committed.objectKey !== body.expectedObjectKey) {
           return rejected("malformed", deny("object_key_mismatch"));
         }
+        // Legacy browser rows must receive their commit-anchored deadline from
+        // cleanup before reads resume; a missing deadline cannot renew secrets.
+        if (committed.expiresAt == null && browserArtifactLifetimeSeconds(committed.kind ?? "") != null) {
+          return rejected("malformed", deny("artifact_not_committed"));
+        }
+        const remainingSeconds = committed.expiresAt == null ? grantTtlSeconds :
+          Math.floor((new Date(committed.expiresAt).getTime() - issuedAt.getTime()) / 1000);
+        if (!Number.isFinite(remainingSeconds) || remainingSeconds <= 0) {
+          return rejected("malformed", deny("artifact_not_committed"));
+        }
+        const downloadTtlSeconds = Math.min(grantTtlSeconds, remainingSeconds);
+        const downloadExpiresAt = new Date(issuedAt.getTime() + downloadTtlSeconds * 1000);
         if (!input.storage.presignGet) throw new Error("storage provider cannot presign downloads");
         const signed = await input.storage.presignGet({
           objectKey: body.expectedObjectKey,
-          expiresInSeconds: grantTtlSeconds,
+          expiresInSeconds: downloadTtlSeconds,
           maxBytes: body.maxBytes,
           checksumSha256: body.expectedSha256,
         });
@@ -357,7 +370,7 @@ export function createArtifactTransferGrantService(input: {
           url: signed.url,
           headers: signed.headers,
           issuedAt: issuedAt.toISOString(),
-          expiresAt: expiresAt.toISOString(),
+          expiresAt: downloadExpiresAt.toISOString(),
           maxBytes: body.maxBytes,
           expectedSha256: body.expectedSha256,
           objectKey: body.expectedObjectKey,
@@ -384,7 +397,7 @@ export function createArtifactTransferGrantService(input: {
           jobId: body.jobId,
           attempt: body.attempt,
           leaseId: body.leaseId,
-          expiresAt,
+          expiresAt: downloadExpiresAt,
           maxBytes: body.maxBytes,
         };
         return artifactTransferGrantOperationResponseV1Schema.parse({
