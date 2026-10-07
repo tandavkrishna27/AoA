@@ -1178,6 +1178,10 @@ jobs:
           # worker-daemon + sandbox-provider-contract deps, above).
           pnpm --filter @armyofagents/sandbox-e2b-provider build
 
+          # Browser preparation stages the built guest entry through its dist-only
+          # package export, including in server integration tests before Build.
+          pnpm --filter @armyofagents/browser-runtime... build
+
       - name: Typecheck
         run: pnpm -r typecheck
 
