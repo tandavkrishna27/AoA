@@ -69,6 +69,7 @@ import { assertAdmissibleMappedOrganization } from "./tenant-admission.js";
 import {
   agentRuntimeDecisionService,
   runtimeDecisionSourceUniqueKey,
+  runtimeDecisionPromptHash,
 } from "./agent-runtime-decisions.js";
 import { approvalService } from "./approvals.js";
 import { publishLiveEvent } from "./live-events.js";
@@ -450,13 +451,14 @@ function buildRuntimeDecisionResult(
   decidedBy: { principalType: "user" | "agent" | "service" | "system"; principalId: string },
   controlIdempotencyKey: string,
   now: Date,
+  requestSourceRevision: number,
 ): RuntimeDecisionResultV1 {
   const common = {
     requestId: row.id,
     nonce: row.nonce,
     requestDigest: row.promptHash ?? sha256Hex({ decision: row.id }),
     schemaVersion: 1,
-    sourceRevision: row.sourceRevision,
+    sourceRevision: requestSourceRevision,
     expiresAt: toIso(row.expiresAt, now),
     decidedBy,
     decidedAt: toIso(row.answeredAt, now),
@@ -706,7 +708,7 @@ export function jobApprovalBridge(
           // replay dedup to the same command. (The product resolve path is safe by a
           // different mechanism — approve() throws on a non-pending status and rolls back.)
           const commandId = row.id;
-          const result = buildRuntimeDecisionResult(row, decidedBy, commandId, now);
+          const result = buildRuntimeDecisionResult(row, decidedBy, commandId, now, req.expectedSourceRevision);
           const commandBody = buildControlCommandBody(input.fence, commandId, "runtime_decision_result", result, now);
           const queued = await repos.jobControl.queueGovernedControlCommand({
             ...input.fence,
@@ -867,7 +869,7 @@ async function markGovernedReceiptAppliedByAggregate(
 
 /** Build the E1 runtime-decision REQUEST body the SERVER minted (used for the receipt
  * digest and, at validation time, to exercise the fail-closed default/options rules). */
-function buildRuntimeDecisionRequestBody(
+export function buildRuntimeDecisionRequestBody(
   req: RuntimeDecisionOpenRequest,
   requestId: string,
   expiresAtIso: string,
@@ -875,7 +877,7 @@ function buildRuntimeDecisionRequestBody(
   const common = {
     requestId,
     nonce: req.nonce,
-    requestDigest: sha256Hex({ title: req.title, summary: req.summary ?? null, promptText: req.promptText ?? null, command: req.command ?? null }),
+    requestDigest: runtimeDecisionPromptHash(req),
     schemaVersion: 1,
     sourceRevision: 0,
     expiresAt: expiresAtIso,

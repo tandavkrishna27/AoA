@@ -207,6 +207,8 @@ export class RuntimeDecisionCancelledError extends Error {
 }
 
 type CreatePromptInput = {
+  /** Fenced worker requests retain their frozen identity and are immutable. */
+  requestId?: string;
   companyId: string;
   /**
    * BRW-004 (E8-F002) — NULL for a distributed job decision.
@@ -288,7 +290,7 @@ type CreateTrustRuleInput = {
 };
 
 type DecisionRepo = {
-  createDecision(input: typeof agentRuntimeDecisions.$inferInsert): Promise<AgentRuntimeDecisionRow>;
+  createDecision(input: typeof agentRuntimeDecisions.$inferInsert, options?: { immutable: boolean }): Promise<AgentRuntimeDecisionRow>;
   getDecision(companyId: string, decisionId: string): Promise<AgentRuntimeDecisionRow | null>;
   listActiveForRun(input: { companyId: string; runId: string }): Promise<AgentRuntimeDecisionRow[]>;
   /**
@@ -364,7 +366,7 @@ function redactJsonSecrets(value: unknown): unknown {
   return value;
 }
 
-function promptHash(input: Pick<CreatePromptInput, "kind" | "title" | "summary" | "promptText" | "command">) {
+export function runtimeDecisionPromptHash(input: Pick<CreatePromptInput, "kind" | "title" | "summary" | "promptText" | "command">) {
   return hashString(JSON.stringify({
       kind: input.kind,
       title: input.title,
@@ -536,7 +538,12 @@ export function runtimeDecisionDetail(row: AgentRuntimeDecisionRow): RuntimeDeci
 
 function realRepo(db: Db): DecisionRepo {
   return {
-    async createDecision(input) {
+    async createDecision(input, options) {
+      if (options?.immutable) {
+        const [created] = await db.insert(agentRuntimeDecisions).values(input).onConflictDoNothing().returning();
+        if (!created) throw conflict("Runtime decision request identity already exists");
+        return created;
+      }
       return db
         .insert(agentRuntimeDecisions)
         .values(input)
@@ -1055,7 +1062,8 @@ export function agentRuntimeDecisionService(db: Db, deps: ServiceDeps = {}) {
     const autoAllowed = trustRuleHonored || connectorGrant;
     const resolvedExpiresAt =
       input.expiresAt ?? new Date(nowDate.getTime() + defaultTtlMs(input.kind));
-    const created = await repo.createDecision({
+    const prompt: typeof agentRuntimeDecisions.$inferInsert = {
+      ...(input.requestId ? { id: input.requestId } : {}),
       companyId: input.companyId,
       agentId: input.agentId,
       runId: input.runId,
@@ -1066,7 +1074,7 @@ export function agentRuntimeDecisionService(db: Db, deps: ServiceDeps = {}) {
       status: autoAllowed ? "answered" : "created",
       nonce: input.nonce,
       sourceRevision: autoAllowed ? 1 : 0,
-      promptHash: promptHash(input),
+      promptHash: runtimeDecisionPromptHash(input),
       sourceUniqueKey: sourceUniqueKey(input),
       title: safeText(input.title) ?? "Runtime decision",
       summary: safeText(input.summary),
@@ -1088,7 +1096,8 @@ export function agentRuntimeDecisionService(db: Db, deps: ServiceDeps = {}) {
           : null,
       answeredByUserId: trustRuleHonored && matchingTrustRule ? matchingTrustRule.createdByUserId ?? null : null,
       answeredAt: autoAllowed ? nowDate : null,
-    });
+    };
+    const created = input.requestId ? await repo.createDecision(prompt, { immutable: true }) : await repo.createDecision(prompt);
     if (!autoAllowed && (TERMINAL_STATUSES.has(created.status as RuntimeDecisionStatus) || created.status === "answered")) {
       throw conflict("Runtime decision prompt already consumed for this nonce");
     }
