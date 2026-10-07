@@ -175,6 +175,11 @@
       "workflow": "pr.yml",
       "step": "Frozen worker-protocol v1 consumer (E1)"
     },
+    "scripts/browser-dispatch-wiring.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "Gate-clause wiring (an epic may not claim a capability nothing calls)"
+    },
     "scripts/check-gate-clause-wiring.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",
