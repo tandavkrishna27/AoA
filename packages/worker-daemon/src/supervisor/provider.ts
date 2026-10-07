@@ -150,6 +150,11 @@ export type SandboxEnumerationMode = "none" | "metadata";
  */
 export type FileStagingMode = "none" | "grant_download";
 
+export interface SandboxLifetimeResult {
+  readonly providerOpId: string;
+  readonly expiresAt: number;
+}
+
 /**
  * One file to stage: WHERE it goes inside the sandbox, and a GRANT that redeems to its bytes.
  *
@@ -526,6 +531,7 @@ export type DeclinableOperation =
   | "digest_artifact"
   | "export_artifact"
   | "stage_files"
+  | "renew_lifetime"
   // CLI-012 — the metadata-only enumeration. Not a frozen operation, same as the three above.
   | "enumerate_outputs"
   // SVC-008a — the process-supervision trio. Not frozen operations, same as the three above.
@@ -647,166 +653,9 @@ export function deriveStopVerdict(observation: ProcessObservation): "stopped" | 
 export interface SandboxProvider {
   /** Only a provider with measured enforcement may expose this local capability. */
   readonly browserNetworkPolicyMode?: "verified_default_deny";
-  /** The advertised op set (always a superset of the 8 core ops). */
-  readonly advertisedOperations: ReadonlySet<ProviderOperation>;
-  readonly checkpointMode: CheckpointMode;
-  readonly healthMode: HealthMode;
-
-  // --- core ---
-  create(spec: CreateSandboxSpec, ctx: ProviderOpContext): Promise<CreateResult>;
-  execute(input: ExecuteInput, ctx: ProviderOpContext): Promise<ExecuteResult>;
-  cancel(sandboxId: string, ctx: ProviderOpContext): Promise<StopResult>;
-  kill(sandboxId: string, ctx: ProviderOpContext): Promise<StopResult>;
-  destroy(sandboxId: string, ctx: ProviderOpContext): Promise<CleanupResult>;
-  list(input: ListInput, ctx: ProviderOpContext): Promise<ListResult>;
-  inspect(sandboxId: string, ctx: ProviderOpContext): Promise<InspectResult>;
-  reconcileCleanup(sandboxId: string, ctx: ProviderOpContext): Promise<CleanupResult>;
-
-  // --- optional (gated on advertisement) ---
-  checkpoint(sandboxId: string, ctx: ProviderOpContext): Promise<CheckpointResult>;
-  restore(sandboxId: string, ctx: ProviderOpContext): Promise<RestoreResult>;
-  health(sandboxId: string, ctx: ProviderOpContext): Promise<HealthResult>;
-
-  // --- optional artifact export (gated on `artifactExportMode`) -------------------------
-  //
-  // NOT in `advertisedOperations`: that set is typed to the FROZEN `ProviderOperation` union
-  // and these are not frozen operations. Support is declared by the mode above instead. Like
-  // the optional trio, the METHODS are present on every implementer and only SUPPORT is
-  // optional — "mandatory means no absent path".
-
-  /** Describe an in-sandbox file. Metadata only; never returns content. */
-  digestArtifact(sandboxId: string, path: string, ctx: ProviderOpContext): Promise<ArtifactDigestResult>;
-
-  /**
-   * Upload an in-sandbox file directly to object storage under `grant`, returning a reference.
-   *
-   * ★ `grant` IS A BEARER CAPABILITY — anyone holding it can write that object key until it
-   * expires. The port already classifies this class of value as sensitive: `InspectResult`
-   * carries `objectGrants` among `command`/`env`/`logs`/`secrets`, and
-   * `RedactedResourceProjection` — the only shape cleanup authority ever returns — excludes it.
-   * An implementation must never let a grant reach a projection, a log line, or an error.
-   */
-  exportArtifact(
-    sandboxId: string,
-    path: string,
-    grant: ArtifactUploadGrantV1,
-    ctx: ProviderOpContext,
-  ): Promise<ArtifactExportResult>;
-
-  /** Whether this provider supports the two operations above. */
-  readonly artifactExportMode: ArtifactExportMode;
-
-  // --- optional output enumeration (gated on `sandboxEnumerationMode`) -------------------
-  //
-  // NOT in `advertisedOperations`, for the same reason the export pair is not. The METHOD is
-  // present on every implementer and only SUPPORT is optional.
-
-  /**
-   * CLI-012 — enumerate the regular files under `root`: FILES ONLY, RECURSIVE, ABSOLUTE paths
-   * strictly under `root`, sorted, and BOUNDED. **METADATA ONLY — no bytes cross this port.**
-   *
-   * Throws {@link UnsupportedProviderOperation} when `sandboxEnumerationMode` is `"none"`.
-   */
-  enumerateOutputs(sandboxId: string, root: string, ctx: ProviderOpContext): Promise<EnumerateOutputsResult>;
-
-  /** Whether this provider supports the operation above. */
-  readonly sandboxEnumerationMode: SandboxEnumerationMode;
-
-  // --- optional file staging (gated on `fileStagingMode`) -------------------------------
-  //
-  // NOT in `advertisedOperations`, for the same reason the export pair is not: that set is
-  // typed to the FROZEN `ProviderOperation` union and this is not a frozen operation. Support
-  // is declared by the mode below. The METHOD is present on every implementer and only
-  // SUPPORT is optional — "mandatory means no absent path".
-
-  /**
-   * Write `files` into a live sandbox before the tenant command runs, by redeeming each
-   * file's download grant.
-   *
-   * Grant in, reference out: the bytes go store -> provider -> sandbox and never cross this
-   * port. An implementation MUST verify what it fetched against the grant's `expectedSha256`
-   * before writing — a provider that wrote unverified bytes would be the WRK-009 defect
-   * again, where a fabricated success is byte-identical to a real one on every gate.
-   *
-   * Throws {@link UnsupportedProviderOperation} when `fileStagingMode` is `"none"`.
-   */
-  stageFiles(
-    sandboxId: string,
-    files: readonly StagedFileRequest[],
-    ctx: ProviderOpContext,
-  ): Promise<StageFilesResult>;
-
-  /** Whether this provider supports the operation above. */
-  readonly fileStagingMode: FileStagingMode;
-
-  // --- optional process supervision (gated on `processSupervisionMode`) -----------------
-  //
-  // NOT in `advertisedOperations`, for the same reason the export pair and stageFiles are
-  // not: that set is typed to the FROZEN `ProviderOperation` union. Support is declared by
-  // the mode below. The METHODS are present on every implementer and only SUPPORT is
-  // optional — "mandatory means no absent path".
-  //
-  // ★ WHY THIS EXISTS AT ALL. `execute` is a COMPLETION oracle: it resolves only once the
-  // command has already exited, so a supervisor built on it records a hung launch as a
-  // started instance. `inspect`/`health` answer about the SANDBOX, which is up from the
-  // moment `create` resolves. Neither can witness a process.
-
-  /**
-   * Launch a process and return as soon as the provider ACKNOWLEDGES it — never waiting
-   * for it to exit.
-   *
-   * ★ It takes {@link ExecuteInput} as the WHOLE request rather than a payload beside a
-   * redundant `sandboxId`, so the launch target is single-sourced: a separate parameter
-   * would let the validated sandbox and the launched sandbox disagree, and an authority
-   * wrapper would then validate one and launch in another.
-   *
-   * Throws {@link UnsupportedProviderOperation} when `processSupervisionMode` is `"none"`,
-   * and {@link ProcessLaunchNotAcknowledged} when no non-empty handle can be read.
-   */
-  startProcess(input: ExecuteInput, ctx: ProviderOpContext): Promise<ProcessStartResult>;
-
-  /**
-   * Read what the provider can SEE of the process behind `handle`. About the PROCESS —
-   * never about the sandbox, and never a sandbox-scoped answer relabelled.
-   *
-   * ★ `gone` may NOT be sourced from a boolean whose `false` branch also swallows an
-   * error (`RealE2bTransport.isRunning` is exactly that shape). A failure to look is
-   * `{state: "unknown", reason: "read_failed"}`; an ANSWER that the process is absent is
-   * `gone`. Collapsing the two reports an affirmative absence from a read that threw.
-   *
-   * Throws {@link UnsupportedProviderOperation} when `processSupervisionMode` is `"none"`.
-   */
-  processStatus(
-    sandboxId: string,
-    handle: ProcessHandle,
-    ctx: ProviderOpContext,
-  ): Promise<ProcessStatusResult>;
-
-  /**
-   * Deliver a graceful-stop or forced-kill signal to the process behind `handle`, then
-   * RE-READ its status and report what that read saw.
-   *
-   * Throws {@link UnsupportedProviderOperation} when `processSupervisionMode` is `"none"`.
-   */
-  signalProcess(
-    sandboxId: string,
-    handle: ProcessHandle,
-    kind: "cancel" | "kill",
-    ctx: ProviderOpContext,
-  ): Promise<ProcessSignalResult>;
-
-  /** Whether this provider supports the three operations above. */
-  readonly processSupervisionMode: ProcessSupervisionMode;
-}
-
-/** A management-only, REDACTED projection of a sandbox: identity + lifecycle
- * state + a HASH of the ownership labels. It carries NO command, env, logs,
- * secrets, workspace/customer bytes, or object grants — the only shape the
- * cleanup authority ever returns from `inspect`/`list`. */
-export interface RedactedResourceProjection {
-  readonly sandboxId: string;
-  readonly resourceLabelsHash: string;
-  readonly generation: number;
-  readonly state: SandboxState;
-  readonly providerOpId: string;
-}
+  /** Local credential refresh on an existing ownership binding. This is not a
+   * provider wire operation and never re-resolves secrets. */
+  refreshAuthority?(capability: unknown): void;
+  readonly sandboxLifetimeMode?: "none" | "renewable";
+  /** Absolute expiry, clamped by the owned capability at the provider gate. */
+  renewLifetime?(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult>;

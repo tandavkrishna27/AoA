@@ -10,7 +10,7 @@
     },
     "packages/adapter-manager": {
       "mode": "floor",
-      "count": 27
+      "count": 28
     },
     "packages/adapter-utils": {
       "mode": "floor",
@@ -38,11 +38,11 @@
     },
     "packages/provider-wire": {
       "mode": "floor",
-      "count": 8
+      "count": 10
     },
     "packages/sandbox-e2b-provider": {
       "mode": "pinned",
-      "count": 23
+      "count": 25
     },
     "packages/sandbox-fake-provider": {
       "mode": "pinned",
@@ -58,7 +58,7 @@
     },
     "packages/worker-daemon": {
       "mode": "pinned",
-      "count": 181
+      "count": 183
     },
     "packages/worker-keystore": {
       "mode": "pinned",
@@ -78,7 +78,7 @@
     },
     "server": {
       "mode": "floor",
-      "count": 1608
+      "count": 1609
     },
     "tests": {
       "mode": "pinned",

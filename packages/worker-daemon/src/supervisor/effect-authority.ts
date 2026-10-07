@@ -39,6 +39,7 @@ import type {
   ProviderOpContext,
   RestoreResult,
   SandboxProvider,
+  SandboxLifetimeResult,
   StageFilesResult,
   StagedFileRequest,
 } from "./provider.js";
@@ -101,6 +102,14 @@ export class EffectAuthority {
   create(spec: CreateSandboxSpec, ctx: ProviderOpContext): Promise<CreateResult> {
     this.#guard();
     return this.#provider.create(spec, ctx);
+  }
+
+  renewLifetime(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult> {
+    this.#guard();
+    if (this.#provider.sandboxLifetimeMode !== "renewable" || !this.#provider.renewLifetime) {
+      throw new Error("sandbox lifetime renewal unavailable");
+    }
+    return this.#provider.renewLifetime(sandboxId, expiresAt, ctx);
   }
 
   execute(input: ExecuteInput, ctx: ProviderOpContext): Promise<ExecuteResult> {
