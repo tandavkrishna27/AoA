@@ -43,6 +43,8 @@ import { readDistributedExecutionDeploymentFlag } from "../config/distributed-ex
 // note above requires; `drainAdmissionDenial` is loaded DYNAMICALLY at the drain point,
 // and only when an intent was actually captured.
 import type { AdmissionDenialSink } from "./worker-admission-denial-audit.js";
+import { parseBrowserPreparation, type BrowserPreparation } from "./browser-runtime-preparation.js";
+import { resolveDistributedNetworkPolicy, resolveBrowserControlPlaneDenyCidrs } from "../config/distributed-network-policies.js";
 
 export interface AuthenticatedJobPrincipal {
   kind: "user" | "agent" | "mcp" | "commander" | "local_board" | "system";
@@ -65,6 +67,8 @@ export interface SubmitJobRequest {
   companyId: string;
   principal: AuthenticatedJobPrincipal;
   command: SubmitJobCommand;
+  /** Internal server producer authority; never part of SubmitJobCommand/API input. */
+  trustedBrowserPreparation?: BrowserPreparation;
 }
 
 function canonicalJson(value: unknown): string {
@@ -148,14 +152,19 @@ export async function submitJobWithinTenant(
   // (`findIdempotentReplay`) compares against it, so normalising the workload input below
   // must not change what a replay is keyed on — otherwise a redelivery of the same request
   // would either look new or collide with a different one.
-  const commandDigest = digest(input.command);
+  const commandDigest = input.trustedBrowserPreparation
+    ? digest({ command: input.command, trustedBrowserPreparation: input.trustedBrowserPreparation }) : digest(input.command);
   // BRW-001 (review finding F1) — `inputHash` is NOT computed here any more. It is derived
   // from the VALIDATED input, strictly after the admission gate below, so that an
   // unauthorized caller cannot distinguish a malformed workload input from a valid one.
+  const configuredNetworkPolicy = input.command.source.kind !== "browser_request"
+    ? resolveDistributedNetworkPolicy(input.organizationId, input.companyId) : null;
   const policySnapshot = {
     policyId: "job-submission-default",
     version: 1,
     sourceKind: input.command.source.kind,
+    ...(input.trustedBrowserPreparation ? { browserPreparation: input.trustedBrowserPreparation } : {}),
+    ...(configuredNetworkPolicy ? { networkPolicy: configuredNetworkPolicy, controlPlaneDenyCidrs: resolveBrowserControlPlaneDenyCidrs() } : {}),
   };
   const policyHash = digest(policySnapshot);
   const requirements = {
@@ -231,6 +240,9 @@ export async function submitJobWithinTenant(
           // target, placement, or lease is selected at submission.
           executionPrincipal = { kind: "worker", id: source.operationId };
         } else if (source.kind === "browser_request") {
+          if (input.trustedBrowserPreparation && (!parseBrowserPreparation(input.trustedBrowserPreparation) ||
+              input.trustedBrowserPreparation.parentJobId !== source.parentJobId ||
+              input.principal.kind !== "agent" || input.trustedBrowserPreparation.agentId !== input.principal.id)) throw denial();
           executionPrincipal = await repos.jobControl.internalRunSourceIsAdmitted({
             companyId: input.companyId,
             runId: source.browserRequestId,
@@ -314,7 +326,7 @@ export async function submitJobWithinTenant(
           status: "queued",
           // A one-shot caller owns explicit retry/recovery. Never blindly repeat model spend
           // after an ambiguous lease expiry; the durable operation can be rejoined instead.
-          maxAttempts: input.command.source.kind === "one_shot" ? 1 : undefined,
+          maxAttempts: ["one_shot", "browser_request"].includes(input.command.source.kind) ? 1 : undefined,
           createdAt: now,
           updatedAt: now,
         });
@@ -449,7 +461,9 @@ export async function findIdempotentReplay(
     idempotencyKey: input.command.idempotencyKey,
   });
   if (!existing) return null;
-  if (existing.commandDigest !== digest(input.command)) {
+  const commandDigest = input.trustedBrowserPreparation
+    ? digest({ command: input.command, trustedBrowserPreparation: input.trustedBrowserPreparation }) : digest(input.command);
+  if (existing.commandDigest !== commandDigest) {
     throw new HttpError(409, "Idempotency key conflicts with a different command");
   }
   const existingAttempt = await repos.jobControl.findInitialAttempt(existing.id);

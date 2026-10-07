@@ -8,6 +8,7 @@ import {
   type LeaseWorkerAuthority,
   type TenantRepositories,
 } from "@armyofagents/db";
+import { BROWSER_CONFIG_PATH, BROWSER_RUNNER_PATH, BROWSER_RUNTIME_ROOT, browserDispatchExtension, parseBrowserPreparation, parseAuthoritativeBrowserPolicy } from "./browser-runtime-preparation.js";
 import {
   jobEnvelopeV1Schema,
   canonicalizeJsonV1,
@@ -201,6 +202,7 @@ function inferredCredentialBinding(target: NormalizedPlacementRegistryTarget) {
     return {
       credentialId: "stored-owner-authority",
       credentialKind: "personal_subscription" as const,
+      credentialOwnerPrincipalId: target.registeredProfile.ownerPrincipalId,
       executionTargetSlug: target.targetSlug,
       pinnedTargetId: target.targetId,
     };
@@ -494,6 +496,15 @@ function buildJobEnvelope(input: {
 }): JobEnvelopeV1 | null {
   const executionSource = source(input.job);
   if (!executionSource) return null;
+  const browserPreparation = input.job.workloadType === "browser_session" ? parseBrowserPreparation(input.job.policySnapshot.browserPreparation) : null;
+  if (input.job.workloadType === "browser_session" && (!browserPreparation ||
+      input.job.sourceIntent.parentJobId !== browserPreparation.parentJobId ||
+      input.target.targetId !== browserPreparation.targetId || input.target.targetAuthorityKey !== browserPreparation.targetAuthorityKey ||
+      input.target.targetGeneration !== browserPreparation.targetGeneration || input.target.profileHash !== browserPreparation.targetProfileHash ||
+      input.target.providerConstraintHash !== browserPreparation.providerConstraintHash ||
+      ![BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH, `${BROWSER_RUNTIME_ROOT}/package.json`].every((path) => input.stagedInput.some((file) => file.path === path)))) return null;
+  const networkPolicy = browserPreparation?.networkPolicy ?? parseAuthoritativeBrowserPolicy(input.job.policySnapshot.networkPolicy);
+  if (input.job.policySnapshot.networkPolicy && !networkPolicy) return null;
   const deadline = new Date(Math.max(
     input.job.createdAt.getTime() + 1,
     input.databaseNow.getTime() + Math.max(1, Number((input.job.input as Record<string, unknown>).maxRuntimeSeconds ?? 600)) * 1_000,
@@ -524,7 +535,9 @@ function buildJobEnvelope(input: {
     workspace: null,
     secretHandles: input.secretHandles,
     resourceLimits: input.resourceLimits,
-    networkPolicy: {
+    networkPolicy: networkPolicy ? {
+      policyId: networkPolicy.policyId, version: networkPolicy.version, digest: networkPolicy.digest,
+    } : {
       policyId: "job-default-deny",
       version: 1,
       digest: input.attempt.placementPolicyDigest,
@@ -537,7 +550,8 @@ function buildJobEnvelope(input: {
     // is `critical: false`, so a worker that does not understand the namespace ignores it and
     // stages nothing rather than rejecting the offer. No staged files ⇒ `[]`, byte-identical
     // to every envelope built before this existed.
-    extensions: input.stagedInput.length > 0 ? [stagedInputExtension(input.stagedInput)] : [],
+    extensions: [ ...(input.stagedInput.length > 0 ? [stagedInputExtension(input.stagedInput)] : []),
+      ...(browserPreparation ? [browserDispatchExtension(browserPreparation)] : []) ],
     workloadType: input.job.workloadType,
     workload: input.job.input,
   };

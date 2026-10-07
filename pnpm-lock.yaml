@@ -830,6 +830,9 @@ importers:
       '@armyofagents/adapter-utils':
         specifier: workspace:*
         version: link:../packages/adapter-utils
+      '@armyofagents/browser-runtime':
+        specifier: workspace:*
+        version: link:../packages/browser-runtime
       '@armyofagents/db':
         specifier: workspace:*
         version: link:../packages/db
@@ -896,6 +899,9 @@ importers:
       embedded-postgres:
         specifier: ^18.1.0-beta.16
         version: 18.1.0-beta.16(patch_hash=55uhvnotpqyiy37rn3pqpukhei)
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0

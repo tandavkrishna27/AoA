@@ -5,6 +5,7 @@ import { documentToolHandlers } from "./document-tools.js";
 import { approvalToolHandlers } from "./approval-tools.js";
 import { skillToolHandlers } from "./skill-tools.js";
 import { askFounderToolHandlers } from "./ask-founder-tool.js";
+import { handleBrowserSessionRequest, BROWSER_SESSION_TOOL_PARAMETERS } from "./browser-session-tool.js";
 import type { ToolHandler } from "./types.js";
 
 export {
@@ -26,6 +27,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
   ...approvalToolHandlers,
   ...skillToolHandlers,
   ...askFounderToolHandlers,
+  request_browser_session: handleBrowserSessionRequest,
 };
 
 /**
@@ -66,9 +68,11 @@ export const toolAllowedActors: Record<string, McpActorType[]> = {
   // commander cannot call it.
   "ask_human": ["agent"],
   "ask_founder": ["agent"],
+  "request_browser_session": ["agent"],
 };
 
 export const TOOL_DEFINITIONS = [
+  { name: "request_browser_session", description: "Request a governed browser session for your active task. Inherits parent network and execution authority; returns job identifiers and no browser control endpoint.", inputSchema: BROWSER_SESSION_TOOL_PARAMETERS },
   {
     name: "me",
     description: "Return the authenticated caller's identity and role",
