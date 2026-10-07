@@ -71,5 +71,7 @@ Integrated journey verification: recursive workspace types and full build passed
 Five focused files passed 99 tests with zero skips, including actual PostgreSQL
 and the production-equivalent staged Chromium guest. The review's late-descendant
 census finding and stale-parent PID reuse regression were observed RED before
-their fixes. Citation integrity passes. Full normal suite and normal Linux PR CI
-are pending before program integration; no production conformance is claimed.
+their fixes. Citation integrity passes. Full normal suite passed 24,291 tests,
+with 2,034 skips. PR #682 merged after required CI passed, including 192 Linux
+browser tests and all 32 producer/journey cases; no production conformance is
+claimed.

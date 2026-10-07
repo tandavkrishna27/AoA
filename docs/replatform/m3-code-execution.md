@@ -228,3 +228,20 @@ backend configuration that actually blocks every escape class is required before
 a changed-mechanism probe is meaningful. Sources:
 [released SDK](https://github.com/e2b-dev/E2B/releases/tag/e2b%402.53.1),
 [versioned network contract](https://github.com/e2b-dev/E2B/blob/e2b%402.53.1/packages/js-sdk/src/sandbox/sandboxApi.ts).
+
+## October 8 scope and journey checkpoint
+
+The user explicitly selected the current stop-and-export recovery contract for
+M3; live checkpoint requests are not added. Hard runtime limits remain the
+server-owned job deadlines with bounded renewal, and service health follows the
+locked process-observation contract. No configurable service lifetime or HTTP
+readiness contract is invented from older residual-plan wording.
+
+PR #682 merged at 8cd4af665e after required normal CI passed. Full local normal
+suite passed 24,291 tests, with 2,034 skips. Integrated real PostgreSQL and staged
+Chromium checks passed 99 tests without skips. Linux browser CI passed 192 tests
+(one Windows-only skip) and all 32 producer/journey cases, explicitly including
+both guest variants. Timer cleanup and persistent-context video persistence are
+fixed; continuous process identity census runs before evidence upload/cleanup.
+This establishes local governed wiring, not production provider enforcement or
+application cookie-issuer compatibility. Host retirement remains gated.
