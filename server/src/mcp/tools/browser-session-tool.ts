@@ -1,5 +1,4 @@
 import { HttpError } from "../../errors.js";
-import { requestBrowserSessionForActiveRun } from "../../services/agent-browser-request.js";
 import { err, ok, type ToolHandler } from "./types.js";
 
 export const handleBrowserSessionRequest: ToolHandler = async (ctx, args) => {
@@ -7,6 +6,7 @@ export const handleBrowserSessionRequest: ToolHandler = async (ctx, args) => {
     return err(403, -32003, "Browser requests require an authenticated active agent task run");
   }
   try {
+    const { requestBrowserSessionForActiveRun } = await import("../../services/agent-browser-request.js");
     return ok(await requestBrowserSessionForActiveRun({ companyId: ctx.companyId, agentId: ctx.actor.agentId, runId: ctx.actor.runId }, args));
   } catch (error) {
     if (error instanceof HttpError) return err(error.status, -32009, error.message);

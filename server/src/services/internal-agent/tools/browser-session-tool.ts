@@ -1,5 +1,4 @@
 import { BROWSER_SESSION_TOOL_PARAMETERS } from "../../../mcp/tools/browser-session-tool.js";
-import { requestBrowserSessionForActiveRun } from "../../agent-browser-request.js";
 import type { AgentTool } from "../types.js";
 
 export const browserSessionTool: AgentTool = {
@@ -12,6 +11,7 @@ export const browserSessionTool: AgentTool = {
       return { success: false, data: null, summary: "Browser requests require an active agent task run", error: "FORBIDDEN" };
     }
     try {
+      const { requestBrowserSessionForActiveRun } = await import("../../agent-browser-request.js");
       const data = await requestBrowserSessionForActiveRun({ companyId: ctx.companyId, agentId: ctx.agentId, runId: ctx.runId,
         runKind: ctx.agentKind === "aoa" ? "internal_agent" : "heartbeat" }, params);
       return { success: true, data, summary: "Governed browser session queued" };
