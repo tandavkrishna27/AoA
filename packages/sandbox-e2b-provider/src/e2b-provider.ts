@@ -32,6 +32,8 @@ import {
 } from "@armyofagents/worker-protocol";
 import { createHash } from "node:crypto";
 import type {
+  BrowserCredentialDeliveryInput,
+  BrowserCredentialDeliveryResult,
   BrowserDecisionDeliveryInput,
   BrowserDecisionDeliveryResult,
   ArtifactDigestResult,
@@ -73,7 +75,10 @@ import type {
 // DAT-009-3e (E5-F002) — the ONE home of the signed-PUT header contract. A VALUE import from
 // worker-daemon, which is one of this package's declared runtime dependencies.
 import { readBrowserDecisionDelivery } from "@armyofagents/worker-daemon";
+import { readBrowserCredentialDelivery } from "@armyofagents/worker-daemon";
 import { WRITE_BROWSER_DECISION } from "./browser-decision-script.js";
+import { WRITE_BROWSER_CREDENTIAL } from "./browser-credential-script.js";
+import { browserCredentialOrigin, redeemBrowserCredential } from "./browser-credential-redemption.js";
 import { grantPutHeaders } from "@armyofagents/worker-daemon";
 
 import { METADATA_KEYS } from "./directives.js";
@@ -123,6 +128,10 @@ export const E2B_MAX_ARTIFACT_BYTES = 25 * 1024 * 1024;
 export const DEFAULT_ADVERTISED_OPTIONAL_OPS: readonly ProviderOperation[] = ["health"];
 
 export interface E2bSandboxProviderOptions {
+  /** Independently configured native CP authority; absent means refusal. */
+  readonly browserCredentialControlPlaneOrigin?: string;
+  /** Injectable only for isolated native-redemption tests; defaults to fetch. */
+  readonly browserCredentialFetch?: typeof fetch;
   readonly transport: E2bTransport;
   /** The pinned E2B template alias every sandbox is created from. */
   readonly templateId?: string;
@@ -456,8 +465,10 @@ export class E2bSandboxProvider implements SandboxProvider {
    */
   readonly #runSecrets = new Map<
     string,
-    { readonly values: readonly string[]; timer: ReturnType<typeof setTimeout> }
+    { readonly values: readonly string[]; readonly expiresAt: number; timer: ReturnType<typeof setTimeout> }
   >();
+  readonly #browserCredentialControlPlaneOrigin: string | undefined;
+  readonly #browserCredentialFetch: typeof fetch;
   /**
    * SVC-008a — the SAME mechanism as `#idempotency` above, for the launch.
    *
@@ -493,6 +504,8 @@ export class E2bSandboxProvider implements SandboxProvider {
   readonly processSupervisionMode: ProcessSupervisionMode;
 
   constructor(options: E2bSandboxProviderOptions) {
+    this.#browserCredentialControlPlaneOrigin = options.browserCredentialControlPlaneOrigin === undefined ? undefined : browserCredentialOrigin(options.browserCredentialControlPlaneOrigin);
+    this.#browserCredentialFetch = options.browserCredentialFetch ?? fetch;
     this.#transport = options.transport;
     this.#templateId = options.templateId ?? "base";
     this.#defaultTtlMs = options.defaultTtlMs ?? DEFAULT_TTL_MS;
@@ -560,16 +573,17 @@ export class E2bSandboxProvider implements SandboxProvider {
     this.#registerSecretValues(sandboxId, [...classifyRunSecrets(env), ...additionalValues], ttlMs);
   }
 
-  #registerSecretValues(sandboxId: string, values: readonly string[], ttlMs: number): void {
+  #registerSecretValues(sandboxId: string, values: readonly string[], ttlMs: number, expiresAt: number = Date.now() + ttlMs): void {
     this.#purgeRunSecrets(sandboxId);
-    const entry: { readonly values: readonly string[]; timer: ReturnType<typeof setTimeout> } = {
+    const entry: { readonly values: readonly string[]; readonly expiresAt: number; timer: ReturnType<typeof setTimeout> } = {
+      expiresAt,
       values: Object.freeze([...new Set(values)].sort((a, b) => b.length - a.length)),
       // Replaced immediately below; assigned first so the closure can compare identities.
       timer: undefined as unknown as ReturnType<typeof setTimeout>,
     };
     entry.timer = setTimeout(() => {
       if (this.#runSecrets.get(sandboxId) === entry) this.#runSecrets.delete(sandboxId);
-    }, ttlMs);
+    }, Math.max(0, expiresAt - Date.now()));
     (entry.timer as unknown as { unref?: () => void }).unref?.();
     this.#runSecrets.set(sandboxId, entry);
   }
@@ -652,6 +666,27 @@ export class E2bSandboxProvider implements SandboxProvider {
       AbortSignal.timeout(Math.max(1, Math.ceil(deadlineMs))), "browser decision delivery timed out");
     if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.crashed) throw new Error("browser approval write failed");
     return { providerOpId: this.#nextOpId("execute"), delivered: true };
+  }
+
+  async deliverBrowserCredential(raw: BrowserCredentialDeliveryInput, ctx: ProviderOpContext): Promise<BrowserCredentialDeliveryResult> {
+    try {
+      const input = readBrowserCredentialDelivery(raw, Date.now());
+      if (!this.#browserCredentialControlPlaneOrigin || !Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0 || !this.#runSecrets.has(input.sandboxId)) throw new Error("browser credential authority unavailable");
+      const deadlineAt = Math.min(Date.now() + Math.min(ctx.deadlineMs, 5000), Date.parse(input.grant.expiresAt));
+      const signal = AbortSignal.timeout(Math.max(1, Math.ceil(deadlineAt - Date.now())));
+      const credential = await boundedBySignal(redeemBrowserCredential(input, this.#browserCredentialControlPlaneOrigin, this.#browserCredentialFetch, signal), signal, "browser credential redemption timed out");
+      const registry = this.#runSecrets.get(input.sandboxId);
+      if (!registry || registry.expiresAt <= Date.now() || signal.aborted || deadlineAt <= Date.now()) throw new Error("browser credential authority expired");
+      // Cookie values stay in the existing sandbox-local scanner registry and
+      // retain its expiry; no worker canaries or logs receive credential bytes.
+      this.#registerSecretValues(input.sandboxId, [...registry.values, credential.cookieValue, credential.bytes.toString("utf8")], registry.expiresAt - Date.now(), registry.expiresAt);
+      if (signal.aborted || deadlineAt <= Date.now()) throw new Error("browser credential deadline exhausted");
+      const result = await boundedBySignal(this.#transport.runCommand({ sandboxId: input.sandboxId, command: "node",
+        args: ["-e", WRITE_BROWSER_CREDENTIAL, JSON.stringify({ requestId: input.requestId, expiresAt: input.grant.expiresAt, bytes: credential.bytes.toString("base64") })],
+        envVars: {}, timeoutMs: Math.max(1, deadlineAt - Date.now()) }), signal, "browser credential delivery timed out");
+      if (signal.aborted || result.exitCode !== 0 || result.signal !== null || result.timedOut || result.crashed) throw new Error("browser credential write failed");
+      return { providerOpId: this.#nextOpId("execute"), delivered: true };
+    } catch { throw new Error("browser credential delivery refused"); }
   }
 
   async renewLifetime(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult> {
