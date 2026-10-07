@@ -3,23 +3,18 @@ import { lookup } from "node:dns/promises";
 import { createServer } from "node:http";
 import { connect, isIP, type Socket } from "node:net";
 import { classifyEgressDestination, type NetworkDenialClass, ipInCidr } from "@armyofagents/shared/egress-policy";
-import { networkPolicyV1Schema, type NetworkPolicyV1 } from "@armyofagents/worker-protocol";
+import { canonicalizeJsonV1, networkPolicyV1Schema, type NetworkPolicyV1 } from "@armyofagents/worker-protocol";
 
 export interface BrowserNetworkConfig {
   readonly networkPolicy: NetworkPolicyV1;
   readonly controlPlaneDenyCidrs: readonly string[];
-}
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(",")}}`;
-  return JSON.stringify(value);
 }
 export function validateBrowserNetworkConfig(raw: unknown): BrowserNetworkConfig {
   if (!raw || typeof raw !== "object") throw new Error("Browser network authority missing");
   const input = raw as Record<string, unknown>;
   const policy = networkPolicyV1Schema.parse(input.networkPolicy);
   const { digest, ...body } = policy;
-  if (digest !== createHash("sha256").update(canonical(body)).digest("hex")) throw new Error("Browser network digest mismatch");
+  if (digest !== createHash("sha256").update(canonicalizeJsonV1(body)).digest("hex")) throw new Error("Browser network digest mismatch");
   const cidrs = input.controlPlaneDenyCidrs;
   if (!Array.isArray(cidrs) || cidrs.length < 1 || cidrs.length > 256 || cidrs.some((value) => {
     if (typeof value !== "string" || value.length > 100 || value.trim() !== value) return true;

@@ -1,15 +1,11 @@
+import { canonicalizeJsonV1 } from "@armyofagents/worker-protocol";
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { connect } from "node:net";
 import { startBrowserEgressProxy, validateBrowserNetworkConfig } from "../egress-proxy.js";
 const body = { policyId: "browser-egress", version: 1, defaultAction: "deny", allow: [{ scheme: "https", host: "allowed.example", port: 443 }],
   denyPrivateNetworks: true, denyMetadata: true, denyControlPlane: true };
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value !== null && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`).join(",")}}`;
-  return JSON.stringify(value);
-}
-export const network = { networkPolicy: { ...body, digest: createHash("sha256").update(canonical(body)).digest("hex") }, controlPlaneDenyCidrs: ["8.8.8.8/32"] };
+export const network = { networkPolicy: { ...body, digest: createHash("sha256").update(canonicalizeJsonV1(body)).digest("hex") }, controlPlaneDenyCidrs: ["8.8.8.8/32"] };
 describe("guest default deny egress", () => {
   it("closes pending DNS connections without dialing after cancellation", async () => {
     let finishDns!: (addresses: string[]) => void; let observed!: () => void;
