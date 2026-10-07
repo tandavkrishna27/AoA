@@ -37,6 +37,7 @@ const connector = {
   catalogEntryId: "catalog-entry",
   oauthPolicyVersion: 1,
   secretRef: "mcp:oauth:11111111-1111-4111-8111-111111111111",
+  transport: "http", url: "https://mcp.notion.com/mcp",
 };
 const scope = {
   companyId: connector.companyId,
@@ -49,13 +50,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   current = { ...connector };
   const chain = {
+    $dynamic: () => chain,
     from: () => chain,
     innerJoin: () => chain,
     where: () => Promise.resolve(current ? [{ ...current }] : []),
   };
   db = { select: () => chain } as unknown as Db;
   mocks.policy.mockReturnValue({
-    entryId: connector.catalogEntryId,
+    resourceUrl: "https://mcp.notion.com/mcp", entryId: connector.catalogEntryId,
     version: 1,
   });
   mocks.blocked.mockReturnValue(false);
@@ -66,6 +68,27 @@ beforeEach(() => {
   });
 });
 describe("browser CP connector OAuth composition", () => {
+  it("resolves Commander company connector authority without an agent grant", async () => {
+    expect(await createBrowserConnectorOAuthResolver(db)({ companyId: scope.companyId, connectorId: scope.connectorId, userId: "human-owner", origin: "https://mcp.notion.com", assertAuthorityCurrent: async () => {} })).toBe("resolved-access-token");
+    await assertBrowserConnectorCurrent(db, { companyId: scope.companyId, connectorId: scope.connectorId, userId: "human-owner", origin: "https://mcp.notion.com" });
+  });
+  it("refuses mixed human and agent identities before reading a secret", async () => {
+    await expect(createBrowserConnectorOAuthResolver(db)({ ...scope, userId: "human-owner", origin: "https://mcp.notion.com" } as any)).rejects.toThrow();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+  it("refuses a human origin outside the connector OAuth resource", async () => {
+    await expect(createBrowserConnectorOAuthResolver(db)({companyId:scope.companyId,connectorId:scope.connectorId,userId:'human-owner',origin:'https://other.example',assertAuthorityCurrent:async()=>{}})).rejects.toThrow();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+  it("requires a trusted live parent/fence recheck before resolving human credentials", async () => {
+    await expect(createBrowserConnectorOAuthResolver(db)({companyId:scope.companyId,connectorId:scope.connectorId,userId:'human-owner',origin:'https://mcp.notion.com'})).rejects.toThrow();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+  it("rechecks human parent authority before token refresh", async () => {
+    const assertAuthorityCurrent=vi.fn().mockRejectedValue(new Error('lost parent'));
+    await expect(createBrowserConnectorOAuthResolver(db)({companyId:scope.companyId,connectorId:scope.connectorId,userId:'human-owner',origin:'https://mcp.notion.com',assertAuthorityCurrent})).rejects.toThrow();
+    expect(assertAuthorityCurrent).toHaveBeenCalled(); expect(mocks.resolve).not.toHaveBeenCalled();
+  });
   it("uses owner-bound secret access and existing refresh leases/committer, returning only access token", async () => {
     expect(await createBrowserConnectorOAuthResolver(db)(scope)).toBe(
       "resolved-access-token"

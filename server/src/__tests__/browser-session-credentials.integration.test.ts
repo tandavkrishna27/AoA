@@ -24,6 +24,7 @@ import {
 import { createJobLeaseRenewalService } from "../services/job-fencing.js";
 import { createBrowserArtifactRetention } from "../services/browser-artifact-retention-sweep.js";
 import { parseDistributedNetworkPolicies } from "../config/distributed-network-policies.js";
+import { assertBrowserConnectorCurrent, type BrowserConnectorScope } from "../services/browser-connector-oauth.js";
 import {
   setupJobControlFixture,
   auth as fixtureAuth,
@@ -36,8 +37,8 @@ import type { VerifiedWorkerOperation } from "../services/job-leasing.js";
 const binding = {
   bindingId: randomUUID(),
   connectorId: randomUUID(),
-  origin: "https://example.com",
-  exchangeUrl: "https://example.com/login",
+  origin: "https://mcp.notion.com",
+  exchangeUrl: "https://mcp.notion.com/login",
   cookieName: "__Host-session",
 };
 const policy = parseDistributedNetworkPolicies(
@@ -46,7 +47,7 @@ const policy = parseDistributedNetworkPolicies(
       [COMPANY]: {
         policyId: "browser-test",
         version: 1,
-        allow: [{ scheme: "https", host: "example.com", port: 443 }],
+        allow: [{ scheme: "https", host: "mcp.notion.com", port: 443 }],
       },
     },
   })
@@ -92,6 +93,7 @@ describe.skipIf(
     await f.admin`INSERT INTO company_memberships(company_id,principal_type,principal_id,status,membership_role) VALUES(${COMPANY},'user','human-founder','active','owner')`;
   }, 180000);
   beforeEach(async () => {
+    await f.admin`UPDATE company_memberships SET status='active' WHERE company_id=${COMPANY} AND principal_id='human-founder'`;
     process.env.AOA_SECRETS_MASTER_KEY = "a".repeat(64);
     objects.clear();
     exchange.mockReset();
@@ -253,6 +255,88 @@ describe.skipIf(
       organizationId: ORG,
       workerId: active.identity.workerId,
     } as VerifiedWorkerOperation);
+  async function humanSession(userId = "human-founder") {
+    const parentJobId = randomUUID(), parentAttemptId = randomUUID(), parentLeaseId = randomUUID(), turnId = randomUUID(), conversationId = randomUUID();
+    await f.admin`INSERT INTO "user"(id,name,email,email_verified,created_at,updated_at) VALUES(${userId},'Browser owner',${`${userId}@example.test`},true,now(),now()) ON CONFLICT(id) DO NOTHING`;
+    await f.admin`INSERT INTO organization_memberships(organization_id,user_id,role,status) VALUES(${ORG},${userId},'owner','active') ON CONFLICT(organization_id,user_id) DO UPDATE SET status='active'`;
+    await f.admin`INSERT INTO company_memberships(company_id,principal_type,principal_id,status) VALUES(${COMPANY},'user',${userId},'active') ON CONFLICT(company_id,principal_type,principal_id) DO UPDATE SET status='active'`;
+    await f.admin`INSERT INTO internal_agent_config(company_id,enabled_capabilities) VALUES(${COMPANY},${f.admin.json(['browser_use'])}) ON CONFLICT(company_id) DO UPDATE SET enabled_capabilities=EXCLUDED.enabled_capabilities`;
+    await f.admin`INSERT INTO company_mcp_connectors(id,company_id,server_name,display_name,transport,url,source,catalog_entry_id,oauth_policy_version,secret_ref,status) VALUES(${binding.connectorId},${COMPANY},'notion-browser','Notion fixture','http','https://mcp.notion.com/mcp','catalog','notion-hosted',1,${`mcp:oauth:${binding.connectorId}`},'active') ON CONFLICT(id) DO UPDATE SET status='active',company_id=EXCLUDED.company_id,url=EXCLUDED.url`;
+    const parentPolicy = { networkPolicy: policy, controlPlaneDenyCidrs: ['203.0.113.8/32'], browserSessionBindings: [binding] };
+    // Clone only fixture rows to retain the real frozen fence joins. No provider calls.
+    await f.admin`INSERT INTO jobs SELECT (jsonb_populate_record(NULL::jobs,to_jsonb(j)||${f.admin.json({id:parentJobId,source_kind:'commander_turn',source_identity:turnId,source_intent:{kind:'commander_turn',internalAgentRunId:turnId,conversationId},idempotency_key:parentJobId,workload_type:'command_run',policy_snapshot:parentPolicy,requester_principal_kind:'founder',requester_principal_id:userId,authenticated_principal_kind:'user',authenticated_principal_id:userId,executor_principal_kind:'sandbox',executor_principal_id:turnId})})).* FROM jobs j WHERE j.id=${active.identity.jobId}`;
+    await f.admin`INSERT INTO job_attempts SELECT (jsonb_populate_record(NULL::job_attempts,to_jsonb(a)||${f.admin.json({id:parentAttemptId,job_id:parentJobId})})).* FROM job_attempts a WHERE a.id=${active.identity.attemptId}`;
+    await f.admin`INSERT INTO leases SELECT (jsonb_populate_record(NULL::leases,to_jsonb(l)||${f.admin.json({id:parentLeaseId,job_id:parentJobId,attempt_id:parentAttemptId})})).* FROM leases l WHERE l.id=${active.identity.leaseId}`;
+    await f.admin`INSERT INTO internal_agent_conversations(id,company_id,user_id) VALUES(${conversationId},${COMPANY},${userId})`;
+    await f.admin`INSERT INTO internal_agent_runs(id,company_id,user_id,agent_id,trigger_type,trigger_source,status,provider,execution_owner,distributed_job_id,distributed_attempt_id) VALUES(${turnId},${COMPANY},${userId},NULL,'conversation','user_message','running','openai','distributed',${parentJobId},${parentAttemptId})`;
+    await f.admin`INSERT INTO internal_agent_messages(conversation_id,role,content,run_id) VALUES(${conversationId},'user','keyless session fixture',${turnId})`;
+    const [child] = await f.admin`SELECT policy_snapshot FROM jobs WHERE id=${active.identity.jobId}`;
+    const prep = { ...child.policy_snapshot.browserPreparation, schemaVersion: 2, principalKind: 'commander', userId, conversationId,runId:turnId,agentId:null,issueId:null,parentJobId,parentAttemptId,parentLeaseId };
+    await f.admin`UPDATE jobs SET requester_principal_kind='founder',requester_principal_id=${userId},authenticated_principal_kind='user',authenticated_principal_id=${userId},policy_snapshot=${f.admin.json({browserPreparation:prep})} WHERE id=${active.identity.jobId}`;
+    const resolve = vi.fn(async (_scope: BrowserConnectorScope) => 'cp_access_token');
+    broker = createBrowserSessionCredentialBroker({ appDb:f.app.db,identityDb:ownerDb,storage,signingKey:'s'.repeat(64),publicOrigin:'https://control.example',resolveConnectorOAuth:resolve,
+      assertConnectorCurrent: async scope => { await current(scope); await assertBrowserConnectorCurrent(ownerDb, scope); },exchange,storageTimeoutMs:500 });
+    return { userId,parentJobId,parentAttemptId,parentLeaseId,turnId,conversationId,resolve };
+  }
+  it("issues and atomically redeems the owner's approved human session without an agent grant", async () => {
+    const human = await humanSession();
+    const [entry] = await broker.prepare(auth(),request,ctx);
+    expect(entry).toBeDefined();
+    const [replayed] = await broker.prepare(auth(),request,ctx);
+    expect(replayed.grant.artifactId).toBe(entry.grant.artifactId);
+    expect(human.resolve).toHaveBeenCalledTimes(1);
+    expect(human.resolve).toHaveBeenCalledWith(expect.objectContaining({userId:human.userId,origin:binding.origin,connectorId:binding.connectorId,assertAuthorityCurrent:expect.any(Function)}));
+    expect(human.resolve.mock.calls[0][0]).not.toHaveProperty('agentId');
+    const url = new URL(entry.grant.url), scopedToken = url.searchParams.get('grant')!;
+    const stored = objects.values().next().value!.toString();
+    expect(stored).not.toMatch(/cp_access_token|scoped_cookie_value_012345/);
+    expect(JSON.parse((await broker.redeem(entry.grant.artifactId,scopedToken)).toString())).toMatchObject({cookie:{name:binding.cookieName,value:'scoped_cookie_value_012345'}});
+    await expect(broker.redeem(entry.grant.artifactId,scopedToken)).rejects.toThrow();
+    expect(objects.size).toBe(0);
+  });
+  it("does not issue a human cookie from another operator's native allow_once answer", async () => {
+    const human = await humanSession('other-session-owner');
+    expect(await broker.prepare(auth(),request,ctx)).toEqual([]);
+    expect(human.resolve).not.toHaveBeenCalled(); expect(exchange).not.toHaveBeenCalled();
+  });
+  it.each(['company-membership','organization-membership','connector-disabled','connector-deleted','connector-url','parent-cancelled','parent-lease','turn','conversation','binding','policy','browser-disabled','cross-tenant'])('refuses human issuance after %s changes', async fault => {
+    const human = await humanSession();
+    if(fault==='company-membership')await f.admin`UPDATE company_memberships SET status='suspended' WHERE company_id=${COMPANY} AND principal_id=${human.userId}`;
+    if(fault==='organization-membership')await f.admin`UPDATE organization_memberships SET status='suspended' WHERE organization_id=${ORG} AND user_id=${human.userId}`;
+    if(fault==='connector-disabled')await f.admin`UPDATE company_mcp_connectors SET status='disabled' WHERE id=${binding.connectorId}`;
+    if(fault==='connector-deleted')await f.admin`DELETE FROM company_mcp_connectors WHERE id=${binding.connectorId}`;
+    if(fault==='connector-url')await f.admin`UPDATE company_mcp_connectors SET url='https://other.example/mcp' WHERE id=${binding.connectorId}`;
+    if(fault==='parent-cancelled')await f.admin`UPDATE jobs SET status='cancelled' WHERE id=${human.parentJobId}`;
+    if(fault==='parent-lease')await f.admin`UPDATE leases SET expires_at=now()-interval '1 second',ack_deadline=now()-interval '2 seconds' WHERE id=${human.parentLeaseId}`;
+    if(fault==='turn')await f.admin`UPDATE internal_agent_runs SET status='cancelled' WHERE id=${human.turnId}`;
+    if(fault==='conversation')await f.admin`UPDATE internal_agent_conversations SET user_id='different-owner' WHERE id=${human.conversationId}`;
+    if(fault==='binding')await f.admin`UPDATE jobs SET policy_snapshot=${f.admin.json({networkPolicy:policy,browserSessionBindings:[]})} WHERE id=${human.parentJobId}`;
+    if(fault==='policy')await f.admin`UPDATE jobs SET policy_snapshot=${f.admin.json({networkPolicy:{...policy,digest:'0'.repeat(64)},browserSessionBindings:[binding]})} WHERE id=${human.parentJobId}`;
+    if(fault==='browser-disabled')await f.admin`UPDATE internal_agent_config SET enabled_capabilities='[]' WHERE company_id=${COMPANY}`;
+    if(fault==='cross-tenant') {
+      const otherCompany = randomUUID();
+      await f.admin`INSERT INTO companies(id,name,issue_prefix,organization_id) VALUES(${otherCompany},'Other browser tenant','OBT',${ORG})`;
+      await f.admin`UPDATE company_mcp_connectors SET company_id=${otherCompany} WHERE id=${binding.connectorId}`;
+    }
+    await expect(broker.prepare(auth(),request,ctx)).rejects.toThrow();
+    expect(human.resolve).not.toHaveBeenCalled(); expect(objects.size).toBe(0);
+  });
+  it("rechecks human authority after issuance before credential redemption", async () => {
+    const human = await humanSession();
+    const [entry] = await broker.prepare(auth(),request,ctx);
+    await f.admin`UPDATE organization_memberships SET status='suspended' WHERE organization_id=${ORG} AND user_id=${human.userId}`;
+    await expect(broker.prepare(auth(),request,ctx)).rejects.toThrow();
+    await expect(broker.redeem(entry.grant.artifactId,new URL(entry.grant.url).searchParams.get('grant')!)).rejects.toThrow();
+  });
+  it("rechecks the live human parent after OAuth resolution before exchanging a cookie", async () => {
+    const human = await humanSession();
+    human.resolve.mockImplementation(async () => {
+      await f.admin`UPDATE company_memberships SET status='suspended' WHERE company_id=${COMPANY} AND principal_id=${human.userId}`;
+      return 'cp_access_token';
+    });
+    await expect(broker.prepare(auth(),request,ctx)).rejects.toThrow();
+    expect(exchange).not.toHaveBeenCalled(); expect(objects.size).toBe(0);
+  });
   it("separates distinct immutable requests sharing a binding and refuses a changed same-request prompt", async () => {
     const native = agentRuntimeDecisionService(ownerDb),
       requestId = randomUUID();

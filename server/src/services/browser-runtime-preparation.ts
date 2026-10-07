@@ -55,9 +55,9 @@ const agentBrowserPreparationSchema = z.object({
   sessionBinding:browserSessionBindingSchema.optional(),
 }).strict();
 export const browserPreparationSchema = z.discriminatedUnion("schemaVersion", [agentBrowserPreparationSchema,
-  agentBrowserPreparationSchema.omit({ sessionBinding: true }).extend({ schemaVersion: z.literal(2),
+  agentBrowserPreparationSchema.extend({ schemaVersion: z.literal(2),
     principalKind: z.literal("commander"), userId: z.string().min(1).max(256), conversationId: z.string().uuid(),
-    agentId: z.null(), issueId: z.null(), sessionBinding: z.never().optional() }).strict()]);
+    agentId: z.null(), issueId: z.null() }).strict()]);
 export type BrowserPreparation = z.infer<typeof browserPreparationSchema>;
 
 export function parseBrowserPreparation(raw: unknown): BrowserPreparation | null {

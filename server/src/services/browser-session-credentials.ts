@@ -14,11 +14,13 @@ import {
   jobEvents,
   jobProjectionReceipts,
   jobs,
+  internalAgentConfig,
   type ActiveFenceRequest,
   type Db,
 } from "@armyofagents/db";
 import {
   artifactDownloadGrantV1Schema,
+  canonicalizeJsonV1,
   permissionRuntimeDecisionRequestV1Schema,
   type ArtifactDownloadGrantV1,
   type LeaseRenewRequestV1,
@@ -27,12 +29,14 @@ import { z } from "zod";
 import { runInTenant } from "../db/tenant-context.js";
 import type { StorageProvider } from "../storage/types.js";
 import { localEncryptedProvider } from "../secrets/local-encrypted-provider.js";
-import { parseBrowserPreparation } from "./browser-runtime-preparation.js";
+import { parseBrowserPreparation, type BrowserPreparation } from "./browser-runtime-preparation.js";
+import { loadCommanderJobAuthority, commanderJobHasHumanOwner } from "./commander-job-authority.js";
 import { browserSessionBindingSchema } from "../config/browser-session-bindings.js";
 import { exchangeBrowserSessionCookie } from "./browser-session-cookie-exchange.js";
 import {
   assertBrowserConnectorCurrent,
   createBrowserConnectorOAuthResolver,
+  type BrowserConnectorScope,
 } from "./browser-connector-oauth.js";
 import type { ResolvedFenceContext } from "./worker-fence-context.js";
 import type { VerifiedWorkerOperation } from "./job-leasing.js";
@@ -163,17 +167,9 @@ export function createBrowserSessionCredentialBroker(input: {
   storage: StorageProvider;
   signingKey: string;
   publicOrigin: string;
-  resolveConnectorOAuth?: (input: {
-    companyId: string;
-    connectorId: string;
-    agentId: string;
-  }) => Promise<string>;
+  resolveConnectorOAuth?: (input: BrowserConnectorScope) => Promise<string>;
   exchange?: typeof exchangeBrowserSessionCookie;
-  assertConnectorCurrent?: (input: {
-    companyId: string;
-    connectorId: string;
-    agentId: string;
-  }) => Promise<void>;
+  assertConnectorCurrent?: (input: BrowserConnectorScope) => Promise<void>;
   now?: () => Date;
   storageTimeoutMs?: number;
 }): BrowserSessionCredentialPort {
@@ -192,8 +188,25 @@ export function createBrowserSessionCredentialBroker(input: {
       createBrowserConnectorOAuthResolver(input.identityDb);
   const assertConnector =
     input.assertConnectorCurrent ??
-    ((scope: { companyId: string; connectorId: string; agentId: string }) =>
+    ((scope: BrowserConnectorScope) =>
       assertBrowserConnectorCurrent(input.identityDb, scope));
+  const connectorScope = (preparation: BrowserPreparation, companyId: string): BrowserConnectorScope => ({ companyId,
+    connectorId: preparation.sessionBinding!.connectorId,
+    ...(preparation.schemaVersion === 2 ? { userId: preparation.userId, origin: preparation.sessionBinding!.origin } : { agentId: preparation.agentId }) });
+  const assertHumanCurrent = async (preparation: BrowserPreparation, companyId: string) => {
+    if (preparation.schemaVersion !== 2) return;
+    const authority = await loadCommanderJobAuthority(input.identityDb, { companyId, jobId: preparation.parentJobId });
+    const [parent] = await input.identityDb.select({ policy: jobs.policySnapshot, status: jobs.status }).from(jobs)
+      .where(and(eq(jobs.id, preparation.parentJobId), eq(jobs.companyId, companyId)));
+    const [config] = await input.identityDb.select({ capabilities: internalAgentConfig.enabledCapabilities }).from(internalAgentConfig).where(eq(internalAgentConfig.companyId, companyId));
+    const bindings = parent?.policy.browserSessionBindings;
+    if (!authority || authority.userId !== preparation.userId || authority.turnId !== preparation.runId || authority.conversationId !== preparation.conversationId ||
+      authority.distributedAttemptId !== preparation.parentAttemptId || authority.distributedJobId !== preparation.parentJobId || authority.executionOwner !== "distributed" || authority.status !== "running" || parent?.status !== "running" ||
+      !Array.isArray(config?.capabilities) || !config.capabilities.includes("browser_use") || !Array.isArray(bindings) ||
+      canonicalizeJsonV1(parent.policy.networkPolicy) !== canonicalizeJsonV1(preparation.networkPolicy) ||
+      !bindings.some(binding => canonicalizeJsonV1(binding) === canonicalizeJsonV1(preparation.sessionBinding))) throw new Error("browser human session authority unavailable");
+    await assertConnector(connectorScope(preparation, companyId));
+  };
   // Probe the existing encryption provider at composition, before accepting an
   // authenticated guest workload. The probe contains no credential value.
   const encryptionReady = localEncryptedProvider
@@ -381,6 +394,10 @@ export function createBrowserSessionCredentialBroker(input: {
               job?.policySnapshot.browserPreparation
             ),
             binding = preparation?.sessionBinding;
+          if (preparation?.schemaVersion === 2 && binding) {
+            if (!job || !commanderJobHasHumanOwner(job) || job.requesterPrincipalId !== preparation.userId) return null;
+            await assertHumanCurrent(preparation, ctx.companyId);
+          }
           if (
             !job ||
             job.workloadType !== "browser_session" ||
@@ -522,6 +539,7 @@ export function createBrowserSessionCredentialBroker(input: {
             !result ||
             decidedBy?.principalType !== "user" ||
             decidedBy.principalId !== row.decision.answeredByUserId ||
+            (preparation.schemaVersion === 2 && row.decision.answeredByUserId !== preparation.userId) ||
             result.decision !== "allow_once" ||
             result.requestDigest !== permission.requestDigest ||
             result.nonce !== binding.bindingId ||
@@ -550,6 +568,7 @@ export function createBrowserSessionCredentialBroker(input: {
                   artifact: existing[0],
                   replayed: true as const,
                   fence: ctx.fenceIdentity,
+                  preparation,
                 }
               : null;
           const [attempt] = await tx
@@ -656,6 +675,7 @@ export function createBrowserSessionCredentialBroker(input: {
       );
       if (!prepared) return [];
       if (prepared.replayed) {
+        await assertHumanCurrent(prepared.preparation, prepared.fence.companyId);
         const envelope = await readEnvelope(prepared.artifact);
         if (JSON.stringify(envelope.fence) !== JSON.stringify(prepared.fence))
           return [];
@@ -694,14 +714,16 @@ export function createBrowserSessionCredentialBroker(input: {
         );
       };
       try {
-        const accessToken = await resolveOAuth({
-          companyId: prepared.fence.companyId,
-          connectorId: prepared.preparation.sessionBinding!.connectorId,
-          agentId: prepared.preparation.agentId,
-        });
+        await assertHumanCurrent(prepared.preparation, prepared.fence.companyId);
+        const accessToken = await resolveOAuth({ ...connectorScope(prepared.preparation, prepared.fence.companyId),
+          ...(prepared.preparation.schemaVersion === 2 ? { assertAuthorityCurrent: async () => {
+            await runInTenant(input.appDb, auth.organizationId, repos => repos.jobControl.lockActiveFence(prepared.fence));
+            await assertHumanCurrent(prepared.preparation, prepared.fence.companyId);
+          } } : {}) });
         await runInTenant(input.appDb, auth.organizationId, (repos) =>
           repos.jobControl.lockActiveFence(prepared.fence)
         );
+        await assertHumanCurrent(prepared.preparation, prepared.fence.companyId);
         const cookie = await (input.exchange ?? exchangeBrowserSessionCookie)({
           binding: prepared.preparation.sessionBinding!,
           accessToken,
@@ -741,11 +763,8 @@ export function createBrowserSessionCredentialBroker(input: {
           new Date(reply.expiresAt).getTime() <= now().getTime()
         )
           throw new Error("scoped browser session reply refused");
-        await assertConnector({
-          companyId: prepared.fence.companyId,
-          connectorId: prepared.preparation.sessionBinding!.connectorId,
-          agentId: prepared.preparation.agentId,
-        });
+        await assertHumanCurrent(prepared.preparation, prepared.fence.companyId);
+        await assertConnector(connectorScope(prepared.preparation, prepared.fence.companyId));
         const encrypted = await localEncryptedProvider.createVersion({
           value: JSON.stringify(envelope),
           externalRef: null,
@@ -790,6 +809,7 @@ export function createBrowserSessionCredentialBroker(input: {
           auth.organizationId,
           async (repos, tx) => {
             await repos.jobControl.lockActiveFence(prepared.fence);
+            await assertHumanCurrent(prepared.preparation, prepared.fence.companyId);
             const [row] = await tx
               .update(jobArtifacts)
               .set({
@@ -879,7 +899,7 @@ export function createBrowserSessionCredentialBroker(input: {
         async (repos, tx) => {
           await repos.jobControl.lockActiveFence(envelope.fence);
           const [job] = await tx
-            .select({ policy: jobs.policySnapshot, status: jobs.status })
+            .select()
             .from(jobs)
             .where(
               and(
@@ -900,7 +920,7 @@ export function createBrowserSessionCredentialBroker(input: {
           )
             throw new Error("browser credential grant refused");
           const preparation = parseBrowserPreparation(
-            job?.policy.browserPreparation
+            job?.policySnapshot.browserPreparation
           );
           if (
             !preparation?.sessionBinding ||
@@ -943,11 +963,9 @@ export function createBrowserSessionCredentialBroker(input: {
             current.expiresAt.getTime() <= now().getTime()
           )
             throw new Error("browser credential grant refused");
-          await assertConnector({
-            companyId: envelope.fence.companyId,
-            connectorId: envelope.binding.connectorId,
-            agentId: preparation.agentId,
-          });
+          if (preparation.schemaVersion === 2 && (!commanderJobHasHumanOwner(job!) || job!.requesterPrincipalId !== preparation.userId)) throw new Error("browser credential grant refused");
+          await assertHumanCurrent(preparation, envelope.fence.companyId);
+          await assertConnector(connectorScope(preparation, envelope.fence.companyId));
           await bounded(
             input.storage.deleteObject({ objectKey: artifact.objectKey! })
           );

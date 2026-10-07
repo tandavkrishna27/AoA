@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { companies, heartbeatRuns, internalAgentRuns, internalAgentConfig, issues, jobs, leases, workers, executionTargets, companyMcpConnectors,companyMcpConnectorAgents,type Db } from "@armyofagents/db";
 import { loadCommanderJobAuthority, commanderJobHasHumanOwner } from "./commander-job-authority.js";
+import { assertBrowserConnectorCurrent } from "./browser-connector-oauth.js";
 import { workerHelloV1Schema } from "@armyofagents/worker-protocol";
 import { runInTenant } from "../db/tenant-context.js";
 import { HttpError } from "../errors.js";
@@ -92,7 +93,6 @@ function createBrowserRequestService(input: BrowserRequestServiceInput): { reque
     const parsed = browserSessionRequestSchema.safeParse(raw);
     if (!parsed.success) throw new HttpError(400, "Invalid browser session request");
     const request = parsed.data;
-    if (commander && request.sessionBindingId) throw new HttpError(403, "Commander session credential authority unavailable");
     const browserRequestId = requestId(actor, request.idempotencyKey);
     const organizationId = company.organizationId;
     const auditSink: { event: PreparedActivityEvent | null } = { event: null };
@@ -144,16 +144,19 @@ function createBrowserRequestService(input: BrowserRequestServiceInput): { reque
         if (!getBrowserSessionCredentialPort()) refusal("Scoped browser session broker unavailable");
         try { await getBrowserSessionCredentialPort()!.assertReady(); } catch { refusal("Scoped browser session encryption unavailable"); }
         if(!sessionBinding)refusal("Trusted browser session binding unavailable");
+        if (commander) await assertBrowserConnectorCurrent(input.identityDb, { companyId: actor.companyId, connectorId: sessionBinding.connectorId, userId: commander.userId, origin: sessionBinding.origin });
+        else {
         const [connector]=await input.identityDb.select({id:companyMcpConnectors.id}).from(companyMcpConnectors)
           .innerJoin(companyMcpConnectorAgents,and(eq(companyMcpConnectorAgents.connectorId,companyMcpConnectors.id),eq(companyMcpConnectorAgents.companyId,actor.companyId),eq(companyMcpConnectorAgents.agentId,actor.agentId!)))
           .where(and(eq(companyMcpConnectors.id,sessionBinding.connectorId),eq(companyMcpConnectors.companyId,actor.companyId),eq(companyMcpConnectors.status,"active"),eq(companyMcpConnectors.source,"catalog")));
         if(!connector)refusal("Agent browser connector authority unavailable");
+        }
       }
       const { workload, config } = buildBrowserRunnerConfig(request, policy, Array.isArray(parent.policySnapshot.controlPlaneDenyCidrs) ? parent.policySnapshot.controlPlaneDenyCidrs as string[] : [],sessionBinding);
       const preparation = parseBrowserPreparation({ ...(commander ? { schemaVersion: 2 as const, principalKind: "commander" as const, userId: commander.userId, conversationId: commander.conversationId, agentId: null, issueId: null } : { schemaVersion: 1 as const, agentId: actor.agentId!, issueId: issue!.id }), requestDigest: createHash("sha256").update(JSON.stringify(request)).digest("hex"),
         runId: actor.runId, parentJobId: parent.id, parentAttemptId: run.distributedAttemptId, parentLeaseId: lease.id,
         targetId: lease.targetId, targetAuthorityKey: lease.targetAuthorityKey, targetGeneration: lease.targetGeneration,
-        profileHash: lease.profileHash, targetProfileHash: target.profileHash, providerConstraintHash: lease.providerConstraintHash, networkPolicy: policy,...(!commander && sessionBinding?{sessionBinding}:{}) });
+        profileHash: lease.profileHash, targetProfileHash: target.profileHash, providerConstraintHash: lease.providerConstraintHash, networkPolicy: policy,...(sessionBinding?{sessionBinding}:{}) });
       if (!preparation) refusal("Browser preparation refused");
       await tx.insert(internalAgentRuns).values({ id: browserRequestId, companyId: actor.companyId, agentId: actor.agentId,
         ...(commander ? { userId: commander.userId, triggerType: "conversation", relatedEntityType: "conversation", relatedEntityId: commander.conversationId } : { triggerType: "sub_agent", relatedEntityType: "task", relatedEntityId: issue!.id }), triggerSource: "browser_request", status: "running" }).onConflictDoNothing();

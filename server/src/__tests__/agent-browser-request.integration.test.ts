@@ -13,6 +13,7 @@ import { runInTenant } from "../db/tenant-context.js";
 import { createLocalDiskStorageProvider } from "../storage/local-disk-provider.js";
 import { submitJobWithinTenant } from "../services/job-submission.js";
 import { loadCommanderJobAuthority } from "../services/commander-job-authority.js";
+import { setBrowserSessionCredentialPort } from "../services/browser-session-credentials.js";
 import { parseDistributedNetworkPolicies } from "../config/distributed-network-policies.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -68,6 +69,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     await fixture.admin`INSERT INTO agents(id,company_id,name,kind,status,adapter_type) VALUES(${AGENT},${COMPANY},'Browser requester','org','idle','claude_local')`;
   }, 180_000);
   beforeEach(async () => {
+    setBrowserSessionCredentialPort(undefined);
     process.env.AOA_DISTRIBUTED_EXECUTION_ENABLED = "true";
     await fixture.resetRuntimeRows();
     await fixture.admin`DELETE FROM issues WHERE id=${ISSUE}`;
@@ -118,6 +120,23 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     expect(job.policy_snapshot.browserPreparation).toMatchObject({schemaVersion:2,principalKind:'commander',agentId:null,issueId:null,userId:commanderUser,conversationId,runId:RUN,networkPolicy:policy,parentLeaseId:parent.identity.leaseId});
     expect((await fixture.admin`SELECT agent_id,user_id FROM internal_agent_runs WHERE id=${result.browserRequestId}`)[0]).toEqual({agent_id:null,user_id:commanderUser});
     expect(JSON.stringify(result)).not.toMatch(/credential|endpoint|cdp|fence|https:/i);
+  });
+  it("stages only the immutable human session binding under real company connector authority", async () => {
+    const actor = await commanderParent(), connectorId = randomUUID(), bindingId = randomUUID();
+    const binding = { bindingId,connectorId,origin:'https://mcp.notion.com',exchangeUrl:'https://mcp.notion.com/login',cookieName:'__Host-session' };
+    const scopedPolicy = parseDistributedNetworkPolicies(JSON.stringify({[ORG]:{[COMPANY]:{policyId:'human-session',version:1,allow:[{scheme:'https',host:'mcp.notion.com',port:443}]}}})).get(`${ORG}:${COMPANY}`)!;
+    await fixture.admin`DELETE FROM company_mcp_connectors WHERE company_id=${COMPANY} AND catalog_entry_id='notion-hosted'`;
+    await fixture.admin`INSERT INTO company_mcp_connectors(id,company_id,server_name,display_name,transport,url,source,catalog_entry_id,oauth_policy_version,secret_ref,status) VALUES(${connectorId},${COMPANY},'human-notion','Human fixture','http','https://mcp.notion.com/mcp','catalog','notion-hosted',1,${`mcp:oauth:${connectorId}`},'active')`;
+    await fixture.admin`UPDATE jobs SET policy_snapshot=${fixture.admin.json({networkPolicy:scopedPolicy,controlPlaneDenyCidrs:['203.0.113.8/32'],browserSessionBindings:[binding]})} WHERE id=${parent.seeded.jobId}`;
+    setBrowserSessionCredentialPort({assertReady:async()=>{},prepare:async()=>[],redeem:async()=>{throw new Error('not used by producer fixture');}});
+    try {
+      const result = await createCommanderBrowserRequestService(serviceInput()).request(actor,{...request,sessionBindingId:bindingId,urls:[binding.origin]});
+      const [job] = await fixture.admin`SELECT policy_snapshot FROM jobs WHERE id=${result.jobId}`;
+      expect(job.policy_snapshot.browserPreparation).toMatchObject({schemaVersion:2,userId:actor.userId,agentId:null,sessionBinding:binding,networkPolicy:scopedPolicy});
+      expect(JSON.stringify(job.policy_snapshot)).not.toMatch(/refresh_token|access_token|cookie_value|cdp/i);
+      await expect(createCommanderBrowserRequestService(serviceInput()).request(actor,{...request,idempotencyKey:'trace-refused',sessionBindingId:bindingId,urls:[binding.origin],options:{recordTrace:true}})).rejects.toThrow();
+      await expect(createCommanderBrowserRequestService(serviceInput()).request(actor,{...request,idempotencyKey:'foreign-binding',sessionBindingId:randomUUID(),urls:[binding.origin]})).rejects.toThrow();
+    } finally { setBrowserSessionCredentialPort(undefined); }
   });
   it("reads an actual user-submitted Commander parent and refuses spoofed principal scope", async () => {
     await commanderParent();
