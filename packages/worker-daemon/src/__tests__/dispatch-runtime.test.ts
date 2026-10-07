@@ -405,15 +405,10 @@ describe("composeDispatchRuntime — JOB-015 control-command handlers", () => {
     expect(order.indexOf("makeDriver")).toBeGreaterThan(-1);
   });
 
-  it("★ `result` is deliberately ABSENT — §5's disclosed gap, pinned in code", async () => {
-    // The two governance result kinds have no applier (E8/BRW-004 + E9/SVC-001 own them).
-    // The daemon must compose NOTHING for them rather than a stub that ACKs: an ACKed but
-    // unapplied command clears `ack_status` forever and reproduces this ticket's own
-    // finding. If a future commit composes `result`, this test reds and its author has to
-    // decide deliberately whether §5 is still true.
+  it("result handler is composed and refuses unsupported governance commands", async () => {
     const { captured } = await compose();
     const handlers = (captured.driverControlHandlers as () => Record<string, unknown>)();
-    expect(handlers.result).toBeUndefined();
-    expect(Object.keys(handlers)).toEqual(["drain"]);
+    expect(handlers.result).toBeTypeOf("function");
+    await expect((handlers.result as (command: unknown) => Promise<void>)({ commandKind: "product_approval_result" })).rejects.toThrow("unsupported governance result");
   });
 });

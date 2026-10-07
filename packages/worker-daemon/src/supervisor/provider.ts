@@ -385,6 +385,8 @@ export interface ProviderOpContext {
 }
 
 export interface CreateSandboxSpec {
+  /** Browser-only: provider must enforce this policy before creating the guest. */
+  readonly browserNetworkPolicy?: import("@armyofagents/worker-protocol").NetworkPolicyV1;
   readonly resourceLabels: ResourceLabels;
   /** The TENANT command — it runs INSIDE the sandbox, never in the worker. */
   readonly command: string;
@@ -394,6 +396,8 @@ export interface CreateSandboxSpec {
 }
 
 export interface CreateResult {
+  /** Exact policy installed before guest creation; absent is a refusal for browser runs. */
+  readonly browserNetworkPolicyDigest?: string;
   readonly sandboxId: string;
   readonly providerOpId: string;
   readonly resourceLabels: ResourceLabels;
@@ -641,6 +645,8 @@ export function deriveStopVerdict(observation: ProcessObservation): "stopped" | 
  * implement this port later without changing it.
  */
 export interface SandboxProvider {
+  /** Only a provider with measured enforcement may expose this local capability. */
+  readonly browserNetworkPolicyMode?: "verified_default_deny";
   /** The advertised op set (always a superset of the 8 core ops). */
   readonly advertisedOperations: ReadonlySet<ProviderOperation>;
   readonly checkpointMode: CheckpointMode;

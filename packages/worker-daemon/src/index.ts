@@ -561,6 +561,8 @@ export type {
 } from "./supervisor/service-lifecycle.js";
 
 export { createSupervisor } from "./supervisor/supervisor.js";
+export { BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH, BROWSER_DISPATCH_NAMESPACE,
+  readBrowserNetworkPolicy, browserDispatchRefusal } from "./supervisor/browser-dispatch.js";
 export type {
   Supervisor,
   SupervisorDeps,

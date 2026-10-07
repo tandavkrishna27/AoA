@@ -54,8 +54,15 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
         acceptDownloads: true,
         downloadsPath: options.downloadsStagingPath,
         args: [...(launchOptions.args ?? [])],
+        ...(launchOptions.viewport === undefined ? {} : { viewport: { ...launchOptions.viewport } }),
+        ...(launchOptions.locale === undefined ? {} : { locale: launchOptions.locale }),
+        ...(launchOptions.timezoneId === undefined ? {} : { timezoneId: launchOptions.timezoneId }),
         ...(options.videoDir === undefined ? {} : { recordVideo: { dir: options.videoDir } }),
       });
+      if (launchOptions.recordTrace) {
+        try { await context.tracing.start({ screenshots: true, snapshots: true }); }
+        catch (error) { await context.close(); throw error; }
+      }
 
       // Downloads are collected as they fire, on EVERY page including popups — a download
       // triggered from a new tab would otherwise never be seen.
@@ -67,6 +74,7 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
       context.on("page", attach);
 
       const page = context.pages()[0] ?? (await context.newPage());
+      const video = options.videoDir === undefined ? null : page.video();
 
       // GRACEFUL-CANCELLATION TEARDOWN, and the measured reason it is not sufficient.
       //
@@ -102,6 +110,8 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
       };
 
       return {
+        ...(video ? { video: { saveAs: (target: string) => video.saveAs(target) } } : {}),
+        ...(launchOptions.recordTrace ? { stopTracing: (target: string) => context.tracing.stop({ path: target }) } : {}),
         async navigate(url: string) {
           // The waiter is ARMED BEFORE the navigation, deliberately. The `download` event can
           // fire before `goto`'s rejection propagates, so arming it afterwards is a race —

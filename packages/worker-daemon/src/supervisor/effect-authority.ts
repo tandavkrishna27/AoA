@@ -83,6 +83,11 @@ export class EffectAuthority {
     return this.#active;
   }
 
+  supportsBrowserNetworkPolicy(): boolean {
+    this.#guard();
+    return this.#provider.browserNetworkPolicyMode === "verified_default_deny";
+  }
+
   /** Withdraw effect authority (idempotent, terminal). After this, every
    * effectful op throws and the supervisor must route through cleanup only. */
   withdraw(): void {

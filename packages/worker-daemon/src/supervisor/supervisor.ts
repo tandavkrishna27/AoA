@@ -23,6 +23,13 @@ import { readCommanderWarmControl, type CommanderWarmControl } from "../lease/co
  */
 
 import { randomUUID } from "node:crypto";
+import { browserDispatchRefusal, readBrowserNetworkPolicy, BROWSER_CONFIG_PATH, BROWSER_RUNNER_PATH } from "./browser-dispatch.js";
+import { createBrowserApprovalController, type BrowserApprovalController } from "./browser-approval.js";
+import { deliverBrowserApproval } from "./browser-approval-delivery.js";
+import { createBrowserOutput } from "./browser-output.js";
+import type { WorkerSelfModel } from "../poll/capacity.js";
+import { readStagedInputPointers } from "../lease/staged-input.js";
+import type { ControlCommandV1 } from "@armyofagents/worker-protocol";
 
 import { artifactPreparedPayloadV1Schema } from "@armyofagents/worker-protocol";
 import type { ArtifactPreparedPayloadV1, LogPayloadV1, ProgressPayloadV1, UsagePayloadV1 } from "@armyofagents/worker-protocol";
@@ -126,6 +133,7 @@ export interface WorkerSupervisionIdentity {
 }
 
 export interface SupervisorDeps {
+  readonly browserSelfModel?: WorkerSelfModel;
   /**
    * The DESKTOP/in-process provider (the `E2bSandboxProvider` on the self-hosted lane).
    * OPTIONAL since DEP-011 Slice 2a: a CONTAINER worker instead injects `makeRunProvider`
@@ -318,6 +326,7 @@ export interface SupervisorDeps {
 export type SupervisorRunStatus = "succeeded" | "failed" | "cancelled" | "create_timeout";
 
 export interface Supervisor extends SupervisorSeam {
+  applyBrowserDecision?(command: ControlCommandV1): Promise<void>;
   accept(handoff: LeaseHandoff): Promise<void>;
   /** Cancel a live run: withdraw effect authority and escalate cleanup on its
    * process tree (cancel → kill → destroy). Idempotent; a no-op if unknown. */
@@ -382,6 +391,7 @@ const TIMEOUT = Symbol("create-deadline");
 const GRACEFUL_STOP_MARGIN_MS = 5_000;
 
 export function createSupervisor(deps: SupervisorDeps): Supervisor {
+  const browserControllers = new Map<string, BrowserApprovalController>();
   // DEP-011 Slice 2a — FAIL FAST at construction (review F4/F5):
   //  (a) EXACTLY one of `provider`/`makeRunProvider` may be set — both is a misconfig
   //      (which authority does `buildRun` build?).
@@ -485,6 +495,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
   /** Withdraw effect authority and escalate cleanup on the run's labeled
    * resource(s). Idempotent per run. */
   async function escalateCleanup(run: ActiveRun, reason: string): Promise<void> {
+    browserControllers.get(run.leaseId)?.close();
     run.effect.withdraw();
     if (run.cleanedUp) return;
 
@@ -629,6 +640,20 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       redactionCanaries: runCanaries,
     });
 
+    if (handoff.offer.job.workloadType === "browser_session") {
+      const self = deps.browserSelfModel;
+      const verified = !!self && self.registeredTargetProfile.capabilityCeiling.includes("sandbox.filtered_egress") &&
+        self.report.reportedCapabilities.includes("sandbox.filtered_egress") &&
+        self.registeredTargetProfile.providerConstraints.profileId === self.verifiedProviderConstraints.profileId &&
+        self.registeredTargetProfile.providerConstraints.version === self.verifiedProviderConstraints.version &&
+        self.registeredTargetProfile.providerConstraints.digest === self.verifiedProviderConstraints.digest;
+      const refusal = browserDispatchRefusal(handoff, verified);
+      if (refusal !== null) {
+        await events.terminal({ status: "failed", exitCode: null, errorCode: refusal, errorMessage: null });
+        return;
+      }
+    }
+
     // 0. materialize secrets — redeem the envelope's `env`/`sandbox_local_only` handles under a
     // deadline CARVED FROM the create budget (R6). FAIL CLOSED: any denial/timeout/throw emits a
     // durable terminal and escalates cleanup WITHOUT creating a sandbox — a partial/empty env would
@@ -709,6 +734,15 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       }
     }
     let spec = createSpecFor(handoff, run.labels, env);
+    const browserPolicy = handoff.offer.job.workloadType === "browser_session" ? readBrowserNetworkPolicy(handoff) : null;
+    if (browserPolicy) {
+      if (!run.effect.supportsBrowserNetworkPolicy() || !deps.resolveStagedFiles) {
+        await events.terminal({ status: "failed", exitCode: null, errorCode: "browser_network_authority_unavailable", errorMessage: null });
+        return;
+      }
+      spec = { ...spec, command: "node", args: [BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH],
+        env: { ...spec.env, NODE_PATH: "/usr/local/lib/node_modules" }, browserNetworkPolicy: browserPolicy };
+    }
     const warmRunner = handoff.offer.job.source.kind === "commander_turn" && spec.command === "node" &&
       spec.args.length === 4 && spec.args[0] === "/home/user/aoa-commander-warm-v1.cjs" &&
       ["codex", "claude"].includes(spec.args[1]) && spec.args[2] === "/home/user/aoa-commander-input.json" &&
@@ -764,6 +798,11 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       return;
     }
     run.sandboxId = created.sandboxId;
+    if (browserPolicy && (!("browserNetworkPolicyDigest" in created) || created.browserNetworkPolicyDigest !== browserPolicy.digest)) {
+      await events.terminal({ status: "failed", exitCode: null, errorCode: "browser_network_policy_not_installed", errorMessage: null });
+      await escalateCleanup(run, "browser_network_policy_not_installed");
+      return;
+    }
     emitOp("create", "success");
 
     if (run.cancelled) {
@@ -808,6 +847,13 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
           return;
         }
         staged = resolved;
+        if (browserPolicy) {
+          const expected = readStagedInputPointers(handoff.offer.job.extensions);
+          if (staged.length !== expected.length || expected.some((pointer) => {
+            const file = staged.find((item) => item.path === pointer.path);
+            return !file || file.grant.objectKey !== pointer.objectKey || file.grant.expectedSha256 !== pointer.sha256 || file.grant.maxBytes !== pointer.sizeBytes;
+          })) throw new Error("browser staged grants mismatch");
+        }
       } catch (err) {
         emitOp("stage_files", "failed");
         deps.logger?.warn(
@@ -858,6 +904,9 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
             });
             await escalateCleanup(run, cancelled ? "cancelled_during_stage_input" : "stage_input_deadline");
             return;
+          }
+          if (browserPolicy && (wrote.stagedPaths.length !== staged.length || staged.some((file) => !wrote.stagedPaths.includes(file.path)))) {
+            throw new Error("browser staging acknowledgement mismatch");
           }
           emitOp("stage_files", "success");
         } catch (err) {
@@ -1005,6 +1054,27 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       ? createCommanderLiveOutput({ canaries: runCanaries,
           emit: (message) => events.log({ stream: "stdout", level: "info", message }) }) : null;
     const execStartedAt = now();
+    const browserController = browserPolicy ? createBrowserApprovalController({
+      identity: { organizationId: handoff.offer.job.organizationId, companyId: handoff.offer.job.companyId,
+        workerId: handoff.offer.workerId, jobId: handoff.offer.job.jobId, attempt: handoff.offer.job.attempt,
+        leaseId: handoff.offer.leaseId, fenceToken: handoff.offer.fenceToken }, now, deadlineAt: execStartedAt + run.opDeadlineMs,
+      scrubText: (text) => scrubOutputText(text, runCanaries),
+      emit: async (request) => { await events.runtimeDecisionRequested(request); },
+      deliver: (response) => deliverBrowserApproval({ effect: run.effect, sandboxId: created.sandboxId, response, now, ctx: run.makeCtx() }),
+    }) : null;
+    if (browserController) browserControllers.set(run.leaseId, browserController);
+    let browserSessionCompleted = false;
+    let browserSessionFailed = false;
+    const browserOutput = browserController ? createBrowserOutput({ receive: async (message) => {
+      if (!message || typeof message !== "object" || Array.isArray(message)) throw new Error("invalid browser output");
+      const value = message as Record<string, unknown>;
+      if (value.type === "approval_requested") await browserController.request(message);
+      else if (["session_started", "session_completed", "session_failed"].includes(String(value.type))) {
+        if (value.type === "session_completed") browserSessionCompleted = true;
+        if (value.type === "session_failed") browserSessionFailed = true;
+        await events.browserObservation({ artifactIds: [], url: null, title: null });
+      } else throw new Error("unknown browser output");
+    } }) : null;
     let exec;
     try {
       const raced = await withDeadline(
@@ -1014,7 +1084,8 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
             command: spec.command,
             args: spec.args,
             env: spec.env,
-            ...(output || commanderLive ? { onStdout: (chunk: string) => {
+            ...(output || commanderLive || browserOutput ? { onStdout: (chunk: string) => {
+              browserOutput?.onStdout(chunk);
               output?.onStdout(chunk); commanderLive?.onStdout(chunk);
             } } : {}),
           },
@@ -1061,6 +1132,14 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       return;
     }
     emitOp("execute", "success");
+    if (browserOutput && (await withDeadline(browserOutput.close(), 5000) !== true || !browserSessionCompleted || browserSessionFailed)) {
+      browserController?.close();
+      await events.terminal({ status: run.cancelled ? "cancelled" : "failed", exitCode: null,
+        errorCode: run.cancelled ? "cancelled" : "browser_output_invalid", errorMessage: null });
+      await escalateCleanup(run, "browser_output_invalid");
+      return;
+    }
+    browserController?.close();
     const execRuntimeMillis = now() - execStartedAt;
     // Close the channel the moment execute returns: the tail is final, and anything a provider
     // delivers after this point is dropped, not appended to a run that has already ended.
@@ -1448,6 +1527,10 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     } catch {
       // Keep the base deadline; a budget-resolution error must never fail a lease.
     }
+    if (handoff.offer.job.workloadType === "browser_session") {
+      runOpDeadlineMs = Math.min(runOpDeadlineMs, handoff.offer.job.workload.maxSessionSeconds * 1000,
+        (deps.browserSelfModel?.verifiedProviderConstraints.maxContinuousRuntimeSeconds ?? 60) * 1000);
+    }
     const built: ActiveRun = {
       leaseId: handoff.leaseId,
       labels,
@@ -1501,6 +1584,11 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
   }
 
   const supervisor: Supervisor = {
+    async applyBrowserDecision(command) {
+      const controller = browserControllers.get(command.leaseId);
+      if (!controller) throw new Error("browser approval run unavailable");
+      await controller.apply(command);
+    },
     async accept(handoff: LeaseHandoff): Promise<void> {
       const run = buildRun(handoff);
       runs.set(run.leaseId, run);
@@ -1516,6 +1604,8 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
           // swallow — never fail the run
         }
       } finally {
+        browserControllers.get(run.leaseId)?.close();
+        browserControllers.delete(run.leaseId);
         run.effect.withdraw();
         runs.delete(run.leaseId);
       }
