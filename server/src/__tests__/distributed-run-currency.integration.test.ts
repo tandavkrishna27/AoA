@@ -362,7 +362,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       await db.execute(sql`DELETE FROM heartbeat_runs WHERE id = ${chain.runId}`);
       await db.execute(sql`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${chain.runId},
         source_intent = ${JSON.stringify({ kind: 'commander_turn', internalAgentRunId: chain.runId, conversationId })}::jsonb,
-        requester_principal_kind = 'user', requester_principal_id = ${userId},
+        requester_principal_kind = 'team_member', requester_principal_id = ${userId}, authenticated_principal_kind = 'user', authenticated_principal_id = ${userId},
         executor_principal_kind = 'sandbox', executor_principal_id = ${chain.runId} WHERE id = ${chain.jobId}`);
       return { ...chain, userId, conversationId };
     }
@@ -380,6 +380,17 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       expect(await currency.resolve({ ...input, companyId: TENANT_B.company })).toBe('deny');
       expect(await currency.resolve({ ...input, commander: { ...input.commander, userId: 'other' } })).toBe('deny');
       expect(await currency.resolve({ ...input, commander: { ...input.commander, conversationId: randomUUID() } })).toBe('deny');
+    });
+    it.each(['kind','id','role'])('MIG-005 refuses spoofed Commander authenticated principal %s', async (fault) => {
+      assertSetupOk(); const turn = await seedCommanderTurn({ attemptStatus: 'running', leaseExpiry: 'future' });
+      const input = { signedRunId: turn.runId, companyId: COMPANY, agentId: null,
+        commander: { userId: turn.userId, conversationId: turn.conversationId } };
+      const currency = createDistributedRunCurrencyResolver(db);
+      expect(await currency.resolve(input)).toBe('admit');
+      if (fault === 'kind') await db.execute(sql`UPDATE jobs SET authenticated_principal_kind='agent' WHERE id=${turn.jobId}`);
+      if (fault === 'id') await db.execute(sql`UPDATE jobs SET authenticated_principal_id='other-human' WHERE id=${turn.jobId}`);
+      if (fault === 'role') await db.execute(sql`UPDATE jobs SET requester_principal_kind='system' WHERE id=${turn.jobId}`);
+      expect(await currency.resolve(input)).toBe('deny');
     });
     it('MIG-005 binds Commander authority to the frozen source, active user and exact attempt job', async () => {
       assertSetupOk(); const turn = await seedCommanderTurn({ attemptStatus: 'running', leaseExpiry: 'future' });

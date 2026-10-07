@@ -577,7 +577,7 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
               version: SERVER_VERSION,
             },
             capabilities: {
-              resources: {},
+              ...(browserSurface ? {} : { resources: {} }),
               tools: {},
             },
           }),

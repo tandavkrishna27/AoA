@@ -20,6 +20,7 @@ import type { Db } from "@armyofagents/db";
 import { companyMemberships, executionTargets, heartbeatRuns, internalAgentConversations, internalAgentMessages, internalAgentRuns, jobs, jobAttempts, leases } from "@armyofagents/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { submitJobSourceSchema } from "@armyofagents/shared";
+import { commanderJobHasHumanOwner } from "../services/commander-job-authority.js";
 
 import { classifyRunCurrency, type RunCurrencyVerdict } from "./distributed-run-currency.js";
 
@@ -122,7 +123,7 @@ export function createDistributedRunCurrencyResolver(db: Db): DistributedRunCurr
           const source = submitJobSourceSchema.safeParse(job?.sourceIntent);
           if (!job || job.sourceKind !== "commander_turn" || !source.success || source.data.kind !== "commander_turn" ||
             source.data.internalAgentRunId !== signedRunId || source.data.conversationId !== commander.conversationId ||
-            job.requesterPrincipalKind !== "user" || job.requesterPrincipalId !== commander.userId ||
+            !commanderJobHasHumanOwner(job) || job.requesterPrincipalId !== commander.userId ||
             job.executorPrincipalKind !== "sandbox" || job.executorPrincipalId !== signedRunId ||
             job.sourceIdentity !== signedRunId) return "deny";
         }

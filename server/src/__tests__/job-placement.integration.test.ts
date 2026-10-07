@@ -561,7 +561,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       await admin`INSERT INTO internal_agent_messages (conversation_id, role, content, run_id) VALUES (${conversationId}, 'user', 'warm', ${turnId})`;
       await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${turnId},
         source_intent = ${{ kind: 'commander_turn', internalAgentRunId: turnId, conversationId }},
-        requester_principal_kind = 'user', requester_principal_id = ${OWNER_A}, executor_principal_kind = 'sandbox', executor_principal_id = ${turnId}
+        requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A}, executor_principal_kind = 'sandbox', executor_principal_id = ${turnId}
         WHERE id = ${jobId}`;
       requests.push({ organizationId: ORG_A, companyId: COMPANY_A, jobId, attemptId, targetId: TARGET_A, targetGeneration: 1, supportsCheckpointRestore: true });
     }
@@ -682,7 +682,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     await admin`INSERT INTO internal_agent_messages (conversation_id, role, content, run_id) VALUES (${conversationId}, 'user', 'third warm turn', ${thirdTurnId})`;
     await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${thirdTurnId},
       source_intent = ${{ kind: 'commander_turn', internalAgentRunId: thirdTurnId, conversationId }},
-      requester_principal_kind = 'user', requester_principal_id = ${OWNER_A}, executor_principal_kind = 'sandbox', executor_principal_id = ${thirdTurnId}
+      requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A}, executor_principal_kind = 'sandbox', executor_principal_id = ${thirdTurnId}
       WHERE id = ${thirdJobId}`;
     const third = await claim({ ...requests[0], jobId: thirdJobId, attemptId: thirdAttemptId });
     expect(third).toMatchObject({ generation: 3, resource: { labels: forged.resource.labels, checkpointLabels }, currentJobId: thirdJobId });
@@ -947,7 +947,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
         await admin`INSERT INTO internal_agent_messages (conversation_id, role, run_id) VALUES (${conversationId}, 'assistant', ${runId})`;
         await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${runId},
           source_intent = ${{ kind: 'commander_turn', internalAgentRunId: runId, conversationId }},
-          requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+          requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A},
           executor_principal_kind = 'sandbox', executor_principal_id = ${runId} WHERE id = ${jobId}`;
         if (warm) {
           const input = { command: "node", args: ["/home/user/aoa-commander-warm-v1.cjs", "codex",
@@ -978,7 +978,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
             const [original] = await admin`SELECT input, input_hash FROM jobs WHERE id = ${jobId}`;
             await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${nextRun},
               source_intent = ${{ kind: 'commander_turn', internalAgentRunId: nextRun, conversationId }},
-              requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+              requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A},
               executor_principal_kind = 'sandbox', executor_principal_id = ${nextRun},
               input = ${original.input}, input_hash = ${original.input_hash},
               placement_request = ${{ policyId: 'job-submission-default', policyVersion: 1, requestedTarget: TARGET_A }} WHERE id = ${nextJob}`;
@@ -1042,7 +1042,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     await seedJob({ jobId, attemptId });
     await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${newer},
       source_intent = ${{ kind: 'commander_turn', internalAgentRunId: newer, conversationId }},
-      requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+      requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A},
       executor_principal_kind = 'sandbox', executor_principal_id = ${newer} WHERE id = ${jobId}`;
     await admin`UPDATE internal_agent_runs SET execution_owner = 'distributed', distributed_job_id = ${jobId},
       distributed_attempt_id = ${attemptId} WHERE id = ${newer}`;
@@ -1209,7 +1209,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       VALUES (${conversationId}, 'assistant', ${runId})`;
     await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${runId},
       source_intent = ${{ kind: 'commander_turn', internalAgentRunId: runId, conversationId }},
-      requester_principal_kind = 'user', requester_principal_id = ${OWNER_A},
+      requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A},
       executor_principal_kind = 'sandbox', executor_principal_id = ${runId} WHERE id = ${jobId}`;
     await admin`INSERT INTO provider_connections
       (id, organization_id, company_id, provider, auth_method, owner_user_id, execution_target_id,
@@ -2089,7 +2089,7 @@ integration("JOB-009 slice A schema and role boundaries", () => {
       VALUES (${messageId}, ${conversationId}, 'user', 'fake prompt', ${operationId})`;
     await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${operationId},
       source_intent = ${{ kind: "commander_turn", internalAgentRunId: operationId, conversationId }},
-      executor_principal_kind = 'sandbox', executor_principal_id = ${operationId}, requester_principal_kind = 'user', requester_principal_id = ${OWNER_A} WHERE id = ${jobId}`;
+      executor_principal_kind = 'sandbox', executor_principal_id = ${operationId}, requester_principal_kind = 'founder', requester_principal_id = ${OWNER_A}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_A} WHERE id = ${jobId}`;
     await admin`INSERT INTO leases (id, organization_id, company_id, job_id, attempt_id, attempt_number, worker_id, target_id,
       target_authority_key, target_generation, profile_hash, provider_constraint_hash, ack_deadline, expires_at, status, fence)
       VALUES (${leaseId}, ${ORG_A}, ${COMPANY_A}, ${jobId}, ${attemptId}, 1, ${WORKER_A}, ${TARGET_A},

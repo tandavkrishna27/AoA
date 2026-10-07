@@ -453,7 +453,7 @@ integration("DAT-004 lease-scoped secret broker", () => {
       '/home/user/aoa-commander-input.json', '/home/user/aoa-output/aoa-one-shot-result.json'], stdinArtifactId: null, maxRuntimeSeconds: 600 };
     await admin`UPDATE jobs SET source_kind = 'commander_turn', source_identity = ${turnId},
       source_intent = ${{ kind: 'commander_turn', internalAgentRunId: turnId, conversationId }},
-      requester_principal_kind = 'user', requester_principal_id = ${OWNER_USER}, input = ${workload} WHERE id = ${seeded.jobId}`;
+      requester_principal_kind = 'founder', requester_principal_id = ${OWNER_USER}, authenticated_principal_kind = 'user', authenticated_principal_id = ${OWNER_USER}, input = ${workload} WHERE id = ${seeded.jobId}`;
     await mintHandle(seeded.jobId, "h-warm-provider", { ownerPrincipalKind: "sandbox", ownerPrincipalId: turnId });
     const keys = generateKeyPairSync("ed25519");
     let finalizeError: unknown;

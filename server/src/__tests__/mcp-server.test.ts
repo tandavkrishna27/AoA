@@ -175,6 +175,11 @@ function buildApp(options?: {
 
 describe("reserved governed browser surface", () => {
   const actor = { type: "commander", source: "commander_jwt", userId: "human", companyId: "company-1", userRole: "team_member", conversationId: "conversation", signedRunId: "signed-turn" };
+  it("advertises only tool capability", async () => {
+    const { app } = buildApp({ actor });
+    const res = await request(app).post("/api/companies/company-1/browser-mcp").send({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+    expect(res.body.result.capabilities).toEqual({ tools: {} });
+  });
   it.each(["resources/list", "resources/read", "prompts/list"])("does not expose %s", async (method) => {
     const { app } = buildApp({ actor });
     const res = await request(app).post("/api/companies/company-1/browser-mcp").send({ jsonrpc: "2.0", id: 1, method });

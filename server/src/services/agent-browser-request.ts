@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { companies, heartbeatRuns, internalAgentRuns, internalAgentConfig, issues, jobs, leases, workers, executionTargets, companyMcpConnectors,companyMcpConnectorAgents,type Db } from "@armyofagents/db";
-import { loadCommanderJobAuthority } from "./commander-job-authority.js";
+import { loadCommanderJobAuthority, commanderJobHasHumanOwner } from "./commander-job-authority.js";
 import { workerHelloV1Schema } from "@armyofagents/worker-protocol";
 import { runInTenant } from "../db/tenant-context.js";
 import { HttpError } from "../errors.js";
@@ -109,7 +109,7 @@ function createBrowserRequestService(input: BrowserRequestServiceInput): { reque
         if (!authority || authority.userId !== commander.userId || authority.turnId !== commander.turnId || authority.conversationId !== commander.conversationId || authority.distributedAttemptId !== run.distributedAttemptId || authority.executionOwner !== "distributed" || authority.status !== "running" || !Array.isArray(config?.capabilities) || !config.capabilities.includes("browser_use")) refusal("Commander browser authority unavailable");
       }
       const [lease] = await tx.select().from(leases).where(and(eq(leases.organizationId, organizationId), eq(leases.companyId, actor.companyId), eq(leases.jobId, run.distributedJobId), eq(leases.attemptId, run.distributedAttemptId), eq(leases.status, "active"))).limit(1);
-      if (!parent || parent.status !== "running" || !(commander ? parent.sourceKind === "commander_turn" && parent.executorPrincipalKind === "sandbox" && parent.executorPrincipalId === commander.turnId && ["user", "founder", "team_lead", "team_member"].includes(parent.requesterPrincipalKind) && parent.authenticatedPrincipalKind === "user" && parent.authenticatedPrincipalId === commander.userId && parent.requesterPrincipalId === commander.userId : (parent.executorPrincipalId === actor.agentId ||
+      if (!parent || parent.status !== "running" || !(commander ? parent.sourceKind === "commander_turn" && parent.executorPrincipalKind === "sandbox" && parent.executorPrincipalId === commander.turnId && commanderJobHasHumanOwner(parent) && parent.requesterPrincipalId === commander.userId : (parent.executorPrincipalId === actor.agentId ||
           (parent.sourceKind === "one_shot" && parent.authenticatedPrincipalKind === "agent" && parent.authenticatedPrincipalId === actor.agentId)) && ["task_run", "crew_run", "one_shot"].includes(parent.sourceKind)) ||
           !lease?.workerId || !lease.targetId || !lease.targetAuthorityKey || !lease.targetGeneration || !lease.profileHash || !lease.providerConstraintHash || !lease.attemptNumber) refusal("Browser parent authority unavailable");
       await repos.jobControl.lockActiveFence({ organizationId, companyId: actor.companyId, jobId: parent.id, attemptId: run.distributedAttemptId,
