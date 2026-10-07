@@ -164,6 +164,13 @@ export interface BrowserDecisionDeliveryResult {
   readonly delivered: true;
 }
 
+export interface BrowserCredentialDeliveryInput {
+  readonly sandboxId: string;
+  readonly requestId: string;
+  readonly grant: import("@armyofagents/worker-protocol").ArtifactDownloadGrantV1;
+}
+export type BrowserCredentialDeliveryResult = BrowserDecisionDeliveryResult;
+
 /**
  * One file to stage: WHERE it goes inside the sandbox, and a GRANT that redeems to its bytes.
  *
@@ -660,6 +667,8 @@ export function deriveStopVerdict(observation: ProcessObservation): "stopped" | 
  * implement this port later without changing it.
  */
 export interface SandboxProvider {
+  /** Redeem native session bytes provider-side and publish to the fixed private mailbox. */
+  deliverBrowserCredential?(input: BrowserCredentialDeliveryInput, ctx: ProviderOpContext): Promise<BrowserCredentialDeliveryResult>;
   /** Fixed browser approval mailbox operation; unavailable providers refuse it. */
   deliverBrowserDecision?(input: BrowserDecisionDeliveryInput, ctx: ProviderOpContext): Promise<BrowserDecisionDeliveryResult>;
   /** Only a provider with measured enforcement may expose this local capability. */

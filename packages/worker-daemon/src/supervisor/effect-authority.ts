@@ -22,6 +22,8 @@
 import type { ArtifactUploadGrantV1 } from "@armyofagents/worker-protocol";
 
 import type {
+  BrowserCredentialDeliveryInput,
+  BrowserCredentialDeliveryResult,
   BrowserDecisionDeliveryInput,
   BrowserDecisionDeliveryResult,
   ArtifactDigestResult,
@@ -118,6 +120,12 @@ export class EffectAuthority {
     this.#guard();
     if (!this.#provider.deliverBrowserDecision) throw new Error("browser decision delivery unavailable");
     return this.#provider.deliverBrowserDecision(input, ctx);
+  }
+
+  deliverBrowserCredential(input: BrowserCredentialDeliveryInput, ctx: ProviderOpContext): Promise<BrowserCredentialDeliveryResult> {
+    this.#guard();
+    if (!this.#provider.deliverBrowserCredential) throw new Error("browser credential delivery unavailable");
+    return this.#provider.deliverBrowserCredential(input, ctx);
   }
 
   execute(input: ExecuteInput, ctx: ProviderOpContext): Promise<ExecuteResult> {

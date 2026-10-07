@@ -482,6 +482,8 @@ export type {
   SandboxLifetimeResult,
   BrowserDecisionDeliveryInput,
   BrowserDecisionDeliveryResult,
+  BrowserCredentialDeliveryInput,
+  BrowserCredentialDeliveryResult,
   // CLI-012 (ruling F7) — the provider-side METADATA-ONLY output-enumeration capability.
   SandboxEnumerationMode,
   SandboxOutputEntry,
@@ -836,3 +838,4 @@ export type {
 export { buildWorkspacePatch, WorkspacePatchError } from "./patch/index.js";
 export type { BuildWorkspacePatchInput, BuildWorkspacePatchResult } from "./patch/index.js";
 export { readBrowserDecisionDelivery } from "./supervisor/browser-decision.js";
+export { readBrowserCredentialDelivery } from "./supervisor/browser-credential.js";
