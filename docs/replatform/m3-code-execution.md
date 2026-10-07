@@ -175,3 +175,32 @@ attestation. The accepted BRW-008 decision retains the Commander host path until
 the governed path is proven end to end. No paid calls, deployment, main merge or
 calendar certification campaign is part of this execution. Anthropic M1b live
 verification remains deferred.
+
+## October 7 program checkpoint
+
+PR #680 merged service recovery, checkpoint, company-budget and bounded history
+visibility at 076e9ddd5a after required normal CI passed. The first local full
+suite was interrupted by temporary D: drive loss; the complete C: rerun passed
+24,262 tests, with 1,998 skips. Recursive types, full build, lint and 39 focused
+service tests (including real PostgreSQL) passed.
+
+PR #681 merged signed human-owned Commander browser requests and scoped sessions
+at 0c3e37ac00 after all 16 normal CI checks passed. Recursive types, full build,
+lint, 163 integrated focused tests and the full normal local suite passed:
+24,279 tests, with 2,031 skips. Current human ownership is checked consistently
+at admission and use; agent grants remain separate. Browser rollout stays off.
+
+The keyless integrated Commander journey is the next proof. Production provider
+default-deny enforcement and application cookie-issuer compatibility are still
+unproven. This checkpoint does not close M3.
+
+Read-only provider reconciliation examined released E2B SDK 2.53.1; this repo
+remains pinned to 2.30.5. Its host-side SOCKS5 `egressProxy` is a different
+mechanism from the September probes, but its official contract excludes UDP
+(including DNS and QUIC) and removing it on network replacement restores direct
+routing. It cannot establish the required sandbox-wide default-deny boundary by
+itself. No upgrade, new attestation or paid probe was performed. A supported
+backend configuration that actually blocks every escape class is required before
+a changed-mechanism probe is meaningful. Sources:
+[released SDK](https://github.com/e2b-dev/E2B/releases/tag/e2b%402.53.1),
+[versioned network contract](https://github.com/e2b-dev/E2B/blob/e2b%402.53.1/packages/js-sdk/src/sandbox/sandboxApi.ts).
