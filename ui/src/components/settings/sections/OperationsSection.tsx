@@ -14,6 +14,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { RuntimeDecisionContent } from "@/components/hub/RuntimeDecisionPanel";
+import { ServiceOperationsPanel } from "./ServiceOperationsPanel";
 
 // Fixed operator reasons — the mutations require a bounded reason and this settings
 // surface does not collect free text (the audit trail records the operator + action).
@@ -337,6 +338,7 @@ export function OperationsSection() {
         )}
       </section>
 
+      <ServiceOperationsPanel key={`${organizationId}:${selectedCompanyId}`} organizationId={organizationId!} companyId={selectedCompanyId!} />
       {/* ── Workers ── */}
       <section className="space-y-3">
         <h3 className="text-base font-semibold">Workers</h3>

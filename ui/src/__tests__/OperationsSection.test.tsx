@@ -30,6 +30,7 @@ vi.mock("@/api/job-control", () => ({
     revokeWorker: vi.fn(),
   },
 }));
+vi.mock("@/api/service-control", () => ({ serviceControlApi: { list: vi.fn().mockResolvedValue([]) } }));
 const decisions = vi.hoisted(() => ({ detail: vi.fn(), answer: vi.fn() }));
 vi.mock("@/api/agent-runtime-decisions", () => ({ agentRuntimeDecisionsApi: decisions }));
 
@@ -184,7 +185,7 @@ describe("OperationsSection (JOB-008 operator controls)", () => {
     renderSection();
     await screen.findByText(/queued/i);
     expect(mocked.listJobs).toHaveBeenCalledTimes(1);
-    await user.click(await screen.findByRole("button", { name: /refresh/i }));
+    await user.click(await screen.findByRole("button", { name: /^refresh$/i }));
     await waitFor(() => expect(mocked.listJobs).toHaveBeenCalledTimes(2));
   });
 
@@ -201,7 +202,7 @@ describe("OperationsSection (JOB-008 operator controls)", () => {
     await screen.findByText(/queued/i);
     await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);
     await waitFor(() => expect(mocked.getJob).toHaveBeenCalledTimes(1));
-    await user.click(await screen.findByRole("button", { name: /refresh/i }));
+    await user.click(await screen.findByRole("button", { name: /^refresh$/i }));
     // The open JobDetailPanel query must refetch too (its key is prefixed by the jobs key).
     await waitFor(() => expect(mocked.getJob).toHaveBeenCalledTimes(2));
   });
