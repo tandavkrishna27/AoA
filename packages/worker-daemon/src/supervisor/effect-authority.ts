@@ -74,6 +74,7 @@ export class EffectAuthority {
   readonly #provider: SandboxProvider;
   readonly #fence: EffectFence;
   #active = true;
+  readonly #withdrawal = new AbortController();
 
   constructor(provider: SandboxProvider, fence: EffectFence) {
     this.#provider = provider;
@@ -97,6 +98,7 @@ export class EffectAuthority {
    * effectful op throws and the supervisor must route through cleanup only. */
   withdraw(): void {
     this.#active = false;
+    this.#withdrawal.abort();
   }
 
   #guard(): void {
@@ -125,7 +127,10 @@ export class EffectAuthority {
   deliverBrowserCredential(input: BrowserCredentialDeliveryInput, ctx: ProviderOpContext): Promise<BrowserCredentialDeliveryResult> {
     this.#guard();
     if (!this.#provider.deliverBrowserCredential) throw new Error("browser credential delivery unavailable");
-    return this.#provider.deliverBrowserCredential(input, ctx);
+    return this.#provider.deliverBrowserCredential(input, { ...ctx,
+      signal: ctx.signal ? AbortSignal.any([ctx.signal, this.#withdrawal.signal]) : this.#withdrawal.signal,
+      assertActive: () => { this.#guard(); ctx.assertActive?.(); },
+    });
   }
 
   execute(input: ExecuteInput, ctx: ProviderOpContext): Promise<ExecuteResult> {

@@ -401,6 +401,10 @@ export function hashResourceLabels(labels: ResourceLabels): string {
  * double-apply (lost-response replay).
  */
 export interface ProviderOpContext {
+  /** Local operation lifetime; never serialized into the provider wire envelope. */
+  readonly signal?: AbortSignal;
+  /** Host-local current authority check immediately before publishing an effect. */
+  readonly assertActive?: () => void;
   readonly deadlineMs: number;
   readonly idempotencyKey: string;
 }

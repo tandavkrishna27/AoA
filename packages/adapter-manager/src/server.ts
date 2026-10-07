@@ -346,10 +346,10 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
         if (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new WireProtocolError("invalid browser credential deadline");
         const deadlineAt = Math.min(now() + Math.min(ctx.deadlineMs, 5000), Date.parse(delivery.grant.expiresAt));
         return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true }, delivery.sandboxId, ctx, capability,
-          async (detail, remainingMs) => {
+          async (detail, remainingMs, assertActive) => {
             if (warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(delivery.sandboxId, detail.resourceLabels) ||
                 !provider.deliverBrowserCredential || !remainingMs || remainingMs <= 0) throw new WireProtocolError("browser credential delivery unavailable");
-            return decodeBrowserDecisionDelivery(await provider.deliverBrowserCredential(readBrowserCredentialDelivery(delivery, now()), { ...ctx, deadlineMs: remainingMs }));
+            return decodeBrowserDecisionDelivery(await provider.deliverBrowserCredential(readBrowserCredentialDelivery(delivery, now()), { ...ctx, deadlineMs: remainingMs, assertActive }));
           }, deadlineAt);
       }
       case "start_process":
@@ -512,6 +512,9 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
   }
 
   return createServer((req, res) => {
+    const operationAbort = new AbortController();
+    req.on("aborted", () => operationAbort.abort());
+    res.on("close", () => { if (!res.writableEnded) operationAbort.abort(); });
     // A socket/stream error must never become an uncaught exception (process crash).
     res.on("error", () => {});
 
@@ -567,7 +570,7 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
           if (gated && GATE_REQUIRED_OPS.has(op)) {
             const { args, ctx, capability, warmResourceCapability } = decodeOpRequest(body);
             liveRequested = op === "execute" && isRecordOfUnknown(args) && args[EXECUTE_LIVE_STDOUT_KEY] === true;
-            const result = await routeGated(op, args, ctx, capability, warmResourceCapability,
+            const result = await routeGated(op, args, { ...ctx, signal: operationAbort.signal }, capability, warmResourceCapability,
               liveRequested ? (chunk) => frame(JSON.stringify({ stdout: chunk })) : undefined);
             reply(encodeOkResponse(result));
             return;

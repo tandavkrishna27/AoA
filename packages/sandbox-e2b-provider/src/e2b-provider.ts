@@ -673,13 +673,16 @@ export class E2bSandboxProvider implements SandboxProvider {
       const input = readBrowserCredentialDelivery(raw, Date.now());
       if (!this.#browserCredentialControlPlaneOrigin || !Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0 || !this.#runSecrets.has(input.sandboxId)) throw new Error("browser credential authority unavailable");
       const deadlineAt = Math.min(Date.now() + Math.min(ctx.deadlineMs, 5000), Date.parse(input.grant.expiresAt));
-      const signal = AbortSignal.timeout(Math.max(1, Math.ceil(deadlineAt - Date.now())));
+      const signal = AbortSignal.any([AbortSignal.timeout(Math.max(1, Math.ceil(deadlineAt - Date.now()))), ...(ctx.signal ? [ctx.signal] : [])]);
+      ctx.assertActive?.();
+      if (signal.aborted) throw new Error("browser credential authority withdrawn");
       const credential = await boundedBySignal(redeemBrowserCredential(input, this.#browserCredentialControlPlaneOrigin, this.#browserCredentialFetch, signal), signal, "browser credential redemption timed out");
       const registry = this.#runSecrets.get(input.sandboxId);
       if (!registry || registry.expiresAt <= Date.now() || signal.aborted || deadlineAt <= Date.now()) throw new Error("browser credential authority expired");
       // Cookie values stay in the existing sandbox-local scanner registry and
       // retain its expiry; no worker canaries or logs receive credential bytes.
       this.#registerSecretValues(input.sandboxId, [...registry.values, credential.cookieValue, credential.bytes.toString("utf8")], registry.expiresAt - Date.now(), registry.expiresAt);
+      ctx.assertActive?.();
       if (signal.aborted || deadlineAt <= Date.now()) throw new Error("browser credential deadline exhausted");
       const result = await boundedBySignal(this.#transport.runCommand({ sandboxId: input.sandboxId, command: "node",
         args: ["-e", WRITE_BROWSER_CREDENTIAL, JSON.stringify({ requestId: input.requestId, expiresAt: input.grant.expiresAt, bytes: credential.bytes.toString("base64") })],

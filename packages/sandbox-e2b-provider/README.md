@@ -5,3 +5,5 @@ The optional credential port accepts only a scoped download grant and request ID
 The adapter-manager pins redemption to the HTTPS origin of its native `AOA_ADAPTER_MANAGER_CONTROL_PLANE_URL` configuration. Missing, invalid, non-HTTPS, or userinfo-bearing configuration disables credential delivery. This configuration does not establish verified provider egress.
 
 Credential values join the existing sandbox-local export secret scanner registry without extending its retention deadline. Delivery uses the owned interrupt lane, so a browser waiting in the main execution lane can receive its credential.
+
+Worker withdrawal aborts the in-flight local HTTP request and native redemption. After redemption, the host rechecks the current primary capability and deadline before dispatching the fixed writer. The guest checks credential expiry before writing and before renaming. Cancellation cannot atomically undo a guest write that has already been dispatched across the process boundary.

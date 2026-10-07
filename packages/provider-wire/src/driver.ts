@@ -491,7 +491,7 @@ export class NetworkedProviderDriver implements SandboxProvider {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: encodeOpRequest(args, ctx, capability, this.#warmResourceCapability),
-      ...(boundedControlOp ? { signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000)))) } : {}),
+      ...(boundedControlOp ? { signal: AbortSignal.any([AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000)))), ...(ctx.signal ? [ctx.signal] : [])]) } : {}),
     });
     // Body-driven: the codec decides ok vs err vs garbled regardless of HTTP status. A
     // non-JSON / non-envelope body (e.g. a bare 500) surfaces as a WireProtocolError,
