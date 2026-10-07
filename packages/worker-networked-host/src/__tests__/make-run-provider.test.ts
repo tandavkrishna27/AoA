@@ -66,6 +66,12 @@ describe("resolveProviderUrl", () => {
 });
 
 describe("makeNetworkedRunProvider — construction (inert) + the type bridge", () => {
+  it("enables the gated service process and lifetime relays for service handoffs", () => {
+    const factory = makeNetworkedRunProvider("http://adapter-manager:9000");
+    const provider = factory({ capability: mintCapability(), handoff: { offer: { job: { workloadType: "service" } } } } as unknown as Parameters<typeof factory>[0]);
+    expect(provider.processSupervisionMode).toBe("handle");
+    expect(provider.sandboxLifetimeMode).toBe("renewable");
+  });
   it("a URL yields a makeRunProvider whose product is a NetworkedProviderDriver bound to the baseUrl + capability", async () => {
     const cap = mintCapability();
     let sawUrl: string | undefined;

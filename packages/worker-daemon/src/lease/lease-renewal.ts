@@ -68,6 +68,8 @@ import {
   type ControlReceiverMemory,
 } from "./control-commands.js";
 import { sendControlAck } from "./control-ack.js";
+import { readRenewedOwnedLabelsCapability } from "./renewed-owned-labels-capability.js";
+import type { OwnedLabelsCapabilityLike } from "./owned-labels-capability.js";
 import {
   ControlPlaneTransportError,
   type ControlPlaneClient,
@@ -123,6 +125,8 @@ export type RenewAttempt =
        * the next renewal rebuilds and redelivers it.
        */
       readonly controlFault: boolean;
+      readonly capability?: OwnedLabelsCapabilityLike | null;
+      readonly capabilityFault?: boolean;
     }
   | { readonly kind: "rejected"; readonly code: string }
   | { readonly kind: "terminal"; readonly reason: "unauthorized" | "target_revoked" }
@@ -240,6 +244,10 @@ function classifyRenewResponse(response: WorkerOperationHttpResponse): RenewAtte
     const parsed = leaseRenewOperationResponseV1Schema.safeParse(response.body);
     if (!parsed.success) return { kind: "protocol", label: "malformed", code: "malformed" };
     if (parsed.data.outcome === "renewed") {
+      let capability: OwnedLabelsCapabilityLike | null = null;
+      let capabilityFault = false;
+      try { capability = readRenewedOwnedLabelsCapability(parsed.data.body.extensions); }
+      catch { capabilityFault = true; }
       let control: ControlCommandDelivery | null = null;
       let controlFault = false;
       try {
@@ -260,6 +268,8 @@ function classifyRenewResponse(response: WorkerOperationHttpResponse): RenewAtte
         cancelReason: parsed.data.body.cancelReason,
         control,
         controlFault,
+        capability,
+        capabilityFault,
       };
     }
     return { kind: "rejected", code: parsed.data.reason };
@@ -328,6 +338,7 @@ export function createRealRenewalSchedule(): RenewalSchedule {
 /** The supervisor the driver decorates — the real WRK-004 `Supervisor` satisfies
  * this (it extends `SupervisorSeam` and exposes `cancel`/`onLeaseLost`). */
 export interface RenewalSupervisor extends SupervisorSeam {
+  onAuthorityRenewed?(leaseId: string, capability: OwnedLabelsCapabilityLike): void;
   cancel(leaseId: string, reason?: string): Promise<void> | void;
   onLeaseLost(leaseId: string): Promise<void> | void;
 }
@@ -812,6 +823,20 @@ export function createLeaseRenewalDriver(deps: LeaseRenewalDriverDeps): LeaseRen
         state.expiresAtMs = newExpiryMs;
         state.leadMs = computeLeadMs(state.expiresAtMs, schedule.now());
         state.recoveries = 0;
+        // A fresh cancellation renewal can supply the authority needed for its
+        // teardown. Refresh synchronously before the cancel path closes the fence.
+        if (attempt.capabilityFault) {
+          deps.logger?.warn({ leaseId: state.leaseId }, "lease-renewal: unreadable authority refresh; existing authority remains bounded");
+        } else if (attempt.capability && deps.supervisor.onAuthorityRenewed) {
+          try {
+            if (attempt.capability.expiresAt <= schedule.now() || attempt.capability.expiresAt > newExpiryMs) {
+              throw new Error("authority refresh outside renewed lease window");
+            }
+            deps.supervisor.onAuthorityRenewed(state.leaseId, attempt.capability);
+          } catch {
+            deps.logger?.warn({ leaseId: state.leaseId }, "lease-renewal: authority refresh refused; existing authority remains bounded");
+          }
+        }
         if (attempt.cancelRequested) {
           // D2 — the boolean FLOOR, unchanged and permanent. It is the only signal a
           // worker that predates the extension understands, so cancel/graceful_stop are

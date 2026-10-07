@@ -479,6 +479,7 @@ export type {
   FileStagingMode,
   StagedFileRequest,
   StageFilesResult,
+  SandboxLifetimeResult,
   // CLI-012 (ruling F7) — the provider-side METADATA-ONLY output-enumeration capability.
   SandboxEnumerationMode,
   SandboxOutputEntry,

@@ -150,6 +150,11 @@ export type SandboxEnumerationMode = "none" | "metadata";
  */
 export type FileStagingMode = "none" | "grant_download";
 
+export interface SandboxLifetimeResult {
+  readonly providerOpId: string;
+  readonly expiresAt: number;
+}
+
 /**
  * One file to stage: WHERE it goes inside the sandbox, and a GRANT that redeems to its bytes.
  *
@@ -522,6 +527,7 @@ export type DeclinableOperation =
   | "digest_artifact"
   | "export_artifact"
   | "stage_files"
+  | "renew_lifetime"
   // CLI-012 — the metadata-only enumeration. Not a frozen operation, same as the three above.
   | "enumerate_outputs"
   // SVC-008a — the process-supervision trio. Not frozen operations, same as the three above.
@@ -641,6 +647,12 @@ export function deriveStopVerdict(observation: ProcessObservation): "stopped" | 
  * implement this port later without changing it.
  */
 export interface SandboxProvider {
+  /** Local credential refresh on an existing ownership binding. This is not a
+   * provider wire operation and never re-resolves secrets. */
+  refreshAuthority?(capability: unknown): void;
+  readonly sandboxLifetimeMode?: "none" | "renewable";
+  /** Absolute expiry, clamped by the owned capability at the provider gate. */
+  renewLifetime?(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult>;
   /** The advertised op set (always a superset of the 8 core ops). */
   readonly advertisedOperations: ReadonlySet<ProviderOperation>;
   readonly checkpointMode: CheckpointMode;

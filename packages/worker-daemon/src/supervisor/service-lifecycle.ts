@@ -110,7 +110,8 @@ export interface ServiceLifecycleDeps {
   readonly deadlineAt: number;
   /**
    * The run's effect-authority (owned-labels capability) expiry, or null on the desktop
-   * branch where no capability is minted. §4.1/§5.1(3).
+   * branch where no capability is minted. Read live on each tick: the supervisor
+   * supplies a getter updated after a verified lease renewal. §4.1/§5.1(3).
    */
   readonly capExpiresAt: number | null;
   /** Teardown headroom to reserve inside the capability window. */
@@ -222,18 +223,9 @@ export async function runServiceLifecycle(deps: ServiceLifecycleDeps): Promise<S
 
       const now = deps.now();
 
-      // (c) ★ AUTHORITY FRESHNESS — §4.1 and §5.1 clause 3. The owned-labels capability is
-      // lease-clamped and NEVER re-minted (`owned-labels-mint.ts` mints on exactly one route,
-      // and `/leases/:id/renew` does not), so a run longer than its TTL reaches `destroy` with
-      // an EXPIRED cap and the supervisor records a billable orphan.
-      //
-      // ★ WHAT THIS DOES NOT DO, deliberately: it does NOT re-materialize secrets on a
-      // schedule to re-mint the cap. That is SVC-008 §9.1 and it is UNRULED — it would re-run
-      // a secret RESOLUTION on a timer, widening the blast radius of a compromised worker from
-      // one materialization to N, and nobody has ruled on that. So this takes §4.1's other
-      // arm: treat the headroom boundary as a STOP DEADLINE and begin the graceful stop while
-      // the cap is still valid. Never continue past cap expiry — doing so deliberately would
-      // be a designed leak.
+      // (c) Read the current authority expiry on every tick. Lease renewal may
+      // refresh it without resolving secrets again. A missing/refused refresh
+      // retains the old deadline, so teardown starts while authority is valid.
       if (deps.capExpiresAt !== null && now + deps.teardownHeadroomMs >= deps.capExpiresAt) {
         trigger = { kind: "authority_expiring" };
         break;
