@@ -22,12 +22,12 @@ export interface AgentBrowserRequestActor { companyId: string; agentId: string; 
 export interface AgentBrowserRequestResult { browserRequestId: string; jobId: string; attemptId: string; status: "queued"; replayed: boolean }
 export interface AgentBrowserRequestPort { request(actor: AgentBrowserRequestActor, raw: unknown): Promise<AgentBrowserRequestResult> }
 let registered: AgentBrowserRequestPort | undefined;
-const browserTargetColumns = { id: executionTargets.id, slug: executionTargets.slug, kind: executionTargets.kind,
+function browserTargetColumns() { return { id: executionTargets.id, slug: executionTargets.slug, kind: executionTargets.kind,
   trustClass: executionTargets.trustClass, status: executionTargets.status, organizationId: executionTargets.organizationId,
   ownerUserId: executionTargets.ownerUserId, scope: executionTargets.scope, targetAuthorityKey: executionTargets.targetAuthorityKey,
   deviceGeneration: executionTargets.deviceGeneration, registeredProfile: executionTargets.registeredProfile,
   registeredProfileHash: executionTargets.registeredProfileHash, providerConstraintProfile: executionTargets.providerConstraintProfile,
-  lastSeenAt: executionTargets.lastSeenAt };
+  lastSeenAt: executionTargets.lastSeenAt }; }
 export function setAgentBrowserRequestPort(port: AgentBrowserRequestPort | undefined): void { registered = port; }
 export function requestBrowserSessionForActiveRun(actor: AgentBrowserRequestActor, raw: unknown): Promise<AgentBrowserRequestResult> {
   if (!registered) throw new HttpError(503, "Governed browser execution is unavailable");
@@ -52,7 +52,7 @@ export async function resolveBrowserChildCredentialBinding(appDb: Db, registryDb
       eq(leases.organizationId, input.organizationId), eq(leases.companyId, input.companyId), eq(leases.id, preparation.parentLeaseId),
       eq(leases.jobId, preparation.parentJobId), eq(leases.attemptId, preparation.parentAttemptId), eq(leases.status, "active"),
       eq(jobs.status, "running"), sql`${leases.expiresAt} > clock_timestamp()`));
-    const [row] = await tx.select(browserTargetColumns).from(executionTargets).where(and(eq(executionTargets.id, preparation.targetId), eq(executionTargets.targetAuthorityKey, preparation.targetAuthorityKey)));
+    const [row] = await tx.select(browserTargetColumns()).from(executionTargets).where(and(eq(executionTargets.id, preparation.targetId), eq(executionTargets.targetAuthorityKey, preparation.targetAuthorityKey)));
     const target = row ? await normalizePlacementRegistryTarget(row) : null;
     if (!parent || !target || target.status !== "active" || target.targetGeneration !== preparation.targetGeneration || target.profileHash !== preparation.targetProfileHash || target.providerConstraintHash !== preparation.providerConstraintHash) refusal("Browser parent target authority unavailable");
     return { credentialId: "inherited-browser-authority", credentialKind: target.targetClass === "owner_desktop" ? "personal_subscription" as const : "company_api_key" as const,
@@ -108,7 +108,7 @@ export function createAgentBrowserRequestService(input: {
       if (!["active", "enrolled"].includes(worker.status) || worker.revokedAt) refusal("Browser parent worker is unavailable");
       if (worker.fresh !== true) refusal("Browser parent worker heartbeat is stale");
       if (!hello.success || !hello.data.reportedCapabilities.includes("workload.browser_session") || !hello.data.reportedCapabilities.includes("sandbox.filtered_egress") || hello.data.capacity.browserSessionSlots < 1) refusal("Browser capability or capacity unavailable");
-      const [targetRow] = await tx.select(browserTargetColumns).from(executionTargets).where(and(eq(executionTargets.id, lease.targetId), eq(executionTargets.targetAuthorityKey, lease.targetAuthorityKey)));
+      const [targetRow] = await tx.select(browserTargetColumns()).from(executionTargets).where(and(eq(executionTargets.id, lease.targetId), eq(executionTargets.targetAuthorityKey, lease.targetAuthorityKey)));
       const target = targetRow ? await normalizePlacementRegistryTarget(targetRow) : null;
       if (!target || target.status !== "active" || target.targetGeneration !== lease.targetGeneration || target.providerConstraintHash !== lease.providerConstraintHash ||
           !target.registeredProfile.capabilityCeiling.includes("workload.browser_session") || !target.registeredProfile.capabilityCeiling.includes("sandbox.filtered_egress")) refusal("Browser target enforcement unavailable");

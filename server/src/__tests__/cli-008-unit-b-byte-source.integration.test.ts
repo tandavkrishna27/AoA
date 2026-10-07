@@ -382,15 +382,16 @@ describe("CLI-008 Unit B · Task 1 — byte-source ceilings, measured", () => {
     );
 
     // The largest real bundle is `commander` — the number a channel has to carry.
-    expect(MEASURED.instructionsBundleBytes.commander).toBe(26_351);
-    expect(MEASURED.largestInstructionsBundleBytes).toBe(26_351);
+    // BRW-007 adds 221 LF-normalized bytes for request_browser_session in TOOLS.md.
+    expect(MEASURED.instructionsBundleBytes.commander).toBe(26_572);
+    expect(MEASURED.largestInstructionsBundleBytes).toBe(26_572);
     expect(MEASURED.instructionsBundleBytes.cxo).toBe(12_139);
     expect(MEASURED.instructionsBundleBytes.lead).toBe(14_471);
     expect(MEASURED.instructionsBundleBytes.engineer).toBe(10_626);
     expect(MEASURED.instructionsBundleBytes.default).toBe(3_268);
 
     MEASURED.cPlusDBytes = MEASURED.mcpConfigBytes + MEASURED.largestInstructionsBundleBytes;
-    expect(MEASURED.cPlusDBytes).toBe(26_597);
+    expect(MEASURED.cPlusDBytes).toBe(26_818);
   });
 
   // --- Step 3: the decision, with the numbers in it ---------------------------------
@@ -425,15 +426,12 @@ describe("CLI-008 Unit B · Task 1 — byte-source ceilings, measured", () => {
     //   Unit C — the real brokered `aoa` MCP config, serialized exactly as
     //            `prepareHeartbeatMcpDelivery` writes it:                 246 bytes
     //   Unit D — the largest real instructions bundle, `commander`
-    //            (AGENTS + HEARTBEAT + SOUL + TOOLS):                  26,568 bytes
-    //            cxo 12,356 · lead 14,739 · adjutant 12,914 · engineer 10,836 ·
-    //            maker 9,825 · scout 9,343 · memory_keeper 5,689 · planner 5,325 ·
-    //            router 5,117 · dispatcher 5,081 · scribe 4,243 · librarian 4,142 ·
-    //            chronicler 4,027 · default 3,334 · steward 1,547
-    //   C + D                                                          26,814 bytes
+    //            (AGENTS + HEARTBEAT + SOUL + TOOLS, normalized LF):  26,572 bytes
+    //            All other role bundles measured above are smaller.
+    //   C + D                                                          26,818 bytes
     //
-    // SO: C+D DO FIT INSIDE THE EXTENSIONS CEILING, WITH ROOM TO SPARE. 26,814 of 48,960
-    // usable bytes — 54.8% of the container, 22,146 bytes spare. The build plan asked for
+    // SO: C+D DO FIT INSIDE THE EXTENSIONS CEILING, WITH ROOM TO SPARE. 26,818 of 48,960
+    // usable bytes — 54.8% of the container, 22,142 bytes spare. The build plan asked for
     // that to be said plainly either way, and that is the honest answer: the inline
     // candidate is NOT too small for C and D, and sweep 1's rejection of it cannot rest on
     // capacity.
@@ -466,7 +464,7 @@ describe("CLI-008 Unit B · Task 1 — byte-source ceilings, measured", () => {
 
     // The claims above, as assertions, so the comment cannot rot away from the code.
     expect(MEASURED.cPlusDBytes).toBeLessThan(MEASURED.extensionsSelfDescribingMaxRawBytes);
-    expect(MEASURED.extensionsSelfDescribingMaxRawBytes - MEASURED.cPlusDBytes).toBe(22_363);
+    expect(MEASURED.extensionsSelfDescribingMaxRawBytes - MEASURED.cPlusDBytes).toBe(22_142);
     expect(envelopeAdmits([
       { path: "/home/user/.aoa/mcp.json", bytes: new Uint8Array(MEASURED.mcpConfigBytes) },
       { path: "/home/user/.aoa/AGENTS.md", bytes: new Uint8Array(MEASURED.largestInstructionsBundleBytes) },
