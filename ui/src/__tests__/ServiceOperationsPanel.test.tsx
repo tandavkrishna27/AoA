@@ -19,6 +19,13 @@ function panel() {
     <ServiceOperationsPanel organizationId="org-1" companyId="company-1" /></QueryClientProvider>);
 }
 describe("durable service operator controls", () => {
+  it.each(["stopped", "deleted"])("disables invalid transitions from %s", async (desiredState) => {
+    methods.list.mockResolvedValue([{ serviceId: "service-1", desiredState, generation: 2 }]); panel();
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
+    if (desiredState === "deleted") expect(screen.getByRole("button", { name: "Resume" })).toBeDisabled();
+    else expect(screen.getByRole("button", { name: "Resume" })).toBeEnabled();
+  });
   it("reconnects live status and applies scoped pause/resume/stop", async () => {
     const user = userEvent.setup(); panel();
     await user.click(await screen.findByRole("button", { name: "Service details" }));

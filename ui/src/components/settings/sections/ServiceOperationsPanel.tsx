@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { serviceControlApi, type ServiceDefinition } from "@/api/service-control";
 
 const reason = "Operator service control";
+const transitions: Record<string, readonly string[]> = {
+  running: ["paused", "stopped"], paused: ["running", "stopped"], stopped: ["running"], deleted: [],
+};
 const serviceKey = (organizationId: string, companyId: string) => ["service-control", organizationId, companyId] as const;
 type Editor = { serviceId: string | null; definition: ServiceDefinition };
 
@@ -73,7 +76,7 @@ export function ServiceOperationsPanel({ organizationId, companyId }: { organiza
             <div className="flex flex-wrap gap-2"><Button variant="ghost" size="sm" aria-expanded={expanded === service.serviceId}
               onClick={() => setExpanded(expanded === service.serviceId ? null : service.serviceId)}>Service details</Button>
               {(["running", "paused", "stopped"] as const).map((state) => <Button key={state} variant="outline" size="sm"
-                disabled={desired.isPending || service.desiredState === state} onClick={() => { desired.reset(); desired.mutate({ id: service.serviceId, state }); }}>
+                disabled={desired.isPending || !(transitions[service.desiredState] ?? []).includes(state)} onClick={() => { desired.reset(); desired.mutate({ id: service.serviceId, state }); }}>
                 {state === "running" ? "Resume" : state === "paused" ? "Pause" : "Stop"}</Button>)}
             </div>
           </div>
