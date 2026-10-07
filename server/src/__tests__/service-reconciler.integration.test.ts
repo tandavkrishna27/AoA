@@ -130,9 +130,143 @@ afterAll(async () => {
 const suite = describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1");
 
 suite("SVC-002 — the reconciler converges desired state into exactly one instance", () => {
+  let witnessLease: Awaited<ReturnType<JobControlFixture["activateLease"]>> | null = null;
+  let witnessSequence = 0;
+  async function witnessedExit(ageSeconds: number, generation = 1, author = "worker_stopped", exitCode: number | null = 1, controlled = false) {
+    if (!witnessLease) witnessLease = await f().activateLease(901);
+    const { seeded, offer } = witnessLease;
+    const instanceId = randomUUID();
+    await f().admin`INSERT INTO service_instances
+      (id, organization_id, company_id, service_id, generation, status, terminalized_by, job_id, attempt_id, updated_at)
+      VALUES (${instanceId}, ${ORG}, ${COMPANY}, ${SERVICE}, ${generation}, 'stopped', ${author}, ${seeded.jobId}, ${seeded.attemptId},
+        clock_timestamp() - ${ageSeconds} * interval '1 second')`;
+    const event = { payload: { serviceId: SERVICE, serviceInstanceId: instanceId, generation, exitCode } };
+    if (controlled) {
+      const graceful = { payload: { serviceId: SERVICE, serviceInstanceId: instanceId, generation, deadline: new Date().toISOString() } };
+      await f().admin`INSERT INTO job_events
+        (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+         sequence, event_type, fence_token, event_digest, event, occurred_at, created_at)
+        VALUES (${ORG}, ${COMPANY}, ${seeded.jobId}, ${seeded.attemptId}, 1, ${offer.leaseId}, ${randomUUID()},
+          ${++witnessSequence}, 'service_graceful_stop_observed', ${offer.fenceToken}, ${"a".repeat(64)}, ${graceful},
+          clock_timestamp(), clock_timestamp() - ${ageSeconds} * interval '1 second')`;
+    }
+    await f().admin`INSERT INTO job_events
+      (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+       sequence, event_type, fence_token, event_digest, event, occurred_at, created_at)
+      VALUES (${ORG}, ${COMPANY}, ${seeded.jobId}, ${seeded.attemptId}, 1, ${offer.leaseId}, ${randomUUID()},
+        ${++witnessSequence}, 'service_instance_stopped', ${offer.fenceToken}, ${"a".repeat(64)}, ${event},
+        clock_timestamp(), clock_timestamp() - ${ageSeconds} * interval '1 second')`;
+    return instanceId;
+  }
+
+  it("SVC-004 preserves crash backoff across independent reconciler instances", async () => {
+    await seedService({ serviceId: SERVICE });
+    // A future database timestamp avoids timer-sensitive assertions on slow CI.
+    await witnessedExit(-60);
+    const input = { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE };
+    expect(await reconcileService(f().app.db, input)).toEqual({ action: "none", reason: "crash_backoff" });
+    expect(await reconcileService(f().app.db, input)).toEqual({ action: "none", reason: "crash_backoff" });
+    expect(await liveInstances(SERVICE)).toHaveLength(0);
+    expect(await serviceJobs()).toHaveLength(0);
+  });
+
+  it("SVC-004 concurrent restart after backoff creates one attributed job", async () => {
+    await seedService({ serviceId: SERVICE });
+    await witnessedExit(2);
+    const input = { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE };
+    const outcomes = await Promise.all([reconcileService(f().app.db, input), reconcileService(f().app.db, input)]);
+    expect(outcomes.filter((result) => result.action === "created")).toHaveLength(1);
+    expect(await liveInstances(SERVICE)).toHaveLength(1);
+    expect(await serviceJobs()).toHaveLength(1);
+  });
+
+  it("SVC-004 repeated accepted stop and later projection timestamps cannot renew backoff", async () => {
+    await seedService({ serviceId: SERVICE });
+    const instanceId = await witnessedExit(2);
+    await f().admin`UPDATE service_instances SET updated_at = clock_timestamp() + interval '1 minute'
+      WHERE id = ${instanceId}`;
+    await f().admin`INSERT INTO job_events
+      (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+       sequence, event_type, fence_token, event_digest, event, occurred_at, created_at)
+      SELECT organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, ${randomUUID()},
+        sequence + 100, event_type, fence_token, event_digest, event, occurred_at, clock_timestamp()
+      FROM job_events WHERE event->'payload'->>'serviceInstanceId' = ${instanceId}`;
+    expect((await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE })).action)
+      .toBe("created");
+  });
+
+  it("SVC-004 crash cap pauses atomically and writes one company audit under concurrent replay", async () => {
+    await seedService({ serviceId: SERVICE });
+    for (let i = 0; i < 5; i += 1) await witnessedExit(i + 10);
+    const input = { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE };
+    await Promise.all([reconcileService(f().app.db, input), reconcileService(f().app.db, input)]);
+    const [service] = await f().admin`SELECT desired_state FROM services WHERE id = ${SERVICE}`;
+    expect(service.desired_state).toBe("paused");
+    expect(await serviceJobs()).toHaveLength(0);
+    const audits = await f().admin`SELECT company_id, actor_type FROM activity_log
+      WHERE entity_id = ${SERVICE} AND actor_id = 'service-reconciler'`;
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ company_id: COMPANY, actor_type: "system" });
+  });
+
+  it("SVC-004 excludes prior generations and unwitnessed terminalizations", async () => {
+    await seedService({ serviceId: SERVICE, generation: 2 });
+    for (let i = 0; i < 5; i += 1) await witnessedExit(0, 1);
+    await witnessedExit(0, 2, "control_plane_backstop");
+    expect((await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE })).action)
+      .toBe("created");
+  });
+
+  it("SVC-004 excludes witnessed graceful stops for cancellation, drain, budget and deadline", async () => {
+    await seedService({ serviceId: SERVICE });
+    for (let i = 0; i < 5; i += 1) await witnessedExit(0, 1, "worker_stopped", null, true);
+    expect((await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE })).action)
+      .toBe("created");
+  });
+
+  it("SVC-004 spontaneous witnessed gone with unknown exit code still receives backoff", async () => {
+    await seedService({ serviceId: SERVICE });
+    await witnessedExit(-60, 1, "worker_stopped", null);
+    expect(await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE }))
+      .toEqual({ action: "none", reason: "crash_backoff" });
+  });
+
+  it("SVC-004 excludes a witnessed stop whose accepted attempt terminal records cancellation", async () => {
+    await seedService({ serviceId: SERVICE });
+    const instanceId = await witnessedExit(-60);
+    await f().admin`INSERT INTO job_events
+      (organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, event_id,
+       sequence, event_type, fence_token, event_digest, event, occurred_at, created_at)
+      SELECT organization_id, company_id, job_id, attempt_id, attempt_number, lease_id, ${randomUUID()},
+        sequence + 1, 'terminal', fence_token, event_digest, ${{ payload: { status: "cancelled" } }}, occurred_at, clock_timestamp()
+      FROM job_events WHERE event->'payload'->>'serviceInstanceId' = ${instanceId}`;
+    expect((await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE })).action)
+      .toBe("created");
+  });
+
+  it("SVC-004 refuses company mismatch before consulting recovery history", async () => {
+    await seedService({ serviceId: SERVICE });
+    await witnessedExit(-60);
+    expect(await reconcileService(f().app.db, {
+      organizationId: ORG, companyId: randomUUID(), serviceId: SERVICE,
+    })).toEqual({ action: "none", reason: "service_absent" });
+  });
+
+  it("SVC-004 refuses requested checkpoint recovery before creating any job or instance", async () => {
+    await seedService({ serviceId: SERVICE });
+    await f().admin`UPDATE service_generations SET checkpoint_artifact_id = ${randomUUID()}
+      WHERE service_id = ${SERVICE}`;
+    expect(await reconcileService(f().app.db, { organizationId: ORG, companyId: COMPANY, serviceId: SERVICE }))
+      .toEqual({ action: "none", reason: "checkpoint_recovery_unavailable" });
+    expect(await liveInstances(SERVICE)).toHaveLength(0);
+    expect(await serviceJobs()).toHaveLength(0);
+  });
+
   const previousFlag = process.env.AOA_DISTRIBUTED_EXECUTION_ENABLED;
 
   beforeEach(async () => {
+    witnessLease = null;
+    witnessSequence = 0;
     // The submit-time org-capacity admission is gated on this flag, and T2 is entirely
     // about it. Setting it for the whole suite keeps the composition under test identical
     // to the one the composition root builds (which only exists flag-on anyway).
