@@ -847,6 +847,33 @@ if (config.devLocalIdentity) {
 
 const uiMode = config.uiDevMiddleware ? "vite-dev" : config.serveUi ? "static" : "none";
 const storageService = createStorageServiceFromConfig(config);
+
+// Browser credential cleanup continues through rollout rollback and tenant
+// suspension. It uses its own bounded metadata cursor, not the active-org list.
+const { createBrowserArtifactRetention } = await import("./services/browser-artifact-retention-sweep.js");
+const { createStorageProviderFromConfig: createRetentionStorage } = await import("./storage/provider-registry.js");
+const browserRetention = createBrowserArtifactRetention({ ownerDb: db,
+  appDb: distributedExecutionDatabases?.appDb ?? db, storage: createRetentionStorage(config),
+  onError: () => logger.warn("browser artifact cleanup will retry") });
+let browserRetentionStopped = false;
+let browserRetentionTimer: NodeJS.Timeout | undefined;
+const browserRetentionTick = async (): Promise<void> => {
+  try {
+    const report = await browserRetention.tick();
+    if (report.expired || report.failed || report.refused) logger.info(report, "browser artifact retention cleanup");
+  } catch { logger.warn("browser artifact retention scan will retry"); }
+  if (!browserRetentionStopped) {
+    browserRetentionTimer = setTimeout(() => { void browserRetentionTick(); }, 30_000);
+    browserRetentionTimer.unref();
+  }
+};
+const stopBrowserRetention = () => {
+  browserRetentionStopped = true;
+  if (browserRetentionTimer) clearTimeout(browserRetentionTimer);
+};
+process.once("SIGTERM", stopBrowserRetention);
+process.once("SIGINT", stopBrowserRetention);
+void browserRetentionTick();
 const workQuestionSnapshotBackfill = await backfillWorkQuestionSnapshots(db as any);
 if (workQuestionSnapshotBackfill.updated > 0) {
   logger.info(workQuestionSnapshotBackfill, "work-question identity snapshot backfill complete");

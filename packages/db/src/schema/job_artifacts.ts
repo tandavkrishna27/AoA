@@ -94,6 +94,12 @@ export const jobArtifacts = pgTable(
     committedIdentityUnique: uniqueIndex("job_artifacts_committed_identity_uidx")
       .on(table.organizationId, table.jobId, table.attempt, table.identifier)
       .where(sql`status = 'committed'`),
+    expiredIdentityUnique: uniqueIndex("job_artifacts_expired_identity_uidx")
+      .on(table.organizationId, table.jobId, table.attempt, table.identifier)
+      .where(sql`status = 'expired'`),
+    committedRetentionIdx: index("job_artifacts_committed_retention_idx")
+      .on(table.kind, table.expiresAt, table.id)
+      .where(sql`status = 'committed'`),
     // DAT-006 — idempotent ORPHAN quarantine key. The natural quarantine identity is
     // (organization_id, job_id, attempt, identifier) over ONLY `status='quarantined'`
     // rows, so a replayed device-auth finalize is a DO-NOTHING (the mutator returns the

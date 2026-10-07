@@ -1,9 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import postgres, { type Sql } from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
+import type { Db } from "@armyofagents/db";
+import { createLocalDiskStorageProvider } from "../storage/local-disk-provider.js";
+import { createBrowserArtifactRetention } from "../services/browser-artifact-retention-sweep.js";
 import {
   applyPendingMigrations,
   createOperatorDbConnection,
@@ -179,6 +183,8 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
   let embedded: EmbeddedPostgresInstance | null = null;
   let dataDir = "";
   let admin: Sql | null = null;
+  let retentionSql: Sql | null = null;
+  let retentionDb: Db | null = null;
   let app: NonOwnerDbConnection | null = null;
   let operator: NonOwnerDbConnection | null = null;
   let setupError: unknown = null;
@@ -381,6 +387,8 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
       const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
       await applyPendingMigrations(adminUrl);
       admin = postgres(adminUrl, { max: 4 });
+      retentionSql = postgres(adminUrl, { max: 4 });
+      retentionDb = drizzle(retentionSql) as Db;
       await admin.unsafe(provisionTenantAppRoleLoginSql("aoa_app", PASSWORD));
       await admin.unsafe(provisionTenantAppRoleLoginSql("aoa_operator", PASSWORD));
       app = createTenantAppDbConnection(adminUrl.replace("test:test", `aoa_app:${PASSWORD}`), { max: 16 });
@@ -417,6 +425,7 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
     await operator?.close({ timeoutSeconds: 5 }).catch(() => {});
     await app?.close({ timeoutSeconds: 5 }).catch(() => {});
     await admin?.end().catch(() => {});
+    await retentionSql?.end();
     await embedded?.stop().catch(() => {});
     if (dataDir) await rm(dataDir, { recursive: true, force: true }).catch(() => {});
   }, 60_000);
@@ -682,6 +691,184 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
       FROM job_artifacts WHERE job_id = ${seeded.jobId} AND identifier = ${artifactId}`;
     expect(row).toMatchObject({ status: "committed", sha256: "c".repeat(64), size: "256", version: res.versionNumber });
   }, 60_000);
+
+  it("refuses a browser download after its deadline before background purge", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`read-expiry-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    await admin`UPDATE job_artifacts SET expires_at = clock_timestamp() - interval '1 minute' WHERE identifier = ${original.artifactId}`;
+    const request = grantRequest(offer, "download", { artifactId: original.artifactId, expectedObjectKey: original.objectKey });
+    const result = await createArtifactTransferGrantService({ appDb: app.db, storage }).grant({ auth: auth(`read-expiry-denied-${crypto.randomUUID()}`), request: request.request });
+    expect(result.outcome).toBe("rejected");
+    expect(storage.presignCalls).toHaveLength(0);
+    await admin`UPDATE job_artifacts SET status = 'expired' WHERE identifier = ${original.artifactId}`;
+  });
+
+  it("refuses legacy credential downloads until cleanup records their original deadline", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`legacy-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    await admin`UPDATE job_artifacts SET expires_at = NULL, committed_at = clock_timestamp() - interval '1 day' WHERE identifier = ${original.artifactId}`;
+    const request = grantRequest(offer, "download", { artifactId: original.artifactId, expectedObjectKey: original.objectKey });
+    const result = await createArtifactTransferGrantService({ appDb: app.db, storage }).grant({ auth: auth(`legacy-get-${crypto.randomUUID()}`), request: request.request });
+    expect(result.outcome).toBe("rejected");
+    expect(storage.presignCalls).toHaveLength(0);
+  });
+
+  it("bounds a browser download URL by the remaining retention lifetime", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`read-clamp-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const [row] = await admin`UPDATE job_artifacts SET expires_at = clock_timestamp() + interval '45 seconds' WHERE identifier = ${original.artifactId} RETURNING expires_at`;
+    const signed = vi.spyOn(storage, "presignGet");
+    const request = grantRequest(offer, "download", { artifactId: original.artifactId, expectedObjectKey: original.objectKey });
+    const result = await createArtifactTransferGrantService({ appDb: app.db, storage }).grant({ auth: auth(`read-clamp-get-${crypto.randomUUID()}`), request: request.request });
+    expect(result.outcome).toBe("download_granted");
+    if (result.outcome !== "download_granted") throw new Error("download refused");
+    expect(Date.parse(result.grant.expiresAt)).toBeLessThanOrEqual(new Date(row.expires_at).getTime());
+    expect(signed.mock.calls[0][0].expiresInSeconds).toBeLessThanOrEqual(45);
+  });
+
+  it("BRW-003c retention deletes actual bytes and tombstones a suspended tenant's artifact once", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const svc = createArtifactCommitService({ appDb: app.db, storage }); const { offer } = await activateLease();
+    const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await svc.commit({ auth: auth(`purge-first-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const objects = createLocalDiskStorageProvider(join(dataDir, "retention-objects"));
+    await objects.putObject({ objectKey: original.objectKey, body: Buffer.from("credential-canary"), contentType: "application/json" });
+    await admin`UPDATE job_artifacts SET expires_at = clock_timestamp() - interval '1 minute' WHERE identifier = ${original.artifactId}`;
+    await admin`UPDATE organizations SET status = 'suspended' WHERE id = ${ORG}`;
+    try {
+      const cleanup = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: objects });
+      const report = await cleanup.tick(); expect(report.expired).toBe(1);
+      expect((await objects.headObject({ objectKey: original.objectKey })).exists).toBe(false);
+      const [row] = await admin`SELECT status, object_key FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+      expect(row).toMatchObject({ status: "expired", object_key: null });
+      const replay = await cleanup.tick(); expect(replay.expired).toBe(0);
+      const audits = await admin`SELECT id FROM activity_log WHERE entity_id = ${String((await admin`SELECT id FROM job_artifacts WHERE identifier = ${original.artifactId}`)[0].id)} AND action = 'artifact.retention.expired'`;
+      expect(audits).toHaveLength(1);
+    } finally { await admin`UPDATE organizations SET status = 'active' WHERE id = ${ORG}`; }
+  });
+
+  it.each(["before_delete", "after_delete"] as const)("BRW-003c retention preserves retryable identity when deletion fails %s", async (failure) => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_storage_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`purge-retry-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const objects = createLocalDiskStorageProvider(join(dataDir, "retention-objects"));
+    await objects.putObject({ objectKey: original.objectKey, body: Buffer.from("credential-canary"), contentType: "application/json" });
+    await admin`UPDATE job_artifacts SET expires_at = clock_timestamp() - interval '1 minute' WHERE identifier = ${original.artifactId}`;
+    const failed = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: { ...objects,
+      async deleteObject(input) {
+        if (failure === "after_delete") await objects.deleteObject(input);
+        throw new Error("storage unavailable");
+      } } });
+    expect((await failed.tick()).failed).toBe(1);
+    expect((await objects.headObject({ objectKey: original.objectKey })).exists).toBe(failure === "before_delete");
+    const [row] = await admin`SELECT status, object_key FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+    expect(row).toMatchObject({ status: "committed", object_key: original.objectKey });
+    const restarted = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: objects });
+    expect((await restarted.tick()).expired).toBe(1);
+    expect((await objects.headObject({ objectKey: original.objectKey })).exists).toBe(false);
+  });
+
+  it("serializes competing cleanup instances and coalesces a repeated tick", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`race-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    await admin`UPDATE job_artifacts SET expires_at = clock_timestamp() - interval '1 minute' WHERE identifier = ${original.artifactId}`;
+    let entered!: () => void; let release!: () => void;
+    const deleting = new Promise<void>((resolve) => { entered = resolve; });
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const remove = vi.fn(async () => { entered(); await gate; });
+    const first = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: { ...storage, deleteObject: remove } });
+    const pending = first.tick();
+    expect(first.tick()).toBe(pending);
+    await deleting;
+    try {
+      const second = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: { ...storage, deleteObject: remove } });
+      expect((await second.tick()).expired).toBe(0);
+      expect(remove).toHaveBeenCalledTimes(1);
+    } finally { release(); }
+    expect((await pending).expired).toBe(1);
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses cleanup of a pointer outside the artifact's tenant and attempt", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`foreign-clean-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const foreignKey = `${expectedAttemptObjectPrefix({ organizationId: OTHER_ORG, jobId: offer.job.jobId, attempt: 1 })}private.json`;
+    await admin`UPDATE job_artifacts SET expires_at = clock_timestamp() - interval '1 minute', object_key = ${foreignKey} WHERE identifier = ${original.artifactId}`;
+    const remove = vi.fn(async () => {});
+    const cleanup = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: { ...storage, deleteObject: remove } });
+    expect((await cleanup.tick()).refused).toBe(1);
+    expect(remove).not.toHaveBeenCalled();
+    const [row] = await admin`SELECT status, object_key FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+    expect(row).toMatchObject({ status: "committed", object_key: foreignKey });
+  });
+
+  it("anchors legacy expiry to commit and resumes deletion after restart", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const { offer } = await activateLease(); const original = commitRequest(offer, { kind: "browser_cookie_state", retention: "ephemeral" });
+    expect((await createArtifactCommitService({ appDb: app.db, storage }).commit({ auth: auth(`legacy-clean-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const objects = createLocalDiskStorageProvider(join(dataDir, "retention-objects"));
+    await objects.putObject({ objectKey: original.objectKey, body: Buffer.from("legacy-credential"), contentType: "application/json" });
+    await admin`UPDATE job_artifacts SET expires_at = NULL, committed_at = clock_timestamp() - interval '1 day' WHERE identifier = ${original.artifactId}`;
+    const cleanup = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: objects });
+    expect((await cleanup.tick()).scheduled).toBe(1);
+    expect((await objects.headObject({ objectKey: original.objectKey })).exists).toBe(true);
+    const [row] = await admin`SELECT EXTRACT(EPOCH FROM expires_at - committed_at)::integer AS lifetime FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+    expect(row.lifetime).toBe(300);
+    const restarted = createBrowserArtifactRetention({ ownerDb: retentionDb!, appDb: app.db, storage: objects });
+    expect((await restarted.tick()).expired).toBe(1);
+    expect((await objects.headObject({ objectKey: original.objectKey })).exists).toBe(false);
+    expect((await restarted.tick()).expired).toBe(0);
+  });
+
+  it.each([["browser_cookie_state", 300], ["browser_storage_state", 300], ["screenshot", 86400]] as const)("stamps the server lifetime for %s once at commit", async (kind, seconds) => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const svc = createArtifactCommitService({ appDb: app.db, storage }); const { offer } = await activateLease();
+    const original = commitRequest(offer, { kind, retention: "ephemeral" });
+    expect((await svc.commit({ auth: auth(`expiry-clock-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const [row] = await admin`SELECT expires_at, EXTRACT(EPOCH FROM expires_at - committed_at)::integer AS lifetime FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+    expect(row.lifetime).toBe(seconds);
+    expect((await svc.commit({ auth: auth(`expiry-clock-replay-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    const [replay] = await admin`SELECT expires_at FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+    expect(String(replay.expires_at)).toBe(String(row.expires_at));
+  });
+
+  it("does not recreate an expired committed artifact through commit replay", async () => {
+    const { app, admin } = guardCtx();
+    const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const svc = createArtifactCommitService({ appDb: app.db, storage });
+    const { offer } = await activateLease(); const original = commitRequest(offer);
+    expect((await svc.commit({ auth: auth(`expiry-first-${crypto.randomUUID()}`), request: original.request })).outcome).toBe("committed");
+    await admin`UPDATE job_artifacts SET status = 'expired' WHERE identifier = ${original.artifactId}`;
+    const replay = await svc.commit({ auth: auth(`expiry-replay-${crypto.randomUUID()}`), request: original.request });
+    expect(replay.outcome).toBe("rejected");
+    const rows = await admin`SELECT status FROM job_artifacts WHERE identifier = ${original.artifactId}`;
+    expect(rows.map((row) => row.status)).toEqual(["expired"]);
+  });
+
+  it("keeps expired artifact identities unique after retention deletes bytes", async () => {
+    const { app, admin } = guardCtx(); const storage = makeStubStorage();
+    storage.headResult = { exists: true, contentLength: 128, checksumSha256: "b".repeat(64) };
+    const svc = createArtifactCommitService({ appDb: app.db, storage }); const { offer } = await activateLease();
+    const first = commitRequest(offer); const second = commitRequest(offer);
+    for (const request of [first, second]) expect((await svc.commit({ auth: auth(`expiry-unique-${crypto.randomUUID()}`), request: request.request })).outcome).toBe("committed");
+    await admin`UPDATE job_artifacts SET status = 'expired' WHERE identifier IN (${first.artifactId}, ${second.artifactId})`;
+    await expect(admin`UPDATE job_artifacts SET identifier = ${first.artifactId} WHERE identifier = ${second.artifactId}`).rejects.toMatchObject({ code: "23505" });
+  });
 
   it("is idempotent: replaying the same commit returns the same version, one row", async () => {
     const { app, admin } = guardCtx();

@@ -40,6 +40,7 @@ import {
 import { runInTenant } from "../db/tenant-context.js";
 import { logger } from "../middleware/logger.js";
 import { resolveStoredRetention } from "./artifact-retention-authority.js";
+import { browserArtifactLifetimeSeconds } from "./browser-artifact-expiry.js";
 import type { SweepTrigger } from "./artifact-sweep-trigger.js";
 import { JobLeasingError, type VerifiedWorkerOperation } from "./job-leasing.js";
 import { resolveWorkerFenceContext } from "./worker-fence-context.js";
@@ -335,6 +336,7 @@ export function createArtifactCommitService(input: {
             // a browser_cookie_state / browser_storage_state artifact is a privilege the
             // threat model must not grant: those bytes ARE a live session credential.
             retention: retentionDecision.retention,
+            lifetimeSeconds: browserArtifactLifetimeSeconds(manifest.kind),
             declaredSizeBytes: manifest.sizeBytes,
             declaredSha256: manifest.sha256,
             actualSizeBytes,

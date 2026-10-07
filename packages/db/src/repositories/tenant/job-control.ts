@@ -1131,6 +1131,7 @@ export interface JobControlRepository {
       kind: string;
       sensitivity: string;
       retention: string;
+      lifetimeSeconds?: number | null;
       declaredSizeBytes: number;
       declaredSha256: string;
       actualSizeBytes: number;
@@ -4661,6 +4662,19 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
       if (input.declaredSizeBytes !== input.actualSizeBytes) throw new ArtifactCommitRejection("size_mismatch");
       if (input.declaredSha256 !== input.actualSha256) throw new ArtifactCommitRejection("hash_mismatch");
 
+      // Lock an existing identity before replay. Retention holds this same row
+      // through delete-first expiry; a concurrent replay waits and then sees the
+      // expired tombstone rather than recreating committed bytes.
+      const identity = and(eq(jobArtifacts.organizationId, input.organizationId),
+        eq(jobArtifacts.jobId, input.jobId), eq(jobArtifacts.attempt, input.attemptNumber),
+        eq(jobArtifacts.identifier, input.identifier));
+      const [committed] = await tx.select().from(jobArtifacts)
+        .where(and(identity, eq(jobArtifacts.status, "committed"))).limit(1).for("update");
+      if (committed) return { ...committed, replayed: true };
+      const [expired] = await tx.select({ id: jobArtifacts.id }).from(jobArtifacts)
+        .where(and(identity, eq(jobArtifacts.status, "expired"))).limit(1).for("update");
+      if (expired) throw new ArtifactCommitRejection("tenant_mismatch");
+
       // Best-effort per-(org,job) ordinal, computed under the held fence lock. Not a
       // DB uniqueness constraint (concurrent attempts of one job may share a number).
       const [{ next } = { next: 1 }] = await tx
@@ -4685,6 +4699,8 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         kind: input.kind,
         sensitivity: input.sensitivity,
         retention: input.retention,
+        expiresAt: input.lifetimeSeconds == null ? null :
+          sql`clock_timestamp() + ${input.lifetimeSeconds} * interval '1 second'`,
         attempt: input.attemptNumber,
         leaseId: input.leaseId,
         fenceToken: input.fence,

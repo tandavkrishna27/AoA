@@ -81,8 +81,10 @@ export function createLocalDiskStorageProvider(baseDir: string): StorageProvider
       const filePath = resolveWithin(root, input.objectKey);
       try {
         await fs.unlink(filePath);
-      } catch {
-        // idempotent delete
+      } catch (error) {
+        // Already absent is idempotent. Permission or IO failure must remain a
+        // failure so cleanup does not tombstone an object that still exists.
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
     },
   };

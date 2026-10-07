@@ -48,6 +48,15 @@ export interface SweepDeps {
   limit: number;
 }
 
+/** Shared deletion ordering for orphan collection and retention. A failed
+ * physical delete never records absence; a failed record remains retryable. */
+export async function deleteArtifactThenRecord(input: {
+  objectKey: string; deleteObject(key: string): Promise<void>; recordDeletion(): Promise<void>;
+}): Promise<void> {
+  await input.deleteObject(input.objectKey);
+  await input.recordDeletion();
+}
+
 export async function runArtifactOrphanSweep(deps: SweepDeps): Promise<SweepReport> {
   const candidates = await deps.findCandidates({ before: deps.now, limit: deps.limit });
 
@@ -78,8 +87,8 @@ export async function runArtifactOrphanSweep(deps: SweepDeps): Promise<SweepRepo
     const objectKey = candidate.objectKey!;
     try {
       // ★ DELETE FIRST. See the module header — marking first strands a live object.
-      await deps.deleteObject(objectKey);
-      await deps.markSwept(candidate.id);
+      await deleteArtifactThenRecord({ objectKey, deleteObject: deps.deleteObject,
+        recordDeletion: () => deps.markSwept(candidate.id) });
       report.swept += 1;
     } catch {
       // One candidate's failure must not abandon the rest: a single unreachable object
