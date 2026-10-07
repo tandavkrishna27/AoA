@@ -244,10 +244,9 @@ async function gateAction(
     resolver: deps.requestApproval,
     intent: buildApprovalIntent(intentInput),
     timeoutMs: config.approvalTimeoutMs ?? 60_000,
-    // A missing timer is the same misconfiguration as a missing resolver, so the fallback
-    // is a REAL timer rather than a never-resolving one: a deadline that can never fire is a
-    // hang, and a hang is the failure mode this whole clause exists to remove.
-    delay: deps.delay ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    // The approval helper owns and clears the real deadline when no test clock
+    // is injected. A settled action leaves no timer retaining the guest process.
+    delay: deps.delay,
   });
   if (outcome.ok) return null;
   return {

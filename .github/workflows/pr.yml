@@ -1770,8 +1770,8 @@ jobs:
       # Teardown bundles the compiled entry using production guest staging:
       # CJS runner.js + commonjs package marker, with only Playwright external.
       # Build workspace dependencies for the frozen protocol declarations too.
-      - name: Build the runtime for bundled guest teardown
-        run: pnpm --filter @armyofagents/browser-runtime... build
+      - name: Build bundled guest runtime and Commander journey dependencies
+        run: pnpm --filter @armyofagents/browser-runtime... --filter '@armyofagents/server^...' build
 
       # AOA_RUN_BROWSER_TESTS is what un-skips the *.browser.test.ts suites. Without it they
       # skip everywhere, which would make this lane a check that runs nothing.
@@ -1796,6 +1796,27 @@ jobs:
       # clauses would be unproven while the gate showed green.
       - name: Prove the browser suite was not skipped
         run: node scripts/check-browser-suite-executed.mjs /tmp/browser-suite.json
+
+      # Reuse the browser lane: signed MCP, serving PostgreSQL roles, native
+      # owner approval, encrypted one-use delivery and staged local HTTPS guest.
+      # No live model, provider or application-cookie issuer is called.
+      - name: Run the governed Commander browser journey
+        env:
+          AOA_RUN_BROWSER_TESTS: "1"
+        run: |
+          set -o pipefail
+          pnpm exec vitest run server/src/__tests__/agent-browser-request.integration.test.ts \
+            --reporter=basic --reporter=json --outputFile.json=/tmp/commander-browser-journey.json
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const report = JSON.parse(readFileSync('/tmp/commander-browser-journey.json', 'utf8'));
+            const results = report.testResults.flatMap(file => file.assertionResults ?? []);
+            for (const guest of ['false', 'true']) {
+              if (!results.some(result => result.status === 'passed' && result.fullName.includes('carries a signed reserved browser request') && result.fullName.includes('(guest=' + guest + ')'))) {
+                throw new Error('Commander browser journey did not execute: guest=' + guest);
+              }
+            }
+          "
 
   ci-required:
     needs: [changes, policy, brand-check, worker-protocol-contract-bytes, verify, lint, e2e, e2e-pgvector, migrations, distributed-contract, browser]

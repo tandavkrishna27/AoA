@@ -15,9 +15,33 @@ import { submitJobWithinTenant } from "../services/job-submission.js";
 import { loadCommanderJobAuthority } from "../services/commander-job-authority.js";
 import { setBrowserSessionCredentialPort } from "../services/browser-session-credentials.js";
 import { parseDistributedNetworkPolicies } from "../config/distributed-network-policies.js";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import express from "express";
+import supertest from "supertest";
+import { vi } from "vitest";
+import { createCommanderRunJwt } from "../agent-auth-jwt.js";
+import { actorMiddleware } from "../middleware/auth.js";
+import { mcpServerRoutes } from "../mcp/server.js";
+import { setCommanderBrowserRequestPort } from "../services/agent-browser-request.js";
+import { createBrowserSessionCredentialBroker } from "../services/browser-session-credentials.js";
+import { assertBrowserConnectorCurrent } from "../services/browser-connector-oauth.js";
+import { createAcceptedBrowserApprovalProjector } from "../services/job-accepted-browser-approval.js";
+import { runtimeDecisionPromptHash } from "../services/agent-runtime-decisions.js";
+import { jobApprovalBridge } from "../services/job-approval-bridge.js";
+import { createJobOperationsService } from "../services/job-operations.js";
+import { auth as workerAuth, pollRequest, ackRequest } from "./helpers/job-control-fixture.js";
+import { runStagedBrowserJourney } from "./helpers/browser-journey-guest.js";
+import { createBrowserApprovalController } from "../../../packages/worker-daemon/src/supervisor/browser-approval.js";
+import { exchangeBrowserSessionCookie } from "../services/browser-session-cookie-exchange.js";
+import type { executePinnedRequest } from "../services/outbound-url-guard.js";
+import { expectedAttemptObjectPrefix,artifactCommitOperationRequestV1Schema } from "@armyofagents/worker-protocol";
+import { createArtifactCommitService } from "../services/artifact-commit.js";
+import { createJobLeaseRenewalService } from "../services/job-fencing.js";
+import { readControlCommandDelivery } from "../../../packages/worker-daemon/src/lease/control-commands.js";
+import type { BrowserSessionCredentialGrant } from "../services/browser-session-credentials.js";
+import { leaseRenewOperationRequestV1Schema } from "@armyofagents/worker-protocol";
 
 const AGENT = "a6000000-0000-4000-8000-0000000000a7";
 const RUN = "a6000000-0000-4000-8000-0000000000a8";
@@ -43,11 +67,12 @@ function service(enabled = true) { return createAgentBrowserRequestService(servi
 const commanderUser = "human-browser-commander";
 const conversationId = "a6000000-0000-4000-8000-0000000000b1";
 async function commanderParent() {
+  await fixture.admin`DELETE FROM heartbeat_runs WHERE id=${RUN}`;
   await fixture.admin`DELETE FROM internal_agent_messages WHERE conversation_id=${conversationId}`;
   await fixture.admin`DELETE FROM internal_agent_conversations WHERE id=${conversationId}`;
   await fixture.admin`DELETE FROM internal_agent_runs WHERE id=${RUN}`;
   await fixture.admin`INSERT INTO "user"(id,name,email,email_verified,created_at,updated_at) VALUES(${commanderUser},'Commander browser fixture','commander-browser@example.test',true,now(),now()) ON CONFLICT(id) DO NOTHING`;
-  await fixture.admin`INSERT INTO organization_memberships(organization_id,user_id,role,status) VALUES(${ORG},${commanderUser},'member','active') ON CONFLICT(organization_id,user_id) DO UPDATE SET status='active'`;
+  await fixture.admin`INSERT INTO organization_memberships(organization_id,user_id,role,status) VALUES(${ORG},${commanderUser},'member','active') ON CONFLICT(organization_id,user_id) DO UPDATE SET status='active',role='member'`;
   await fixture.admin`INSERT INTO company_memberships(company_id,principal_type,principal_id,status) VALUES(${COMPANY},'user',${commanderUser},'active') ON CONFLICT(company_id,principal_type,principal_id) DO UPDATE SET status='active'`;
   await fixture.admin`INSERT INTO internal_agent_conversations(id,company_id,user_id,status) VALUES(${conversationId},${COMPANY},${commanderUser},'active')`;
   await fixture.admin`INSERT INTO internal_agent_runs(id,company_id,user_id,agent_id,trigger_type,trigger_source,status,provider,execution_owner,distributed_job_id,distributed_attempt_id) VALUES(${RUN},${COMPANY},${commanderUser},NULL,'conversation','conversation','running','openai','distributed',${parent.seeded.jobId},${parent.seeded.attemptId})`;
@@ -98,6 +123,143 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     if (fixture) await fixture.teardown();
     if (storageRoot) await rm(storageRoot, { recursive: true, force: true });
   });
+
+  for(const runGuest of [false,true]) it.skipIf(runGuest && process.env.AOA_RUN_BROWSER_TESTS!=='1')(`carries a signed reserved browser request through real placement, owner approval and encrypted one-use issuance (guest=${runGuest})`, async () => {
+    const actor = await commanderParent();
+    const binding = { bindingId: randomUUID(), connectorId: randomUUID(), origin: "https://mcp.notion.com", exchangeUrl: "https://mcp.notion.com/login", cookieName: "__Host-session" };
+    await fixture.admin`UPDATE organization_memberships SET role='owner' WHERE organization_id=${ORG} AND user_id=${commanderUser}`;
+    await fixture.admin`UPDATE company_memberships SET membership_role='owner' WHERE company_id=${COMPANY} AND principal_id=${commanderUser}`;
+    await fixture.admin`UPDATE jobs SET requester_principal_kind='founder' WHERE id=${parent.identity.jobId}`;
+    const networkPolicy = parseDistributedNetworkPolicies(JSON.stringify({ [ORG]: { [COMPANY]: { policyId: "journey", version: 1, allow: [{ scheme: "https", host: "mcp.notion.com", port: 443 }] } } })).get(`${ORG}:${COMPANY}`)!;
+    await fixture.admin`UPDATE companies SET mcp_enabled=true WHERE id=${COMPANY}`;
+    await fixture.admin`DELETE FROM company_mcp_connectors WHERE company_id=${COMPANY} AND server_name='journey-notion'`;
+    await fixture.admin`INSERT INTO company_mcp_connectors(id,company_id,server_name,display_name,transport,url,source,catalog_entry_id,oauth_policy_version,secret_ref,status) VALUES(${binding.connectorId},${COMPANY},'journey-notion','Keyless journey','http','https://mcp.notion.com/mcp','catalog','notion-hosted',1,${`mcp:oauth:${binding.connectorId}`},'active')`;
+    await fixture.admin`UPDATE jobs SET policy_snapshot=${fixture.admin.json({networkPolicy,controlPlaneDenyCidrs:['203.0.113.8/32'],browserSessionBindings:[binding]})} WHERE id=${parent.seeded.jobId}`;
+    vi.stubEnv("AOA_AGENT_JWT_SECRET", "journey-signed-turn-secret");
+    vi.stubEnv("AOA_SECRETS_MASTER_KEY", "a".repeat(64));
+    vi.stubEnv("AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED", "per-organization");
+    vi.stubEnv("AOA_DISTRIBUTED_EXECUTION_ROLLOUT", JSON.stringify({ organizations:{ [ORG]: { mode: "active", workloads:['*'], tools: true } } }));
+    const storage = createLocalDiskStorageProvider(storageRoot);
+    let issuerDispatch:typeof executePinnedRequest;
+    // Only the external issuer response is keyless. Both OAuth resolution and
+    // exchange retain the real tenant, connector and current parent checks.
+    const broker = createBrowserSessionCredentialBroker({ appDb:fixture.app.db,identityDb:ownerDb,storage,signingKey:'s'.repeat(64),publicOrigin:'https://control.example',
+      assertConnectorCurrent: scope => assertBrowserConnectorCurrent(ownerDb,scope),
+      resolveConnectorOAuth: async scope => { await scope.assertAuthorityCurrent!(); await assertBrowserConnectorCurrent(ownerDb,scope); return 'keyless_cp_access_token'; },
+      exchange: async input => runGuest ? exchangeBrowserSessionCookie(input,{resolveAddresses:async host=>{expect(host).toBe('mcp.notion.com');return ['93.184.216.34'];},dispatch:(...args)=>issuerDispatch(...args)}) : ({name:input.binding.cookieName,value:'keyless_session_cookie_012345',expiresAt:input.expiresAt.toISOString()}) });
+    setBrowserSessionCredentialPort(broker);
+    setCommanderBrowserRequestPort(createCommanderBrowserRequestService(serviceInput()));
+    try {
+      const app = express(); app.use(express.json());
+      app.use(actorMiddleware(ownerDb,{deploymentMode:'authenticated',resolveSession:async()=>null}));
+      app.use('/api',mcpServerRoutes(ownerDb));
+      const token = createCommanderRunJwt({...actor,userRole:'founder'})!;
+      const call = (method:string,params:unknown) => supertest(app).post(`/api/companies/${COMPANY}/browser-mcp`).set('Authorization',`Bearer ${token}`).set('x-aoa-run-id',randomUUID()).send({jsonrpc:'2.0',id:1,method,params});
+      const list = await call('tools/list',{});
+      expect(list.status,JSON.stringify(list.body)).toBe(200); expect(list.body.result.tools.map((t:any)=>t.name)).toEqual(['request_browser_session']);
+      const result = await call('tools/call',{name:'request_browser_session',arguments:{idempotencyKey:'signed-keyless-journey',sessionBindingId:binding.bindingId,urls:[`${binding.origin}/dashboard`],options:{maxSessionSeconds:120,recordVideo:true}}});
+      expect(result.status).toBe(200); expect(result.body.error).toBeUndefined();
+      const [child] = await fixture.admin`SELECT id,source_intent,policy_snapshot FROM jobs WHERE source_kind='browser_request'`;
+      expect(child).toBeDefined();
+      expect(child.policy_snapshot.browserPreparation).toMatchObject({schemaVersion:2,userId:commanderUser,runId:RUN,agentId:null,issueId:null,parentJobId:parent.identity.jobId,sessionBinding:binding});
+      const [attempt] = await fixture.admin`SELECT id FROM job_attempts WHERE job_id=${child.id}`;
+      const auth = {...workerAuth('journey'),profileHash:parent.identity.profileHash};
+      const poll = pollRequest('journey-poll'); poll.capacity.browserSessionSlots=2;
+      const offered = await fixture.leasing.poll({auth,request:poll});
+      expect(offered.outcome).toBe('offer'); if(offered.outcome!=='offer')throw new Error('missing child offer');
+      expect(offered.body.job.jobId).toBe(child.id);
+      expect((await fixture.leasing.ack({auth:{...auth,proofId:'journey-ack'},request:ackRequest(offered.body)})).outcome).toBe('acknowledged');
+      const fence = {...parent.identity,jobId:child.id,attemptId:attempt.id,leaseId:offered.body.leaseId,fence:offered.body.fenceToken,attemptNumber:1};
+      const permission = {decisionKind:'permission' as const,requestId:randomUUID(),nonce:binding.bindingId,sourceRevision:0,schemaVersion:1,title:'Use scoped browser session',summary:networkPolicy.digest,toolName:'browser.session_credentials',networkTarget:binding.origin,riskClass:'credential_use',command:null,cwd:null,path:null,expiresAt:new Date(Date.now()+60000).toISOString(),timeoutPolicy:'deny' as const,defaultDecision:null};
+      const bridge=jobApprovalBridge(fixture.app.db);
+      const leaseRequest={jobId:child.id,leaseId:fence.leaseId,attempt:1,workerId:WORKER,fenceToken:fence.fence};
+      let approvedRequestId=permission.requestId;
+      let videoArtifactId:string|undefined;
+      if(!runGuest) {
+      const payload = {...permission,requestDigest:runtimeDecisionPromptHash({kind:'permission',...permission,promptText:null})};
+      const eventId=randomUUID(),digest=sha256(canonicalizeJsonV1(payload));
+      let projectionError:unknown; const projector=createAcceptedBrowserApprovalProjector(); const apply=projector.apply; projector.apply=async input=>{try{return await apply(input);}catch(error){projectionError=error;throw error;}};
+      await runInTenant(fixture.app.db,ORG,repos=>repos.jobControl.acceptEvent({...fence,batch:{events:[{eventId,sequence:1,eventType:'runtime_decision_requested',fenceToken:fence.fence,suppliedDigest:digest,recomputedDigest:digest,occurredAt:new Date(),payload:{eventId,eventType:'runtime_decision_requested',seq:1,payload},terminalStatus:null,serviceProjection:null}],acceptedEventProjectors:[projector]}}));
+      const receipts=await fixture.admin`SELECT * FROM job_projection_receipts WHERE job_id=${child.id}`;
+      expect(receipts,String(projectionError)).toEqual(expect.arrayContaining([expect.objectContaining({status:'applied',target_aggregate_id:permission.requestId})]));
+      await bridge.resolveGovernedDecision({source:child.source_intent,actor:{companyId:COMPANY,kind:'user',id:commanderUser,userRole:'team_member'},fence,idempotencyKey:randomUUID(),runtimeDecision:{decisionId:permission.requestId,nonce:permission.nonce,expectedSourceRevision:0,kind:'permission',decision:'allow_once',actorUserId:commanderUser,answerIdempotencyKey:randomUUID()}});
+      const [native] = await fixture.admin`SELECT status,answered_by_user_id FROM agent_runtime_decisions WHERE id=${permission.requestId}`;
+      expect(native).toMatchObject({status:'answered',answered_by_user_id:commanderUser});
+      const [entry]=await broker.prepare(auth,leaseRequest,{fenceIdentity:fence,companyId:COMPANY,authorityNow:new Date(),leaseDeadline:new Date(Date.now()+300000)});
+      expect(entry).toBeDefined();
+      const [artifact]=await fixture.admin`SELECT object_key FROM job_artifacts WHERE id=${entry.grant.artifactId}`;
+      const object=await storage.getObject({companyId:COMPANY,objectKey:artifact.object_key});
+      const parts:Buffer[]=[]; for await(const chunk of object.stream)parts.push(Buffer.from(chunk));
+      expect(Buffer.concat(parts).toString()).not.toMatch(/keyless_cp_access_token|keyless_session_cookie_012345/);
+      const grant=new URL(entry.grant.url).searchParams.get('grant')!;
+      const delivered=JSON.parse((await broker.redeem(entry.grant.artifactId,grant)).toString());
+      expect(delivered).toMatchObject({requestId:permission.requestId,bindingId:binding.bindingId,policyDigest:networkPolicy.digest,origin:binding.origin,cookie:{name:binding.cookieName,value:'keyless_session_cookie_012345'}});
+      await expect(broker.redeem(entry.grant.artifactId,grant)).rejects.toThrow();
+      }
+      if(runGuest) {
+        const guestRoot=await mkdtemp(join(tmpdir(),'commander-guest-journey-'));
+        let deliverFile:(directory:string,id:string,body:unknown)=>Promise<void>;
+        let renewedGrants:BrowserSessionCredentialGrant[]=[];
+        let sequence=0;
+        const controller=createBrowserApprovalController({identity:{organizationId:ORG,companyId:COMPANY,workerId:WORKER,jobId:child.id,attempt:1,leaseId:fence.leaseId,fenceToken:fence.fence},deadlineAt:Date.now()+120000,now:Date.now,scrubText:text=>text,
+          credentialBinding:{bindingId:binding.bindingId,origin:binding.origin,policyDigest:networkPolicy.digest},
+          emit:async request=>{
+            if(request.toolName==='browser.session_credentials')approvedRequestId=request.requestId;
+            const id=randomUUID(),hash=sha256(canonicalizeJsonV1(request));
+            const accepted=await runInTenant(fixture.app.db,ORG,repos=>repos.jobControl.acceptEvent({...fence,batch:{events:[{eventId:id,sequence:++sequence,eventType:'runtime_decision_requested',fenceToken:fence.fence,suppliedDigest:hash,recomputedDigest:hash,occurredAt:new Date(),payload:{eventId:id,eventType:'runtime_decision_requested',seq:sequence,payload:request},terminalStatus:null,serviceProjection:null}],acceptedEventProjectors:[createAcceptedBrowserApprovalProjector()]}}));
+            expect(accepted.acceptedEventProjections?.[0]?.outcome).toBe('applied');
+            await bridge.resolveGovernedDecision({source:child.source_intent,actor:{companyId:COMPANY,kind:'user',id:commanderUser,userRole:'founder'},fence,idempotencyKey:randomUUID(),runtimeDecision:{decisionId:request.requestId,nonce:request.nonce,expectedSourceRevision:0,kind:'permission',decision:'allow_once',actorUserId:commanderUser,answerIdempotencyKey:randomUUID()}});
+          },
+          deliver:response=>deliverFile('/home/user/.aoa/browser-approvals',response.requestId,response),
+          deliverCredential:async request=>{
+            const scoped=renewedGrants.find(item=>item.requestId===request.requestId);expect(scoped).toBeDefined();
+            const token=new URL(scoped!.grant.url).searchParams.get('grant')!;
+            const bytes=await broker.redeem(scoped!.grant.artifactId,token);
+            await deliverFile('/home/user/.aoa/browser-session-credentials',request.requestId,JSON.parse(bytes.toString()));
+            await expect(broker.redeem(scoped!.grant.artifactId,token)).rejects.toThrow();
+          },
+        });
+        try {
+          const artifacts=await fixture.admin`SELECT content_type,object_key FROM job_artifacts WHERE job_id=${child.id} AND kind='staged_input'`;
+          const guest=await runStagedBrowserJourney({root:guestRoot,companyId:COMPANY,storage,artifacts:artifacts as unknown as Array<{content_type:string;object_key:string}>,cookieValue:'keyless_session_cookie_012345',onIssuer:dispatch=>{issuerDispatch=dispatch;},onIntent:async(message,deliver)=>{
+            deliverFile=deliver;
+            const request=message.type==='session_credentials_requested'?await controller.requestCredentials(message):await controller.request(message);
+            const renewed=await createJobLeaseRenewalService({appDb:fixture.app.db}).renew({auth:{...auth,proofId:`journey-renew-${request.requestId}`},request:leaseRenewOperationRequestV1Schema.parse({protocolVersion:1,correlationId:randomUUID(),issuedAt:new Date().toISOString(),nonce:randomUUID(),audience:'worker_run',idempotencyKey:randomUUID(),body:{...leaseRequest,protocolVersion:1,observedAt:new Date().toISOString(),extensions:[]}})});
+            expect(renewed.outcome).toBe('renewed');if(renewed.outcome!=='renewed')throw new Error('renewal refused');
+            const extension=renewed.body.extensions?.find(ext=>ext.namespace==='com.armyofagents.browser/session-credential-grants');
+            renewedGrants=extension?(extension.value as unknown as {grants:BrowserSessionCredentialGrant[]}).grants:[];
+            const delivery=readControlCommandDelivery(renewed.body.extensions);
+            const command=delivery?.commands.find(value=>value.commandId===request.requestId);
+            expect(command).toBeDefined();await controller.apply(command);
+            if(message.type==='session_credentials_requested')controller.consumeCredential(request.requestId);
+          }});
+          expect(guest.authenticatedNavigations).toBe(1);
+          expect(guest.events.filter(event=>event.type==='session_credentials_requested')).toHaveLength(1);
+          expect(guest.events.find(event=>event.type==='session_completed'),guest.output).toMatchObject({savedDownloads:expect.arrayContaining([expect.stringContaining('session-video.webm')])});
+          const bytes=await readFile(join(guest.mount,'aoa-output','session-video.webm'));expect(bytes.length).toBeGreaterThan(0);
+          const objectKey=expectedAttemptObjectPrefix({organizationId:ORG,jobId:child.id,attempt:1})+'session-video.webm';
+          await storage.putObject({objectKey,body:bytes,contentType:'video/webm',contentLength:bytes.length});
+          const identifier=randomUUID();
+          // The local fixture store supplies a checksum computed from actual
+          // stored bytes; production local_disk has no transfer/checksum proof.
+          const verifiedStorage={...storage,headObject:async(input:{objectKey:string})=>{const metadata=await storage.headObject(input),object=await storage.getObject(input),parts:Buffer[]=[];for await(const chunk of object.stream)parts.push(Buffer.from(chunk));return {...metadata,checksumSha256:sha256(Buffer.concat(parts))};}};
+          const committed=await createArtifactCommitService({appDb:fixture.app.db,storage:verifiedStorage}).commit({auth:{...auth,proofId:'journey-video'},request:artifactCommitOperationRequestV1Schema.parse({protocolVersion:1,correlationId:randomUUID(),issuedAt:new Date().toISOString(),nonce:randomUUID(),audience:'worker_run',idempotencyKey:randomUUID(),body:{protocolVersion:1,workerId:WORKER,jobId:child.id,attempt:1,leaseId:fence.leaseId,fenceToken:fence.fence,manifest:{protocolVersion:1,organizationId:ORG,companyId:COMPANY,jobId:child.id,attempt:1,artifactId:identifier,kind:'browser_video',sensitivity:'restricted',retention:'run',objectKey,sizeBytes:bytes.length,sha256:sha256(bytes),contentType:'video/webm',createdAt:new Date().toISOString()}}})});
+          expect(committed.outcome,JSON.stringify(committed)).toBe('committed');
+          if(committed.outcome==='committed')videoArtifactId=(await fixture.admin`SELECT id FROM job_artifacts WHERE job_id=${child.id} AND identifier=${committed.artifactId}`)[0].id;
+        } finally {controller.close();await rm(guestRoot,{recursive:true,force:true});}
+      }
+      const detail=await createJobOperationsService({appDb:fixture.app.db,operatorDb:fixture.operator.db}).getJobDetail(ORG,COMPANY,child.id);
+      expect(detail?.runtimeDecisions).toEqual(expect.arrayContaining([expect.objectContaining({id:approvedRequestId,status:'answered'})]));
+      expect(JSON.stringify(detail)).not.toMatch(/keyless_cp_access_token|keyless_session_cookie_012345|grant=/);
+      if(videoArtifactId)expect(detail?.artifacts).toEqual(expect.arrayContaining([expect.objectContaining({id:videoArtifactId,kind:'browser_video',status:'committed',expiresAt:expect.any(Date)})]));
+      await createJobReconciliationService({appDb:fixture.app.db}).requestCancellation({organizationId:ORG,companyId:COMPANY,jobId:parent.identity.jobId,reason:'user_cancel',graceful:false});
+      await expect(broker.prepare(auth,leaseRequest,{fenceIdentity:fence,companyId:COMPANY,authorityNow:new Date(),leaseDeadline:new Date(Date.now()+300000)})).rejects.toThrow();
+      expect((await fixture.admin`SELECT status FROM jobs WHERE id=${child.id}`)[0].status).toBe('cancel_requested');
+      expect((await fixture.admin`SELECT count(*)::int AS n FROM job_control_commands WHERE job_id=${child.id} AND command_kind='cancel'`)[0].n).toBe(1);
+      expect((await fixture.admin`SELECT count(*)::int AS n FROM job_artifacts WHERE job_id=${child.id} AND kind='staged_input' AND status='pending'`)[0].n).toBe(0);
+      expect((await fixture.admin`SELECT count(*)::int AS n FROM job_artifacts WHERE job_id=${child.id} AND kind='browser_cookie_state' AND (status='pending' OR object_key IS NOT NULL)`)[0].n).toBe(0);
+    } finally { setCommanderBrowserRequestPort(undefined);setBrowserSessionCredentialPort(undefined);vi.unstubAllEnvs(); }
+  },120000);
 
   it("binds the real run/task/parent and stages complete trusted inputs before placement", async () => {
     const result = await service().request(actor, request);
