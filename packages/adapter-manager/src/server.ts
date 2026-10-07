@@ -35,7 +35,7 @@ import type {
   SandboxProvider,
   StagedFileRequest,
 } from "@armyofagents/worker-daemon";
-import { createRunOutputCapture, readCommanderWarmRedactionCanaries, scrubOutputText } from "@armyofagents/worker-daemon";
+import { readBrowserDecisionDelivery, createRunOutputCapture, readCommanderWarmRedactionCanaries, scrubOutputText } from "@armyofagents/worker-daemon";
 import {
   EXECUTE_LIVE_STDOUT_KEY,
   EXECUTE_CAPTURE_STDOUT_KEY,
@@ -48,6 +48,7 @@ import {
   decodeProcessStart,
   decodeProcessStatus,
   decodeProcessSignal,
+  decodeBrowserDecisionDelivery,
 } from "@armyofagents/provider-wire/codec";
 import type { OwnedLabelsCapability } from "@armyofagents/provider-wire";
 import { EXPORT_TEARDOWN_RESERVE_MS } from "@armyofagents/worker-daemon";
@@ -142,6 +143,7 @@ const GATE_REQUIRED_OPS: ReadonlySet<string> = new Set([
   // server 404s it, matching the B2 teardown ops, because it carries a bearer grant.
   "stage_files",
   "renew_lifetime",
+  "browser_decision",
   "start_process",
   "process_status",
   "signal_process",
@@ -326,6 +328,18 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       }
       case "list":
         return gateList(deps, args as ListInput, ctx, capability);
+      case "browser_decision": {
+        const delivery = readBrowserDecisionDelivery(args, now());
+        if (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new WireProtocolError("invalid browser decision deadline");
+        const deadlineAt = Math.min(now() + Math.min(ctx.deadlineMs, 5000), Date.parse(delivery.response.expiresAt));
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true }, delivery.sandboxId, ctx, capability,
+          async (detail, remainingMs) => {
+            if (warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(delivery.sandboxId, detail.resourceLabels) ||
+                !provider.deliverBrowserDecision || !remainingMs || remainingMs <= 0) throw new WireProtocolError("browser decision delivery unavailable");
+            const validated = readBrowserDecisionDelivery(delivery, now());
+            return decodeBrowserDecisionDelivery(await provider.deliverBrowserDecision(validated, { ...ctx, deadlineMs: remainingMs }));
+          }, deadlineAt);
+      }
       case "start_process":
       case "process_status":
       case "signal_process": {

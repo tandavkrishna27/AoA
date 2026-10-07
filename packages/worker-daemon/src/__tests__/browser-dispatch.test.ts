@@ -120,6 +120,7 @@ describe("browser dispatch prerequisites", () => {
     let finish!: () => void; const gate = new Promise<void>((resolve) => { finish = resolve; });
     let delivered = 0;
     const provider = { ...fake, browserNetworkPolicyMode: "verified_default_deny" as const,
+      deliverBrowserDecision: async () => { delivered++; return { providerOpId: "decision", delivered: true as const }; },
       create: async (...args: Parameters<typeof fake.create>) => ({ ...await fake.create(...args), browserNetworkPolicyDigest: args[0].browserNetworkPolicy?.digest }),
       stageFiles: async (_sandbox: string, files: readonly { path: string }[]) => ({ stagedPaths: files.map((file) => file.path) }),
       execute: async (...args: Parameters<typeof fake.execute>) => {
@@ -132,7 +133,7 @@ describe("browser dispatch prerequisites", () => {
           await gate;
           input.onStdout?.(JSON.stringify({ type: "network_denied", destinationClass: "private", reason: "late guest text" }) + "\n");
           input.onStdout?.(JSON.stringify({ type: "session_completed", savedDownloads: [] }) + "\n");
-        } else { delivered++; expect(input.args[0]).toBe("-e"); }
+        } else { throw new Error("approval must use its dedicated provider port"); }
         return fake.execute({ ...input, onStdout: undefined }, args[1]);
       } };
     const supervisor = createSupervisor({ provider, browserSelfModel: await makeSelfModel(), identity: SUPERVISOR_IDENTITY, eventSink: sink,

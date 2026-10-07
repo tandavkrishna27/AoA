@@ -22,6 +22,8 @@
 import type { ArtifactUploadGrantV1 } from "@armyofagents/worker-protocol";
 
 import type {
+  BrowserDecisionDeliveryInput,
+  BrowserDecisionDeliveryResult,
   ArtifactDigestResult,
   ArtifactExportResult,
   CheckpointResult,
@@ -110,6 +112,12 @@ export class EffectAuthority {
       throw new Error("sandbox lifetime renewal unavailable");
     }
     return this.#provider.renewLifetime(sandboxId, expiresAt, ctx);
+  }
+
+  deliverBrowserDecision(input: BrowserDecisionDeliveryInput, ctx: ProviderOpContext): Promise<BrowserDecisionDeliveryResult> {
+    this.#guard();
+    if (!this.#provider.deliverBrowserDecision) throw new Error("browser decision delivery unavailable");
+    return this.#provider.deliverBrowserDecision(input, ctx);
   }
 
   execute(input: ExecuteInput, ctx: ProviderOpContext): Promise<ExecuteResult> {

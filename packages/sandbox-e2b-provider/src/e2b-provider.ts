@@ -32,6 +32,8 @@ import {
 } from "@armyofagents/worker-protocol";
 import { createHash } from "node:crypto";
 import type {
+  BrowserDecisionDeliveryInput,
+  BrowserDecisionDeliveryResult,
   ArtifactDigestResult,
   ArtifactExportMode,
   ArtifactExportResult,
@@ -70,6 +72,8 @@ import type {
 } from "@armyofagents/worker-daemon";
 // DAT-009-3e (E5-F002) — the ONE home of the signed-PUT header contract. A VALUE import from
 // worker-daemon, which is one of this package's declared runtime dependencies.
+import { readBrowserDecisionDelivery } from "@armyofagents/worker-daemon";
+import { WRITE_BROWSER_DECISION } from "./browser-decision-script.js";
 import { grantPutHeaders } from "@armyofagents/worker-daemon";
 
 import { METADATA_KEYS } from "./directives.js";
@@ -637,6 +641,18 @@ export class E2bSandboxProvider implements SandboxProvider {
   }
 
   readonly sandboxLifetimeMode = "renewable" as const;
+
+  async deliverBrowserDecision(raw: BrowserDecisionDeliveryInput, ctx: ProviderOpContext): Promise<BrowserDecisionDeliveryResult> {
+    const input = readBrowserDecisionDelivery(raw, Date.now());
+    if (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new Error("invalid browser decision deadline");
+    const deadlineMs = Math.min(ctx.deadlineMs, Date.parse(input.response.expiresAt) - Date.now(), 5000);
+    if (deadlineMs <= 0) throw new Error("expired browser decision");
+    const result = await boundedBySignal(this.#transport.runCommand({ sandboxId: input.sandboxId, command: "node",
+      args: ["-e", WRITE_BROWSER_DECISION, JSON.stringify(input.response)], envVars: {}, timeoutMs: deadlineMs }),
+      AbortSignal.timeout(Math.max(1, Math.ceil(deadlineMs))), "browser decision delivery timed out");
+    if (result.exitCode !== 0 || result.signal !== null || result.timedOut || result.crashed) throw new Error("browser approval write failed");
+    return { providerOpId: this.#nextOpId("execute"), delivered: true };
+  }
 
   async renewLifetime(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult> {
     const remainingMs = expiresAt - Date.now();

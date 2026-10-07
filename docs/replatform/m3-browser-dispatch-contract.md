@@ -41,7 +41,12 @@ live enforcement evidence by themselves.
 After these gates, the supervisor executes the fixed Node guest runner inside the
 sandbox. Bounded structured stdout emits approval intents into the fenced,
 redacted event sequencer and durable sink. Renewal results reach the per-run
-controller and its effect-gated atomic mailbox delivery. Unsupported, mismatched
+controller and its effect-gated atomic mailbox delivery. The local provider
+operation `browser_decision` carries only matched request ID, decision and expiry
+metadata. Adapter-manager uses the bounded interrupt lane with primary authority
+rechecked at use, so an active guest execute cannot block its own approval. The
+E2B fixed guest writer requires a private 0700 directory and publishes a 0600 file
+by rename. Providers without this dedicated operation refuse delivery. Unsupported, mismatched
 or closed-run decisions reject. Cancellation, lease loss and terminal completion
 close the controller. A successful guest session must emit completion; malformed,
 excessive or failed guest output fails the run. Existing bounded artifact export

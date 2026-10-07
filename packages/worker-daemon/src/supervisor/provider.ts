@@ -155,6 +155,15 @@ export interface SandboxLifetimeResult {
   readonly expiresAt: number;
 }
 
+export interface BrowserDecisionDeliveryInput {
+  readonly sandboxId: string;
+  readonly response: Pick<import("@armyofagents/worker-protocol").PermissionRuntimeDecisionResultV1, "requestId" | "decision" | "expiresAt">;
+}
+export interface BrowserDecisionDeliveryResult {
+  readonly providerOpId: string;
+  readonly delivered: true;
+}
+
 /**
  * One file to stage: WHERE it goes inside the sandbox, and a GRANT that redeems to its bytes.
  *
@@ -651,6 +660,8 @@ export function deriveStopVerdict(observation: ProcessObservation): "stopped" | 
  * implement this port later without changing it.
  */
 export interface SandboxProvider {
+  /** Fixed browser approval mailbox operation; unavailable providers refuse it. */
+  deliverBrowserDecision?(input: BrowserDecisionDeliveryInput, ctx: ProviderOpContext): Promise<BrowserDecisionDeliveryResult>;
   /** Only a provider with measured enforcement may expose this local capability. */
   readonly browserNetworkPolicyMode?: "verified_default_deny";
   /** Local credential refresh on an existing ownership binding. This is not a

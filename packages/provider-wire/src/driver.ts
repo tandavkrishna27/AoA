@@ -30,6 +30,8 @@ import type {
   EnumerateOutputsResult,
   SandboxEnumerationMode,
   SandboxLifetimeResult,
+  BrowserDecisionDeliveryInput,
+  BrowserDecisionDeliveryResult,
   SandboxOutputEntry,
   StagedFileRequest,
   ArtifactExportResult,
@@ -74,6 +76,7 @@ import {
   decodeProcessStart,
   decodeProcessStatus,
   decodeProcessSignal,
+  decodeBrowserDecisionDelivery,
 } from "./codec.js";
 import type { OwnedLabelsCapability, WarmResourceCapability } from "./capability.js";
 import type { RedactedListResult } from "./projection.js";
@@ -178,6 +181,10 @@ export class NetworkedProviderDriver implements SandboxProvider {
       throw new Error("provider authority refresh mismatch");
     }
     this.#capability = { ...capability, ownedLabels: { ...capability.ownedLabels } };
+  }
+
+  async deliverBrowserDecision(input: BrowserDecisionDeliveryInput, ctx: ProviderOpContext): Promise<BrowserDecisionDeliveryResult> {
+    return decodeBrowserDecisionDelivery(await this.#post("browser_decision", input, ctx, this.#capability));
   }
 
   async renewLifetime(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult> {
@@ -467,18 +474,18 @@ export class NetworkedProviderDriver implements SandboxProvider {
     // non-frozen `stage_files` route (the vocabulary itself is untouched — E4-D02). Additive:
     // every existing caller still passes a `ProviderOperation`. DAT-009-3e widens it the same
     // way, and only locally, for the artifact pair.
-    op: ProviderOperation | "stage_files" | "digest_artifact" | "export_artifact" | "enumerate_outputs" | "renew_lifetime" | "start_process" | "process_status" | "signal_process",
+    op: ProviderOperation | "stage_files" | "digest_artifact" | "export_artifact" | "enumerate_outputs" | "renew_lifetime" | "start_process" | "process_status" | "signal_process" | "browser_decision",
     args: unknown,
     ctx: ProviderOpContext,
     capability?: OwnedLabelsCapability,
   ): Promise<R> {
-    const boundedServiceOp = op === "renew_lifetime" || op === "start_process" || op === "process_status" || op === "signal_process";
-    if (boundedServiceOp && (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0)) throw new WireProtocolError("exhausted service operation deadline");
+    const boundedControlOp = op === "browser_decision" || op === "renew_lifetime" || op === "start_process" || op === "process_status" || op === "signal_process";
+    if (boundedControlOp && (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0)) throw new WireProtocolError("exhausted control operation deadline");
     const res = await this.#fetch(`${this.#baseUrl}/op/${op}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: encodeOpRequest(args, ctx, capability, this.#warmResourceCapability),
-      ...(boundedServiceOp ? { signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000)))) } : {}),
+      ...(boundedControlOp ? { signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000)))) } : {}),
     });
     // Body-driven: the codec decides ok vs err vs garbled regardless of HTTP status. A
     // non-JSON / non-envelope body (e.g. a bare 500) surfaces as a WireProtocolError,

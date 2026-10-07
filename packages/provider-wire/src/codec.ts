@@ -343,3 +343,10 @@ export function decodeProcessSignal(value: unknown): ProcessSignalResult {
   if (accepted !== "accepted" && accepted !== "refused" && accepted !== "unsupported") throw new WireProtocolError("invalid process acknowledgement");
   return { providerOpId: processText(record.providerOpId), accepted, observation: processObservation(record.observation) };
 }
+
+/** Only bounded acknowledgement metadata may leave the provider. */
+export function decodeBrowserDecisionDelivery(value: unknown): import("@armyofagents/worker-daemon").BrowserDecisionDeliveryResult {
+  const record = processRecord(value);
+  if (record.delivered !== true) throw new WireProtocolError("invalid browser decision acknowledgement");
+  return { providerOpId: processText(record.providerOpId), delivered: true };
+}
