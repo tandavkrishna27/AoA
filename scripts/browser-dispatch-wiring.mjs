@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
 
 // E8-F006: staged execution has no host import of runBrowserSession. Check the
 // explicit production composition instead. This is a structural regression guard,
@@ -36,17 +35,87 @@ export const BROWSER_DISPATCH_LINKS = Object.freeze([
   ['guest-session-call', 'packages/browser-runtime/src/runner.ts', 'return await runBrowserSession(config, {'],
 ].map(([id, file, code]) => Object.freeze({ id, file, code })));
 
+// Dependency-free policy lexer. Literals (including templates and regexes) stay
+// single tokens, so their contents cannot impersonate executable composition.
+// This is deliberately a bounded lexical guard, not a TypeScript semantic parser.
 function tokens(source) {
-  const parsed = ts.createSourceFile('composition.ts', source, ts.ScriptTarget.Latest, true);
   const result = [];
-  function visit(node) {
-    const children = node.getChildren(parsed);
-    if (children.length) { for (const child of children) visit(child); }
-    else if (node.kind !== ts.SyntaxKind.EndOfFileToken && node.getWidth(parsed) > 0) result.push(`${node.kind}:${node.getText(parsed)}`);
+  let i = 0;
+  function slashLiteral() {
+    const start = i++;
+    let inClass = false;
+    while (i < source.length && !/[\r\n]/.test(source[i])) {
+      if (source[i] === "\\") { i += 2; continue; }
+      if (source[i] === '[') inClass = true;
+      else if (source[i] === ']') inClass = false;
+      else if (source[i] === '/' && !inClass) {
+        i++;
+        while (i < source.length && /[a-z]/i.test(source[i])) i++;
+        return source.slice(start, i);
+      }
+      i++;
+    }
+    i = start + 1;
+    return null;
   }
-  visit(parsed);
+  function comment() {
+    if (source.startsWith('//', i)) {
+      const end = source.indexOf('\n', i + 2); i = end < 0 ? source.length : end; return true;
+    }
+    if (source.startsWith('/*', i)) {
+      const end = source.indexOf('*/', i + 2);
+      if (end < 0) throw new Error('unterminated comment');
+      i = end + 2; return true;
+    }
+    return false;
+  }
+  function quoted(quote) {
+    const start = i++;
+    while (i < source.length) {
+      if (source[i] === "\\") { i += 2; continue; }
+      if (source[i] === quote) { i++; return source.slice(start, i); }
+      if (quote === '`' && source[i] === '$' && source[i + 1] === '{') {
+        i += 2;
+        let depth = 1;
+        while (i < source.length && depth) {
+          if (comment()) continue;
+          if (source[i] === '/') { slashLiteral(); continue; }
+          if (source[i] === '"' || source[i] === "'" || source[i] === '`') quoted(source[i]);
+          else if (source[i] === '{') { depth++; i++; }
+          else if (source[i] === '}') { depth--; i++; }
+          else if (source[i] === "\\") i += 2;
+          else i++;
+        }
+        if (depth) throw new Error('unterminated template');
+        continue;
+      }
+      if (quote !== '`' && /[\r\n]/.test(source[i])) throw new Error('unterminated string');
+      i++;
+    }
+    throw new Error('unterminated literal');
+  }
+  while (i < source.length) {
+    const ch = source[i];
+    if (/\s/.test(ch)) { i++; continue; }
+    if (comment()) continue;
+    if (ch === '"' || ch === "'" || ch === '`') { result.push('literal:' + quoted(ch)); continue; }
+    // Conservatively treat a same-line slash pair as opaque in any expression
+    // position. This can hide a division expression (and refuse a link), but
+    // never makes regex prose count as executable code after e.g. if (...).
+    if (ch === '/') {
+      const literal = slashLiteral();
+      result.push(literal === null ? 'punct:/' : 'regex:' + literal); continue;
+    }
+    if (/[A-Za-z0-9_$]/.test(ch)) {
+      const start = i++;
+      while (i < source.length && /[A-Za-z0-9_$]/.test(source[i])) i++;
+      result.push('word:' + source.slice(start, i)); continue;
+    }
+    result.push('punct:' + ch); i++;
+  }
   return result;
 }
+
 function contains(source, expected) {
   return source.some((_, offset) => expected.every((token, index) => source[offset + index] === token));
 }

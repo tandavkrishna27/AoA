@@ -183,8 +183,9 @@ production path. Its fixed composition check follows control-plane runner bundli
 and stage-in, lease path/policy extensions, runtime supervisor/staging composition,
 worker target/provider refusal gates, fixed guest execution and capability-ceiling
 intersection. It does not infer reachability from an extra host reference to the
-guest function. Formatting and comments are parsed as TypeScript syntax; quoted
-diagnostics cannot substitute for executable composition.
+guest function. Whitespace/comments are skipped by a dependency-free lexer; strings, templates
+and regular expressions remain opaque tokens. Diagnostics cannot substitute for
+executable composition.
 
 The existing policy test command includes deletion regressions for every required
 link using current production source. Other declared dormant clauses are retained.
@@ -245,3 +246,22 @@ both guest variants. Timer cleanup and persistent-context video persistence are
 fixed; continuous process identity census runs before evidence upload/cleanup.
 This establishes local governed wiring, not production provider enforcement or
 application cookie-issuer compatibility. Host retirement remains gated.
+### Clean policy job dependency correction
+
+The initial composition checker imported TypeScript, but the policy job runs
+before dependency installation. A clean temporary fixture reproduced
+`ERR_MODULE_NOT_FOUND`. The checker now uses only native Node modules and a
+bounded lexical tokenizer, preserving exact literal tokens while excluding
+comments and refusing literal prose as composition. Templates, nested templates
+and regex diagnostics (including after a control condition) cannot supply a
+missing link. Same-line slash pairs are conservatively opaque; unusual division
+expressions may refuse a link rather than fabricate one. This is not AST parsing.
+
+The clean fixture now imports without node_modules and refuses all missing
+production files. All 28 deletion regressions and both existing controls remain.
+No dependency installation, workflow change or runtime code change was needed.
+
+Focused correction verification: the existing policy command passed 60 tests
+with zero skips, including the clean dependency-free fixture, all 28 link
+deletions and both controls. Native JavaScript syntax and diff checks pass.
+Full suites and recursive workspace checks were not run for this script-only fix.
