@@ -50,16 +50,13 @@ function emit(event: Record<string, unknown>): void {
  * only be exercised by spawning a process is a boot root most tests will skip.
  */
 export async function runFromConfig(config: RunnerConfig): Promise<SessionResult> {
-  const cancellation = new AbortController();
-  const cancel = () => cancellation.abort();
   const requestApproval = config.requireApproval && config.approvalDirectory !== undefined ? createApprovalMailbox({
     directory: config.approvalDirectory, timeoutMs: config.approvalTimeoutMs ?? 60_000,
-    signal: cancellation.signal, emit: (message) => emit({ ...message }),
+    emit: (message) => emit({ ...message }),
   }) : undefined;
-  process.once("SIGTERM", cancel);
-  process.once("SIGINT", cancel);
-  try {
-    const result = await runBrowserSession(config, {
+  // Keep Node's normal signal termination. Mailbox-only cancellation must not
+  // suppress termination of an in-flight browser operation.
+  return runBrowserSession(config, {
       driver: createPlaywrightDriver({
         userDataDir: config.userDataDir,
         downloadsStagingPath: config.downloadsStagingPath,
@@ -78,12 +75,7 @@ export async function runFromConfig(config: RunnerConfig): Promise<SessionResult
       },
       env: process.env,
       requestApproval,
-    });
-    return result;
-  } finally {
-    process.removeListener("SIGTERM", cancel);
-    process.removeListener("SIGINT", cancel);
-  }
+  });
 }
 
 /** The CLI wrapper the sandbox executes: `node runner.js /path/to/session.json`. */
