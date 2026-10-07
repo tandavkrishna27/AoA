@@ -86,6 +86,35 @@ describe("browser dispatch prerequisites", () => {
     expect(sink.events.map((event) => event.eventType)).toEqual(["attempt_started", "browser_observation", "browser_observation", "terminal"]);
     expect(sink.events.at(-1)?.payload).toMatchObject({ status: "succeeded" });
   });
+  it.each(["metadata", "private", "control_plane", "not_allowlisted", "unrecognized"])("projects guest denial %s without guest text", async (destinationClass) => {
+    const handoff = browser([BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH]);
+    const fake = createFakeSandboxProvider(); const sink = collectingSink();
+    const provider = { ...fake, browserNetworkPolicyMode: "verified_default_deny" as const,
+      create: async (...args: Parameters<typeof fake.create>) => ({ ...await fake.create(...args), browserNetworkPolicyDigest: args[0].browserNetworkPolicy?.digest }),
+      stageFiles: async (_sandbox: string, files: readonly { path: string }[]) => ({ stagedPaths: files.map((file) => file.path) }),
+      execute: async (...args: Parameters<typeof fake.execute>) => {
+        args[0].onStdout?.(JSON.stringify({ type: "network_denied", destinationClass, reason: "https://secret.example/?token=guest-secret" }) + "\n");
+        args[0].onStdout?.(JSON.stringify({ type: "session_completed" }) + "\n");
+        return fake.execute({ ...args[0], onStdout: undefined }, args[1]);
+      } };
+    const supervisor = createSupervisor({ provider, browserSelfModel: await makeSelfModel(), identity: SUPERVISOR_IDENTITY,
+      eventSink: sink, redactionCanaries: [], resolveStagedFiles: async () => [BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH].map((path, index) => ({ path, grant: {
+        protocolVersion: 1, operation: "download", method: "GET", artifactId: `artifact-${index}`, objectKey: `key-${index}`,
+        expectedSha256: "a".repeat(64), maxBytes: 10, url: "https://store.example/get", headers: {}, issuedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60000).toISOString(), redaction: "secret" } })) });
+    await supervisor.accept(handoff);
+    const denials = sink.events.filter((event) => event.eventType === "network_denied");
+    if (destinationClass === "unrecognized") {
+      expect(denials).toHaveLength(0);
+      expect(sink.events.at(-1)?.payload).toMatchObject({ status: "failed" });
+    } else {
+      expect(denials).toHaveLength(1);
+      expect(denials[0]?.payload).toEqual({ destinationClass, reason: "Browser egress policy denied destination" });
+      expect(await verifyWorkerEventDigestV1(denials[0]!, sha256hex)).toBe(true);
+    }
+    expect(JSON.stringify(sink.events)).not.toContain("guest-secret");
+    expect(JSON.stringify(sink.events)).not.toContain("secret.example");
+  });
   it.each(["completed", "cancelled", "lease_lost"] as const)("supervisor approval delivery closes on %s", async (outcome) => {
     const handoff = browser([BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH]); const fake = createFakeSandboxProvider(); const sink = collectingSink();
     let finish!: () => void; const gate = new Promise<void>((resolve) => { finish = resolve; });
@@ -101,6 +130,7 @@ describe("browser dispatch prerequisites", () => {
             expiresAt: new Date(Date.now() + 30000).toISOString(), intent: { action: "navigate", title: "credential-canary", summary: null,
               networkTarget: "https://example.com", riskClass: "network_egress" } }) + "\n");
           await gate;
+          input.onStdout?.(JSON.stringify({ type: "network_denied", destinationClass: "private", reason: "late guest text" }) + "\n");
           input.onStdout?.(JSON.stringify({ type: "session_completed", savedDownloads: [] }) + "\n");
         } else { delivered++; expect(input.args[0]).toBe("-e"); }
         return fake.execute({ ...input, onStdout: undefined }, args[1]);
@@ -129,6 +159,7 @@ describe("browser dispatch prerequisites", () => {
     if (outcome === "lease_lost") await supervisor.onLeaseLost(handoff.leaseId);
     if (outcome !== "completed") await expect(supervisor.applyBrowserDecision!(command)).rejects.toThrow("closed");
     finish(); await running;
+    expect(sink.events.filter((entry) => entry.eventType === "network_denied")).toHaveLength(outcome === "completed" ? 1 : 0);
     await expect(supervisor.applyBrowserDecision!(command)).rejects.toThrow("unavailable");
     expect(sink.events.at(-1)?.payload).toMatchObject({ status: outcome === "completed" ? "succeeded" : "cancelled" });
   });

@@ -31,7 +31,7 @@ import type { WorkerSelfModel } from "../poll/capacity.js";
 import { readStagedInputPointers } from "../lease/staged-input.js";
 import type { ControlCommandV1 } from "@armyofagents/worker-protocol";
 
-import { artifactPreparedPayloadV1Schema } from "@armyofagents/worker-protocol";
+import { artifactPreparedPayloadV1Schema, networkDeniedPayloadV1Schema } from "@armyofagents/worker-protocol";
 import type { ArtifactPreparedPayloadV1, LogPayloadV1, ProgressPayloadV1, UsagePayloadV1 } from "@armyofagents/worker-protocol";
 
 import type { LeaseHandoff, SupervisorSeam } from "../poll/poll-loop.js";
@@ -1083,8 +1083,17 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     let browserSessionFailed = false;
     const browserOutput = browserController ? createBrowserOutput({ receive: async (message) => {
       if (!message || typeof message !== "object" || Array.isArray(message)) throw new Error("invalid browser output");
+      if (run.cancelled || !run.effect.isActive()) throw new Error("browser output fence closed");
       const value = message as Record<string, unknown>;
-      if (value.type === "approval_requested") await browserController.request(message);
+      if (value.type === "network_denied") {
+        if (Object.keys(value).length !== 3 || !Object.hasOwn(value, "reason")) throw new Error("invalid browser denial");
+        const parsed = networkDeniedPayloadV1Schema.safeParse({ destinationClass: value.destinationClass, reason: value.reason });
+        if (!parsed.success) throw new Error("invalid browser denial");
+        // Guest-controlled text can contain URLs or session state. Persist only
+        // the frozen class and a worker-authored, non-disclosing reason.
+        await events.networkDenied({ destinationClass: parsed.data.destinationClass, reason: "Browser egress policy denied destination" });
+      }
+      else if (value.type === "approval_requested") await browserController.request(message);
       else if (["session_started", "session_completed", "session_failed"].includes(String(value.type))) {
         if (value.type === "session_completed") browserSessionCompleted = true;
         if (value.type === "session_failed") browserSessionFailed = true;
