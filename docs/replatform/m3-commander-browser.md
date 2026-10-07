@@ -48,3 +48,10 @@ The journey exposed two guest lifecycle defects. Settled approval deadlines reta
 The existing Linux browser CI lane runs both normal control-plane and opt-in guest variants and explicitly verifies that both executed. Local reproduction: set `AOA_RUN_WIN_INTEGRATION=1` on Windows and `AOA_RUN_BROWSER_TESTS=1`, build `@armyofagents/browser-runtime`, then run `pnpm exec vitest run server/src/__tests__/agent-browser-request.integration.test.ts`. This proves local governed wiring. Production application-cookie issuer compatibility, verified provider egress and live provider destruction remain prerequisites; capability advertisement, rollout and the host browser path are unchanged.
 
 Journey verification: 62 focused tests passed, including both real PostgreSQL journey variants and the staged Chromium guest. A continuous retained descendant census captures late renderers and nested helpers; Windows creation timestamps reject stale-parent PID reuse, and final process identities use creation time on Windows or /proc start ticks on Linux. The lifecycle/census group passed 56 tests. Individual server and guest type checks passed; recursive checks are performed by the integration owner.
+
+Integrated journey verification: recursive workspace types and full build passed.
+Five focused files passed 99 tests with zero skips, including actual PostgreSQL
+and the production-equivalent staged Chromium guest. The review's late-descendant
+census finding and stale-parent PID reuse regression were observed RED before
+their fixes. Citation integrity passes. Full normal suite and normal Linux PR CI
+are pending before program integration; no production conformance is claimed.
