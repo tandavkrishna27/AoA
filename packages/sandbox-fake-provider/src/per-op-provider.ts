@@ -77,6 +77,8 @@ export interface PortExecuteInput {
 export type PortSandboxState = "creating" | "running" | "cancelling" | "stopped" | "destroyed" | "failed";
 
 export interface PortCreateResult {
+  /** Optional attestation mirror; this fake never claims browser enforcement. */
+  readonly browserNetworkPolicyDigest?: string;
   readonly sandboxId: string;
   readonly providerOpId: string;
   readonly resourceLabels: PortResourceLabels;
