@@ -22,6 +22,7 @@ import { chromium, type BrowserContext, type Download } from "playwright";
 import type { BrowserDriver, BrowserPage, DownloadHandle } from "./run-session.js";
 import type { BrowserLaunchOptions } from "./launch-guard.js";
 import { browserOriginAllowed, type BrowserNetworkConfig } from "./egress-proxy.js";
+import { validateSessionCredential, type SessionCredentialAuthority, type ScopedSessionCookie } from "./session-credentials.js";
 
 export interface PlaywrightDriverOptions {
   /** Chromium profile directory. A PARAMETER, never an `--user-data-dir` argument. */
@@ -31,6 +32,7 @@ export interface PlaywrightDriverOptions {
   /** Optional video directory; video is only written when the context closes. */
   readonly videoDir?: string;
   readonly egress?: { readonly server: string; readonly config: BrowserNetworkConfig; denied(): void };
+  readonly sessionCredential?: { readonly authority: SessionCredentialAuthority; materialize(): Promise<ScopedSessionCookie>; readonly signal?: AbortSignal };
 }
 
 /** Adapt a Playwright `Download` to the orchestrator's minimal handle. */
@@ -46,6 +48,10 @@ function toHandle(download: Download): DownloadHandle {
 export function createPlaywrightDriver(options: PlaywrightDriverOptions): BrowserDriver {
   return {
     async launch(launchOptions: BrowserLaunchOptions): Promise<BrowserPage> {
+      const session = options.sessionCredential;
+      if (session && (!options.egress || launchOptions.recordTrace || session.signal?.aborted)) throw new Error("Browser session credentials refused");
+      const authority = session ? validateSessionCredential(session.authority, options.egress!.config) : undefined;
+      let credentialExpires = 0;
       // The orchestrator has already run `checkBrowserLaunchSafety`. This adapter does NOT
       // re-derive safety — it passes the caller's decision through unchanged, so there is
       // exactly one place where "is this launch safe" is decided.
@@ -65,7 +71,16 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
       if (options.egress) {
         try {
           await context.route("**/*", async (route) => {
-            if (!browserOriginAllowed(route.request().url(), options.egress!.config)) {
+            const url = route.request().url();
+            // Cookies are scoped by host, not port. Keep the credential-bearing
+            // host on its exact authorized port even if policy allows another.
+            let credentialScope = true;
+            if (authority) {
+              try { const parsed = new URL(url); const bound = new URL(authority.origin);
+                credentialScope = credentialExpires > Date.now() && (parsed.hostname !== bound.hostname || parsed.origin === bound.origin);
+              } catch { credentialScope = false; }
+            }
+            if (!credentialScope || !browserOriginAllowed(url, options.egress!.config)) {
               options.egress!.denied(); await route.abort("blockedbyclient"); return;
             }
             await route.continue();
@@ -74,6 +89,19 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
           // popups; routing lives on the context rather than only the first page.
           await context.routeWebSocket(/.*/, (socket) => { options.egress!.denied(); socket.close(); });
         } catch (error) { await context.close(); throw error; }
+      }
+      if (session) {
+        try {
+          const cookie = await session.materialize();
+          if (session.signal?.aborted || cookie.expires * 1000 <= Date.now()) throw new Error("Browser session credentials refused");
+          credentialExpires = cookie.expires * 1000;
+          await context.addCookies([cookie]);
+          if (session.signal?.aborted || cookie.expires * 1000 <= Date.now()) throw new Error("Browser session credentials refused");
+        } catch {
+          await context.clearCookies().catch(() => {});
+          await context.close().catch(() => {});
+          throw new Error("Browser session credentials refused");
+        }
       }
       if (launchOptions.recordTrace) {
         try { await context.tracing.start({ screenshots: true, snapshots: true }); }
@@ -116,7 +144,7 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
       const shutdown = (): void => {
         if (closed) return;
         closed = true;
-        void context.close().catch(() => undefined);
+        void (session ? context.clearCookies().finally(() => context.close()) : context.close()).catch(() => undefined);
       };
       process.once("SIGTERM", shutdown);
       process.once("SIGINT", shutdown);
@@ -170,7 +198,8 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
           // fixed ordering of saveAs before close.
           detach();
           closed = true;
-          await context.close();
+          if (session) await context.clearCookies().finally(() => context.close());
+          else await context.close();
         },
       };
     },

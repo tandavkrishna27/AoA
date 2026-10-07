@@ -16,6 +16,13 @@ describe("guest runner approval composition", () => {
     await expect(runFromConfig({ launch: { chromiumSandbox: true }, steps: [] } as unknown as RunnerConfig)).rejects.toThrow();
     expect(calls.navigate).not.toHaveBeenCalled(); expect(calls.close).not.toHaveBeenCalled();
   });
+  it("refuses credential trace recording before a browser operation", async () => {
+    calls.navigate.mockClear(); calls.close.mockClear();
+    await expect(runFromConfig({ ...fixtureNetwork(), launch: { chromiumSandbox: true, recordTrace: true }, steps: [],
+      sessionCredential: { bindingId: "92c68644-99e1-4db9-8515-c09a6eea1fbd", origin: "https://allowed.example", cookieName: "__Host-session" } } as RunnerConfig))
+      .rejects.toThrow("Browser session credentials refused");
+    expect(calls.navigate).not.toHaveBeenCalled(); expect(calls.close).not.toHaveBeenCalled();
+  });
   it.each(["allow_once", "deny"] as const)("waits for %s before navigation", async (decision) => {
     calls.navigate.mockClear(); calls.close.mockClear();
     const directory = await mkdtemp(join(tmpdir(), "aoa-runner-approval-"));

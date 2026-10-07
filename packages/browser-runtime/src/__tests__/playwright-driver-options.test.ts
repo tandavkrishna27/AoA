@@ -10,6 +10,29 @@ function context() {
   return { pages: () => [page], on: vi.fn(), close: fake.close, tracing: { start: fake.traceStart, stop: fake.traceStop } };
 }
 describe("guest Playwright settings and persistence", () => {
+  it("injects scoped session before navigation and refuses trace, cancellation or late lease loss", async () => {
+    const authority = { bindingId: "92c68644-99e1-4db9-8515-c09a6eea1fbd", origin: "https://allowed.example", cookieName: "__Host-session" };
+    const cookie = { name: authority.cookieName, value: "application-session-fixture", url: `${authority.origin}/`, expires: Date.now() / 1000 + 30,
+      secure: true as const, httpOnly: true as const, sameSite: "Strict" as const };
+    const controller = new AbortController(); const materialize = vi.fn(async () => cookie);
+    const ctx = { ...context(), route: vi.fn(async () => {}), routeWebSocket: vi.fn(async () => {}), addCookies: vi.fn(async () => {}), clearCookies: vi.fn(async () => {}) };
+    const config = fixtureNetwork([{ scheme: "https", host: "allowed.example", port: 443 }, { scheme: "https", host: "allowed.example", port: 8443 }]);
+    const driver = createPlaywrightDriver({ userDataDir: "/profile", downloadsStagingPath: "/staging",
+      egress: { server: "http://127.0.0.1:12345", config, denied: vi.fn() }, sessionCredential: { authority, materialize, signal: controller.signal } });
+    fake.launch.mockClear();
+    await expect(driver.launch({ chromiumSandbox: true, recordTrace: true })).rejects.toThrow("Browser session credentials refused");
+    expect(fake.launch).not.toHaveBeenCalled();
+    fake.launch.mockResolvedValueOnce(ctx); const page = await driver.launch({ chromiumSandbox: true });
+    expect(ctx.addCookies).toHaveBeenCalledWith([cookie]);
+    const routeHandler = (ctx.route.mock.calls[0] as unknown as [string, (route: unknown) => Promise<void>])[1];
+    const route = { request: () => ({ url: () => "https://allowed.example:8443/private" }), abort: vi.fn(async () => {}), continue: vi.fn(async () => {}) };
+    await routeHandler(route); expect(route.abort).toHaveBeenCalledWith("blockedbyclient"); await page.close();
+    expect(ctx.clearCookies).toHaveBeenCalledOnce();
+    fake.close.mockClear(); fake.launch.mockResolvedValueOnce(ctx); ctx.addCookies.mockImplementationOnce(async () => { controller.abort("lease_lost"); });
+    await expect(driver.launch({ chromiumSandbox: true })).rejects.toThrow("Browser session credentials refused");
+    expect(fake.close).toHaveBeenCalledOnce();
+    fake.launch.mockClear(); await expect(driver.launch({ chromiumSandbox: true })).rejects.toThrow(); expect(fake.launch).not.toHaveBeenCalled();
+  });
   it("binds fixed proxy and blocks redirects, popups, insecure origins and socket channels", async () => {
     const ctx = { ...context(), route: vi.fn(async () => {}), routeWebSocket: vi.fn(async () => {}) };
     fake.launch.mockResolvedValueOnce(ctx); const denied = vi.fn();
