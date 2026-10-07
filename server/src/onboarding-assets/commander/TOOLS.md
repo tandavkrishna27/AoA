@@ -2,7 +2,7 @@
 
 <!-- GENERATED — DO NOT EDIT. Run `pnpm gen:tools:md`. Source: packages/shared/src/generated/tools.json -->
 
-The 87 tools below are your complete set, generated from the live tool registry. Only call tools in this list; no other tool names exist.
+The 88 tools below are your complete set, generated from the live tool registry. Only call tools in this list; no other tool names exist.
 
 **Tool naming convention.** Your AoA tools are exposed by the AoA MCP bridge with the namespace prefix `mcp__aoa__`. Inside this file the tools are written without the prefix for readability (e.g. `query_tasks`); when you invoke a tool call the prefixed form (`mcp__aoa__query_tasks`).
 
@@ -124,6 +124,7 @@ The 87 tools below are your complete set, generated from the live tool registry.
 | `notify_owner` | write | team_member | Send a notification to the thread owner. Use when the crew needs human attention or approval. |
 | `post_task_comment` | write | team_member | Post a comment back onto a task (typically your assigned task) — for example a progress note, a summary of what you did, or a question for the founder. The comment is recorded as authored by you. |
 | `query_dependency_chain` | read | team_member | Analyze task dependency chain — find what blocks a task or what it blocks. |
+| `request_browser_session` | write | team_member | Request a governed browser session for your active task, within inherited network and execution authority. Returns job identifiers, never browser control credentials. |
 | `set_task_status` | write | team_member | Move your own assigned task forward to a new status (for example from in_progress to in_review, or to done). Whether a transition is allowed depends on your autonomy level — moving a task to review requires at least Assist, and completing it requires Drive. Use this when you have finished a unit of work and want to hand the task to the next stage. |
 
 ## Analysis Tools

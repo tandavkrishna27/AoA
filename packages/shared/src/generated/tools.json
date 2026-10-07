@@ -606,6 +606,15 @@
       "mcpAlias": null
     },
     {
+      "name": "request_browser_session",
+      "surface": "commander",
+      "category": "coordination",
+      "readWrite": "write",
+      "requiredRole": "team_member",
+      "description": "Request a governed browser session for your active task, within inherited network and execution authority. Returns job identifiers, never browser control credentials.",
+      "mcpAlias": null
+    },
+    {
       "name": "request_thread_workspace",
       "surface": "commander",
       "category": "action",
@@ -1062,6 +1071,15 @@
       "readWrite": "write",
       "requiredRole": null,
       "description": "Create a memory item and immediately enqueue it for RAG embedding. Always creates with status='pending' — the founder must approve before the item enters the Knowledge Base (Critical Rule #6: agents/MCP cannot self-approve identity or domain memory). Use this when you have structured knowledge to persist; use debrief-push for unstructured content that needs LLM extraction first.",
+      "mcpAlias": null
+    },
+    {
+      "name": "request_browser_session",
+      "surface": "mcp",
+      "category": "other",
+      "readWrite": "write",
+      "requiredRole": null,
+      "description": "Request a governed browser session for your active task. Inherits parent network and execution authority; returns job identifiers and no browser control endpoint.",
       "mcpAlias": null
     },
     {
