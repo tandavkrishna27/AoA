@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import { agentRuntimeDecisions, agentRuntimeTrustRules, heartbeatRuns } from "@armyofagents/db";
 import type {
@@ -306,7 +306,7 @@ type DecisionRepo = {
   updateDecision(
     decisionId: string,
     patch: Partial<typeof agentRuntimeDecisions.$inferInsert>,
-    guard?: { sourceRevision?: number; statuses?: RuntimeDecisionStatus[] },
+    guard?: { sourceRevision?: number; statuses?: RuntimeDecisionStatus[]; distributedStranded?: boolean },
   ): Promise<AgentRuntimeDecisionRow | null>;
   answerWithTrustRule(
     decisionId: string,
@@ -317,11 +317,12 @@ type DecisionRepo = {
   listDueForExpiry(input: { companyId?: string; now: Date; limit: number }): Promise<AgentRuntimeDecisionRow[]>;
   /**
    * R2 stranded-answer sweep (P3-4): decisions in status answered/relay_failed
-   * whose heartbeat run has already gone terminal. These are invisible to
+   * whose heartbeat run is terminal or whose distributed attempt lost its fence. Invisible to
    * listDueForExpiry (hard-scoped to created/shown) — the answer can never be
    * relayed because the run is dead, so the sweeper cancels + closes them. A
-   * missing run row (INNER JOIN drops it) is covered by cancelActiveForRun on
-   * the deleting side, so this only needs the terminal-run rows.
+   * Missing legacy run rows remain covered by cancelActiveForRun on deletion.
+   * Distributed answers require an applied native receipt and their own full
+   * company/organization/job/attempt fence; null run status is never authority.
    */
   listStrandedAnswers(input: { companyId?: string; limit: number }): Promise<AgentRuntimeDecisionRow[]>;
 };
@@ -539,6 +540,37 @@ export function runtimeDecisionDetail(row: AgentRuntimeDecisionRow): RuntimeDeci
   };
 }
 
+/** Cleanup authority comes from an applied native receipt, never a null heartbeat
+ * status. A matching live lease preserves the answer. Reused in the UPDATE guard
+ * so a renewed lease observed after the scan prevents cancellation. */
+function distributedAnswerIsStranded() {
+  return sql`(
+    ${agentRuntimeDecisions.runId} IS NULL AND ${agentRuntimeDecisions.agentId} IS NULL
+    AND ${agentRuntimeDecisions.adapterType} = 'browser_runtime'
+    AND EXISTS (
+      SELECT 1 FROM job_projection_receipts r
+      JOIN jobs j ON j.id=r.job_id AND j.organization_id=r.organization_id AND j.company_id=r.company_id
+      JOIN companies c ON c.id=j.company_id AND c.organization_id=j.organization_id
+      JOIN job_attempts a ON a.id=r.attempt_id AND a.job_id=j.id AND a.organization_id=j.organization_id AND a.company_id=j.company_id
+      WHERE r.target_aggregate_id=${agentRuntimeDecisions.id} AND r.company_id=${agentRuntimeDecisions.companyId}
+        AND r.aggregate_kind='agent_runtime_decisions' AND r.projection_kind='runtime_decision' AND r.status='applied'
+        AND j.workload_type='browser_session'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM job_projection_receipts r
+      JOIN jobs j ON j.id=r.job_id AND j.organization_id=r.organization_id AND j.company_id=r.company_id
+      JOIN companies c ON c.id=j.company_id AND c.organization_id=j.organization_id
+      JOIN job_attempts a ON a.id=r.attempt_id AND a.job_id=j.id AND a.organization_id=j.organization_id AND a.company_id=j.company_id
+      JOIN leases l ON l.attempt_id=a.id AND l.job_id=j.id AND l.organization_id=j.organization_id AND l.company_id=j.company_id
+      WHERE r.target_aggregate_id=${agentRuntimeDecisions.id} AND r.company_id=${agentRuntimeDecisions.companyId}
+        AND r.aggregate_kind='agent_runtime_decisions' AND r.projection_kind='runtime_decision' AND r.status='applied'
+        AND j.workload_type='browser_session' AND j.status IN ('queued','running','cancel_requested')
+        AND a.status IN ('leased','running','cancel_requested') AND l.status='active'
+        AND l.fence=r.source_fence AND l.attempt_number=a.attempt_number AND l.expires_at>clock_timestamp()
+    )
+  )`;
+}
+
 function realRepo(db: Db): DecisionRepo {
   return {
     async createDecision(input, options) {
@@ -656,6 +688,7 @@ function realRepo(db: Db): DecisionRepo {
       if (guard?.statuses?.length) {
         conditions.push(inArray(agentRuntimeDecisions.status, guard.statuses));
       }
+      if (guard?.distributedStranded) conditions.push(distributedAnswerIsStranded());
       return db
         .update(agentRuntimeDecisions)
         .set({ ...patch, updatedAt: new Date() })
@@ -734,38 +767,16 @@ function realRepo(db: Db): DecisionRepo {
         .orderBy(asc(agentRuntimeDecisions.expiresAt))
         .limit(input.limit);
     },
-    /**
-     * ★★★ BRW-004 (E8-F002) — THE HAZARD TYPESCRIPT CANNOT SEE.
-     *
-     * This is an INNER JOIN on `run_id`. Making that column nullable does not produce a type
-     * error here, does not produce a runtime error, and does not produce a wrong row: it
-     * SILENTLY EXCLUDES every distributed decision from the stranded-answer sweep. A hole,
-     * not a crash — which is strictly worse, because nothing reports it.
-     *
-     * ★ It is CORRECT that they are excluded, and the join is left as the join. This sweep
-     * exists to catch an answer whose HEARTBEAT RUN went terminal before the in-band relay
-     * could deliver it (`index.ts`'s R2 sweep). A distributed decision has no heartbeat run
-     * and no in-band relay, so this sweep has nothing to say about it.
-     *
-     * ★★ BUT THAT MEANS A DISTRIBUTED DECISION HAS NO STRANDED-ANSWER SWEEP AT ALL, and the
-     * equivalent — noticing that the job/attempt went terminal before the queued
-     * `runtime_decision_result` was delivered — does not exist anywhere yet. It cannot: no
-     * control-plane hop delivers a control command to a running worker (BRW-004 terrain §4),
-     * so there is no delivery to be stranded from. Tracked as E8-F004; the sweep belongs
-     * beside JOB-015's delivery hop, not in front of it. Recorded here rather than left as an
-     * unexplained absence, because an exclusion nobody wrote down is an exclusion nobody
-     * finds.
-     */
     async listStrandedAnswers(input) {
       const conditions = [
         inArray(agentRuntimeDecisions.status, ["answered", "relay_failed"]),
-        inArray(heartbeatRuns.status, [...TERMINAL_RUN_STATUSES]),
+        or(inArray(heartbeatRuns.status, [...TERMINAL_RUN_STATUSES]), distributedAnswerIsStranded()),
       ];
       if (input.companyId) conditions.push(eq(agentRuntimeDecisions.companyId, input.companyId));
       return db
         .select()
         .from(agentRuntimeDecisions)
-        .innerJoin(heartbeatRuns, eq(agentRuntimeDecisions.runId, heartbeatRuns.id))
+        .leftJoin(heartbeatRuns, eq(agentRuntimeDecisions.runId, heartbeatRuns.id))
         .where(and(...conditions))
         .orderBy(asc(agentRuntimeDecisions.answeredAt))
         .limit(input.limit)
@@ -960,6 +971,7 @@ export function agentRuntimeDecisionService(db: Db, deps: ServiceDeps = {}) {
     }, {
       sourceRevision: row.sourceRevision,
       statuses: ["created", "shown", "answered", "relay_failed"],
+      ...(row.runId === null ? { distributedStranded: true } : {}),
     });
     if (!cancelled) return null;
     await activityLogger({
@@ -1539,14 +1551,14 @@ export function agentRuntimeDecisionService(db: Db, deps: ServiceDeps = {}) {
   // R2 stranded-answer sweep (P3-4): a decision that reached answered/relay_failed
   // but whose run went terminal before the broker could relay is invisible to the
   // expiry sweep (listDueForExpiry is hard-scoped to created/shown). Select those
-  // rows joined to a terminal run and cancel + close each, so the founder's
+  // terminal run or receipt-bound dead distributed fence and cancel + close each, so the founder's
   // waiting-lane item does not linger forever as an un-relayable ghost. Runs next
   // to expireDuePrompts on the same 30s interval.
   async function sweepStrandedAnswers(input: { companyId?: string; limit: number }) {
     const stranded = await repo.listStrandedAnswers({ companyId: input.companyId, limit: input.limit });
     let cancelled = 0;
     for (const row of stranded) {
-      const result = await cancelStrandedDecision(row, "answer was never picked up by the run");
+      const result = await cancelStrandedDecision(row, row.runId === null ? "browser answer lost its originating attempt fence" : "answer was never picked up by the run");
       if (result) cancelled += 1;
     }
     return { cancelled, processed: stranded.length };

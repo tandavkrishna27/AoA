@@ -176,6 +176,31 @@ the governed path is proven end to end. No paid calls, deployment, main merge or
 calendar certification campaign is part of this execution. Anthropic M1b live
 verification remains deferred.
 
+## E8-F006 staged browser guard reconciliation
+
+The existing gate-clause policy guard now enrolls E8-1 as a conditional wired
+production path. Its fixed composition check follows control-plane runner bundling
+and stage-in, lease path/policy extensions, runtime supervisor/staging composition,
+worker target/provider refusal gates, fixed guest execution and capability-ceiling
+intersection. It does not infer reachability from an extra host reference to the
+guest function. Whitespace/comments are skipped by a dependency-free lexer; strings, templates
+and regular expressions remain opaque tokens. Diagnostics cannot substitute for
+executable composition.
+
+The existing policy test command includes deletion regressions for every required
+link using current production source. Other declared dormant clauses are retained.
+This is a structural regression guard, not a general boot import-graph proof or
+provider conformance. Browser advertisement and rollout are unchanged; verified
+provider enforcement and the governed host-retirement prerequisite remain open.
+
+Focused verification: 59 existing-policy tests passed with zero skips, including
+28 production-link deletion regressions. Disabling the composition checker made
+all 28 fail while both controls passed; restoring it returned green. The old
+`unwired` manifest failed the enrollment regression before correction. The policy
+checker reports 29 wired and five unchanged dormant clauses, with both provider
+claims matching source. Individual JavaScript syntax checks and diff checks pass.
+No full suite, recursive types/build, provider calls or runtime changes were made.
+
 ## October 7 program checkpoint
 
 PR #680 merged service recovery, checkpoint, company-budget and bounded history
@@ -204,3 +229,39 @@ backend configuration that actually blocks every escape class is required before
 a changed-mechanism probe is meaningful. Sources:
 [released SDK](https://github.com/e2b-dev/E2B/releases/tag/e2b%402.53.1),
 [versioned network contract](https://github.com/e2b-dev/E2B/blob/e2b%402.53.1/packages/js-sdk/src/sandbox/sandboxApi.ts).
+
+## October 8 scope and journey checkpoint
+
+The user explicitly selected the current stop-and-export recovery contract for
+M3; live checkpoint requests are not added. Hard runtime limits remain the
+server-owned job deadlines with bounded renewal, and service health follows the
+locked process-observation contract. No configurable service lifetime or HTTP
+readiness contract is invented from older residual-plan wording.
+
+PR #682 merged at 8cd4af665e after required normal CI passed. Full local normal
+suite passed 24,291 tests, with 2,034 skips. Integrated real PostgreSQL and staged
+Chromium checks passed 99 tests without skips. Linux browser CI passed 192 tests
+(one Windows-only skip) and all 32 producer/journey cases, explicitly including
+both guest variants. Timer cleanup and persistent-context video persistence are
+fixed; continuous process identity census runs before evidence upload/cleanup.
+This establishes local governed wiring, not production provider enforcement or
+application cookie-issuer compatibility. Host retirement remains gated.
+### Clean policy job dependency correction
+
+The initial composition checker imported TypeScript, but the policy job runs
+before dependency installation. A clean temporary fixture reproduced
+`ERR_MODULE_NOT_FOUND`. The checker now uses only native Node modules and a
+bounded lexical tokenizer, preserving exact literal tokens while excluding
+comments and refusing literal prose as composition. Templates, nested templates
+and regex diagnostics (including after a control condition) cannot supply a
+missing link. Same-line slash pairs are conservatively opaque; unusual division
+expressions may refuse a link rather than fabricate one. This is not AST parsing.
+
+The clean fixture now imports without node_modules and refuses all missing
+production files. All 28 deletion regressions and both existing controls remain.
+No dependency installation, workflow change or runtime code change was needed.
+
+Focused correction verification: the existing policy command passed 60 tests
+with zero skips, including the clean dependency-free fixture, all 28 link
+deletions and both controls. Native JavaScript syntax and diff checks pass.
+Full suites and recursive workspace checks were not run for this script-only fix.

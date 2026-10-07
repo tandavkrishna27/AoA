@@ -97,8 +97,9 @@ export function evaluateGateClauseWiring(input) {
     // register nobody updates in either direction stops being believed.
     //
     // `expectedReferences` exists because a non-zero count does not always mean reachable.
-    // `runBrowserSession` is referenced once, by `runner.ts`, which nothing invokes because
-    // no package depends on `browser-runtime` at all. Acknowledging a KNOWN count keeps the
+    // The original dormant browser guest had one internal runner reference. Staged browser
+    // dispatch now has a separate composition guard; other dormant clauses still use this
+    // reference-count floor. Acknowledging a KNOWN count keeps the
     // promote-check sharp — it still fires the moment a NEW reference appears — without
     // forcing a false `wired`. The number must be typed out, so nobody can wave away an
     // arbitrary quantity of references by accident.

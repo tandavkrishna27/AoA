@@ -403,7 +403,7 @@ jobs:
           # callers" was itself counted as that symbol's production caller. All three commands
           # in ONE step, for the reason above.
           node --test scripts/lib/__tests__/gate-clause-wiring.test.mjs
-          node --test scripts/check-gate-clause-wiring.test.mjs
+          node --test scripts/check-gate-clause-wiring.test.mjs scripts/browser-dispatch-wiring.test.mjs
           node scripts/check-gate-clause-wiring.mjs
 
       - name: Finding ownership (an open finding must name an owner, or say it has none)

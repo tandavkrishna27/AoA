@@ -35,6 +35,24 @@ Human session checks: 65 tests passed across the broker/OAuth/exchange/binding/r
 
 Integration verification: recursive workspace typecheck and full workspace build passed. Seven integrated focused files passed 163 tests, including real PostgreSQL producer, credential, currency, placement and secret-broker cases. Fresh foundation and human-session reviews found no actionable issue. Full normal local suite passed with four workers: 24,279 tests, 2,031 skips; 2,515 passed files, 226 skipped files. Five moved source references were corrected; citation integrity and all 56 checker tests pass. PR #681 merged after all 16 normal CI checks passed; this is not M3 closure.
 
+### Distributed stranded-answer cleanup
+
+The existing bounded native stranded-answer sweep also cancels answered and
+relay-failed browser decisions after their receipt-bound attempt becomes terminal
+or loses its exact active, unexpired lease fence. Applied native receipts bind the
+organization, company, browser job and own attempt. A live binding preserves the
+answer despite a null heartbeat run. Unbound or wrong-kind receipts do not
+authorize cleanup. The conditional native UPDATE rechecks eligibility alongside
+revision/status guards, retaining owner and answer and using existing cancellation
+audit and hub reconciliation. Suspended and archived tenants remain eligible for
+terminal cleanup. It issues no credentials and replays no execution.
+
+The existing 30-second sweep and batch ceilings are reused. No schema or frozen
+operation changes. Initial orphan cases and a scan-to-update renewal race were
+observed RED, then fixed. Focused checks passed 87 tests, including 20 real
+PostgreSQL cases; individual server types passed. Fresh review found no actionable
+issue. Full integration checks remain pending.
+
 ### Keyless governed journey
 
 The serving PostgreSQL producer fixture now authenticates a real signed Commander turn through the reserved browser MCP route, ignores a spoofed run header, exposes only the browser request tool, creates and places a human-owned child, and obtains an actual worker lease/ACK. Accepted guest intents project native owner approvals and durable receipts. The native bridge answers `allow_once`; authenticated renewal carries the matched control and scoped encrypted credential grant. Atomic redemption delivers only the cookie mailbox reply to the staged guest.
@@ -53,5 +71,7 @@ Integrated journey verification: recursive workspace types and full build passed
 Five focused files passed 99 tests with zero skips, including actual PostgreSQL
 and the production-equivalent staged Chromium guest. The review's late-descendant
 census finding and stale-parent PID reuse regression were observed RED before
-their fixes. Citation integrity passes. Full normal suite and normal Linux PR CI
-are pending before program integration; no production conformance is claimed.
+their fixes. Citation integrity passes. Full normal suite passed 24,291 tests,
+with 2,034 skips. PR #682 merged after required CI passed, including 192 Linux
+browser tests and all 32 producer/journey cases; no production conformance is
+claimed.

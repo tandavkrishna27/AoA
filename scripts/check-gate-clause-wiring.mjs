@@ -20,6 +20,8 @@ import {
   providerCapabilityClaimKey,
 } from "./lib/gate-clause-wiring.mjs";
 
+import { inspectBrowserDispatchComposition } from "./browser-dispatch-wiring.mjs";
+
 export const MANIFEST_RELATIVE_PATH = "scripts/gate-clause-wiring.json";
 
 /** Source roots that constitute PRODUCTION. Tests are excluded by `isTestPath`. */
@@ -145,10 +147,10 @@ function* walk(root) {
  * ★ WHAT THIS MEASURES, STATED HONESTLY. A count of 0 is DEFINITIVE: nothing outside a test
  * so much as mentions the symbol, so no production path can reach it. A count > 0 is
  * NECESSARY BUT NOT SUFFICIENT for reachability — the referencing code may itself be
- * unreachable. `runBrowserSession` is precisely that case: `runner.ts` genuinely calls it,
- * but nothing invokes `runner.ts`, because no package depends on `browser-runtime` at all.
- * Proving full boot-root reachability needs an import-graph walk this guard deliberately
- * does not attempt — inferring it cheaply is the kind of guess that has been wrong here
+ * unreachable. A staged guest such as `runBrowserSession` also need not acquire another
+ * host reference when dispatch is connected. E8-1 therefore uses the explicit staged
+ * composition guard below. Proving general boot-root reachability needs an import-graph
+ * walk this caller counter deliberately does not attempt — inferring it cheaply is the kind of guess that has been wrong here
  * before. So the guard catches the zero case with certainty and the `reason` field carries
  * the rest.
  */
@@ -231,6 +233,18 @@ if (process.argv.includes("--counts")) {
 }
 
 const result = evaluateGateClauseWiring({ declared, callerCounts });
+
+// E8-F006: the guest is staged, not imported into the host. An E8 wired claim
+// requires the explicit composition guard; ordinary symbol counts cannot prove it.
+const browserClause = declared["E8-1-sandbox-local-browser"];
+if (browserClause?.status === "wired") {
+  const missing = inspectBrowserDispatchComposition(ROOT);
+  if (browserClause.composition !== "staged_browser_dispatch_v1" || missing.length) {
+    console.error("gate-clause-wiring: E8-1 staged browser composition missing", missing);
+    process.exit(1);
+  }
+}
+
 
 // W4U1 — measure the source side of every declared provider-capability claim.
 const sourceValues = {};
