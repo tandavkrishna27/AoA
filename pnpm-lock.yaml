@@ -359,6 +359,13 @@ importers:
         version: 5.9.3
 
   packages/browser-runtime:
+    dependencies:
+      '@armyofagents/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@armyofagents/worker-protocol':
+        specifier: workspace:*
+        version: link:../worker-protocol
     devDependencies:
       '@types/node':
         specifier: ^24.6.0

@@ -21,6 +21,7 @@
 import { chromium, type BrowserContext, type Download } from "playwright";
 import type { BrowserDriver, BrowserPage, DownloadHandle } from "./run-session.js";
 import type { BrowserLaunchOptions } from "./launch-guard.js";
+import { browserOriginAllowed, type BrowserNetworkConfig } from "./egress-proxy.js";
 
 export interface PlaywrightDriverOptions {
   /** Chromium profile directory. A PARAMETER, never an `--user-data-dir` argument. */
@@ -29,6 +30,7 @@ export interface PlaywrightDriverOptions {
   readonly downloadsStagingPath: string;
   /** Optional video directory; video is only written when the context closes. */
   readonly videoDir?: string;
+  readonly egress?: { readonly server: string; readonly config: BrowserNetworkConfig; denied(): void };
 }
 
 /** Adapt a Playwright `Download` to the orchestrator's minimal handle. */
@@ -53,12 +55,26 @@ export function createPlaywrightDriver(options: PlaywrightDriverOptions): Browse
         chromiumSandbox: launchOptions.chromiumSandbox === true,
         acceptDownloads: true,
         downloadsPath: options.downloadsStagingPath,
-        args: [...(launchOptions.args ?? [])],
+        args: [...(launchOptions.args ?? []), ...(options.egress ? ["--proxy-bypass-list=<-loopback>", "--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"] : [])],
+        ...(options.egress ? { proxy: { server: options.egress.server }, serviceWorkers: "block" as const } : {}),
         ...(launchOptions.viewport === undefined ? {} : { viewport: { ...launchOptions.viewport } }),
         ...(launchOptions.locale === undefined ? {} : { locale: launchOptions.locale }),
         ...(launchOptions.timezoneId === undefined ? {} : { timezoneId: launchOptions.timezoneId }),
         ...(options.videoDir === undefined ? {} : { recordVideo: { dir: options.videoDir } }),
       });
+      if (options.egress) {
+        try {
+          await context.route("**/*", async (route) => {
+            if (!browserOriginAllowed(route.request().url(), options.egress!.config)) {
+              options.egress!.denied(); await route.abort("blockedbyclient"); return;
+            }
+            await route.continue();
+          });
+          // No browser workload currently authorizes sockets. Block ws/wss including
+          // popups; routing lives on the context rather than only the first page.
+          await context.routeWebSocket(/.*/, (socket) => { options.egress!.denied(); socket.close(); });
+        } catch (error) { await context.close(); throw error; }
+      }
       if (launchOptions.recordTrace) {
         try { await context.tracing.start({ screenshots: true, snapshots: true }); }
         catch (error) { await context.close(); throw error; }

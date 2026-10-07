@@ -58,3 +58,5 @@ export {
 export { createPlaywrightDriver, type PlaywrightDriverOptions } from "./playwright-driver.js";
 export { startFixtureSite, type FixtureSite } from "./fixture-site.js";
 export { main as runnerMain, runFromConfig, type RunnerConfig } from "./runner.js";
+export { browserOriginAllowed, startBrowserEgressProxy, validateBrowserNetworkConfig,
+  type BrowserNetworkConfig, type BrowserEgressProxy } from "./egress-proxy.js";

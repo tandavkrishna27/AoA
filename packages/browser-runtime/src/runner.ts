@@ -27,9 +27,10 @@ import { readListeningPorts } from "./listening-ports.js";
 import { resolveUnderRoot, safeDownloadName } from "./path-adapter.js";
 import { runBrowserSession, type SessionConfig, type SessionResult } from "./run-session.js";
 import { createApprovalMailbox } from "./approval-mailbox.js";
+import { startBrowserEgressProxy, validateBrowserNetworkConfig, type BrowserNetworkConfig } from "./egress-proxy.js";
 
 /** What the host stages next to this file. */
-export interface RunnerConfig extends SessionConfig {
+export interface RunnerConfig extends SessionConfig, BrowserNetworkConfig {
   /** Chromium profile directory. A PARAMETER of launchPersistentContext, never an argument. */
   readonly userDataDir: string;
   /** Where Playwright stages downloads before `saveAs` persists them. */
@@ -50,17 +51,23 @@ function emit(event: Record<string, unknown>): void {
  * only be exercised by spawning a process is a boot root most tests will skip.
  */
 export async function runFromConfig(config: RunnerConfig): Promise<SessionResult> {
-  const requestApproval = config.requireApproval && config.approvalDirectory !== undefined ? createApprovalMailbox({
-    directory: config.approvalDirectory, timeoutMs: config.approvalTimeoutMs ?? 60_000,
-    emit: (message) => emit({ ...message }),
-  }) : undefined;
-  // Keep Node's normal signal termination. Mailbox-only cancellation must not
-  // suppress termination of an in-flight browser operation.
-  return runBrowserSession(config, {
+  const network = validateBrowserNetworkConfig(config);
+  const denied = (destinationClass: "metadata" | "private" | "control_plane" | "not_allowlisted"): void =>
+    emit({ type: "network_denied", destinationClass, reason: "Browser egress policy denied destination" });
+  const proxy = await startBrowserEgressProxy(network, { denied });
+  try {
+    const requestApproval = config.requireApproval && config.approvalDirectory !== undefined ? createApprovalMailbox({
+      directory: config.approvalDirectory, timeoutMs: config.approvalTimeoutMs ?? 60_000,
+      emit: (message) => emit({ ...message }),
+    }) : undefined;
+    // Keep Node's normal signal termination. Mailbox-only cancellation must not
+    // suppress termination of an in-flight browser operation.
+    return await runBrowserSession(config, {
       driver: createPlaywrightDriver({
         userDataDir: config.userDataDir,
         downloadsStagingPath: config.downloadsStagingPath,
         videoDir: config.videoDir,
+        egress: { server: proxy.server, config: network, denied: () => denied("not_allowlisted") },
       }),
       // The containment measurement reads the real /proc tables. On a platform without them
       // this THROWS rather than reporting "clean", so an unmeasurable environment fails the
@@ -75,7 +82,10 @@ export async function runFromConfig(config: RunnerConfig): Promise<SessionResult
       },
       env: process.env,
       requestApproval,
-  });
+    });
+  } finally {
+    await proxy.close();
+  }
 }
 
 /** The CLI wrapper the sandbox executes: `node runner.js /path/to/session.json`. */
