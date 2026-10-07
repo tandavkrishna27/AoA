@@ -29,6 +29,7 @@ import type {
   StageFilesResult,
   EnumerateOutputsResult,
   SandboxEnumerationMode,
+  SandboxLifetimeResult,
   SandboxOutputEntry,
   StagedFileRequest,
   ArtifactExportResult,
@@ -69,6 +70,10 @@ import {
   WireProtocolError,
   decodeOpResponse,
   encodeOpRequest,
+  isValidCapability,
+  decodeProcessStart,
+  decodeProcessStatus,
+  decodeProcessSignal,
 } from "./codec.js";
 import type { OwnedLabelsCapability, WarmResourceCapability } from "./capability.js";
 import type { RedactedListResult } from "./projection.js";
@@ -91,6 +96,8 @@ export interface NetworkedProviderDriverOptions {
   /** Relay pause/resume only when the selected target explicitly supports both. Default off. */
   readonly enableLiveStdout?: boolean;
   readonly enableCheckpointRestore?: boolean;
+  readonly enableLifetimeRenewal?: boolean;
+  readonly enableProcessSupervision?: boolean;
   readonly warmResourceCapability?: WarmResourceCapability;
 }
 
@@ -130,25 +137,18 @@ export class NetworkedProviderDriver implements SandboxProvider {
   readonly fileStagingMode: FileStagingMode = "grant_download";
 
   /**
-   * SVC-008a — `"none"`, and honestly so, for exactly the reason `fileStagingMode` is.
-   *
-   * `start_process` / `process_status` / `signal_process` are NOT members of the frozen
-   * `ProviderOperation` vocabulary (deliberately — see `ProcessSupervisionMode`), and
-   * `#post` is typed to that vocabulary, so this driver has no wire route to reach a
-   * remote provider's process supervision. Giving the adapter-manager wire an inbound
-   * process route is its own piece of work; claiming support without one would silently
-   * drop every signal and report a launch nobody made.
-   *
-   * ★ Consequence, stated rather than smuggled: the containerized/networked lane CANNOT
-   * supervise a service until that route exists. That is the identical, accepted cost
-   * CLI-008 Unit B paid for `stageFiles`, and this ticket does not take it on.
+   * Process supervision is an explicit relay opt-in. The adapter-manager checks the
+   * far provider's mode and owned resource before dispatch. Unsupported peers refuse;
+   * no launch or process-state observation is synthesized. These local operations
+   * do not extend the frozen ProviderOperation vocabulary.
    */
-  readonly processSupervisionMode: ProcessSupervisionMode = "none";
+  readonly processSupervisionMode: ProcessSupervisionMode;
 
   readonly #enableLiveStdout: boolean;
   readonly #baseUrl: string;
   readonly #fetch: typeof fetch;
-  readonly #capability?: OwnedLabelsCapability;
+  #capability?: OwnedLabelsCapability;
+  readonly sandboxLifetimeMode: "none" | "renewable";
   readonly #warmResourceCapability?: WarmResourceCapability;
 
   constructor(options: NetworkedProviderDriverOptions) {
@@ -156,12 +156,40 @@ export class NetworkedProviderDriver implements SandboxProvider {
     this.#fetch = options.fetch ?? fetch;
     this.#enableLiveStdout = options.enableLiveStdout === true;
     this.#capability = options.capability;
+    this.sandboxLifetimeMode = options.enableLifetimeRenewal === true ? "renewable" : "none";
+    this.processSupervisionMode = options.enableProcessSupervision === true ? "handle" : "none";
     this.#warmResourceCapability = options.warmResourceCapability;
     this.checkpointMode = options.enableCheckpointRestore === true ? "snapshot" : "none";
     this.advertisedOperations = new Set<ProviderOperation>([
       ...CORE_PROVIDER_OPERATIONS,
       ...(options.enableCheckpointRestore === true ? ["checkpoint", "restore"] as const : []),
     ]);
+  }
+
+  /** Refresh only this driver's existing ownership binding. Signature verification
+   * remains on the adapter-manager gate for every operation. */
+  refreshAuthority(capability: unknown): void {
+    const prior = this.#capability;
+    const fields = ["organizationId", "targetId", "workerId", "jobId", "attempt", "leaseId", "deviceGeneration"] as const;
+    if (!prior || !isValidCapability(capability) || capability.v !== prior.v || capability.audience !== prior.audience ||
+        !Number.isSafeInteger(capability.expiresAt) || capability.expiresAt < prior.expiresAt ||
+        capability.sig.length === 0 || capability.sig.length > 256 ||
+        fields.some((field) => capability.ownedLabels[field] !== prior.ownedLabels[field])) {
+      throw new Error("provider authority refresh mismatch");
+    }
+    this.#capability = { ...capability, ownedLabels: { ...capability.ownedLabels } };
+  }
+
+  async renewLifetime(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult> {
+    if (this.sandboxLifetimeMode !== "renewable") throw new UnsupportedProviderOperation("renew_lifetime");
+    if (!Number.isSafeInteger(expiresAt) || !Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new WireProtocolError("invalid lifetime renewal");
+    const result = await this.#post<unknown>("renew_lifetime", { sandboxId, expiresAt }, ctx, this.#capability);
+    if (typeof result !== "object" || result === null || Array.isArray(result)) throw new WireProtocolError("invalid lifetime response");
+    const metadata = result as Record<string, unknown>;
+    if (typeof metadata.providerOpId !== "string" || metadata.providerOpId.length === 0 || metadata.expiresAt !== expiresAt) {
+      throw new WireProtocolError("invalid lifetime response");
+    }
+    return { providerOpId: metadata.providerOpId, expiresAt };
   }
 
   async create(spec: CreateSandboxSpec, ctx: ProviderOpContext): Promise<CreateResult> {
@@ -364,23 +392,27 @@ export class NetworkedProviderDriver implements SandboxProvider {
   // transient read failure, whose prescribed response is "escalate and retry" — so a
   // caller that wired up this driver by mistake would retry forever instead of failing
   // at the first call. The throw is unmissable and names the operation.
-  async startProcess(_input: ExecuteInput, _ctx: ProviderOpContext): Promise<ProcessStartResult> {
-    throw new UnsupportedProviderOperation("start_process");
+  async startProcess(input: ExecuteInput, ctx: ProviderOpContext): Promise<ProcessStartResult> {
+    if (this.processSupervisionMode === "none") throw new UnsupportedProviderOperation("start_process");
+    const { onStdout: _callback, ...metadata } = input;
+    return decodeProcessStart(await this.#post("start_process", metadata, ctx, this.#capability));
   }
   async processStatus(
-    _sandboxId: string,
-    _handle: ProcessHandle,
-    _ctx: ProviderOpContext,
+    sandboxId: string,
+    handle: ProcessHandle,
+    ctx: ProviderOpContext,
   ): Promise<ProcessStatusResult> {
-    throw new UnsupportedProviderOperation("process_status");
+    if (this.processSupervisionMode === "none") throw new UnsupportedProviderOperation("process_status");
+    return decodeProcessStatus(await this.#post("process_status", { sandboxId, handle }, ctx, this.#capability));
   }
   async signalProcess(
-    _sandboxId: string,
-    _handle: ProcessHandle,
-    _kind: "cancel" | "kill",
-    _ctx: ProviderOpContext,
+    sandboxId: string,
+    handle: ProcessHandle,
+    kind: "cancel" | "kill",
+    ctx: ProviderOpContext,
   ): Promise<ProcessSignalResult> {
-    throw new UnsupportedProviderOperation("signal_process");
+    if (this.processSupervisionMode === "none") throw new UnsupportedProviderOperation("signal_process");
+    return decodeProcessSignal(await this.#post("signal_process", { sandboxId, handle, kind }, ctx, this.#capability));
   }
 
   async #executeLive(input: Omit<ExecuteInput, "onStdout">, ctx: ProviderOpContext, onStdout: (chunk: string) => void): Promise<ExecuteResult> {
@@ -435,15 +467,18 @@ export class NetworkedProviderDriver implements SandboxProvider {
     // non-frozen `stage_files` route (the vocabulary itself is untouched — E4-D02). Additive:
     // every existing caller still passes a `ProviderOperation`. DAT-009-3e widens it the same
     // way, and only locally, for the artifact pair.
-    op: ProviderOperation | "stage_files" | "digest_artifact" | "export_artifact" | "enumerate_outputs",
+    op: ProviderOperation | "stage_files" | "digest_artifact" | "export_artifact" | "enumerate_outputs" | "renew_lifetime" | "start_process" | "process_status" | "signal_process",
     args: unknown,
     ctx: ProviderOpContext,
     capability?: OwnedLabelsCapability,
   ): Promise<R> {
+    const boundedServiceOp = op === "renew_lifetime" || op === "start_process" || op === "process_status" || op === "signal_process";
+    if (boundedServiceOp && (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0)) throw new WireProtocolError("exhausted service operation deadline");
     const res = await this.#fetch(`${this.#baseUrl}/op/${op}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: encodeOpRequest(args, ctx, capability, this.#warmResourceCapability),
+      ...(boundedServiceOp ? { signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000)))) } : {}),
     });
     // Body-driven: the codec decides ok vs err vs garbled regardless of HTTP status. A
     // non-JSON / non-envelope body (e.g. a bare 500) surfaces as a WireProtocolError,

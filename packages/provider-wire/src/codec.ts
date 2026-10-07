@@ -17,7 +17,7 @@
 // — NEVER silently to an `ok` result.
 // -----------------------------------------------------------------------------
 
-import type { ProviderOpContext } from "@armyofagents/worker-daemon";
+import type { ProviderOpContext, ProcessObservation, ProcessStartResult, ProcessStatusResult, ProcessSignalResult } from "@armyofagents/worker-daemon";
 import {
   ResourceNotAvailableError,
   SandboxEgressDeniedError,
@@ -283,7 +283,7 @@ function isValidCtx(value: unknown): value is ProviderOpContext {
  * SIGNATURE is verified by the adapter-manager verify against the pinned public key.
  * A malformed capability is rejected here so junk never reaches the gate as if valid.
  */
-function isValidCapability(value: unknown): value is OwnedLabelsCapability {
+export function isValidCapability(value: unknown): value is OwnedLabelsCapability {
   if (!isRecord(value)) return false;
   if (typeof value.v !== "number" || typeof value.audience !== "string") return false;
   if (typeof value.expiresAt !== "number" || typeof value.sig !== "string") return false;
@@ -302,3 +302,44 @@ function isValidCapability(value: unknown): value is OwnedLabelsCapability {
 
 /** Opt-in NDJSON stdout frames followed by exactly one ordinary result envelope. */
 export const EXECUTE_LIVE_STDOUT_KEY = "liveStdout";
+
+function processRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new WireProtocolError("invalid process metadata");
+  return value as Record<string, unknown>;
+}
+function processText(value: unknown): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 512) throw new WireProtocolError("invalid process metadata");
+  return value;
+}
+function processTime(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) throw new WireProtocolError("invalid process metadata");
+  return value;
+}
+function processObservation(value: unknown): ProcessObservation {
+  const record = processRecord(value);
+  if (record.state === "unknown") {
+    const reason = record.reason;
+    if (reason !== "read_failed" && reason !== "sandbox_unreachable" && reason !== "handle_unrecognized" && reason !== "state_unrecognized") throw new WireProtocolError("invalid process observation");
+    return { state: "unknown", reason };
+  }
+  const observedAt = processTime(record.observedAt);
+  if (record.state === "running" || record.state === "gone") return { state: record.state, observedAt };
+  if (record.state !== "exited" || !(record.exitCode === null || (typeof record.exitCode === "number" && Number.isSafeInteger(record.exitCode))) ||
+      !(record.signal === null || (typeof record.signal === "string" && record.signal.length <= 128))) throw new WireProtocolError("invalid process observation");
+  return { state: "exited", exitCode: record.exitCode as number | null, signal: record.signal as string | null, observedAt };
+}
+/** Project only bounded process metadata; provider extra fields never cross the wire. */
+export function decodeProcessStart(value: unknown): ProcessStartResult {
+  const record = processRecord(value);
+  return { providerOpId: processText(record.providerOpId), handle: processText(record.handle), acknowledgedAt: processTime(record.acknowledgedAt) };
+}
+export function decodeProcessStatus(value: unknown): ProcessStatusResult {
+  const record = processRecord(value);
+  return { providerOpId: processText(record.providerOpId), observation: processObservation(record.observation) };
+}
+export function decodeProcessSignal(value: unknown): ProcessSignalResult {
+  const record = processRecord(value);
+  const accepted = record.accepted;
+  if (accepted !== "accepted" && accepted !== "refused" && accepted !== "unsupported") throw new WireProtocolError("invalid process acknowledgement");
+  return { providerOpId: processText(record.providerOpId), accepted, observation: processObservation(record.observation) };
+}

@@ -70,7 +70,7 @@ import {
   type ExportedArtifactRef,
   type SandboxArtifactExporter,
 } from "../lease/artifact-export.js";
-import type { OwnedLabelsCapabilityLike } from "../lease/owned-labels-capability.js";
+import { isOwnedLabelsCapabilityShape, type OwnedLabelsCapabilityLike } from "../lease/owned-labels-capability.js";
 
 /** CLI-003/D3 — a captured stdout/stderr/system log line to turn into a `log` event. */
 export interface RunObservationLogEntry {
@@ -318,6 +318,7 @@ export interface SupervisorDeps {
 export type SupervisorRunStatus = "succeeded" | "failed" | "cancelled" | "create_timeout";
 
 export interface Supervisor extends SupervisorSeam {
+  onAuthorityRenewed(leaseId: string, capability: OwnedLabelsCapabilityLike): void;
   accept(handoff: LeaseHandoff): Promise<void>;
   /** Cancel a live run: withdraw effect authority and escalate cleanup on its
    * process tree (cancel → kill → destroy). Idempotent; a no-op if unknown. */
@@ -330,6 +331,8 @@ export interface Supervisor extends SupervisorSeam {
 }
 
 interface ActiveRun {
+  provider: SandboxProvider;
+  warmAuthorityExpiresAt: number | null;
   readonly leaseId: string;
   readonly labels: ResourceLabels;
   readonly fence: EffectFence;
@@ -350,6 +353,9 @@ interface ActiveRun {
   /** The per-run capability's absolute ms-epoch expiry, set when the networked authorities are
    * rebuilt. The clock-first teardown compares it to the supervisor `now` (§2a.5). */
   capExpiresAt: number | null;
+  readonly serviceJobDeadlineAt: number | null;
+  sandboxExpiresAt: number | null;
+  lifetimeRenewalPending: boolean;
   /** H1 — this run's provider-op budget, resolved ONCE at `buildRun` from the handoff (i.e.
    * from `workload.maxRuntimeSeconds`). Governs `create` (⇒ the sandbox TTL) and `execute`;
    * cleanup/teardown keep the base deadline. */
@@ -705,6 +711,8 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         const rebuilt = buildAuthorities(driver, warmControl?.warmResourceCapability?.physicalLabels ?? run.labels, run.fence);
         run.effect = rebuilt.effect;
         run.cleanup = rebuilt.cleanup;
+        run.provider = driver;
+        run.warmAuthorityExpiresAt = warmControl?.warmResourceCapability?.expiresAt ?? null;
         run.capExpiresAt = Math.min(capability.expiresAt, warmControl?.warmResourceCapability?.expiresAt ?? capability.expiresAt);
       }
     }
@@ -726,6 +734,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
     // 1. create — raced against its deadline, REDUCED by the redemption time so redeem + create stay
     // within `createDeadlineMs` (R6 "subtracted, not added").
     const createBudget = Math.max(0, createDeadlineMs - secretElapsedMs);
+    const sandboxLifetimeStartedAt = now();
     let created;
     try {
       // H1 — `run.makeCtx()` carries THIS RUN's budget. That ctx becomes the E2B sandbox
@@ -764,6 +773,9 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       return;
     }
     run.sandboxId = created.sandboxId;
+    if (run.serviceJobDeadlineAt !== null && run.provider.sandboxLifetimeMode === "renewable") {
+      run.sandboxExpiresAt = sandboxLifetimeStartedAt + run.opDeadlineMs;
+    }
     emitOp("create", "success");
 
     if (run.cancelled) {
@@ -958,8 +970,12 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         nowIso,
         schedule,
         tickMs: serviceHealthTickMs,
-        deadlineAt: now() + run.opDeadlineMs,
-        capExpiresAt: run.capExpiresAt,
+        deadlineAt: run.serviceJobDeadlineAt !== null && run.provider.sandboxLifetimeMode === "renewable"
+          ? run.serviceJobDeadlineAt : now() + run.opDeadlineMs,
+        get capExpiresAt() {
+          return run.sandboxExpiresAt === null ? run.capExpiresAt
+            : Math.min(run.capExpiresAt ?? run.sandboxExpiresAt, run.sandboxExpiresAt);
+        },
         teardownHeadroomMs: RUN_TEARDOWN_HEADROOM_MS,
         // ★ EVERY tick, not once: §4.5. `run.cancelled` is set by `cancel`/`onLeaseLost`/
         // `shutdown`, and the renewal driver closes the fence-close proxy before calling them.
@@ -1449,6 +1465,8 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       // Keep the base deadline; a budget-resolution error must never fail a lease.
     }
     const built: ActiveRun = {
+      provider: initialProvider,
+      warmAuthorityExpiresAt: null,
       leaseId: handoff.leaseId,
       labels,
       fence,
@@ -1463,6 +1481,9 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       cleanedUp: false,
       networked,
       capExpiresAt: null,
+      serviceJobDeadlineAt: handoff.offer.job.workloadType === "service" ? Date.parse(handoff.offer.job.deadline) : null,
+      sandboxExpiresAt: null,
+      lifetimeRenewalPending: false,
       opDeadlineMs: runOpDeadlineMs,
       serviceStop: null,
     };
@@ -1501,6 +1522,36 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
   }
 
   const supervisor: Supervisor = {
+    onAuthorityRenewed(leaseId, capability): void {
+      const run = runs.get(leaseId);
+      if (!run || run.cancelled || !run.effect.isActive()) throw new Error("authority refresh requires a live fence");
+      if (!run.networked || run.capExpiresAt === null || !run.provider.refreshAuthority ||
+          !isOwnedLabelsCapabilityShape(capability) || capability.v !== 1 || capability.audience !== "adapter-manager" ||
+          !labelsEqual(capability.ownedLabels, run.labels) || !Number.isSafeInteger(capability.expiresAt) ||
+          capability.expiresAt <= now() || capability.expiresAt < run.capExpiresAt) {
+        throw new Error("authority refresh binding mismatch");
+      }
+      run.provider.refreshAuthority(capability);
+      run.capExpiresAt = Math.min(capability.expiresAt, run.warmAuthorityExpiresAt ?? capability.expiresAt);
+      if (run.serviceJobDeadlineAt !== null && run.sandboxId !== null && run.sandboxExpiresAt !== null &&
+          !run.lifetimeRenewalPending && run.provider.sandboxLifetimeMode === "renewable") {
+        const expiresAt = Math.min(run.capExpiresAt, run.serviceJobDeadlineAt);
+        if (expiresAt <= run.sandboxExpiresAt || expiresAt <= now()) return;
+        const sandboxId = run.sandboxId;
+        run.lifetimeRenewalPending = true;
+        // Do not block renewal timers or control acknowledgements. Only a timely provider
+        // acknowledgement can move the observed expiry; failure keeps the old stop window.
+        void withDeadline(run.effect.renewLifetime(sandboxId, expiresAt, ctx(5000)), 5000)
+          .then((result) => {
+            if (result !== TIMEOUT && !run.cancelled && run.effect.isActive() && runs.get(leaseId) === run &&
+                run.sandboxId === sandboxId && result.expiresAt === expiresAt && expiresAt > now()) {
+              run.sandboxExpiresAt = expiresAt;
+            }
+          }).catch(() => {
+            deps.logger?.warn({ leaseId }, "supervisor: sandbox lifetime renewal failed");
+          }).finally(() => { run.lifetimeRenewalPending = false; });
+      }
+    },
     async accept(handoff: LeaseHandoff): Promise<void> {
       const run = buildRun(handoff);
       runs.set(run.leaseId, run);

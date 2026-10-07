@@ -62,6 +62,7 @@ import type {
   ResourceSummary,
   RestoreResult,
   SandboxEnumerationMode,
+  SandboxLifetimeResult,
   SandboxProvider,
   SandboxState,
   StopOutcome,
@@ -464,6 +465,7 @@ export class E2bSandboxProvider implements SandboxProvider {
    * a create replay hand back a launch, or the reverse.
    */
   readonly #processIdempotency = new Map<string, ProcessStartResult>();
+  readonly #processLaunches = new Map<string, Promise<ProcessStartResult>>();
   #opCounter = 0;
   /** SVC-008a §9.4 — how many records this provider could not classify. The observable
    * that keeps the interim `hasLiveLease` rule from being silent; the provider has no
@@ -515,7 +517,7 @@ export class E2bSandboxProvider implements SandboxProvider {
     return this.#indeterminateRecords;
   }
 
-  #nextOpId(op: ProviderOperation): string {
+  #nextOpId(op: ProviderOperation | "renew_lifetime"): string {
     this.#opCounter += 1;
     return `e2b-${op}-${this.#opCounter}`;
   }
@@ -551,9 +553,13 @@ export class E2bSandboxProvider implements SandboxProvider {
     ttlMs: number,
     additionalValues: readonly string[] = [],
   ): void {
+    this.#registerSecretValues(sandboxId, [...classifyRunSecrets(env), ...additionalValues], ttlMs);
+  }
+
+  #registerSecretValues(sandboxId: string, values: readonly string[], ttlMs: number): void {
     this.#purgeRunSecrets(sandboxId);
     const entry: { readonly values: readonly string[]; timer: ReturnType<typeof setTimeout> } = {
-      values: Object.freeze([...new Set([...classifyRunSecrets(env), ...additionalValues])].sort((a, b) => b.length - a.length)),
+      values: Object.freeze([...new Set(values)].sort((a, b) => b.length - a.length)),
       // Replaced immediately below; assigned first so the closure can compare identities.
       timer: undefined as unknown as ReturnType<typeof setTimeout>,
     };
@@ -628,6 +634,25 @@ export class E2bSandboxProvider implements SandboxProvider {
     this.#registerRunSecrets(sandboxId, spec.env, ttlMs);
     if (key) this.#idempotency.set(key, { sandboxId, resourceLabels: spec.resourceLabels });
     return { sandboxId, providerOpId: this.#nextOpId("create"), resourceLabels: spec.resourceLabels };
+  }
+
+  readonly sandboxLifetimeMode = "renewable" as const;
+
+  async renewLifetime(sandboxId: string, expiresAt: number, ctx: ProviderOpContext): Promise<SandboxLifetimeResult> {
+    const remainingMs = expiresAt - Date.now();
+    if (!Number.isSafeInteger(expiresAt) || remainingMs <= 0 || remainingMs > 300_000 || !Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) {
+      throw new Error("invalid sandbox lifetime renewal");
+    }
+    const secretSet = this.#runSecrets.get(sandboxId);
+    if (!secretSet) throw new SandboxExportSecretSetUnavailableError();
+    const signal = AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000))));
+    await boundedBySignal(this.#transport.setTimeout(sandboxId, remainingMs), signal, "sandbox lifetime renewal timed out");
+    // A failed/late acknowledgement cannot recreate an expired registry.
+    if (this.#runSecrets.get(sandboxId) !== secretSet || expiresAt <= Date.now()) {
+      throw new SandboxExportSecretSetUnavailableError();
+    }
+    this.#registerSecretValues(sandboxId, secretSet.values, expiresAt - Date.now());
+    return { providerOpId: this.#nextOpId("renew_lifetime"), expiresAt };
   }
 
   async execute(input: ExecuteInput, ctx: ProviderOpContext): Promise<ExecuteResult> {
@@ -1134,6 +1159,24 @@ export class E2bSandboxProvider implements SandboxProvider {
 
   async startProcess(input: ExecuteInput, ctx: ProviderOpContext): Promise<ProcessStartResult> {
     this.#requireProcessSupervision("start_process");
+    if (!Number.isFinite(ctx.deadlineMs) || ctx.deadlineMs <= 0) throw new Error("exhausted process launch deadline");
+    const key = ctx.idempotencyKey;
+    const recorded = key ? this.#processIdempotency.get(key) : undefined;
+    if (recorded) return recorded;
+    let launch = key ? this.#processLaunches.get(key) : undefined;
+    if (!launch) {
+      launch = this.#launchProcess(input, ctx).finally(() => {
+        if (key) this.#processLaunches.delete(key);
+      });
+      if (key) this.#processLaunches.set(key, launch);
+    }
+    // Bounding acknowledgement must not cap background runtime. Sandbox TTL and the
+    // fenced service sequencer own runtime. A late acknowledgement still enters the
+    // replay store, so a lost response cannot cause a second background launch.
+    return boundedBySignal(launch, AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(ctx.deadlineMs, 5000)))), "process launch acknowledgement timed out");
+  }
+
+  async #launchProcess(input: ExecuteInput, ctx: ProviderOpContext): Promise<ProcessStartResult> {
     // ★★★ REPLAY BEFORE LAUNCH — the `ProviderOpContext` contract, on the operation where
     // breaking it is most expensive.
     //
@@ -1160,7 +1203,7 @@ export class E2bSandboxProvider implements SandboxProvider {
         command: input.command,
         args: input.args,
         envVars: input.env,
-        timeoutMs: this.#ttl(ctx),
+        timeoutMs: 0,
       });
       // Belt-and-suspenders on the port's non-empty contract: a transport that regressed
       // to the `String(x ?? "")` idiom must not be able to hand a caller `handle: ""`,

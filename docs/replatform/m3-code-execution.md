@@ -74,7 +74,7 @@ scope. The bridge returns the original request revision and the same prompt hash
 fixing a mismatch that previously rejected legitimate human decisions.
 
 Full workspace typechecking and build pass. The full test suite passes across
-four sequential shards: 23,972 tests with 1,935 environment skips. Two earlier
+four sequential shards: 23,973 tests with 1,935 environment skips. Two earlier
 unsharded runs hit native Node allocation failures on this machine. Focused
 browser, worker and existing runtime-decision regressions also pass.
 
@@ -82,3 +82,35 @@ The guest mailbox, worker controller and delivery helper are not yet composed
 into actual browser dispatch. Browser capability remains absent. Network
 enforcement, credential materialization, reconnect/UI, agent/Commander sources,
 and service residuals remain open. Anthropic live verification stays deferred.
+
+## Service renewal implementation checkpoint
+
+Lease renewal consumes the server's owned-labels capability extension and refreshes
+the per-run driver without resolving credentials again. Refresh requires the same
+ownership tuple and an active fence. A cancellation response refreshes cleanup
+authority before closing the fence.
+
+Service handoffs enable owned process launch, status, signal and sandbox lifetime
+relays in the networked factory. Each operation uses the adapter-manager ownership
+gate, rechecks primary authority at use and has a five-second bound. Process results
+contain bounded metadata only; signal acceptance never implies process exit.
+Warm Commander resources cannot use service lifetime renewal.
+Launch acknowledgement is bounded independently of background process runtime;
+the sandbox TTL and fenced service loop own runtime. Pending launch retries share
+one launch, and a late acknowledgement is retained for replay under a key scoped
+to the sandbox and full ownership identity.
+
+An asynchronous sandbox TTL acknowledgement extends the service's observed expiry
+only while its original fence remains live. Requested expiry is capped by the
+renewed capability and frozen job deadline. Failure or a pending acknowledgement
+keeps the previous teardown window. The provider retains the existing credential
+scanner set for the acknowledged lifetime and cannot revive an expired registry.
+
+Focused tests exercise the HTTP path with a newly signed capability, health past
+the initial four-minute window, deadline stop, failed and late acknowledgement,
+foreign ownership, missing authority, cancellation ordering and metadata projection.
+Full workspace typechecking and build pass. The integrated full suite passes
+across four sequential shards: 24,026 tests with 1,935 environment skips. The
+E2B launch deadline regression and lost-response replay tests pass against the
+real transport with an injected SDK, without provider calls. Browser dispatch and the remaining service
+recovery, rollout and readiness work remain open.

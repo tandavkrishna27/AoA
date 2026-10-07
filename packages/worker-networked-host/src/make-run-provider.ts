@@ -62,7 +62,7 @@ export class NetworkedProviderCapabilityError extends Error {
  * @param fetchImpl  injectable fetch (default: the global) — tests spy on the network hop.
  */
 export function makeNetworkedRunProvider(baseUrl: string, fetchImpl: typeof fetch = fetch): MakeRunProvider {
-  return ({ capability, warmControl }) => {
+  return ({ capability, warmControl, handoff }) => {
     if (capability === undefined) {
       throw new NetworkedProviderCapabilityError("no owned-labels capability was minted for this run");
     }
@@ -86,7 +86,9 @@ export function makeNetworkedRunProvider(baseUrl: string, fetchImpl: typeof fetc
     };
     const warm = warmControl === undefined ? null : readCommanderWarmControl(warmControl, validated);
     if (warmControl !== undefined && !warm) throw new NetworkedProviderCapabilityError("invalid warm resource authority");
+    const service = handoff?.offer?.job?.workloadType === "service" && warm === null;
     return new NetworkedProviderDriver({ baseUrl, capability: validated, fetch: fetchImpl, enableLiveStdout: true,
+      enableProcessSupervision: service, enableLifetimeRenewal: service,
       ...(warm ? { enableCheckpointRestore: true, warmResourceCapability: warm.warmResourceCapability } : {}) });
   };
 }

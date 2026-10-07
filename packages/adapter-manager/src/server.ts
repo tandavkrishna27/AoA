@@ -45,6 +45,9 @@ import {
   encodeErrResponse,
   encodeOkResponse,
   isModelledWireError,
+  decodeProcessStart,
+  decodeProcessStatus,
+  decodeProcessSignal,
 } from "@armyofagents/provider-wire/codec";
 import type { OwnedLabelsCapability } from "@armyofagents/provider-wire";
 import { EXPORT_TEARDOWN_RESERVE_MS } from "@armyofagents/worker-daemon";
@@ -138,6 +141,10 @@ const GATE_REQUIRED_OPS: ReadonlySet<string> = new Set([
   // GATED-ONLY (no keyless raw handler below), routed through `gateOwnedOp`. An ungated
   // server 404s it, matching the B2 teardown ops, because it carries a bearer grant.
   "stage_files",
+  "renew_lifetime",
+  "start_process",
+  "process_status",
+  "signal_process",
   // DAT-009-3e — the artifact pair, on the `stage_files` precedent: each reads out of (digest) or
   // uploads from (export, carrying a bearer UPLOAD grant) ONE live owned sandbox, so each is a
   // single-sandbox owned op, GATED-ONLY, routed through `gateOwnedOp`. Neither is a member of the
@@ -319,6 +326,53 @@ export function createProviderServer(options: CreateProviderServerOptions): Serv
       }
       case "list":
         return gateList(deps, args as ListInput, ctx, capability);
+      case "start_process":
+      case "process_status":
+      case "signal_process": {
+        if (typeof args !== "object" || args === null || Array.isArray(args) || ctx.deadlineMs <= 0) throw new WireProtocolError("invalid process request");
+        const input = args as Record<string, unknown>;
+        const sandboxId = input.sandboxId;
+        if (typeof sandboxId !== "string" || sandboxId.length === 0 || sandboxId.length > 512) throw new WireProtocolError("invalid process identity");
+        if (op === "start_process") {
+          if (typeof input.command !== "string" || input.command.length === 0 || !Array.isArray(input.args) ||
+              !input.args.every((arg) => typeof arg === "string") || typeof input.env !== "object" || input.env === null || Array.isArray(input.env) ||
+              !Object.values(input.env).every((value) => typeof value === "string")) throw new WireProtocolError("invalid process launch");
+        } else if (typeof input.handle !== "string" || input.handle.length === 0 || input.handle.length > 512 ||
+            (op === "signal_process" && input.kind !== "cancel" && input.kind !== "kill")) throw new WireProtocolError("invalid process handle");
+        const deadlineAt = now() + Math.min(ctx.deadlineMs, 5000);
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true }, sandboxId, ctx, capability,
+          async (detail, remainingMs) => {
+            requireWarmExecution(sandboxId, detail.resourceLabels);
+            if (warmResourceCapability !== undefined || provider.processSupervisionMode !== "handle" || !remainingMs || remainingMs <= 0) throw new WireProtocolError("process supervision unavailable");
+            const boundedCtx = { ...ctx, deadlineMs: remainingMs };
+            if (op === "start_process") {
+              const launchCtx = { ...boundedCtx, idempotencyKey: ctx.idempotencyKey === "" ? ""
+                : JSON.stringify(["service_launch", sandboxId, createGateDeps!.ledger.key(detail.resourceLabels, ctx.idempotencyKey)]) };
+              return decodeProcessStart(await provider.startProcess({ sandboxId, command: input.command as string, args: input.args as string[], env: input.env as Record<string, string> }, launchCtx));
+            }
+            if (op === "process_status") return decodeProcessStatus(await provider.processStatus(sandboxId, input.handle as string, boundedCtx));
+            return decodeProcessSignal(await provider.signalProcess(sandboxId, input.handle as string, input.kind as "cancel" | "kill", boundedCtx));
+          }, deadlineAt);
+      }
+      case "renew_lifetime": {
+        if (typeof args !== "object" || args === null || Array.isArray(args)) {
+          return Promise.reject(new WireProtocolError("invalid lifetime renewal"));
+        }
+        const { sandboxId, expiresAt } = args as { sandboxId: unknown; expiresAt: unknown };
+        if (typeof sandboxId !== "string" || sandboxId.length === 0 || typeof expiresAt !== "number" ||
+            !Number.isSafeInteger(expiresAt) || ctx.deadlineMs <= 0) {
+          return Promise.reject(new WireProtocolError("invalid lifetime renewal"));
+        }
+        const deadlineAt = now() + Math.min(ctx.deadlineMs, 5000);
+        return gateOwnedOp({ ...deps, sandboxLock: interruptLock, requirePrimaryAuthorityAtUse: true }, sandboxId, ctx, capability,
+          (detail, remainingMs) => {
+            if (!capability || warmResourceCapability !== undefined || options.warmCleanupJournal?.isRegistered(sandboxId, detail.resourceLabels) || expiresAt <= now() || expiresAt > capability.expiresAt || !remainingMs || remainingMs <= 0 ||
+                provider.sandboxLifetimeMode !== "renewable" || !provider.renewLifetime) {
+              throw new WireProtocolError("lifetime renewal refused");
+            }
+            return provider.renewLifetime(sandboxId, expiresAt, { ...ctx, deadlineMs: remainingMs });
+          }, deadlineAt);
+      }
       case "stage_files": {
         // E7-F011 — a single-sandbox owned mutation (writes files into the live sandbox).
         // Same gate as execute/cancel: verify capability -> AM-local inspect -> field-wise

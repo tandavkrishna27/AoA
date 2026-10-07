@@ -93,6 +93,7 @@ async function fireNextTimer(): Promise<void> {
 }
 
 interface DriverCase {
+  readonly renewedAuthorities: unknown[];
   readonly drains: (string | null)[];
   readonly log: string[];
   readonly metrics: ReturnType<typeof createMetrics>;
@@ -105,6 +106,7 @@ async function makeDriverCase(options: { handlers?: boolean } = {}): Promise<Dri
   const sup = recordingSupervisor(log);
   const proxies = spyProxyFactory(log);
   const drains: (string | null)[] = [];
+  const renewedAuthorities: unknown[] = [];
   const metrics = createMetrics();
   const handlers: ControlCommandHandlers = {
     drain: (reason) => {
@@ -116,15 +118,44 @@ async function makeDriverCase(options: { handlers?: boolean } = {}): Promise<Dri
     session: staticSessionProvider(session),
     key,
     identity: RENEWAL_IDENTITY,
-    supervisor: sup.supervisor,
+    supervisor: { ...sup.supervisor, onAuthorityRenewed: (_leaseId: string, capability: unknown) => { renewedAuthorities.push(capability); log.push("authority:renewed"); } },
     schedule: scheduler,
     makeFenceProxy: proxies.factory,
     metrics,
     tuning: { leadMs: 20_000 },
     ...(options.handlers === false ? {} : { controlHandlers: () => handlers }),
   });
-  return { drains, log, metrics, driver };
+  return { drains, renewedAuthorities, log, metrics, driver };
 }
+
+describe("renewed effect authority delivery", () => {
+  it("applies a capability from a fresh successful renewal to the live supervisor", async () => {
+    const c = await makeDriverCase();
+    const expiresAt = scheduler.now() + 300_000;
+    const capability = { v: 1, audience: "adapter-manager", expiresAt, sig: "signed-renewal",
+      ownedLabels: { organizationId: POLL_FIXTURE_IDS.org, targetId: RENEWAL_IDENTITY.targetId, workerId: POLL_FIXTURE_IDS.worker,
+        jobId: POLL_FIXTURE_IDS.job, attempt: 1, leaseId: POLL_FIXTURE_IDS.lease, deviceGeneration: RENEWAL_IDENTITY.deviceGeneration } };
+    fake.enqueueRenew({ kind: "renewed", expiresAt: new Date(expiresAt).toISOString(), extensions: [
+      { namespace: "aoa.dev/owned-labels-capability", schemaVersion: 1, critical: false, value: capability },
+    ] });
+    void c.driver.accept(makeRenewalHandoff({ windowMs: 100_000 }));
+    await fireNextTimer();
+    expect(c.renewedAuthorities).toEqual([capability]);
+  });
+  it("refreshes cleanup authority before applying the cancellation floor", async () => {
+    const c = await makeDriverCase();
+    const expiresAt = scheduler.now() + 300_000;
+    const capability = { v: 1, audience: "adapter-manager", expiresAt, sig: "signed-cancel-renewal",
+      ownedLabels: { organizationId: POLL_FIXTURE_IDS.org, targetId: RENEWAL_IDENTITY.targetId, workerId: POLL_FIXTURE_IDS.worker,
+        jobId: POLL_FIXTURE_IDS.job, attempt: 1, leaseId: POLL_FIXTURE_IDS.lease, deviceGeneration: RENEWAL_IDENTITY.deviceGeneration } };
+    fake.enqueueRenew({ kind: "renewed", expiresAt: new Date(expiresAt).toISOString(), cancelRequested: true, cancelReason: "operator",
+      extensions: [{ namespace: "aoa.dev/owned-labels-capability", schemaVersion: 1, critical: false, value: capability }] });
+    void c.driver.accept(makeRenewalHandoff({ windowMs: 100_000 }));
+    await fireNextTimer();
+    expect(c.renewedAuthorities).toEqual([capability]);
+    expect(c.log.indexOf("authority:renewed")).toBeLessThan(c.log.findIndex((entry) => entry.startsWith("cancel:")));
+  });
+});
 
 describe("JOB-015 — a delivered drain is APPLIED and ACKed", () => {
   it("calls the drain handler and uploads a completed ACK carrying the echoed sequence", async () => {
