@@ -1,8 +1,9 @@
 import { api } from "./client";
+import type { ServiceRecoveryMetadata } from "@armyofagents/shared";
 
 export interface ServiceDefinition { command: string; args: string[]; gracefulStopSeconds: number }
 export interface ServiceSummary { serviceId: string; desiredState: string; generation: number; createdAt: string; updatedAt: string }
-export interface ServiceDetail extends ServiceSummary {
+export interface ServiceDetail extends ServiceSummary, ServiceRecoveryMetadata {
   definition: ServiceDefinition | null;
   liveInstance: { serviceInstanceId: string; status: string; generation: number; jobId: string | null } | null;
 }

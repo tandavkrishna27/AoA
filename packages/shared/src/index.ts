@@ -1400,6 +1400,7 @@ export * from "./work-questions.js";
 export * from "./user-entity-follows.js";
 export * from "./notification-registry.js";
 export * from "./types/job-control.js";
+export type { ServiceRecoveryMetadata } from "./types/service-recovery.js";
 export * from "./job-control-source.js";
 export {
   submitJobCommandSchema,

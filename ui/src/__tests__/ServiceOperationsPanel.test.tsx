@@ -19,6 +19,44 @@ function panel() {
     <ServiceOperationsPanel organizationId="org-1" companyId="company-1" /></QueryClientProvider>);
 }
 describe("durable service operator controls", () => {
+  it("does not invent recovery or budget data when details are unavailable", async () => {
+    const user = userEvent.setup(); panel();
+    await user.click(await screen.findByRole("button", { name: "Service details" }));
+    expect(await screen.findByText("Recovery: Unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Company budget: Unavailable")).toBeInTheDocument();
+  });
+  it("shows expired checkpoints and crash limits without claiming the service is paused", async () => {
+    methods.detail.mockResolvedValue({ serviceId: "service-1", desiredState: "running", generation: 2,
+      definition: null, liveInstance: null, recovery: { action: "pause" },
+      checkpoint: { restoreArtifactId: "checkpoint-1", latest: { artifactId: "checkpoint-1", generation: 1,
+        createdAt: "2026-10-01T00:00:00Z", expiresAt: "2026-10-02T00:00:00Z", available: false } },
+      companyBudget: null, instanceHistory: [], historyLimit: 20 });
+    const user = userEvent.setup(); panel();
+    await user.click(await screen.findByRole("button", { name: "Service details" }));
+    expect(await screen.findByText("Recovery: Crash limit reached")).toBeInTheDocument();
+    expect(screen.getByText("Checkpoint: Expired")).toBeInTheDocument();
+    expect(screen.getByText("Company budget: No active company limit")).toBeInTheDocument();
+    expect(screen.getByText("No instances recorded.")).toBeInTheDocument();
+  });
+  it("shows durable recovery, checkpoint, company budget and recent instance history", async () => {
+    methods.detail.mockResolvedValue({ serviceId: "service-1", desiredState: "running", generation: 2,
+      definition: null, liveInstance: null,
+      recovery: { action: "wait", until: "2026-10-07T16:00:00Z" },
+      checkpoint: { restoreArtifactId: null, latest: { artifactId: "checkpoint-1", generation: 2,
+        createdAt: "2026-10-07T15:00:00Z", expiresAt: null, available: true } },
+      companyBudget: { amountCents: 500, observedCents: 123, hardStopEnabled: true, status: "ok" },
+      instanceHistory: [{ serviceInstanceId: "old-instance", generation: 2, status: "stopped",
+        terminalizedBy: "worker_stopped", lastObservedAt: null, createdAt: "2026-10-07T14:00:00Z", updatedAt: "2026-10-07T15:00:00Z" }],
+      historyLimit: 20 });
+    const user = userEvent.setup(); panel();
+    await user.click(await screen.findByRole("button", { name: "Service details" }));
+    expect(await screen.findByText(/Recovery: Waiting/)).toBeInTheDocument();
+    expect(screen.getByText(/Checkpoint: Available/)).toBeInTheDocument();
+    expect(screen.getByText(/Company budget: \$1.23 of \$5.00/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Recent instance history" })).toBeInTheDocument();
+    expect(screen.getByText(/Process exit confirmed/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /checkpoint/i })).not.toBeInTheDocument();
+  });
   it.each(["stopped", "deleted"])("disables invalid transitions from %s", async (desiredState) => {
     methods.list.mockResolvedValue([{ serviceId: "service-1", desiredState, generation: 2 }]); panel();
     expect(await screen.findByRole("button", { name: "Pause" })).toBeDisabled();

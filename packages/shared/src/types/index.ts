@@ -1,4 +1,5 @@
 export type { Company } from "./company.js";
+export type { ServiceRecoveryMetadata } from "./service-recovery.js";
 export type {
   LiveEvent,
   HubItemChangedLivePayload,

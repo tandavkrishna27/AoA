@@ -8,6 +8,7 @@ const transitions: Record<string, readonly string[]> = {
   running: ["paused", "stopped"], paused: ["running", "stopped"], stopped: ["running"], deleted: [],
 };
 const serviceKey = (organizationId: string, companyId: string) => ["service-control", organizationId, companyId] as const;
+const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 type Editor = { serviceId: string | null; definition: ServiceDefinition };
 
 function DefinitionEditor({ initial, pending, submit, close }: { initial: Editor; pending: boolean;
@@ -41,6 +42,21 @@ function ServiceDetails({ organizationId, companyId, serviceId, edit }: { organi
   return <div className="space-y-2 border-t border-border pt-2 text-sm">
     <p>Active instance: {data.liveInstance?.status ?? "No active instance"}</p>
     {data.liveInstance ? <p className="text-xs text-muted-foreground">Instance generation {data.liveInstance.generation}</p> : null}
+    <p>Recovery: {!data.recovery ? "Unavailable" : data.recovery.action === "wait" ? `Waiting until ${new Date(data.recovery.until).toLocaleString()}` :
+      data.recovery.action === "pause" ? "Crash limit reached" : "Ready when service is running"}</p>
+    <p>Checkpoint: {!data.checkpoint ? "Unavailable" : data.checkpoint.latest ? data.checkpoint.latest.available ? "Available" : "Expired" : "None recorded"}</p>
+    {data.checkpoint?.latest ? <p className="text-xs text-muted-foreground">Generation {data.checkpoint.latest.generation} ·
+      {" "}{new Date(data.checkpoint.latest.createdAt).toLocaleString()}</p> : null}
+    {data.checkpoint?.restoreArtifactId ? <p className="text-xs text-muted-foreground">Current generation has a checkpoint restore selected.</p> : null}
+    <p>Company budget: {data.companyBudget === undefined ? "Unavailable" : data.companyBudget ?
+      `${currency.format(data.companyBudget.observedCents / 100)} of ${currency.format(data.companyBudget.amountCents / 100)} · ${data.companyBudget.status.replaceAll("_", " ")}${data.companyBudget.hardStopEnabled ? " · Hard stop enabled" : ""}` : "No active company limit"}</p>
+    <h4 className="font-medium">Recent instance history</h4>
+    {!data.instanceHistory?.length ? <p className="text-xs text-muted-foreground">No instances recorded.</p> :
+      <ul className="space-y-1 text-xs text-muted-foreground">{data.instanceHistory.map((instance) => <li key={instance.serviceInstanceId}>
+        Generation {instance.generation} · {instance.status} · {new Date(instance.createdAt).toLocaleString()}
+        {instance.terminalizedBy ? ` · ${instance.terminalizedBy === "worker_stopped" ? "Process exit confirmed" : "Process exit unconfirmed"}` : ""}
+      </li>)}</ul>}
+    {data.instanceHistory?.length === data.historyLimit ? <p className="text-xs text-muted-foreground">Showing the latest {data.historyLimit} instances.</p> : null}
     {data.definition ? <><p className="break-words font-mono text-xs">{data.definition.command}</p>
       <Button variant="outline" size="sm" onClick={() => edit(data.definition!)}>Update generation</Button></> :
       <p className="text-xs text-muted-foreground">Current definition unavailable.</p>}
