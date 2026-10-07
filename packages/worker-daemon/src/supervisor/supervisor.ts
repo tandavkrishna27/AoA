@@ -1,16 +1,16 @@
 import { readCommanderWarmControl, type CommanderWarmControl } from "../lease/commander-warm-control.js";
 /**
- * `Supervisor` — the sandbox lifecycle orchestrator (WRK-004).
+ * `Supervisor` â€” the sandbox lifecycle orchestrator (WRK-004).
  *
  * It is the real implementation behind the WRK-003 `SupervisorSeam`: the poll
  * loop hands it an ACKed lease (`accept`) and it drives the whole run INSIDE a
- * provider sandbox — never in the worker process:
+ * provider sandbox â€” never in the worker process:
  *
- *   create → attempt_started → execute (in sandbox) → terminal → destroy
+ *   create â†’ attempt_started â†’ execute (in sandbox) â†’ terminal â†’ destroy
  *
- * under the EFFECT authority (the happy path). Abnormal paths — a hung create, a
- * cancel, a lease loss, or shutdown — WITHDRAW effect authority and route through
- * the DISTINCT, monotonic CleanupAuthority, which can only cancel → kill →
+ * under the EFFECT authority (the happy path). Abnormal paths â€” a hung create, a
+ * cancel, a lease loss, or shutdown â€” WITHDRAW effect authority and route through
+ * the DISTINCT, monotonic CleanupAuthority, which can only cancel â†’ kill â†’
  * destroy (escalating on non-compliance) and read a redacted projection. The
  * escalation reclaims the whole process tree.
  *
@@ -19,7 +19,7 @@ import { readCommanderWarmControl, type CommanderWarmControl } from "../lease/co
  * they enter any log or metric.
  *
  * Runtime imports: relative modules + the frozen protocol type carried on the
- * handoff — the E4-D01 boundary.
+ * handoff â€” the E4-D01 boundary.
  */
 
 import { randomUUID } from "node:crypto";
@@ -79,26 +79,26 @@ import {
 } from "../lease/artifact-export.js";
 import { isOwnedLabelsCapabilityShape, type OwnedLabelsCapabilityLike } from "../lease/owned-labels-capability.js";
 
-/** CLI-003/D3 — a captured stdout/stderr/system log line to turn into a `log` event. */
+/** CLI-003/D3 â€” a captured stdout/stderr/system log line to turn into a `log` event. */
 export interface RunObservationLogEntry {
   readonly stream: LogPayloadV1["stream"];
   readonly level?: LogPayloadV1["level"];
   readonly message: string;
 }
 
-/** CLI-003/D3 — a progress tick to turn into a `progress` event. */
+/** CLI-003/D3 â€” a progress tick to turn into a `progress` event. */
 export interface RunObservationProgressEntry {
   readonly message: string;
   readonly percent: ProgressPayloadV1["percent"];
 }
 
 /**
- * CLI-003/D3+D5 — the bounded observation captured from a completed sandbox run:
+ * CLI-003/D3+D5 â€” the bounded observation captured from a completed sandbox run:
  * log output (stdout/stderr/system), progress ticks, and EVIDENTIARY-ONLY usage.
  * In the wired world this is populated from the D1 transport streaming callbacks +
  * the adapter's token/runtime accounting; the live population channel is the inert
  * E4-D12 seam, so CLI-003 wires the seam + unit-tests it. Usage never carries a
- * price — JOB-012 prices server-side.
+ * price â€” JOB-012 prices server-side.
  */
 export interface RunObservation {
   readonly logs?: readonly RunObservationLogEntry[];
@@ -107,7 +107,7 @@ export interface RunObservation {
 }
 
 /**
- * WRK-018 — what the supervisor itself observed of a completed run, handed to `observeRun`:
+ * WRK-018 â€” what the supervisor itself observed of a completed run, handed to `observeRun`:
  * the run's stdout TAIL from the optional provider stream channel, already scrubbed by the
  * run's own canaries (`run-output.ts`), and the execute window on the SUPERVISOR's clock.
  * Present whenever an `observeRun` is composed; `stdoutTail` is `""` when the provider does
@@ -122,10 +122,10 @@ export interface RunOutputObservation {
 
 /** The max number of captured `log` events a single run may emit, leaving headroom
  * under the frozen 500-event batch cap for attempt_started/progress/usage/terminal.
- * Envelope-level (≤500-event / ≤3.75 MiB) batching itself is the durable sink's job. */
+ * Envelope-level (â‰¤500-event / â‰¤3.75 MiB) batching itself is the durable sink's job. */
 const MAX_LOG_EVENTS = 480;
 
-/** The worker's stable identity (targetId + deviceGeneration) — not carried on a
+/** The worker's stable identity (targetId + deviceGeneration) â€” not carried on a
  * per-lease handoff, so it is bound once at supervisor construction. */
 export interface WorkerSupervisionIdentity {
   readonly targetId: string;
@@ -137,18 +137,18 @@ export interface SupervisorDeps {
   /**
    * The DESKTOP/in-process provider (the `E2bSandboxProvider` on the self-hosted lane).
    * OPTIONAL since DEP-011 Slice 2a: a CONTAINER worker instead injects `makeRunProvider`
-   * (a per-run networked driver factory) — exactly ONE of `provider`/`makeRunProvider`
+   * (a per-run networked driver factory) â€” exactly ONE of `provider`/`makeRunProvider`
    * may be set, and `!provider && !makeRunProvider` is a `no_provider` refusal upstream
    * (`compose-dispatch.ts`). Fail-fast at construction if both are present.
    */
   readonly provider?: SandboxProvider;
   /**
-   * DEP-011 Slice 2a — the PER-RUN networked provider FACTORY (a TYPE here; the impl comes
+   * DEP-011 Slice 2a â€” the PER-RUN networked provider FACTORY (a TYPE here; the impl comes
    * from the OUTSIDE composition root, DEP-011 Slice 2b). The capability does not exist at
    * `buildRun`, so the container branch builds NO-OP null-object authorities there and REBUILDS
    * the real authorities over `makeRunProvider({handoff, capability})` INSIDE `runLifecycle`
-   * AFTER redemption. SYNC (no `await` between the two authority reassignments — §2a.3). REQUIRES
-   * `materializeRunSecrets` (the rebuild only runs inside its block) — fail-fast pairing them.
+   * AFTER redemption. SYNC (no `await` between the two authority reassignments â€” Â§2a.3). REQUIRES
+   * `materializeRunSecrets` (the rebuild only runs inside its block) â€” fail-fast pairing them.
    */
   readonly makeRunProvider?: (input: { handoff: LeaseHandoff; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }) => SandboxProvider;
   readonly identity: WorkerSupervisionIdentity;
@@ -166,7 +166,7 @@ export interface SupervisorDeps {
   /**
    * Generic per-op deadline stamped on the op context (default 60s).
    *
-   * ★ H1 — may be a FUNCTION of the handoff, resolved ONCE per run at acceptance. That is what
+   * â˜… H1 â€” may be a FUNCTION of the handoff, resolved ONCE per run at acceptance. That is what
    * lets the composition root derive the deadline from the run's own
    * `workload.maxRuntimeSeconds`, which otherwise never reaches the supervisor at all: this
    * number is simultaneously the execute race, the E2B sandbox TTL, and the E2B command
@@ -180,45 +180,45 @@ export interface SupervisorDeps {
   /** ms after acceptance the cleanup authority's escalation becomes mandatory. */
   readonly cleanupDeadlineMs?: number;
   /**
-   * CLI-008 Unit B — wall-clock budget for the WHOLE staging step (default 30s).
+   * CLI-008 Unit B â€” wall-clock budget for the WHOLE staging step (default 30s).
    *
-   * ★ ONE budget across BOTH halves, subtracted not added — the R6 shape `secretRedeemDeadlineMs`
+   * â˜… ONE budget across BOTH halves, subtracted not added â€” the R6 shape `secretRedeemDeadlineMs`
    * established for redeem+create. The resolve fetches bytes over the network and the write
    * pushes them into the sandbox; two independent 30 s budgets would make the step's real bound
    * 60 s while every knob still read 30. A bound nobody can compute from the config is not a bound.
    */
   readonly stageInputDeadlineMs?: number;
   /**
-   * SVC-008b — the service supervise loop's tick interval, in ms
+   * SVC-008b â€” the service supervise loop's tick interval, in ms
    * (default {@link SERVICE_HEALTH_TICK_MS_DEFAULT}). Ignored by every non-service run.
    *
-   * ★ INJECTABLE BECAUSE §9.3 IS OPEN, not because tests want it fast. The interval sets the
+   * â˜… INJECTABLE BECAUSE Â§9.3 IS OPEN, not because tests want it fast. The interval sets the
    * durable `service_health` volume (a 10 s tick over 72 h is ~26 000 rows per instance) and
-   * it interacts with SVC-003's liveness deadline, so whoever rules on §9.3 changes the
+   * it interacts with SVC-003's liveness deadline, so whoever rules on Â§9.3 changes the
    * composition root rather than this module.
    */
   readonly serviceHealthTickMs?: number;
   /** Injectable timer for the create-deadline race (default node timers). */
   readonly setTimeoutFn?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>;
   readonly clearTimeoutFn?: (handle: ReturnType<typeof setTimeout>) => void;
-  /** DAT-005 D4 — per-run secret canaries scrubbed from EVERY event this supervisor's
+  /** DAT-005 D4 â€” per-run secret canaries scrubbed from EVERY event this supervisor's
    * lifecycle sequencer emits (attempt_started / terminal / op stream), BEFORE the
    * digest + durable outbox. The canary-seeding channel that populates this is the
    * inert E4-D12 seam; until then it is `[]` (verbatim emit, no secret-bearing
-   * supervisor string exists yet — every terminal errorMessage is hardcoded null). */
+   * supervisor string exists yet â€” every terminal errorMessage is hardcoded null). */
   /**
-   * ★ REQUIRED, deliberately. This was `redactionCanaries?:` with a `?? []` fallback — an
+   * â˜… REQUIRED, deliberately. This was `redactionCanaries?:` with a `?? []` fallback â€” an
    * OMISSION-BY-DEFAULT in a REDACTION mechanism: a caller that simply forgot got no
    * redaction at all, silently, and nothing anywhere would say so.
    *
    * A fail-open default in a security control is the worst kind of default, because the
-   * failure is invisible in exactly the case it matters. Passing `[]` is still allowed —
+   * failure is invisible in exactly the case it matters. Passing `[]` is still allowed â€”
    * but it now has to be TYPED OUT, which makes "this run has no canaries" a decision
    * someone made rather than one they omitted.
    */
   readonly redactionCanaries: readonly string[];
   /**
-   * CLI-003/D3 — an OPTIONAL run-observation source. When present, the supervisor
+   * CLI-003/D3 â€” an OPTIONAL run-observation source. When present, the supervisor
    * resolves it AFTER `execute` (with the exec result) and emits the captured
    * log/progress/usage producer events between `attempt_started` and `terminal`.
    * Absent (the default) leaves the lifecycle event stream unchanged. Best-effort:
@@ -227,51 +227,51 @@ export interface SupervisorDeps {
   readonly observeRun?: (input: {
     handoff: LeaseHandoff;
     exec: ExecuteResult;
-    /** WRK-018 — additive; always set by the supervisor when it calls `observeRun`. */
+    /** WRK-018 â€” additive; always set by the supervisor when it calls `observeRun`. */
     output?: RunOutputObservation;
   }) => RunObservation | Promise<RunObservation>;
   /**
-   * CLI-008 Unit B — resolve the control-plane-staged files for this run, as {path, GRANT}
-   * pairs. Absent (the default) ⇒ nothing is staged and the lifecycle is byte-identical to
+   * CLI-008 Unit B â€” resolve the control-plane-staged files for this run, as {path, GRANT}
+   * pairs. Absent (the default) â‡’ nothing is staged and the lifecycle is byte-identical to
    * before, which is what keeps staging OPTIONAL for every existing run.
    *
-   * ★ GRANTS, NOT BYTES. The composition root reads the staged-input pointer off the frozen
+   * â˜… GRANTS, NOT BYTES. The composition root reads the staged-input pointer off the frozen
    * envelope and mints a download grant per file over the frozen `artifact_transfer_grant`
-   * op; the bytes go store → provider → sandbox and never cross this seam. A bytes-shaped
+   * op; the bytes go store â†’ provider â†’ sandbox and never cross this seam. A bytes-shaped
    * signature would route payloads through a daemon that is dependency-pinned (E4-D01)
    * precisely so it does not handle them.
    *
-   * ★ FAIL CLOSED, unlike `observeRun`. `observeRun` is instrumentation and a throw there is
+   * â˜… FAIL CLOSED, unlike `observeRun`. `observeRun` is instrumentation and a throw there is
    * swallowed; this is INPUT. A run that was meant to have files and does not is a sandbox
    * whose agent works from the wrong context, terminalizes cleanly, and satisfies every gate
-   * downstream while proving nothing. A throw here — resolving OR staging — fails the attempt
+   * downstream while proving nothing. A throw here â€” resolving OR staging â€” fails the attempt
    * and escalates cleanup.
    */
   readonly resolveStagedFiles?: (input: { handoff: LeaseHandoff }) => Promise<readonly StagedFileRequest[]>;
   /**
-   * DAT-009-3c (E5-D07) — the artifact-export SEQUENCER, built by the dispatch runtime (slice 3d)
+   * DAT-009-3c (E5-D07) â€” the artifact-export SEQUENCER, built by the dispatch runtime (slice 3d)
    * from the control-plane client, device key and session, none of which the supervisor holds.
    * The supervisor supplies the per-run `exporter` (this run's sandbox, through this run's
-   * `EffectAuthority`). Absent, or present with no producer ⇒ inert: no call, no metric, and the
+   * `EffectAuthority`). Absent, or present with no producer â‡’ inert: no call, no metric, and the
    * lifecycle is byte-identical.
    */
   readonly exportArtifacts?: ArtifactExportSequencer;
   /**
-   * DAT-009-3c (E5-D07) — the PRODUCER (CLI-012): names the files this run returns. Requests
+   * DAT-009-3c (E5-D07) â€” the PRODUCER (CLI-012): names the files this run returns. Requests
    * only, never bytes. REQUIRES `exportArtifacts` (fail-fast at construction: a producer with no
    * one to hand its requests to would silently export nothing on every run).
    *
-   * ★ BEST-EFFORT, like `observeRun` and unlike `resolveStagedFiles` (E5-D07). The work is already
+   * â˜… BEST-EFFORT, like `observeRun` and unlike `resolveStagedFiles` (E5-D07). The work is already
    * done; a refused, thrown or timed-out export logs, emits `export_artifact` `failed`/`timed_out`,
-   * and continues to the TRUTHFUL terminal — the command's own verdict. The attempt is not failed.
+   * and continues to the TRUTHFUL terminal â€” the command's own verdict. The attempt is not failed.
    */
   readonly resolveExportArtifacts?: (input: {
     handoff: LeaseHandoff;
     exec: ExecuteResult;
     /**
-     * CLI-012 (E5-D07) — THE PER-RUN SANDBOX VIEW, additive on DAT-009-3c's `{handoff, exec}`.
+     * CLI-012 (E5-D07) â€” THE PER-RUN SANDBOX VIEW, additive on DAT-009-3c's `{handoff, exec}`.
      *
-     * ★ THE PRODUCER IS COMPOSED AT THE BOOT ROOT AND HAS NO SANDBOX OF ITS OWN. It never names
+     * â˜… THE PRODUCER IS COMPOSED AT THE BOOT ROOT AND HAS NO SANDBOX OF ITS OWN. It never names
      * a sandbox id: this closure is bound to THIS run's sandbox and THIS run's `run.effect`, so
      * enumeration passes the same fence gate `digestArtifact`/`exportArtifact` do and cannot
      * become a second, quieter door onto a gated action. It also honours the window latch, so
@@ -279,13 +279,13 @@ export interface SupervisorDeps {
      */
     enumerate: (root: string) => Promise<readonly SandboxOutputEntry[]>;
   }) => Promise<readonly ArtifactExportRequest[]>;
-  /** DAT-009-3c — ONE budget for the whole export window (producer + every file), default 30 s.
+  /** DAT-009-3c â€” ONE budget for the whole export window (producer + every file), default 30 s.
    * On the networked lane it is further clamped so destroy keeps `EXPORT_TEARDOWN_RESERVE_MS`. */
   readonly exportArtifactsDeadlineMs?: number;
   /**
-   * DAT-008 slice 5 — PER-RUN secret materialisation. Given a handoff, redeems the envelope's
+   * DAT-008 slice 5 â€” PER-RUN secret materialisation. Given a handoff, redeems the envelope's
    * `env`/`sandbox_local_only` handles and returns the sandbox `env` plus the redeemed values (to
-   * seed as per-run redaction canaries). Absent (the default) = no secrets, `env` stays `{}` —
+   * seed as per-run redaction canaries). Absent (the default) = no secrets, `env` stays `{}` â€”
    * byte-identical pre-slice-5 behaviour. A THROW or a TIMEOUT fails the attempt CLOSED: a durable
    * terminal is emitted and cleanup escalated, and NO sandbox is created.
    */
@@ -293,19 +293,19 @@ export interface SupervisorDeps {
     handoff: LeaseHandoff,
   ) => Promise<{ env: Record<string, string>; canaries: readonly string[]; capability?: OwnedLabelsCapabilityLike; warmControl?: CommanderWarmControl }>;
   /**
-   * DAT-008 slice 5 — the per-lease canary coordinator shared with the fence-close proxy, so ONE
+   * DAT-008 slice 5 â€” the per-lease canary coordinator shared with the fence-close proxy, so ONE
    * redemption seeds BOTH event streams. Absent = the supervisor uses its own per-run array
    * (seeded from `redactionCanaries`); the proxy sink is simply not fed (unit/non-driver builds).
    */
   readonly canaryCoordinator?: RunCanaryCoordinator;
   /**
-   * DAT-008 slice 5 (R6) — the redemption budget, in ms. CARVED FROM `createDeadlineMs` (clamped to
+   * DAT-008 slice 5 (R6) â€” the redemption budget, in ms. CARVED FROM `createDeadlineMs` (clamped to
    * it) and SUBTRACTED from the create budget, so a slow control plane cannot extend the run's wall
    * clock. Default 5000.
    */
   readonly secretRedeemDeadlineMs?: number;
   /**
-   * DEP-017 — the live env-absence probe (`env-probe.ts`). PRESENT = composed: after stage-in and
+   * DEP-017 â€” the live env-absence probe (`env-probe.ts`). PRESENT = composed: after stage-in and
    * `attempt_started`, before the tenant command, the probe runs INSIDE the run's sandbox with the
    * run's own env, then again with two planted canaries (the positive control). Any present
    * credential class, a probe that did not run, or a control that did not turn red FAILS the
@@ -328,3 +328,1375 @@ export type SupervisorRunStatus = "succeeded" | "failed" | "cancelled" | "create
 export interface Supervisor extends SupervisorSeam {
   applyBrowserDecision?(command: ControlCommandV1): Promise<void>;
   onAuthorityRenewed(leaseId: string, capability: OwnedLabelsCapabilityLike): void;
+  accept(handoff: LeaseHandoff): Promise<void>;
+  /** Cancel a live run: withdraw effect authority and escalate cleanup on its
+   * process tree (cancel â†’ kill â†’ destroy). Idempotent; a no-op if unknown. */
+  cancel(leaseId: string, reason?: string): Promise<void>;
+  /** Handle a lost/replaced lease exactly like a cancel (effect withdrawn). */
+  onLeaseLost(leaseId: string): Promise<void>;
+  /** Cancel every live run and let cleanup converge (shutdown). */
+  shutdown(): Promise<void>;
+  activeRunCount(): number;
+}
+
+interface ActiveRun {
+  provider: SandboxProvider;
+  warmAuthorityExpiresAt: number | null;
+  readonly leaseId: string;
+  readonly labels: ResourceLabels;
+  readonly fence: EffectFence;
+  // MUTABLE (DEP-011 Slice 2a Â§2a.3): the networked branch builds NO-OP null-object
+  // authorities at `buildRun` and REBUILDS the real ones over the per-run driver AFTER
+  // redemption. NEVER unset (a `TypeError`-and-map-leak the null-object prevents); the
+  // two reassignments are SYNCHRONOUS (no `await` between) so a concurrent cancel sees
+  // both-no-op or both-real, never a half-swap.
+  effect: EffectAuthority;
+  cleanup: CleanupAuthority;
+  readonly makeCtx: () => ProviderOpContext;
+  sandboxId: string | null;
+  cancelled: boolean;
+  cleanedUp: boolean;
+  /** True on the container/networked branch (`makeRunProvider`) â€” routes teardown through
+   * the HONEST TRUST cleanup (clock-first, orphan-on-expiry, RNA-skew re-check). */
+  readonly networked: boolean;
+  /** The per-run capability's absolute ms-epoch expiry, set when the networked authorities are
+   * rebuilt. The clock-first teardown compares it to the supervisor `now` (Â§2a.5). */
+  capExpiresAt: number | null;
+  readonly serviceJobDeadlineAt: number | null;
+  sandboxExpiresAt: number | null;
+  lifetimeRenewalPending: boolean;
+  /** H1 â€” this run's provider-op budget, resolved ONCE at `buildRun` from the handoff (i.e.
+   * from `workload.maxRuntimeSeconds`). Governs `create` (â‡’ the sandbox TTL) and `execute`;
+   * cleanup/teardown keep the base deadline. */
+  /** MUTABLE since DEP-017: the env probe CARVES its own elapsed time out of the run's budget
+   * (the R6 "subtracted, not added" rule), and `makeCtx` reads this field LIVE so the supervisor
+   * race and the provider's own ctx stay the SAME number (H1). Without a probe it never moves. */
+  opDeadlineMs: number;
+  /**
+   * SVC-008b â€” the live service sequencer's stop handle, or null (every batch run, and a
+   * service run before its launch / after it settles).
+   *
+   * â˜… It is what makes `gracefulStopSeconds` reachable at all. Without it, a server-ordered
+   * cooperative cancel goes straight to `escalateCleanup`, which destroys the sandbox and
+   * hard-kills the process tree â€” the graceful ladder never runs, which is the behaviour
+   * SVC-008 Â§1.3(d) objects to.
+   */
+  serviceStop: ServiceStopHandle | null;
+}
+
+const TIMEOUT = Symbol("create-deadline");
+
+/**
+ * SVC-008b â€” how long past `gracefulStopSeconds` the supervisor waits for a service
+ * sequencer to finish its ladder before raising the fence and escalating anyway.
+ *
+ * It covers the two provider round-trips the ladder still owes after its deadline lapses
+ * (`signalProcess("kill")` + the status re-read). It is NOT a second graceful window: when it
+ * fires, the run is cancelled and the sandbox is reclaimed on the existing escalation path.
+ */
+const GRACEFUL_STOP_MARGIN_MS = 5_000;
+
+export function createSupervisor(deps: SupervisorDeps): Supervisor {
+  const browserControllers = new Map<string, BrowserApprovalController>();
+  // DEP-011 Slice 2a â€” FAIL FAST at construction (review F4/F5):
+  //  (a) EXACTLY one of `provider`/`makeRunProvider` may be set â€” both is a misconfig
+  //      (which authority does `buildRun` build?).
+  //  (b) `makeRunProvider` REQUIRES `materializeRunSecrets`: the post-redemption rebuild
+  //      runs ONLY inside the `if (deps.materializeRunSecrets)` block, so pairing them
+  //      without it would leave the no-op authorities in place forever (a silent
+  //      fail-safe-but-wrong misconfig). Pair them or fail now, loudly.
+  if (deps.provider && deps.makeRunProvider) {
+    throw new Error("createSupervisor: provider and makeRunProvider are mutually exclusive (set exactly one)");
+  }
+  if (deps.makeRunProvider && !deps.materializeRunSecrets) {
+    throw new Error("createSupervisor: makeRunProvider requires materializeRunSecrets (the per-run authorities rebuild after redemption)");
+  }
+  // DAT-009-3c (E5-D07) â€” a producer without a sequencer would silently export nothing on every
+  // run. Pair them or fail now. (A sequencer without a producer is allowed and inert.)
+  if (deps.resolveExportArtifacts && !deps.exportArtifacts) {
+    throw new Error("createSupervisor: resolveExportArtifacts requires exportArtifacts (the sequencer the producer hands its requests to)");
+  }
+  const networked = deps.makeRunProvider !== undefined;
+  const now = deps.now ?? (() => Date.now());
+  const nowIso = deps.nowIso ?? (() => new Date().toISOString());
+  const newEventId = deps.newEventId ?? randomUUID;
+  const newKey = deps.newIdempotencyKey ?? randomUUID;
+  const createDeadlineMs = deps.createDeadlineMs ?? 30_000;
+  // The BASE deadline: what cleanup/teardown ops use, and the fallback when no per-run
+  // resolver is composed (the desktop root, and every test that passes a plain number).
+  const opDeadlineMs = typeof deps.opDeadlineMs === "number" ? deps.opDeadlineMs : 60_000;
+  // H1 â€” the per-run resolver, when the composition root supplies one. Resolved ONCE at
+  // `buildRun`, never re-derived, so `create` and `execute` cannot disagree about the budget.
+  const resolveRunDeadlineMs =
+    typeof deps.opDeadlineMs === "function" ? deps.opDeadlineMs : () => opDeadlineMs;
+  const cleanupDeadlineMs = deps.cleanupDeadlineMs ?? 30_000;
+  const stageInputDeadlineMs = deps.stageInputDeadlineMs ?? 30_000;
+  const exportArtifactsDeadlineMs = deps.exportArtifactsDeadlineMs ?? 30_000;
+  const serviceHealthTickMs =
+    typeof deps.serviceHealthTickMs === "number" &&
+    Number.isFinite(deps.serviceHealthTickMs) &&
+    deps.serviceHealthTickMs > 0
+      ? deps.serviceHealthTickMs
+      : SERVICE_HEALTH_TICK_MS_DEFAULT;
+  // DAT-008 slice 5 (R6): the redemption budget is CARVED FROM the create budget â€” never larger â€”
+  // so redeem + create together stay within `createDeadlineMs`.
+  const secretRedeemDeadlineMs = Math.min(deps.secretRedeemDeadlineMs ?? 5_000, createDeadlineMs);
+  const schedule = deps.setTimeoutFn ?? ((fn, ms) => setTimeout(fn, ms));
+  const cancelTimer = deps.clearTimeoutFn ?? ((h) => clearTimeout(h));
+
+  const runs = new Map<string, ActiveRun>();
+
+  const emitOp = (operation: string, outcome: string): void =>
+    deps.metrics?.inc(SANDBOX_OP_METRIC, { operation, outcome });
+
+  function ctx(deadlineMs: number = opDeadlineMs): ProviderOpContext {
+    return { deadlineMs, idempotencyKey: newKey() };
+  }
+
+  function labelsFor(handoff: LeaseHandoff): ResourceLabels {
+    return {
+      organizationId: String(handoff.offer.job.organizationId),
+      targetId: deps.identity.targetId,
+      workerId: String(handoff.offer.workerId),
+      jobId: String(handoff.offer.job.jobId),
+      attempt: handoff.offer.job.attempt,
+      leaseId: handoff.leaseId,
+      deviceGeneration: deps.identity.deviceGeneration,
+    };
+  }
+
+  function deliveryIdentity(handoff: LeaseHandoff): EventDeliveryIdentity {
+    return {
+      organizationId: String(handoff.offer.job.organizationId),
+      companyId: String(handoff.offer.job.companyId),
+      workerId: String(handoff.offer.workerId),
+      jobId: String(handoff.offer.job.jobId),
+      attempt: handoff.offer.job.attempt,
+      leaseId: handoff.leaseId,
+      fenceToken: String(handoff.fenceToken),
+    };
+  }
+
+  function createSpecFor(handoff: LeaseHandoff, labels: ResourceLabels, env: Readonly<Record<string, string>>): CreateSandboxSpec {
+    const workload = handoff.offer.job.workload as Record<string, unknown>;
+    const command = typeof workload.command === "string" ? workload.command : handoff.offer.job.workloadType;
+    const args = Array.isArray(workload.args) ? (workload.args as unknown[]).map(String) : [];
+    // DAT-008 slice 5 â€” `env` is the redeemed provider-credential map (M2). Empty when no
+    // `env`/`sandbox_local_only` handle rides the envelope, preserving pre-slice-5 behaviour.
+    return { resourceLabels: labels, command, args, env, workloadType: handoff.offer.job.workloadType };
+  }
+
+  async function withDeadline<T>(op: Promise<T>, deadlineMs: number): Promise<T | typeof TIMEOUT> {
+    let handle: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<typeof TIMEOUT>((resolve) => {
+      handle = schedule(() => resolve(TIMEOUT), deadlineMs);
+    });
+    try {
+      return await Promise.race([op, timeout]);
+    } finally {
+      if (handle !== null) cancelTimer(handle);
+    }
+  }
+
+  /** Withdraw effect authority and escalate cleanup on the run's labeled
+   * resource(s). Idempotent per run. */
+  async function escalateCleanup(run: ActiveRun, reason: string): Promise<void> {
+    browserControllers.get(run.leaseId)?.close();
+    run.effect.withdraw();
+    if (run.cleanedUp) return;
+
+    // Discover the labeled resource(s) even when `create` hung or is still
+    // in-flight (no sandboxId yet).
+    let targets: string[];
+    if (run.sandboxId !== null) {
+      targets = [run.sandboxId];
+    } else {
+      const listed = await run.cleanup.list(ctx());
+      // A concurrent pass may have latched, or `create` may have resolved, while
+      // we awaited the list â€” re-check and prefer a now-known sandboxId.
+      if (run.cleanedUp) return;
+      targets = run.sandboxId !== null ? [run.sandboxId] : listed.map((r) => r.sandboxId);
+    }
+
+    // CONTAINMENT MUST NOT FAIL OPEN. An empty pass reclaimed NOTHING: a provider
+    // that only registers the sandbox on `create` resolve (the real E2B runtime)
+    // is not listable while create is in-flight, so `list()` returns []. Do NOT
+    // consume the terminal `cleanedUp` latch on an empty/ineffective pass â€” leave
+    // the run retryable so the post-create `if (run.cancelled)` pass reclaims the
+    // now-known live sandbox. Latching here would strand a tenant sandbox past
+    // lease loss with zero worker-side teardown â€” the exact leak WRK-004 prevents.
+    if (targets.length === 0) {
+      deps.logger?.info(
+        {
+          leaseId: run.leaseId,
+          resourceLabelsHash: hashResourceLabels(run.labels),
+          deviceGeneration: run.labels.deviceGeneration,
+          reason,
+        },
+        "supervisor: cleanup pass found no reclaimable resource (create in-flight) â€” staying retryable",
+      );
+      return;
+    }
+
+    // Only NOW â€” with a real target to reclaim â€” consume the terminal latch, so a
+    // genuine convergence is never double-run (idempotent-destroy purpose intact).
+    run.cleanedUp = true;
+
+    // DEP-011 Slice 2a Â§2a.5 â€” the NETWORKED branch is the HONEST TRUST variant: NEVER the
+    // gate-masking `converge` (which reads the uniform RNA as "gone â†’ success" and would mask a
+    // LIVE, billing sandbox behind a lease-expired cap). `convergeNetworked` is clock-first with an
+    // RNA skew re-check and records a DISTINCT `orphaned` outcome, never calling the RNA-means-gone
+    // `converge`.
+    const status = run.networked
+      ? await convergeNetworked(run, targets)
+      : await run.cleanup.converge(targets, () => ctx());
+    const stage = run.cleanup.escalationStage();
+    deps.metrics?.inc(CLEANUP_ESCALATION_METRIC, { escalation_stage: stage });
+    deps.metrics?.inc(CLEANUP_OUTCOME_METRIC, { outcome: status });
+    deps.logger?.info(
+      {
+        leaseId: run.leaseId,
+        resourceLabelsHash: hashResourceLabels(run.labels),
+        deviceGeneration: run.labels.deviceGeneration,
+        cleanupEpoch: run.cleanup.cleanupEpoch(),
+        escalationStage: stage,
+        cleanupStatus: status,
+        // Â§2a.5 F1 â€” a DISTINCT escalateCleanup log field the deferred reaper's leak-rate signal reads.
+        orphaned: status === "orphaned",
+        reason,
+      },
+      "supervisor: cleanup converged",
+    );
+  }
+
+  /**
+   * DEP-011 Slice 2a Â§2a.5 â€” the HONEST TRUST teardown for the NETWORKED branch (Option A). The
+   * worker holds the cap + its `expiresAt` and its OWN clock, so the decision is the worker's, NOT
+   * the gate's ambiguous RNA:
+   *  - CLOCK-FIRST: if the cap is expired on the worker clock, a gated teardown is doomed â€” record
+   *    an `orphaned` outcome WITHOUT touching the gate (never a false `success`).
+   *  - On a returned uniform RNA from an attempted (valid-at-issue) op, RE-READ the clock (skew-safe):
+   *    expired-during-round-trip â‡’ `orphaned`; STILL valid â‡’ a valid cap + RNA means the sandbox is
+   *    genuinely GONE â‡’ `success`. RNA is consulted ONLY here, and only after the clock says the cap
+   *    should still work.
+   * Hard reclamation of a live orphan is the deferred server-side reaper's job (Option A); this is the
+   * worker's honest best-effort teardown while the cap is valid.
+   */
+  async function convergeNetworked(run: ActiveRun, targets: string[]): Promise<"success" | "failed" | "orphaned"> {
+    if (run.capExpiresAt === null || !(run.capExpiresAt > now())) return "orphaned";
+    let aggregate: "success" | "failed" = "success";
+    for (const sandboxId of targets) {
+      try {
+        const result = await run.cleanup.destroy(sandboxId, ctx());
+        if (result.cleanupStatus !== "success") aggregate = "failed";
+      } catch (err) {
+        if (err instanceof ResourceNotAvailableError) {
+          // Skew re-check: expired-in-flight â‡’ orphan (do NOT read RNA as "gone"); still-valid â‡’
+          // genuinely gone â‡’ nothing to reclaim (a success for this target).
+          if (!(run.capExpiresAt > now())) return "orphaned";
+          continue;
+        }
+        throw err;
+      }
+    }
+    return aggregate;
+  }
+
+  /** DEP-011 Slice 2a Â§2a.5 â€” record an HONEST orphan without touching the gate: the cap is expired
+   * (on the worker clock), so a gated teardown is doomed. A DISTINCT `orphaned` cleanup outcome +
+   * log field (never `success`, never `failed`); the deferred server-side reaper reclaims the live
+   * sandbox. Consumes the cleanup latch so no later pass double-handles it. */
+  function recordOrphan(run: ActiveRun, reason: string): void {
+    run.cleanedUp = true;
+    deps.metrics?.inc(CLEANUP_OUTCOME_METRIC, { outcome: "orphaned" });
+    deps.logger?.warn(
+      {
+        leaseId: run.leaseId,
+        resourceLabelsHash: hashResourceLabels(run.labels),
+        deviceGeneration: run.labels.deviceGeneration,
+        cleanupStatus: "orphaned",
+        orphaned: true,
+        reason,
+      },
+      "supervisor: networked capability expired before teardown â€” recording an HONEST orphan (server-side reaper owns reclamation)",
+    );
+  }
+
+  async function runLifecycle(handoff: LeaseHandoff, run: ActiveRun): Promise<void> {
+    // DAT-008 slice 5 â€” the PER-RUN canary array. When a coordinator is present the fence-close
+    // proxy captures this SAME array (by leaseId) at construction, so seeding it once â€” before
+    // create, before any emit â€” scrubs BOTH the lifecycle stream (this sequencer) and the proxy's
+    // post-close `network_denied` stream.
+    //
+    // â˜… NOTE ON `deps.redactionCanaries`: it is honoured ONLY on the no-coordinator fallback path
+    // (unit/non-driver builds). On the coordinator path it is deliberately NOT merged, because the
+    // proxy shares the coordinator's array BY REFERENCE and a merge would need a new array the
+    // proxy would not see. This is safe today because the sole production composition passes
+    // `redactionCanaries: []` (`dispatch-runtime.ts`). If a construction-time canary is ever needed
+    // ALONGSIDE a coordinator, pre-seed the coordinator's per-lease array â€” do NOT re-add a prefix
+    // here, or the proxy stream would silently lose it.
+    const runCanaries: string[] = deps.canaryCoordinator
+      ? deps.canaryCoordinator.ensure(handoff.leaseId)
+      : [...(deps.redactionCanaries ?? [])];
+    const events = new EventSequencer({
+      identity: deliveryIdentity(handoff),
+      sink: deps.eventSink,
+      newEventId,
+      now: nowIso,
+      redactionCanaries: runCanaries,
+    });
+
+    if (handoff.offer.job.workloadType === "browser_session") {
+      const self = deps.browserSelfModel;
+      const verified = !!self && self.registeredTargetProfile.capabilityCeiling.includes("sandbox.filtered_egress") &&
+        self.report.reportedCapabilities.includes("sandbox.filtered_egress") &&
+        self.registeredTargetProfile.providerConstraints.profileId === self.verifiedProviderConstraints.profileId &&
+        self.registeredTargetProfile.providerConstraints.version === self.verifiedProviderConstraints.version &&
+        self.registeredTargetProfile.providerConstraints.digest === self.verifiedProviderConstraints.digest;
+      const refusal = browserDispatchRefusal(handoff, verified);
+      if (refusal !== null) {
+        await events.terminal({ status: "failed", exitCode: null, errorCode: refusal, errorMessage: null });
+        return;
+      }
+    }
+
+    // 0. materialize secrets â€” redeem the envelope's `env`/`sandbox_local_only` handles under a
+    // deadline CARVED FROM the create budget (R6). FAIL CLOSED: any denial/timeout/throw emits a
+    // durable terminal and escalates cleanup WITHOUT creating a sandbox â€” a partial/empty env would
+    // burn a provider round-trip and surface a misleading auth error much later.
+    let env: Readonly<Record<string, string>> = {};
+    let warmControl: CommanderWarmControl | undefined;
+    let secretElapsedMs = 0;
+    if (deps.materializeRunSecrets) {
+      const t0 = now();
+      let mat;
+      try {
+        mat = await withDeadline(deps.materializeRunSecrets(handoff), secretRedeemDeadlineMs);
+      } catch (err) {
+        deps.logger?.warn(
+          { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels) },
+          "supervisor: secret redemption failed â€” failing the attempt closed",
+        );
+        await events.terminal({ status: "failed", exitCode: null, errorCode: "secret_redemption_failed", errorMessage: null });
+        await escalateCleanup(run, "secret_redemption_error");
+        return;
+      }
+      if (mat === TIMEOUT) {
+        deps.logger?.warn(
+          { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels) },
+          "supervisor: secret redemption deadline exceeded â€” failing the attempt closed",
+        );
+        await events.terminal({ status: "failed", exitCode: null, errorCode: "secret_redemption_timeout", errorMessage: null });
+        await escalateCleanup(run, "secret_redemption_timeout");
+        return;
+      }
+      // Seed the run's redeemed values BEFORE create and BEFORE any emit that could carry one
+      // (M7 ordering). Because `runCanaries` is the array both sinks captured, this one push feeds
+      // the lifecycle stream AND the fence-close proxy stream.
+      runCanaries.push(...mat.canaries);
+      env = mat.env;
+      if (mat.warmControl) {
+        const validated = readCommanderWarmControl(mat.warmControl, mat.capability);
+        if (!validated || !mat.capability || !labelsEqual(mat.capability.ownedLabels, run.labels)) {
+          await events.terminal({ status: "failed", exitCode: null, errorCode: "warm_control_required", errorMessage: null });
+          return;
+        }
+        warmControl = validated;
+      }
+
+      secretElapsedMs = now() - t0;
+
+      // DEP-011 Slice 2a â€” the NETWORKED branch: the per-run capability now exists, so REBUILD the
+      // real per-run authorities over `makeRunProvider({handoff, capability})`, replacing the no-op
+      // null-object ones (Â§2a.3). This is the ONLY place the container worker's real provider is
+      // constructed â€” the capability does not exist at `buildRun`.
+      if (networked) {
+        const capability = mat.capability;
+        if (capability === undefined) {
+          // FAIL CLOSED (Â§2a.6): a networked run that resolves handles but gets NO capability must
+          // NEVER build a driver with `capability: undefined` (refused at the gate on every op â€” a
+          // mislabeled `create_failed`). Emit a diagnosable terminal; the no-op authorities handle
+          // cleanup safely (nothing created).
+          deps.logger?.warn(
+            { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels) },
+            "supervisor: networked run resolved no owned-labels capability â€” failing the attempt closed",
+          );
+          await events.terminal({ status: "failed", exitCode: null, errorCode: "no_run_capability", errorMessage: null });
+          await escalateCleanup(run, "no_run_capability");
+          return;
+        }
+        // SYNCHRONOUS SWAP (Â§2a.3): `makeRunProvider` is sync and NO `await` separates the two
+        // reassignments, so a concurrent cancel/onLeaseLost reaching `escalateCleanup` sees EITHER
+        // both no-op OR both real â€” never a half-swap.
+        const driver = deps.makeRunProvider!({ handoff, capability, ...(warmControl ? { warmControl } : {}) });
+        if (warmControl && (driver.checkpointMode !== "snapshot" || !driver.advertisedOperations.has("checkpoint") || !driver.advertisedOperations.has("restore"))) {
+          await events.terminal({ status: "failed", exitCode: null, errorCode: "warm_checkpoint_unavailable", errorMessage: null });
+          return;
+        }
+        const rebuilt = buildAuthorities(driver, warmControl?.warmResourceCapability?.physicalLabels ?? run.labels, run.fence);
+        run.effect = rebuilt.effect;
+        run.cleanup = rebuilt.cleanup;
+        run.provider = driver;
+        run.warmAuthorityExpiresAt = warmControl?.warmResourceCapability?.expiresAt ?? null;
+        run.capExpiresAt = Math.min(capability.expiresAt, warmControl?.warmResourceCapability?.expiresAt ?? capability.expiresAt);
+      }
+    }
+    let spec = createSpecFor(handoff, run.labels, env);
+    const browserPolicy = handoff.offer.job.workloadType === "browser_session" ? readBrowserNetworkPolicy(handoff) : null;
+    if (browserPolicy) {
+      if (!run.effect.supportsBrowserNetworkPolicy() || !deps.resolveStagedFiles) {
+        await events.terminal({ status: "failed", exitCode: null, errorCode: "browser_network_authority_unavailable", errorMessage: null });
+        return;
+      }
+      spec = { ...spec, command: "node", args: [BROWSER_RUNNER_PATH, BROWSER_CONFIG_PATH],
+        env: { ...spec.env, NODE_PATH: "/usr/local/lib/node_modules" }, browserNetworkPolicy: browserPolicy };
+    }
+    const warmRunner = handoff.offer.job.source.kind === "commander_turn" && spec.command === "node" &&
+      spec.args.length === 4 && spec.args[0] === "/home/user/aoa-commander-warm-v1.cjs" &&
+      ["codex", "claude"].includes(spec.args[1]) && spec.args[2] === "/home/user/aoa-commander-input.json" &&
+      spec.args[3] === "/home/user/aoa-output/aoa-one-shot-result.json";
+    if ((warmRunner && (!networked || !warmControl)) || (warmControl && !warmRunner)) {
+      await events.terminal({ status: "failed", exitCode: null, errorCode: "warm_control_required", errorMessage: null });
+      return;
+    }
+    if (warmControl && handoff.offer.job.source.kind === "commander_turn") {
+      spec = { ...spec, env: { ...env, AOA_COMMANDER_WARM_TURN: handoff.offer.job.source.internalAgentRunId,
+        AOA_COMMANDER_REDACTION_CANARIES: JSON.stringify(runCanaries) } };
+    }
+
+
+    // 1. create â€” raced against its deadline, REDUCED by the redemption time so redeem + create stay
+    // within `createDeadlineMs` (R6 "subtracted, not added").
+    const createBudget = Math.max(0, createDeadlineMs - secretElapsedMs);
+    const sandboxLifetimeStartedAt = now();
+    let created;
+    try {
+      // H1 â€” `run.makeCtx()` carries THIS RUN's budget. That ctx becomes the E2B sandbox
+      // TTL (`#ttl(ctx)` -> `transport.create({timeoutMs})` + `setTimeout`), so the sandbox
+      // must be born with the run's lifetime, not the base 60 s. The create RACE is still
+      // `createBudget` (30 s minus redemption) - a slow CREATE is a different failure from a
+      // long-running command, and only the latter is what the workload budgets for.
+      if (warmControl?.mode === "resume") {
+        const sandboxId = warmControl.resourceId!;
+        run.sandboxId = sandboxId; // Cleanup must know the retained resource even if resume fails.
+        const restored = await withDeadline(run.effect.resume(sandboxId, run.makeCtx()), createBudget);
+        if (restored === TIMEOUT) created = TIMEOUT;
+        else {
+          if (!restored.restored) throw new Error("Commander warm restore refused");
+          created = { providerOpId: restored.providerOpId, sandboxId, generation: run.labels.deviceGeneration };
+        }
+      } else {
+        const createContext = run.makeCtx();
+        created = await withDeadline(run.effect.create(warmControl ? { ...spec, env: {} } : spec,
+          warmControl ? { ...createContext, deadlineMs: createContext.deadlineMs + warmControl.idleTtlMs } : createContext), createBudget);
+      }
+    } catch (err) {
+      emitOp("create", "failed");
+      await events.terminal({ status: "failed", exitCode: null, errorCode: "create_failed", errorMessage: null });
+      await escalateCleanup(run, "create_error");
+      return;
+    }
+    if (created === TIMEOUT) {
+      emitOp("create", "timed_out");
+      deps.logger?.warn(
+        { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels) },
+        "supervisor: create deadline exceeded",
+      );
+      await events.terminal({ status: "failed", exitCode: null, errorCode: "create_timeout", errorMessage: null });
+      await escalateCleanup(run, "create_timeout");
+      return;
+    }
+    run.sandboxId = created.sandboxId;
+    if (browserPolicy && (!("browserNetworkPolicyDigest" in created) || created.browserNetworkPolicyDigest !== browserPolicy.digest)) {
+      await events.terminal({ status: "failed", exitCode: null, errorCode: "browser_network_policy_not_installed", errorMessage: null });
+      await escalateCleanup(run, "browser_network_policy_not_installed");
+      return;
+    }
+    if (run.serviceJobDeadlineAt !== null && run.provider.sandboxLifetimeMode === "renewable") {
+      run.sandboxExpiresAt = sandboxLifetimeStartedAt + run.opDeadlineMs;
+    }
+    emitOp("create", "success");
+
+    if (run.cancelled) {
+      // CLI-003/D3 â€” a cancel that arrives after create but before the tenant command
+      // still reaches a durable cancelled terminal, then escalates cleanup.
+      await events.terminal({ status: "cancelled", exitCode: null, errorCode: "cancelled", errorMessage: null });
+      await escalateCleanup(run, "cancelled_during_create");
+      return;
+    }
+
+    // 1b. CLI-008 Unit B â€” stage the control plane's files INTO the sandbox.
+    //
+    // Position: after `create` (there is no sandbox to write into before it) and before
+    // `attempt_started`/`execute` (the files exist so the tenant command can read them). It is
+    // deliberately BEFORE `attempt_started` so a staging failure never emits an event that
+    // says the tenant command started when it never did.
+    if (deps.resolveStagedFiles) {
+      // â˜…â˜… BOTH HALVES ARE RACED. Every neighbouring await in this function is bounded â€” secrets
+      // (:494), create (:561), execute (:656) â€” and staging was the one that was not. A stalled
+      // fetch or a sandbox filesystem that never returns meant `accept()` NEVER TERMINALIZED,
+      // and an active sandbox was retained for as long as the process lived. That is strictly
+      // worse than the failure the fail-closed arms below were written for: a hang produces no
+      // terminal at all, so nothing downstream even knows the attempt is stuck.
+      const stageStartedAt = now();
+      let staged: readonly StagedFileRequest[] = [];
+      try {
+        const resolved = await withDeadline(deps.resolveStagedFiles({ handoff }), stageInputDeadlineMs);
+        if (resolved === TIMEOUT) {
+          emitOp("stage_files", "timed_out");
+          deps.logger?.warn(
+            { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels) },
+            "supervisor: staged-input resolve deadline exceeded â€” failing the attempt closed",
+          );
+          const cancelled = run.cancelled;
+          await events.terminal({
+            status: cancelled ? "cancelled" : "failed",
+            exitCode: null,
+            errorCode: cancelled ? "cancelled" : "stage_input_timeout",
+            errorMessage: null,
+          });
+          await escalateCleanup(run, cancelled ? "cancelled_during_stage_input" : "stage_input_deadline");
+          return;
+        }
+        staged = resolved;
+        if (browserPolicy) {
+          const expected = readStagedInputPointers(handoff.offer.job.extensions);
+          if (staged.length !== expected.length || expected.some((pointer) => {
+            const file = staged.find((item) => item.path === pointer.path);
+            return !file || file.grant.objectKey !== pointer.objectKey || file.grant.expectedSha256 !== pointer.sha256 || file.grant.maxBytes !== pointer.sizeBytes;
+          })) throw new Error("browser staged grants mismatch");
+        }
+      } catch (err) {
+        emitOp("stage_files", "failed");
+        deps.logger?.warn(
+          { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels), err },
+          "supervisor: could not resolve staged input for this run â€” failing the attempt closed",
+        );
+        // A cancel arriving mid-resolve withdraws effect authority and surfaces here as a
+        // throw. Report it as `cancelled`, exactly as the execute arm below does â€” labelling a
+        // cancel a staging failure would send someone hunting a store problem that never was.
+        const cancelled = run.cancelled;
+        await events.terminal({
+          status: cancelled ? "cancelled" : "failed",
+          exitCode: null,
+          errorCode: cancelled ? "cancelled" : "stage_input_unavailable",
+          errorMessage: null,
+        });
+        await escalateCleanup(run, cancelled ? "cancelled_during_stage_input" : "stage_input_unresolved");
+        return;
+      }
+      if (staged.length > 0) {
+        // What is LEFT of the step budget after the resolve, never a fresh one.
+        const writeBudget = Math.max(0, stageInputDeadlineMs - (now() - stageStartedAt));
+        try {
+          const wrote = await withDeadline(
+            // â˜… The ctx is passed and the E2B provider IGNORES it â€” `stageFiles` hands the files
+            // to `transport.writeFiles`, whose `writeFiles`/`fetch` accept no abort signal, so
+            // there is nothing to honour it with. RECORDED RATHER THAN HALF-BUILT: this race is
+            // a supervisor-side backstop that bounds the SUPERVISOR, and a timed-out write may
+            // still be in flight inside the transport. That is acceptable here only because the
+            // timeout arm escalates cleanup, which destroys the sandbox the write targets.
+            // Threading a signal end to end is a transport change and belongs with the work that
+            // needs it.
+            run.effect.stageFiles(created.sandboxId, staged, run.makeCtx()),
+            writeBudget,
+          );
+          if (wrote === TIMEOUT) {
+            emitOp("stage_files", "timed_out");
+            deps.logger?.warn(
+              { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels), stagedCount: staged.length },
+              "supervisor: staging the control plane's input exceeded its deadline â€” failing the attempt closed",
+            );
+            const cancelled = run.cancelled;
+            await events.terminal({
+              status: cancelled ? "cancelled" : "failed",
+              exitCode: null,
+              errorCode: cancelled ? "cancelled" : "stage_input_timeout",
+              errorMessage: null,
+            });
+            await escalateCleanup(run, cancelled ? "cancelled_during_stage_input" : "stage_input_deadline");
+            return;
+          }
+          if (browserPolicy && (wrote.stagedPaths.length !== staged.length || staged.some((file) => !wrote.stagedPaths.includes(file.path)))) {
+            throw new Error("browser staging acknowledgement mismatch");
+          }
+          emitOp("stage_files", "success");
+        } catch (err) {
+          // FAIL CLOSED. Running the agent without the files the control plane meant it to
+          // have produces a clean terminal for mutilated work â€” the one outcome nothing
+          // downstream can detect.
+          emitOp("stage_files", "failed");
+          deps.logger?.warn(
+            { leaseId: run.leaseId, resourceLabelsHash: hashResourceLabels(run.labels), stagedCount: staged.length, err },
+            "supervisor: staging the control plane's input failed â€” failing the attempt closed",
+          );
+          // Same reasoning as the resolve arm: a cancel withdraws effect authority and reaches
+          // us as a throw from `stageFiles`, and it is a cancel, not a store failure.
+          const cancelled = run.cancelled;
+          await events.terminal({
+            status: cancelled ? "cancelled" : "failed",
+            exitCode: null,
+            errorCode: cancelled ? "cancelled" : "stage_input_failed",
+            errorMessage: null,
+          });
+          await escalateCleanup(run, cancelled ? "cancelled_during_stage_input" : "stage_input_error");
+          return;
+        }
+      }
+    }
+
+    // 2. attempt_started â€” the tenant command is running INSIDE the sandbox.
+    await events.attemptStarted(created.sandboxId);
+
+    // 2a. DEP-017 â€” the live env-absence probe, INSIDE this sandbox, with THIS run's env, after
+    // stage-in and before the tenant command. The summary is a `system` log event (scrubbed by the
+    // run's canaries, which the planted values join before they execute) emitted BEFORE any
+    // terminal, so the evidence survives a failure. A failing verdict fails the attempt closed.
+    if (deps.envProbe) {
+      const probeStartedAt = now();
+      const probeSummary = await runEnvProbe({
+        sandboxId: created.sandboxId,
+        env: spec.env,
+        ownOrganizationId: String(handoff.offer.job.organizationId),
+        allowedNames: [...PROVIDER_AUTH_ENV_TARGETS],
+        runCanaries,
+        execute: (input) => run.effect.execute(input, run.makeCtx()),
+        withDeadline,
+        deadlineMs: Math.min(deps.envProbe.deadlineMs ?? ENV_PROBE_DEFAULT_DEADLINE_MS, run.opDeadlineMs),
+        ...(deps.envProbe.metadataUrl !== undefined ? { metadataUrl: deps.envProbe.metadataUrl } : {}),
+        ...(deps.envProbe.randomToken ? { randomToken: deps.envProbe.randomToken } : {}),
+        ...(deps.envProbe.foreignOrganizationId ? { foreignOrganizationId: deps.envProbe.foreignOrganizationId } : {}),
+      });
+      // â˜… CARVED FROM the run's budget, never added to it (the R6 rule). The ceiling sits one
+      // teardown headroom under the owned-labels capability window, so a probe that ADDED its
+      // time to a near-ceiling run would push `destroy` past the capability's expiry and leave a
+      // BILLABLE sandbox recorded `orphaned`. `makeCtx` reads this field live, so the provider's
+      // own command timeout shrinks with the supervisor's race.
+      run.opDeadlineMs = Math.max(1_000, run.opDeadlineMs - (now() - probeStartedAt));
+      const absent = probeSummary.verdict === "absent";
+      await events.log({ stream: "system", level: absent ? "info" : "error", message: envProbeLogMessage(probeSummary) });
+      emitOp("env_probe", absent ? "success" : "failed");
+      if (!absent) {
+        const cancelled = run.cancelled;
+        await events.terminal({
+          status: cancelled ? "cancelled" : "failed",
+          exitCode: null,
+          errorCode: cancelled ? "cancelled" : ENV_PROBE_ERROR_CODES[probeSummary.verdict],
+          errorMessage: null,
+        });
+        await escalateCleanup(run, cancelled ? "cancelled_during_env_probe" : "env_probe_failed");
+        return;
+      }
+    }
+
+    // 2b. SVC-008b â€” THE SERVICE BRANCH.
+    //
+    // â˜… Position: after `attempt_started` (the attempt HAS started â€” the sandbox exists and
+    // the staged input landed) and before `execute`. `execute` is a COMPLETION oracle, and
+    // running a service through it is SVC-008 Â§1.2's mis-supervision: the run ends when the
+    // startup script returns, and a service that happens to exit 0 is reported `succeeded`.
+    //
+    // â˜… The service sequencer emits the INSTANCE events and returns an outcome; `terminal`
+    // and teardown stay HERE, so the orphan-aware destroy below is written once and cannot
+    // drift per workload type.
+    if (handoff.offer.job.workloadType === "service") {
+      const workload = parseServiceWorkload(handoff.offer.job.workload);
+      if (workload === null) {
+        // Defensive: the envelope's discriminated union already guarantees this shape, so a
+        // failure here is a wire/parse divergence. Fail the attempt with a NAMED code rather
+        // than falling through to the batch body, which is the defect this branch exists for.
+        await events.terminal({ status: "failed", exitCode: null, errorCode: "service_workload_invalid", errorMessage: null });
+        await escalateCleanup(run, "service_workload_invalid");
+        return;
+      }
+      const outcome = await runServiceLifecycle({
+        workload,
+        sandboxId: created.sandboxId,
+        effect: run.effect,
+        events,
+        makeCtx: run.makeCtx,
+        now,
+        nowIso,
+        schedule,
+        tickMs: serviceHealthTickMs,
+        deadlineAt: run.serviceJobDeadlineAt !== null && run.provider.sandboxLifetimeMode === "renewable"
+          ? run.serviceJobDeadlineAt : now() + run.opDeadlineMs,
+        get capExpiresAt() {
+          return run.sandboxExpiresAt === null ? run.capExpiresAt
+            : Math.min(run.capExpiresAt ?? run.sandboxExpiresAt, run.sandboxExpiresAt);
+        },
+        teardownHeadroomMs: RUN_TEARDOWN_HEADROOM_MS,
+        // â˜… EVERY tick, not once: Â§4.5. `run.cancelled` is set by `cancel`/`onLeaseLost`/
+        // `shutdown`, and the renewal driver closes the fence-close proxy before calling them.
+        fenceClosed: () => run.cancelled,
+        logger: deps.logger,
+        publishStopHandle: (handle) => {
+          run.serviceStop = handle;
+        },
+      });
+      run.serviceStop = null;
+      await events.terminal({
+        status: outcome.status,
+        exitCode: outcome.exitCode,
+        errorCode: outcome.errorCode,
+        errorMessage: outcome.errorMessage,
+      });
+      if (outcome.escalate !== null) {
+        await escalateCleanup(run, outcome.escalate);
+        return;
+      }
+      await finishRun(run, created.sandboxId);
+      return;
+    }
+
+    // 3. execute (in sandbox) â€” raced against a supervisor-side op deadline so a
+    // provider that hangs (ignoring the opDeadlineMs it also carries on ctx) still
+    // reaches a durable terminal within a bound (Â§2.1 within-policy). A well-behaved
+    // provider returns before the race fires (with its own timedOut verdict), so the
+    // op wins; the backstop only bites a hung/misbehaving provider.
+    // WRK-018 â€” the optional stdout stream channel. Opened ONLY when an observer is composed, so
+    // without one the execute input is byte-identical to the pre-channel shape. The capture is
+    // PER RUN (a multi-tenant daemon runs many at once) and scrubs with THIS run's canary array
+    // â€” the same live reference its event sequencer reads â€” so one run's stream can neither
+    // reach nor be redacted by another's.
+    const output = deps.observeRun
+      ? createRunOutputCapture({
+          canaries: runCanaries,
+          onDrop: (reason) => deps.metrics?.inc(RUN_OUTPUT_DROPPED_METRIC, { reason }),
+        })
+      : null;
+    const commanderLive = handoff.offer.job.source.kind === "commander_turn" && spec.command === "node" &&
+      spec.args.length === 4 && ["/home/user/aoa-commander-runner.cjs", "/home/user/aoa-commander-warm-v1.cjs"].includes(spec.args[0])
+      ? createCommanderLiveOutput({ canaries: runCanaries,
+          emit: (message) => events.log({ stream: "stdout", level: "info", message }) }) : null;
+    const execStartedAt = now();
+    const browserController = browserPolicy ? createBrowserApprovalController({
+      identity: { organizationId: handoff.offer.job.organizationId, companyId: handoff.offer.job.companyId,
+        workerId: handoff.offer.workerId, jobId: handoff.offer.job.jobId, attempt: handoff.offer.job.attempt,
+        leaseId: handoff.offer.leaseId, fenceToken: handoff.offer.fenceToken }, now, deadlineAt: execStartedAt + run.opDeadlineMs,
+      scrubText: (text) => scrubOutputText(text, runCanaries),
+      emit: async (request) => { await events.runtimeDecisionRequested(request); },
+      deliver: (response) => deliverBrowserApproval({ effect: run.effect, sandboxId: created.sandboxId, response, now, ctx: run.makeCtx() }),
+    }) : null;
+    if (browserController) browserControllers.set(run.leaseId, browserController);
+    let browserSessionCompleted = false;
+    let browserSessionFailed = false;
+    const browserOutput = browserController ? createBrowserOutput({ receive: async (message) => {
+      if (!message || typeof message !== "object" || Array.isArray(message)) throw new Error("invalid browser output");
+      const value = message as Record<string, unknown>;
+      if (value.type === "approval_requested") await browserController.request(message);
+      else if (["session_started", "session_completed", "session_failed"].includes(String(value.type))) {
+        if (value.type === "session_completed") browserSessionCompleted = true;
+        if (value.type === "session_failed") browserSessionFailed = true;
+        await events.browserObservation({ artifactIds: [], url: null, title: null });
+      } else throw new Error("unknown browser output");
+    } }) : null;
+    let exec;
+    try {
+      const raced = await withDeadline(
+        run.effect.execute(
+          {
+            sandboxId: created.sandboxId,
+            command: spec.command,
+            args: spec.args,
+            env: spec.env,
+            ...(output || commanderLive || browserOutput ? { onStdout: (chunk: string) => {
+              browserOutput?.onStdout(chunk);
+              output?.onStdout(chunk); commanderLive?.onStdout(chunk);
+            } } : {}),
+          },
+          // H1 - the run's budget on BOTH sides: the ctx is the provider's own command
+          // timeout, and the race below is the supervisor-side backstop for a provider that
+          // ignores it. They must be the same number, or the backstop fires first and
+          // reports `execute_timeout` for a command still inside its budget.
+          run.makeCtx(),
+        ),
+        run.opDeadlineMs,
+      );
+      if (raced === TIMEOUT) {
+        await commanderLive?.close();
+        output?.close(); // discard: a late chunk is dropped + counted, never buffered
+        emitOp("execute", "timed_out");
+        const cancelled = run.cancelled;
+        await events.terminal({
+          status: cancelled ? "cancelled" : "failed",
+          exitCode: null,
+          errorCode: cancelled ? "cancelled" : "execute_timeout",
+          errorMessage: null,
+        });
+        await escalateCleanup(run, "execute_deadline");
+        return;
+      }
+      exec = raced;
+    } catch (err) {
+      output?.close();
+      await commanderLive?.close();
+      emitOp("execute", "failed");
+      // Â§2.1 â€” this is the ONLY lifecycle exit and it MUST still reach a durable
+      // terminal. The common cancel/lease-loss path tears down the sandbox
+      // (escalateCleanup) which makes the in-flight execute REJECT here; without a
+      // terminal the attempt is stranded non-terminal until the JOB-006 reaper. A
+      // cancelled run reaches `cancelled`; a genuine execute failure reaches `failed`.
+      const cancelled = run.cancelled;
+      await events.terminal({
+        status: cancelled ? "cancelled" : "failed",
+        exitCode: null,
+        errorCode: cancelled ? "cancelled" : "execute_failed",
+        errorMessage: null,
+      });
+      await escalateCleanup(run, "execute_error");
+      return;
+    }
+    emitOp("execute", "success");
+    if (browserOutput && (await withDeadline(browserOutput.close(), 5000) !== true || !browserSessionCompleted || browserSessionFailed)) {
+      browserController?.close();
+      await events.terminal({ status: run.cancelled ? "cancelled" : "failed", exitCode: null,
+        errorCode: run.cancelled ? "cancelled" : "browser_output_invalid", errorMessage: null });
+      await escalateCleanup(run, "browser_output_invalid");
+      return;
+    }
+    browserController?.close();
+    const execRuntimeMillis = now() - execStartedAt;
+    // Close the channel the moment execute returns: the tail is final, and anything a provider
+    // delivers after this point is dropped, not appended to a run that has already ended.
+    const captured = output?.close();
+    await commanderLive?.close();
+
+    if (run.cancelled) {
+      // Cancelled while executing â€” emit a durable cancelled terminal (CLI-003/D3),
+      // then escalate; no terminal success, no double destroy.
+      await events.terminal({ status: "cancelled", exitCode: null, errorCode: "cancelled", errorMessage: null });
+      await escalateCleanup(run, "cancelled_during_execute");
+      return;
+    }
+
+    // 3b. Producers (CLI-003/D3+D5): best-effort log/progress/usage captured from
+    // the run, emitted between attempt_started and terminal. Instrumentation must
+    // NEVER fail the run â€” a throw is logged and swallowed. Usage is evidentiary-only
+    // (the frozen `.strict()` schema rejects any price field â€” JOB-012 prices).
+    if (deps.observeRun) {
+      try {
+        const obs = await deps.observeRun({
+          handoff,
+          exec,
+          output: { stdoutTail: captured?.stdoutTail ?? "", runtimeMillis: execRuntimeMillis,
+            scrubText: (text) => scrubOutputText(text, runCanaries) },
+        });
+        for (const entry of (obs.logs ?? []).slice(0, MAX_LOG_EVENTS)) {
+          await events.log({ stream: entry.stream, level: entry.level ?? "info", message: entry.message });
+        }
+        for (const tick of obs.progress ?? []) {
+          await events.progress({ message: tick.message, percent: tick.percent });
+        }
+        // WRK-018 1(b) â€” there is deliberately NO diagnostic log of the parsed counts here.
+        // One was built and then DROPPED by the M1 planning session (F2, 2026-09-23) after five
+        // Codex P1s of one family: a line that must carry data while every surface of it is
+        // subject to canary redaction has no caller-side boundary â€” the last finding showed the
+        // LOGGER ITSELF adds `msg`/`time`/`level` below any scrubber a caller can run (E4-F019).
+        // Consequence, recorded rather than hidden: acceptance 1(b) is not live-provable.
+        if (obs.usage) await events.usage(obs.usage);
+      } catch (err) {
+        deps.logger?.warn({ leaseId: run.leaseId, err }, "supervisor: run observation failed (best-effort)");
+      }
+    }
+
+    // 3c. DAT-009-3c â€” the ARTIFACT EXPORT window (E5-D07). After `observeRun`, so usage is
+    // already in the durable outbox and a slow export can never delay or drop it; BEFORE the
+    // terminal, because an upload grant and a commit both need a LIVE fence and the local emit
+    // would race the outbox drain; BEFORE `finishRun`, because export reads from a live sandbox.
+    // Only this (the normal) terminal exports (Ruling B). Best-effort: the terminal below is the
+    // command's verdict whatever the window's outcome.
+    if (deps.resolveExportArtifacts && deps.exportArtifacts) {
+      const prepared = await runExportWindow(handoff, run, created.sandboxId, exec, deps.resolveExportArtifacts, deps.exportArtifacts);
+      // 3d. CLI-013 â€” ANNOUNCE each committed artifact, BEFORE the terminal.
+      //
+      // â˜…â˜…â˜… DELIBERATELY OUTSIDE `runExportWindow`'s catch (E7-D12, FATAL). The window is
+      // best-effort about EXPORTING; this loop is not best-effort about EMITTING. `#emit`
+      // allocates `seq` before awaiting the sink, so a swallowed sink failure leaves a hole and
+      // `createJobEventIngestService` then accepts nothing past it â€” the terminal below included.
+      // "Log and continue to a truthful terminal" is the one outcome the ingest contract forbids,
+      // so the rejection propagates and fails the attempt instead. The committed artifact is
+      // durable either way; the commit is never retracted.
+      for (const announcement of prepared) await events.artifactPrepared(announcement);
+    }
+
+    // 4. terminal event â€” ENRICHED with exec.signal/timedOut (CLI-003/D3). The frozen
+    // terminal payload has no signal/timedOut field, so they fold into the free
+    // errorCode/errorMessage strings; a timed-out or signalled exec is `failed`.
+    const status = exec.exitCode === 0 && !exec.timedOut && (!warmControl || exec.signal === null) ? "succeeded" : "failed";
+    const errorCode = exec.timedOut ? "exec_timeout" : exec.signal !== null ? "exec_signalled" : null;
+    const errorMessage = exec.signal !== null ? `signal:${exec.signal}` : null;
+    if (warmControl && status === "succeeded") {
+      let receipt: Awaited<ReturnType<EffectAuthority["checkpoint"]>>;
+      try {
+        if (run.cancelled || !run.effect.isActive()) throw new Error("Commander warm fence closed");
+        const checkpoint = await withDeadline(run.effect.checkpoint(created.sandboxId, run.makeCtx()), Math.min(opDeadlineMs, 5000));
+        if (checkpoint === TIMEOUT || checkpoint.mode !== "snapshot" || !checkpoint.checkpointRef || checkpoint.checkpointRef.length > 512 ||
+            !checkpoint.providerOpId || run.cancelled || !run.effect.isActive()) throw new Error("Commander warm checkpoint unavailable");
+        receipt = checkpoint;
+      } catch {
+        await events.terminal({ status: run.cancelled ? "cancelled" : "failed", exitCode: exec.exitCode,
+          errorCode: run.cancelled ? "cancelled" : "warm_checkpoint_failed", errorMessage: null });
+        await escalateCleanup(run, "warm_checkpoint_failed");
+        return;
+      }
+      // Ledger sink failures are fatal: emitting a terminal past a missing
+      // sequence would leave an un-ingestable success claim. Last-resort cleanup
+      // handles the failure; it cannot retain the resource.
+      await events.log({ stream: "stdout", level: "info", message: "aoa-commander-checkpoint-v1:" + JSON.stringify({
+        version: 1, sessionId: warmControl.sessionId, generation: warmControl.generation, resourceId: created.sandboxId,
+        checkpointRef: receipt.checkpointRef, resourceLabels: warmControl.warmResourceCapability?.physicalLabels ?? run.labels }) });
+      if (run.cancelled || !run.effect.isActive()) {
+        await events.terminal({ status: "cancelled", exitCode: exec.exitCode, errorCode: "cancelled", errorMessage: null });
+        await escalateCleanup(run, "warm_fence_closed_after_checkpoint");
+        return;
+      }
+      await events.terminal({ status: "succeeded", exitCode: exec.exitCode, errorCode, errorMessage });
+      if (!run.cancelled && run.effect.isActive()) return; // Durable checkpoint + terminal; CP owns retention/reaping.
+      await escalateCleanup(run, "warm_fence_closed_after_terminal");
+      return;
+    }
+    await events.terminal({ status, exitCode: exec.exitCode, errorCode, errorMessage });
+
+    // 5. destroy UNDER EFFECT AUTHORITY (happy-path reclaim).
+    await finishRun(run, created.sandboxId);
+  }
+
+  /**
+   * DAT-009-3c (E5-D07) â€” one artifact-export window for one run. Never throws, never fails the
+   * attempt, and emits `export_artifact` EXACTLY once.
+   *
+   * â˜… ATTEMPT-BOUND (F10). Everything tenant-shaped comes from THIS run's `handoff` (the one
+   * `accept` received for this lease â€” never a lookup by id, never a supervisor-level "current
+   * run"), and the exporter is closed over THIS run's `sandboxId` and `run.effect`, whose fence
+   * was built from the same handoff. The producer cannot name a sandbox; the sequencer derives
+   * the object key and artifact id from the handoff; the control plane re-binds both to the
+   * authenticated authority's lease (`resolveWorkerFenceContext`).
+   *
+   * â˜… `run.effect` is read AT CALL TIME: the networked branch reassigns it after redemption, and a
+   * cancel/lease loss withdraws it, so `EffectAuthority`'s guard refuses before the grant reaches
+   * any provider.
+   *
+   * â˜… NO PATH, GRANT URL OR BYTES in any log line or label: `ArtifactExportFailedError.message`
+   * embeds the (tenant-authored) path, so only `stage` + the path-free `reason` are logged, never
+   * the error.
+   */
+  async function runExportWindow(
+    handoff: LeaseHandoff,
+    run: ActiveRun,
+    sandboxId: string,
+    exec: ExecuteResult,
+    resolveExportArtifacts: NonNullable<SupervisorDeps["resolveExportArtifacts"]>,
+    exportArtifacts: ArtifactExportSequencer,
+  ): Promise<readonly ArtifactPreparedPayloadV1[]> {
+    const report = (outcome: "success" | "failed" | "timed_out", stage: string, reason: string, exported = 0): void => {
+      emitOp("export_artifact", outcome);
+      const fields = {
+        leaseId: run.leaseId,
+        resourceLabelsHash: hashResourceLabels(run.labels),
+        stage,
+        reason,
+        exported,
+      };
+      if (outcome === "success") {
+        deps.logger?.info(fields, "supervisor: artifact export window complete");
+      } else {
+        deps.logger?.warn(fields, "supervisor: artifact export window did not complete (best-effort, E5-D07; attempt NOT failed)");
+      }
+    };
+
+    // One budget for the whole window; on the networked lane never past the point where destroy
+    // would lose its reserve inside the capability window.
+    let budget = exportArtifactsDeadlineMs;
+    if (run.networked) {
+      const room = (run.capExpiresAt ?? Number.NEGATIVE_INFINITY) - now() - EXPORT_TEARDOWN_RESERVE_MS;
+      budget = Math.min(budget, room);
+    }
+    if (!(budget > 0)) {
+      report("failed", "window", "export_window_exhausted");
+      return [];
+    }
+    if (!run.effect.isActive()) {
+      report("failed", "window", "authority_withdrawn");
+      return [];
+    }
+
+    // The window LATCH: once the window ends (deadline or settle), an abandoned sequencer can no
+    // longer reach the sandbox.
+    let open = true;
+    const assertOpen = (): void => {
+      if (!open) throw new Error("export window closed");
+    };
+    const exporter: SandboxArtifactExporter = {
+      digest: async (path) => {
+        assertOpen();
+        try {
+          const described = await run.effect.digestArtifact(sandboxId, path, run.makeCtx());
+          emitOp("digest_artifact", "success");
+          // Re-checked AFTER the await: a digest that resolves once the window has ended must not
+          // hand the abandoned sequencer a value it would go on to mint a grant with.
+          assertOpen();
+          return { sha256: described.sha256, sizeBytes: described.sizeBytes };
+        } catch (err) {
+          emitOp("digest_artifact", "failed");
+          throw err;
+        }
+      },
+      export: async (path, grant) => {
+        assertOpen();
+        const exported = await run.effect.exportArtifact(sandboxId, path, grant, run.makeCtx());
+        // Re-checked AFTER the await: an upload that lands once the window has ended stops before
+        // the commit. The uncommitted object is the orphan sweep's (`isSweepEligible`), never a late
+        // commit racing the terminal to the control plane.
+        assertOpen();
+        return { objectKey: exported.objectKey };
+      },
+    };
+
+    // CLI-012 â€” the per-run enumeration view. Latched exactly like `digest`/`export` above: a
+    // listing that resolves after the window ended must not hand an abandoned producer a list it
+    // would go on to mint grants from.
+    const enumerate = async (root: string): Promise<readonly SandboxOutputEntry[]> => {
+      assertOpen();
+      const result = await run.effect.enumerateOutputs(sandboxId, root, run.makeCtx());
+      assertOpen();
+      return result.entries;
+    };
+
+    let phase: "produce" | "sequence" = "produce";
+    // CLI-013 â€” hoisted out of the IIFE so the COMMITTED references can be joined back to the
+    // request that named them: `ExportedArtifactRef` carries no `kind`, and the announcement's
+    // `kind` must be the one the request DECLARED (E7-D08), never one invented here.
+    let requests: readonly ArtifactExportRequest[] = [];
+    const work = (async () => {
+      requests = await resolveExportArtifacts({ handoff, exec, enumerate });
+      phase = "sequence";
+      return exportArtifacts({ handoff, exporter, requests, isOpen: () => open });
+    })();
+    // A raced-out window leaves `work` running; its eventual rejection is expected and handled.
+    work.catch(() => undefined);
+
+    let raced: Awaited<ReturnType<typeof exportArtifacts>> | typeof TIMEOUT;
+    try {
+      raced = await withDeadline(work, budget);
+      open = false;
+    } catch (err) {
+      open = false;
+      if (err instanceof ArtifactExportFailedError) {
+        report("failed", err.stage, exportReasonCode(err.reason));
+      } else {
+        report("failed", phase, phase === "produce" ? "producer_failed" : "sequencer_failed");
+      }
+      return [];
+    }
+
+    if (raced === TIMEOUT) {
+      report("timed_out", phase, "deadline");
+      // â˜… KNOWN GAP, recorded not hidden (`E7-F044`): a window that committed some files and then
+      // timed out loses their announcements, because the sequencer only returns its accumulated
+      // `exported` set when it resolves. Closing it needs an incremental-progress signal on the
+      // E5-owned `ArtifactExportSequencer` seam, which this ticket may not change. The artifacts
+      // stay durable and counted; only the events are missing.
+      return [];
+    }
+
+    // â˜… TRUTHFUL, NOT OPTIMISTIC (CLI-012, `E5-D07` ruling 7). The window now gets a partial
+    // outcome rather than all-or-throw, so `success` means "every named file committed". A
+    // window that committed some and refused others reports `failed` with the FIRST refusal's
+    // stage and reason and the count that DID commit â€” reporting `success` because something
+    // got through would make a per-file refusal invisible to the operator, which is the whole
+    // reason the classification exists.
+    const firstFailure = raced.failures[0];
+    if (firstFailure) {
+      report("failed", firstFailure.stage, firstFailure.reason, raced.exported.length);
+    } else {
+      report("success", phase, "exported", raced.exported.length);
+    }
+
+    // â˜…â˜…â˜… DELIBERATELY OUTSIDE THE CATCH ABOVE, AND AFTER BOTH `report` ARMS (CLI-013).
+    //
+    // Two things at once. (1) The announcements are built for a PARTIAL window too: a window that
+    // committed some files and refused others still made those commits durable, and `report`
+    // classifies the WINDOW while the announcement is per COMMITTED artifact â€” not the same
+    // question. (2) `announcementsFor`'s fail-closed throw must ESCAPE. While this sat inside the
+    // try, the throw was converted into `sequencer_failed` + an empty list and the terminal was
+    // emitted anyway â€” a refusal short-circuited by an enclosing catch, which is the exact defect
+    // class this ticket filed as `E7-F043`, and it silently hid a committed artifact instead of
+    // aborting the lifecycle as `E7-D12` requires.
+    return announcementsFor(raced.exported, requests);
+  }
+
+  /**
+   * CLI-013 â€” join each COMMITTED reference back to the request that named it, so the
+   * announcement carries the `kind` the request DECLARED (E7-D08) rather than one invented here.
+   *
+   * â˜… FAIL-CLOSED on a committed path with no request. It is unreachable by construction â€” the
+   * sequencer only exports what it was handed â€” so if it ever happens the join, not the artifact,
+   * is wrong, and announcing a guessed `kind` would put a fabricated classification into the
+   * evidence stream. Under E7-D12 a throw here fails the attempt, which is the same posture a
+   * sink failure gets and for the same reason.
+   */
+  function announcementsFor(
+    exported: readonly ExportedArtifactRef[],
+    requests: readonly ArtifactExportRequest[],
+  ): readonly ArtifactPreparedPayloadV1[] {
+    const kindByPath = new Map(requests.map((r) => [r.path, r.kind]));
+    return exported.map((ref) => {
+      const kind = kindByPath.get(ref.path);
+      if (kind === undefined) throw new Error("supervisor: committed artifact has no export request");
+      // PARSED, never cast. `artifactId` is branded and `ExportedArtifactRef.artifactId` is a
+      // plain string, so an `as` here would assert a shape nobody checked; the frozen schema
+      // refuses a malformed id at the join instead of carrying it into the digest.
+      return artifactPreparedPayloadV1Schema.parse({ artifactId: ref.artifactId, kind });
+    });
+  }
+
+  /**
+   * The happy-path reclaim, shared by the batch and service arms.
+   *
+   * DEP-011 Slice 2a Â§2a.5 â€” PROACTIVE clock-first check on the networked branch: the cap is
+   * lease-clamped + never re-minted, so a run longer than its TTL reaches here with an EXPIRED
+   * cap. A gated destroy would be doomed (uniform RNA), and routing that RNA into the `:catch`
+   * below would risk the masked-strand. Record an HONEST orphan DIRECTLY and return â€” the run
+   * terminal already emitted above; the orphan is a DISTINCT cleanup outcome.
+   *
+   * â˜… EXTRACTED VERBATIM by SVC-008b, not rewritten. A second copy on the service arm is
+   * exactly how the two would drift, and the thing that would drift is the orphan check.
+   */
+  async function finishRun(run: ActiveRun, sandboxId: string): Promise<void> {
+    if (run.networked && run.capExpiresAt !== null && !(run.capExpiresAt > now())) {
+      recordOrphan(run, "cap_expired_before_happy_destroy");
+      return;
+    }
+    try {
+      const destroyed = await run.effect.destroy(sandboxId, ctx());
+      emitOp("destroy", destroyed.cleanupStatus === "success" ? "success" : "failed");
+      deps.metrics?.inc(CLEANUP_OUTCOME_METRIC, { outcome: destroyed.cleanupStatus });
+      if (destroyed.cleanupStatus === "failed") {
+        // A failed happy-path destroy falls back to cleanup escalation.
+        await escalateCleanup(run, "happy_destroy_failed");
+      }
+      deps.logger?.info(
+        {
+          leaseId: run.leaseId,
+          sandboxId,
+          providerOpId: destroyed.providerOpId,
+          resourceLabelsHash: hashResourceLabels(run.labels),
+          cleanupStatus: destroyed.cleanupStatus,
+        },
+        "supervisor: run complete",
+      );
+    } catch {
+      await escalateCleanup(run, "happy_destroy_error");
+    }
+  }
+
+  /** Build the effect + cleanup authorities over `provider` for `labels`/`fence`. Used for
+   * BOTH the desktop real provider (at `buildRun`, byte-identical) and â€” on the networked
+   * branch â€” the null-object provider (at `buildRun`) then the real per-run driver (rebuilt
+   * in `runLifecycle` after redemption). */
+  function buildAuthorities(
+    provider: SandboxProvider,
+    labels: ResourceLabels,
+    fence: EffectFence,
+  ): { effect: EffectAuthority; cleanup: CleanupAuthority } {
+    return {
+      effect: new EffectAuthority(provider, fence),
+      cleanup: new CleanupAuthority({
+        provider,
+        resourceLabels: labels,
+        targetGeneration: labels.deviceGeneration,
+        fence,
+        deadline: now() + cleanupDeadlineMs,
+        epoch: 0,
+        now,
+      }),
+    };
+  }
+
+  function buildRun(handoff: LeaseHandoff): ActiveRun {
+    const labels = labelsFor(handoff);
+    const fence: EffectFence = {
+      jobId: labels.jobId,
+      attempt: labels.attempt,
+      leaseId: labels.leaseId,
+      fenceToken: String(handoff.fenceToken),
+      deviceGeneration: labels.deviceGeneration,
+      observedSeq: 0,
+    };
+    // DESKTOP (`deps.provider`): build the REAL authorities here â€” byte-identical to
+    // pre-DEP-011. NETWORKED (`deps.makeRunProvider`): the capability does not exist yet,
+    // so build NO-OP null-object authorities over `createNoopProvider()` (never unset â€”
+    // Â§2a.3); `runLifecycle` REBUILDS them over the real per-run driver after redemption.
+    const initialProvider = deps.provider ?? createNoopProvider();
+    const { effect, cleanup } = buildAuthorities(initialProvider, labels, fence);
+    // H1 â€” resolve the run's budget ONCE, here. A resolver that threw or returned a
+    // non-positive/NaN value would otherwise reach `setTimeout`, which fires immediately and
+    // would kill every run instantly â€” so an unusable answer falls back to the base deadline
+    // rather than becoming an instant-kill.
+    let runOpDeadlineMs = opDeadlineMs;
+    try {
+      const resolved = resolveRunDeadlineMs(handoff);
+      if (typeof resolved === "number" && Number.isFinite(resolved) && resolved > 0) {
+        runOpDeadlineMs = resolved;
+      }
+    } catch {
+      // Keep the base deadline; a budget-resolution error must never fail a lease.
+    }
+    if (handoff.offer.job.workloadType === "browser_session") {
+      runOpDeadlineMs = Math.min(runOpDeadlineMs, handoff.offer.job.workload.maxSessionSeconds * 1000,
+        (deps.browserSelfModel?.verifiedProviderConstraints.maxContinuousRuntimeSeconds ?? 60) * 1000);
+    }
+    const built: ActiveRun = {
+      provider: initialProvider,
+      warmAuthorityExpiresAt: null,
+      leaseId: handoff.leaseId,
+      labels,
+      fence,
+      effect,
+      cleanup,
+      // LIVE: `built.opDeadlineMs`, never the captured local â€” the probe below carves from it,
+      // and a ctx built from a stale copy would hand the provider a budget the supervisor no
+      // longer honours (H1: the race and the ctx must be the same number).
+      makeCtx: () => ctx(built.opDeadlineMs),
+      sandboxId: null,
+      cancelled: false,
+      cleanedUp: false,
+      networked,
+      capExpiresAt: null,
+      serviceJobDeadlineAt: handoff.offer.job.workloadType === "service" ? Date.parse(handoff.offer.job.deadline) : null,
+      sandboxExpiresAt: null,
+      lifetimeRenewalPending: false,
+      opDeadlineMs: runOpDeadlineMs,
+      serviceStop: null,
+    };
+    return built;
+  }
+
+  /**
+   * SVC-008b â€” the single stop path, with ONE new decision: whether the stop is COOPERATIVE.
+   *
+   * â˜…â˜…â˜… WHAT CHANGED AND WHAT DID NOT. For every batch run the behaviour is byte-identical
+   * to the pre-SVC-008b `cancel`: `run.serviceStop` is null, so the `graceful` block is
+   * skipped entirely and the function is `cancelled = true` then `escalateCleanup`, in that
+   * order, as before. The graceful block is reachable ONLY while a service sequencer has
+   * published a stop handle.
+   *
+   * â˜… ORDERING IS LOAD-BEARING. `run.cancelled` is set AFTER the graceful window, not before:
+   * the service loop treats `run.cancelled` as its fence-closed signal (Â§4.5) and would abort
+   * its own ladder mid-way if the flag were raised first, emitting nothing and leaving the
+   * process to the hard destroy â€” i.e. the graceful path would exist and never run.
+   *
+   * â˜… BOUNDED. The wait is the workload's own `gracefulStopSeconds` plus one teardown-margin,
+   * raced by the supervisor's injected timer. A sequencer that wedges cannot hold the renewal
+   * driver open: the race fires, `cancelled` is raised, and the escalation reclaims the
+   * sandbox exactly as it does today.
+   */
+  async function stopRun(leaseId: string, reason: string, cooperative: boolean): Promise<void> {
+    const run = runs.get(leaseId);
+    if (run === undefined) return;
+    const stop = run.serviceStop;
+    if (cooperative && stop !== null) {
+      stop.requestStop(reason);
+      await withDeadline(stop.finished, stop.gracefulStopMs + GRACEFUL_STOP_MARGIN_MS);
+    }
+    run.cancelled = true;
+    await escalateCleanup(run, reason);
+  }
+
+  const supervisor: Supervisor = {
+    async applyBrowserDecision(command) {
+      const controller = browserControllers.get(command.leaseId);
+      if (!controller) throw new Error("browser approval run unavailable");
+      await controller.apply(command);
+    },
+    onAuthorityRenewed(leaseId, capability): void {
+      const run = runs.get(leaseId);
+      if (!run || run.cancelled || !run.effect.isActive()) throw new Error("authority refresh requires a live fence");
+      if (!run.networked || run.capExpiresAt === null || !run.provider.refreshAuthority ||
+          !isOwnedLabelsCapabilityShape(capability) || capability.v !== 1 || capability.audience !== "adapter-manager" ||
+          !labelsEqual(capability.ownedLabels, run.labels) || !Number.isSafeInteger(capability.expiresAt) ||
+          capability.expiresAt <= now() || capability.expiresAt < run.capExpiresAt) {
+        throw new Error("authority refresh binding mismatch");
+      }
+      run.provider.refreshAuthority(capability);
+      run.capExpiresAt = Math.min(capability.expiresAt, run.warmAuthorityExpiresAt ?? capability.expiresAt);
+      if (run.serviceJobDeadlineAt !== null && run.sandboxId !== null && run.sandboxExpiresAt !== null &&
+          !run.lifetimeRenewalPending && run.provider.sandboxLifetimeMode === "renewable") {
+        const expiresAt = Math.min(run.capExpiresAt, run.serviceJobDeadlineAt);
+        if (expiresAt <= run.sandboxExpiresAt || expiresAt <= now()) return;
+        const sandboxId = run.sandboxId;
+        run.lifetimeRenewalPending = true;
+        // Do not block renewal timers or control acknowledgements. Only a timely provider
+        // acknowledgement can move the observed expiry; failure keeps the old stop window.
+        void withDeadline(run.effect.renewLifetime(sandboxId, expiresAt, ctx(5000)), 5000)
+          .then((result) => {
+            if (result !== TIMEOUT && !run.cancelled && run.effect.isActive() && runs.get(leaseId) === run &&
+                run.sandboxId === sandboxId && result.expiresAt === expiresAt && expiresAt > now()) {
+              run.sandboxExpiresAt = expiresAt;
+            }
+          }).catch(() => {
+            deps.logger?.warn({ leaseId }, "supervisor: sandbox lifetime renewal failed");
+          }).finally(() => { run.lifetimeRenewalPending = false; });
+      }
+    },
+    async accept(handoff: LeaseHandoff): Promise<void> {
+      const run = buildRun(handoff);
+      runs.set(run.leaseId, run);
+      try {
+        await runLifecycle(handoff, run);
+      } catch (err) {
+        // The lifecycle is best-effort: never reject out of `accept` (the loop
+        // treats settle as the in-flight lifetime). Last-resort cleanup.
+        deps.logger?.error({ leaseId: run.leaseId, err }, "supervisor: run lifecycle error");
+        try {
+          await escalateCleanup(run, "lifecycle_error");
+        } catch {
+          // swallow â€” never fail the run
+        }
+      } finally {
+        browserControllers.get(run.leaseId)?.close();
+        browserControllers.delete(run.leaseId);
+        run.effect.withdraw();
+        runs.delete(run.leaseId);
+      }
+    },
+
+    async cancel(leaseId: string, reason = "cancel"): Promise<void> {
+      return stopRun(leaseId, reason, true);
+    },
+
+    /**
+     * â˜… SVC-008b SPLIT THIS FROM `cancel`, and the split is the whole difference.
+     *
+     * It used to delegate: `cancel(leaseId, "lease_lost")`. For a BATCH run that is still
+     * byte-identical â€” `graceful` only reaches a live `run.serviceStop`, which is null on
+     * every batch run â€” so nothing about batch behaviour moved. For a SERVICE run it is the
+     * Â§4.5 rule: a lost lease is NOT a cooperative stop. The fence has closed, the renewal
+     * driver has already denied every governed effect locally, and negotiating a graceful
+     * shutdown across a dead fence would be the first daemon component to write past one.
+     */
+    onLeaseLost(leaseId: string): Promise<void> {
+      return stopRun(leaseId, "lease_lost", false);
+    },
+
+    async shutdown(): Promise<void> {
+      const live = [...runs.values()];
+      for (const run of live) {
+        try {
+          // Shutdown is not cooperative either: the process this daemon supervises is going
+          // away with it, and waiting out a 300 s graceful window would hold the shutdown.
+          await stopRun(run.leaseId, "shutdown", false);
+        } catch {
+          // best-effort per run
+        }
+      }
+    },
+
+    activeRunCount(): number {
+      return runs.size;
+    },
+  };
+
+  return supervisor;
+}
