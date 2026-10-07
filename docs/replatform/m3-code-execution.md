@@ -114,3 +114,57 @@ across four sequential shards: 24,026 tests with 1,935 environment skips. The
 E2B launch deadline regression and lost-response replay tests pass against the
 real transport with an injected SDK, without provider calls. Browser dispatch and the remaining service
 recovery, rollout and readiness work remain open.
+
+## Current integration — 2026-10-07
+
+The preceding checkpoints record their own revisions. Current integration now
+composes the staged guest, network-policy digest and provider attestation into
+the worker supervisor. The guest enforces pinned HTTPS egress, redirects and
+credential-origin scope. Operator permissions, reconnect refresh and service
+controls use the native APIs. Agent browser requests inherit their active task,
+parent job and authority, with parent cancellation and fence checks.
+
+Service recovery now uses witnessed crash history with bounded backoff and an
+automatic pause. Portable checkpoints contain approved application JSON files;
+they do not claim arbitrary process-memory continuity. Export requires an
+observed service exit, and restore validates the immutable generation binding,
+committed bytes and staged paths before launch.
+
+Browser approval and credential delivery use owned interrupt operations, so a
+guest waiting inside its main execute call does not lock out its own reply.
+Pending decisions temporarily request bounded one-second control polling rather
+than waiting for the ordinary lease renewal interval. Scoped-session grants
+require a matched human allow-once decision and refuse after closure. Cookie
+bytes stay in the control-plane broker, provider and isolated guest; the worker
+receives grant metadata. Credential redemption observes withdrawal and primary
+authority before writer dispatch. An already-dispatched guest write cannot be
+atomically undone; guest expiry checks and sandbox cancellation bound that race.
+
+The encrypted server broker and native evidence links are integrated. Optional
+credential requests require a configured, encryption-ready broker before
+admission. Issuance and one-use redemption recheck human approval, the current
+child and parent fences, connector access and immutable origin scope. Storage
+writes have a bounded response and retain cleanup tombstones for late writes;
+process-death uncertainty retains the metadata pointer for cleanup retries.
+Cookie-state and storage-state artifacts cannot use ordinary evidence downloads.
+
+The native permission aggregate advances its revision when answered and relayed;
+the broker validates the separate immutable request/result revision. Explicit
+distributed request UUIDs identify distinct decisions even when they share one
+trusted session binding. Reusing an immutable request with changed content is
+refused. Broker regressions use the real native create/answer/relay lifecycle.
+
+The combined workspace build, recursive typechecking and server lint pass.
+The full suite passes across four sequential shards: 24,259 tests, with 1,997
+skips. Two Windows OpenCode process tests timed out on separate concurrent
+attempts of the final shard; its complete rerun passed with explicit one-fork,
+nonparallel file execution and the original assertions/timeouts. All 11 real
+PostgreSQL broker tests pass, including the native permission lifecycle.
+Normal PR CI must pass before merging into the program branch. This is not M3
+closure.
+
+Browser exposure remains off until the provider supplies verified default-deny
+attestation. The accepted BRW-008 decision retains the Commander host path until
+the governed path is proven end to end. No paid calls, deployment, main merge or
+calendar certification campaign is part of this execution. Anthropic M1b live
+verification remains deferred.
