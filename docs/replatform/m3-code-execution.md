@@ -160,8 +160,12 @@ skips. Two Windows OpenCode process tests timed out on separate concurrent
 attempts of the final shard; its complete rerun passed with explicit one-fork,
 nonparallel file execution and the original assertions/timeouts. All 11 real
 PostgreSQL broker tests pass, including the native permission lifecycle.
-Normal PR CI must pass before merging into the program branch. This is not M3
-closure.
+The browser teardown suite now executes the production-equivalent staged guest
+bundle and requires real HTTPS fixture navigation before killing the runner.
+The full browser package passes locally on Windows: 179 tests, with seven
+platform skips. Linux retains real kernel socket measurement and its cancellation
+cases require normal PR CI. Normal PR CI must pass before merging into the
+program branch. This is not M3 closure.
 
 Browser exposure remains off until the provider supplies verified default-deny
 attestation. The accepted BRW-008 decision retains the Commander host path until
