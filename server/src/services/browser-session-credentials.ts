@@ -469,7 +469,9 @@ export function createBrowserSessionCredentialBroker(input: {
             row.decision.command !== null ||
             row.decision.cwd !== null ||
             row.decision.path !== null ||
-            row.decision.sourceRevision !== 0 ||
+            // The native aggregate revision advances on answer/relay (and may
+            // advance on display). Immutable wire sourceRevision stays zero;
+            // its full tuple/hash remains checked separately below.
             row.decision.timeoutPolicy !== "deny" ||
             permission.requestId !== row.decision.id ||
             permission.nonce !== binding.bindingId ||

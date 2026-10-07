@@ -17,7 +17,10 @@ import {
   setBrowserSessionCredentialPort,
 } from "../services/browser-session-credentials.js";
 import supertest from "supertest";
-import { runtimeDecisionPromptHash } from "../services/agent-runtime-decisions.js";
+import {
+  agentRuntimeDecisionService,
+  runtimeDecisionPromptHash,
+} from "../services/agent-runtime-decisions.js";
 import { createJobLeaseRenewalService } from "../services/job-fencing.js";
 import { createBrowserArtifactRetention } from "../services/browser-artifact-retention-sweep.js";
 import { parseDistributedNetworkPolicies } from "../config/distributed-network-policies.js";
@@ -86,6 +89,7 @@ describe.skipIf(
       max: 2,
     });
     ownerDb = drizzle(owner) as unknown as Db;
+    await f.admin`INSERT INTO company_memberships(company_id,principal_type,principal_id,status,membership_role) VALUES(${COMPANY},'user','human-founder','active','owner')`;
   }, 180000);
   beforeEach(async () => {
     process.env.AOA_SECRETS_MASTER_KEY = "a".repeat(64);
@@ -142,7 +146,44 @@ describe.skipIf(
     });
     const eventId = randomUUID(),
       digest = "d".repeat(64);
-    await f.admin`INSERT INTO agent_runtime_decisions(id,company_id,adapter_type,kind,status,nonce,prompt_hash,title,summary,tool_name,network_target,risk_class,expires_at,timeout_policy,decision,answered_by_user_id,answered_at) VALUES(${permission.requestId},${COMPANY},'browser_runtime','permission','answered',${binding.bindingId},${permission.requestDigest},${permission.title},${policy.digest},${permission.toolName},${binding.origin},'credential_use',${expiresAt},'deny','allow_once','human-founder',now())`;
+    const native = agentRuntimeDecisionService(ownerDb);
+    const created = await native.createPrompt({
+      requestId: permission.requestId,
+      companyId: COMPANY,
+      agentId: null,
+      runId: null,
+      adapterType: "browser_runtime",
+      kind: "permission",
+      nonce: binding.bindingId,
+      title: permission.title,
+      summary: policy.digest,
+      toolName: permission.toolName,
+      networkTarget: binding.origin,
+      riskClass: "credential_use",
+      command: null,
+      cwd: null,
+      path: null,
+      promptText: null,
+      expiresAt: new Date(expiresAt),
+      timeoutPolicy: "deny",
+    });
+    expect(created.decision.sourceRevision).toBe(0);
+    const answered = await native.answerPrompt({
+      companyId: COMPANY,
+      decisionId: permission.requestId,
+      actorUserId: "human-founder",
+      expectedSourceRevision: 0,
+      nonce: binding.bindingId,
+      kind: "permission",
+      decision: "allow_once",
+      idempotencyKey: randomUUID(),
+    });
+    expect(answered.sourceRevision).toBe(1);
+    const relayed = await native.markRelayed({
+      companyId: COMPANY,
+      decisionId: permission.requestId,
+    });
+    expect(relayed.sourceRevision).toBe(2);
     await f.admin`INSERT INTO job_events(organization_id,company_id,job_id,attempt_id,attempt_number,lease_id,event_id,sequence,event_type,fence_token,event_digest,event,occurred_at) VALUES(${ORG},${COMPANY},${
       active.identity.jobId
     },${active.identity.attemptId},1,${
@@ -212,6 +253,40 @@ describe.skipIf(
       organizationId: ORG,
       workerId: active.identity.workerId,
     } as VerifiedWorkerOperation);
+  it("separates distinct immutable requests sharing a binding and refuses a changed same-request prompt", async () => {
+    const native = agentRuntimeDecisionService(ownerDb),
+      requestId = randomUUID();
+    const prompt = {
+      requestId,
+      companyId: COMPANY,
+      agentId: null,
+      runId: null,
+      adapterType: "browser_runtime",
+      kind: "permission" as const,
+      nonce: binding.bindingId,
+      title: permission.title,
+      summary: policy.digest,
+      toolName: permission.toolName,
+      networkTarget: binding.origin,
+      riskClass: "credential_use",
+      command: null,
+      cwd: null,
+      path: null,
+      promptText: null,
+      expiresAt: new Date(permission.expiresAt),
+      timeoutPolicy: "deny" as const,
+    };
+    const second = await native.createPrompt(prompt);
+    expect(second.decision.id).toBe(requestId);
+    expect(second.decision.id).not.toBe(permission.requestId);
+    await expect(
+      native.createPrompt({ ...prompt, title: "changed immutable prompt" })
+    ).rejects.toMatchObject({ status: 409 });
+    const [row] =
+      await f.admin`SELECT source_revision,title FROM agent_runtime_decisions WHERE id=${permission.requestId}`;
+    expect(row.source_revision).toBe(2);
+    expect(row.title).toBe(permission.title);
+  });
   it("encrypts at rest, replays the same grant, and consumes exactly once", async () => {
     // Queue/staging time does not spend the activated session's runtime budget.
     await f.admin`UPDATE jobs SET created_at=now()-interval '1 hour' WHERE id=${active.identity.jobId}`;

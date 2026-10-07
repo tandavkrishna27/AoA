@@ -406,7 +406,10 @@ export function runtimeDecisionSourceUniqueKey(input: {
   return `runtime:${input.companyId}:${input.runId ?? DISTRIBUTED_RUN_SENTINEL}:${input.nonce}`;
 }
 
-function sourceUniqueKey(input: { companyId: string; runId: string | null; nonce: string }) {
+function sourceUniqueKey(input: { companyId: string; runId: string | null; nonce: string; requestId?: string }) {
+  // Distributed requests have their own immutable UUID. Their nonce can be a
+  // stable trusted binding shared across jobs; it is not their unique identity.
+  if (input.requestId) return JSON.stringify(["immutable_request", input.companyId, input.requestId]);
   return runtimeDecisionSourceUniqueKey(input);
 }
 

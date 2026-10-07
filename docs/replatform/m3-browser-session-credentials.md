@@ -38,6 +38,10 @@ control command must both be `allow_once`; `decidedBy.principalType` must be
 `user`, and its principal ID must equal `answeredByUserId`. Denial, timeout,
 cancellation, wrong tuple/digest, standing grants, and missing human authority
 produce no cookie. This uses the existing permission engine.
+The immutable request/control source revision remains zero while the native
+decision aggregate revision advances on answer and relay. Explicit request UUIDs
+have company-scoped immutable source identities, so separate jobs can reuse the
+same trusted binding nonce without colliding with earlier permission requests.
 
 The control plane mints a live-fenced `connector_oauth` proxy handle and resolves
 OAuth only in the control plane. All resolved login addresses must pass the
