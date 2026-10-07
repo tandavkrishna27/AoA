@@ -175,3 +175,27 @@ attestation. The accepted BRW-008 decision retains the Commander host path until
 the governed path is proven end to end. No paid calls, deployment, main merge or
 calendar certification campaign is part of this execution. Anthropic M1b live
 verification remains deferred.
+
+## E8-F006 staged browser guard reconciliation
+
+The existing gate-clause policy guard now enrolls E8-1 as a conditional wired
+production path. Its fixed composition check follows control-plane runner bundling
+and stage-in, lease path/policy extensions, runtime supervisor/staging composition,
+worker target/provider refusal gates, fixed guest execution and capability-ceiling
+intersection. It does not infer reachability from an extra host reference to the
+guest function. Formatting and comments are parsed as TypeScript syntax; quoted
+diagnostics cannot substitute for executable composition.
+
+The existing policy test command includes deletion regressions for every required
+link using current production source. Other declared dormant clauses are retained.
+This is a structural regression guard, not a general boot import-graph proof or
+provider conformance. Browser advertisement and rollout are unchanged; verified
+provider enforcement and the governed host-retirement prerequisite remain open.
+
+Focused verification: 59 existing-policy tests passed with zero skips, including
+28 production-link deletion regressions. Disabling the composition checker made
+all 28 fail while both controls passed; restoring it returned green. The old
+`unwired` manifest failed the enrollment regression before correction. The policy
+checker reports 29 wired and five unchanged dormant clauses, with both provider
+claims matching source. Individual JavaScript syntax checks and diff checks pass.
+No full suite, recursive types/build, provider calls or runtime changes were made.

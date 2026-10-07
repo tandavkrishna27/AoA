@@ -159,3 +159,6 @@ describe("stripStringLiterals — bounded mis-detection", () => {
     assert.match(out, /createSupervisor\(\)/);
   });
 });
+
+// Reuse the existing policy test command for staged browser composition regressions.
+import "./browser-dispatch-wiring.test.mjs";

@@ -170,10 +170,10 @@
     },
     "E8-1-sandbox-local-browser": {
       "epic": "E8",
-      "status": "unwired",
+      "status": "wired",
       "symbol": "runBrowserSession",
-      "reason": "packages/browser-runtime has zero importers and is in no dependency list. The 1 known reference is runner.ts calling it INSIDE the package; runner.ts is the in-guest entrypoint and nothing stages it, so the capability is unreachable despite the non-zero count. Blocked on dispatch (Sprint 3) then BRW-004+ (Sprint 7).",
-      "expectedReferences": 1
+      "composition": "staged_browser_dispatch_v1",
+      "reason": "The control plane bundles and stages the guest runner, leasing carries its fixed paths and policy, and the composed supervisor stages bytes before conditional runner dispatch. The structural composition guard checks each required link, target filtered-egress ceiling, provider verified marker and hello capability intersection. Wired means the conditional production path exists; browser advertising stays absent by default, and provider enforcement, rollout and D3 remain unverified."
     },
     "E10-2-legacy-reconciliation": {
       "epic": "E10",
