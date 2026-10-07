@@ -33,4 +33,22 @@ Authority follow-up: repaired synthetic Commander fixtures to the actual authent
 
 Human session checks: 65 tests passed across the broker/OAuth/exchange/binding/readiness/preparation group, including 28 real PostgreSQL broker cases. Producer/OAuth/preparation checks passed 44 tests, including 30 real PostgreSQL producer cases. Human broker replay and revocation were rerun in the full 28-case broker file. Includes other operator answer refusal, organization/company revocation, disabled/deleted/cross-tenant connectors, hostile current resource URL, parent fence/turn/conversation/policy/binding/capability changes, revocation during OAuth resolution, encrypted storage, one-use redemption, ordinary agent behavior and cleanup. Mixed principal and missing trusted human fence callback regressions were observed RED before their fixes. Server types and diff checks passed. All session exchange and OAuth token resolution controls were keyless test seams; no external provider calls occurred.
 
-Integration verification: recursive workspace typecheck and full workspace build passed. Seven integrated focused files passed 163 tests, including real PostgreSQL producer, credential, currency, placement and secret-broker cases. Fresh foundation and human-session reviews found no actionable issue. Full normal local suite passed with four workers: 24,279 tests, 2,031 skips; 2,515 passed files, 226 skipped files. Five moved source references were corrected; citation integrity and all 56 checker tests pass. Normal PR CI is pending; this is not M3 closure.
+Integration verification: recursive workspace typecheck and full workspace build passed. Seven integrated focused files passed 163 tests, including real PostgreSQL producer, credential, currency, placement and secret-broker cases. Fresh foundation and human-session reviews found no actionable issue. Full normal local suite passed with four workers: 24,279 tests, 2,031 skips; 2,515 passed files, 226 skipped files. Five moved source references were corrected; citation integrity and all 56 checker tests pass. PR #681 merged after all 16 normal CI checks passed; this is not M3 closure.
+
+### Distributed stranded-answer cleanup
+
+The existing bounded native stranded-answer sweep also cancels answered and
+relay-failed browser decisions after their receipt-bound attempt becomes terminal
+or loses its exact active, unexpired lease fence. Applied native receipts bind the
+organization, company, browser job and own attempt. A live binding preserves the
+answer despite a null heartbeat run. Unbound or wrong-kind receipts do not
+authorize cleanup. The conditional native UPDATE rechecks eligibility alongside
+revision/status guards, retaining owner and answer and using existing cancellation
+audit and hub reconciliation. Suspended and archived tenants remain eligible for
+terminal cleanup. It issues no credentials and replays no execution.
+
+The existing 30-second sweep and batch ceilings are reused. No schema or frozen
+operation changes. Initial orphan cases and a scan-to-update renewal race were
+observed RED, then fixed. Focused checks passed 87 tests, including 20 real
+PostgreSQL cases; individual server types passed. Fresh review found no actionable
+issue. Full integration checks remain pending.
