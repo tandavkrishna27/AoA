@@ -1766,8 +1766,10 @@ jobs:
       # The teardown tests spawn `dist/runner.js` as a real process, so the package must be
       # COMPILED before they run. Without this they fail in ~30ms with a missing module, which
       # is exactly how they failed on the first CI run of this lane.
+      # Include workspace dependencies: the egress policy imports the frozen worker-protocol
+      # package, whose exported declarations do not exist yet in a clean checkout.
       - name: Build the runtime (the teardown tests spawn dist/runner.js)
-        run: pnpm --filter @armyofagents/browser-runtime build
+        run: pnpm --filter @armyofagents/browser-runtime... build
 
       # AOA_RUN_BROWSER_TESTS is what un-skips the *.browser.test.ts suites. Without it they
       # skip everywhere, which would make this lane a check that runs nothing.
