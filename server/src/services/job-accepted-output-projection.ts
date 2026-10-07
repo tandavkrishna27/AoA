@@ -90,7 +90,7 @@ export async function loadAcceptedOutputTarget(
   input: { organizationId: string; companyId: string; jobId: string },
 ): Promise<OutputTarget | null> {
   const [job] = await db
-    .select({ sourceIntent: jobs.sourceIntent, sourceKind: jobs.sourceKind })
+    .select({ sourceIntent: jobs.sourceIntent, sourceKind: jobs.sourceKind, sourceIdentity: jobs.sourceIdentity })
     .from(jobs)
     .where(and(
       eq(jobs.organizationId, input.organizationId),
@@ -113,6 +113,18 @@ export async function loadAcceptedOutputTarget(
         eq(internalAgentRuns.distributedJobId, input.jobId))).limit(1);
     if (!run) throw new AcceptedOutputProjectionError("source_unreadable");
     return { issueId: run.issueId, assigneeAgentId: run.agentId, crewRunId: parsed.data.crewRunId };
+  }
+  if (parsed.data.kind === "browser_request") {
+    if (job.sourceIdentity !== parsed.data.browserRequestId) throw new AcceptedOutputProjectionError("source_unreadable");
+    const [run] = await db.select({ issueId: issues.id, agentId: agents.id })
+      .from(internalAgentRuns)
+      .innerJoin(issues, and(eq(issues.id, internalAgentRuns.relatedEntityId), eq(issues.companyId, input.companyId)))
+      .innerJoin(agents, and(eq(agents.id, internalAgentRuns.agentId), eq(agents.companyId, input.companyId)))
+      .where(and(eq(internalAgentRuns.id, parsed.data.browserRequestId), eq(internalAgentRuns.companyId, input.companyId),
+        eq(internalAgentRuns.triggerSource, "browser_request"), eq(internalAgentRuns.relatedEntityType, "task"),
+        eq(internalAgentRuns.executionOwner, "distributed"), eq(internalAgentRuns.distributedJobId, input.jobId))).limit(1);
+    if (!run) throw new AcceptedOutputProjectionError("source_unreadable");
+    return { issueId: run.issueId, assigneeAgentId: run.agentId };
   }
   return parsed.data.kind === "task_run"
     ? { issueId: parsed.data.issueId, assigneeAgentId: parsed.data.assigneeAgentId }

@@ -9,3 +9,10 @@ The renewal extension `com.armyofagents.browser/session-credential-grants` has s
 The supervisor requires the previously allowed request, exact binding, policy, origin, request expiry and the current job-attempt object prefix. Delivery uses the dedicated owned interrupt port, so the running guest cannot block its own credential mailbox. The provider receives grant metadata; cookie bytes do not enter worker protocol messages. Concurrent and repeated deliveries coalesce, and a successful delivery consumes local eligibility. The control-plane broker must independently recheck the live child fence when issuing and redeeming the grant.
 
 The optional provider port refuses when unavailable. This code does not advertise verified provider-wide egress or enable browser rollout. Focused tests exercise the real supervisor and renewal driver, allow-once, denial, wrong binding, duplicate grant and closure. Full integrated verification remains required before release.
+
+
+## Durable browser evidence
+
+Browser child artifact events project to the company-scoped task recorded by their browser-request internal run. The run must retain the exact child job binding, distributed owner, browser trigger, task relation, and scoped agent. No new task is inferred from an artifact.
+
+Operator evidence exposes an optional task-output ID only when the existing native content provenance check accepts its applied output receipt, accepted event, and exact committed artifact binding. Expired, pending, quarantined, and browser cookie-state evidence has no content link. The UI opens evidence through the existing task-output content URL, preserving authorization and streamed integrity checks.

@@ -162,6 +162,8 @@ export interface WorkerSummary {
  * is on the wire: the row that survives a refused commit is the `granted` intent
  * row, and hiding it would make "the record stays discoverable" false. */
 export interface JobArtifactSummary {
+  /** Authorized committed evidence, bound through an applied task-output receipt. */
+  outputId?: string;
   id: string;
   attempt: number | null;
   identifier: string;

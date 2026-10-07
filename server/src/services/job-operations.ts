@@ -31,6 +31,7 @@ import {
   jobEvents,
   jobArtifacts,
   jobProjectionReceipts,
+  taskOutputs,
   agentRuntimeDecisions,
   workers,
   type DrainOutcome,
@@ -42,6 +43,7 @@ import type {
   WorkerRevokeResult,
   WorkerSummary,
 } from "@armyofagents/shared";
+import { loadTaskOutputContentArtifact } from "./task-output-content.js";
 import { runInTenant } from "../db/tenant-context.js";
 import { createJobReconciliationService } from "./job-reconciliation.js";
 import type { JobControlActor } from "./job-control-audit.js";
@@ -273,7 +275,24 @@ export function createJobOperationsService(input: {
           .orderBy(asc(jobArtifacts.attempt), asc(jobArtifacts.identifier), asc(jobArtifacts.status))
           .limit(JOB_DETAIL_ARTIFACT_LIMIT + 1);
         const artifactsTruncated = artifactPage.length > JOB_DETAIL_ARTIFACT_LIMIT;
-        const artifacts = artifactPage.slice(0, JOB_DETAIL_ARTIFACT_LIMIT);
+        const artifacts: Array<typeof artifactPage[number] & { outputId?: string }> = artifactPage.slice(0, JOB_DETAIL_ARTIFACT_LIMIT);
+        const linkable = artifacts.filter(a => a.status === "committed" && a.kind !== "browser_cookie_state" &&
+          a.applyStatus !== "conflict_quarantined" && (!a.expiresAt || a.expiresAt.getTime() > Date.now()));
+        if (linkable.length) {
+          const candidates = await tx.select({ outputId: taskOutputs.id, artifactId: taskOutputs.externalId })
+            .from(jobProjectionReceipts)
+            .innerJoin(taskOutputs, and(eq(taskOutputs.id, jobProjectionReceipts.targetAggregateId), eq(taskOutputs.companyId, companyId),
+              eq(taskOutputs.provider, "aoa_distributed_job"), eq(taskOutputs.type, "artifact")))
+            .where(and(eq(jobProjectionReceipts.organizationId, organizationId), eq(jobProjectionReceipts.companyId, companyId),
+              eq(jobProjectionReceipts.jobId, jobId), eq(jobProjectionReceipts.projectionKind, "output_projection"),
+              eq(jobProjectionReceipts.aggregateKind, "task_outputs"), eq(jobProjectionReceipts.status, "applied"),
+              inArray(taskOutputs.externalId, linkable.map(a => a.id)))).limit(JOB_DETAIL_ARTIFACT_LIMIT);
+          for (const candidate of candidates) {
+            const bound = await loadTaskOutputContentArtifact(tx, { organizationId, companyId, outputId: candidate.outputId }).catch(() => null);
+            const artifact = artifacts.find(a => a.id === bound?.id);
+            if (artifact) artifact.outputId = candidate.outputId;
+          }
+        }
 
         // Native runtime decisions have no jobId or organizationId. Only an
         // applied projection receipt under this exact tenant/company/job can

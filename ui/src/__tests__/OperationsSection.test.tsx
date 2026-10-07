@@ -64,6 +64,19 @@ beforeEach(() => {
 });
 
 describe("OperationsSection (JOB-008 operator controls)", () => {
+  it("links only committed unexpired evidence to the existing task output content route", async () => {
+    mocked.getJob!.mockResolvedValue({ job: { id: JOB, status: "succeeded" }, attempts: [], leases: [], events: [], artifacts: [
+      { id: "a", identifier: "ready", kind: "screenshot", status: "committed", outputId: "output/a", expiresAt: "2099-01-01T00:00:00Z" },
+      { id: "b", identifier: "pending", kind: "screenshot", status: "granted", outputId: "pending" },
+      { id: "c", identifier: "old", kind: "screenshot", status: "committed", outputId: "old", expiresAt: "2000-01-01T00:00:00Z" },
+      { id: "d", identifier: "cookie", kind: "browser_cookie_state", status: "committed", outputId: "cookie" },
+    ] });
+    const user = userEvent.setup(); renderSection();
+    await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);
+    expect(await screen.findByRole("link", { name: "Open evidence" })).toHaveAttribute("href", "/api/task-outputs/output%2Fa/content");
+    expect(screen.getAllByRole("link", { name: "Open evidence" })).toHaveLength(1);
+  });
+
   it("reconnects to durable browser evidence and answers native permission without run-wide choices", async () => {
     const user = userEvent.setup();
     const data = { job: { id: JOB, status: "running", workloadType: "browser_session" }, attempts: [], leases: [], events: [],

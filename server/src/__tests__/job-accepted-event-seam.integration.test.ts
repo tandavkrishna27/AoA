@@ -67,6 +67,7 @@ import { createAcceptedActivityAuditProjector } from "../services/job-accepted-a
 import { resolveAcceptedOutputProjector } from "../services/job-accepted-output-projection.js";
 import { recordAcceptedActivityCore, JobAuditBridgeTenantError } from "../services/job-audit-bridge.js";
 import { projectAcceptedOutputCore, JobOutputBridgeTenantError } from "../services/job-output-bridge.js";
+import { createJobOperationsService } from "../services/job-operations.js";
 import { createTaskOutputContentService } from "../services/task-output-content.js";
 import { taskOutputRoutes } from "../routes/task-outputs.js";
 import { expectedAttemptObjectPrefix } from "@armyofagents/worker-protocol";
@@ -907,20 +908,29 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
     beforeEach(async () => { if (fixture) await resetBridgeRows(); });
 
     async function projected(tenant = TENANT_A, bytes = Buffer.from("founder result bytes"),
-      options: { kind?: "workspace_patch" | "other"; contentType?: string; crew?: boolean; late?: boolean; redrive?: boolean } = {}) {
+      options: { kind?: "workspace_patch" | "other"; contentType?: string; crew?: boolean; browser?: boolean; late?: boolean; redrive?: boolean } = {}) {
       const kind = options.kind ?? "workspace_patch";
       const contentType = options.contentType ?? "text/plain";
       const issueId = await seedIssue(tenant.companyId);
       const agentId = tenant === TENANT_A ? AGENT_A : AGENT_B;
       const crewRunId = randomUUID();
-      const fence = await seedLeasedAttempt(tenant, options.crew
+      const parent = options.browser ? await seedLeasedAttempt(tenant, taskSourceFor(agentId, issueId)) : null;
+      const fence = await seedLeasedAttempt(tenant, options.browser
+        ? { kind: "browser_request", browserRequestId: crewRunId, parentJobId: parent!.jobId }
+        : options.crew
         ? { kind: "crew_run", crewRunId }
         : taskSourceFor(agentId, issueId));
-      if (options.crew) {
+      if (parent) {
+        const preparation = { parentLeaseId: parent.leaseId, parentJobId: parent.jobId, parentAttemptId: parent.attemptId,
+          targetId: parent.targetId, targetAuthorityKey: parent.targetAuthorityKey, targetGeneration: parent.targetGeneration,
+          profileHash: parent.profileHash, providerConstraintHash: parent.providerConstraintHash };
+        await guard().admin`UPDATE jobs SET source_identity = ${crewRunId}, policy_snapshot = policy_snapshot || ${guard().admin.json({ browserPreparation: preparation })} WHERE id = ${fence.jobId}`;
+      }
+      if (options.crew || options.browser) {
         await guard().admin`INSERT INTO internal_agent_runs
           (id, company_id, agent_id, trigger_type, trigger_source, related_entity_type, related_entity_id,
            execution_owner, distributed_job_id, distributed_attempt_id)
-          VALUES (${crewRunId}, ${tenant.companyId}, ${agentId}, 'event', 'task', 'task', ${issueId},
+          VALUES (${crewRunId}, ${tenant.companyId}, ${agentId}, 'event', ${options.browser ? 'browser_request' : 'task'}, 'task', ${issueId},
             'distributed', ${fence.jobId}, ${fence.attemptId})`;
       }
       if (options.late) {
@@ -968,6 +978,37 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       });
       return app;
     }
+
+    it("projects browser child evidence to its durable task and exposes the authorized content link", async () => {
+      const p = await projected(TENANT_A, Buffer.from("browser screenshot evidence"), { browser: true, kind: "other" });
+      const [output] = await guard().admin`SELECT issue_id FROM task_outputs WHERE id = ${p.outputId}`;
+      expect(output.issue_id).toBe(p.issueId);
+      const operations = createJobOperationsService({ appDb: guard().app.db, operatorDb: guard().app.db });
+      expect((await operations.getJobDetail(ORG, COMPANY, p.fence.jobId))?.artifacts.find(a => a.id === p.artifactId)).toMatchObject({ outputId: p.outputId });
+      const response = await request(appFor(p.reader)).get(`/api/task-outputs/${p.outputId}/content`);
+      expect(response.status).toBe(200); expect(response.text).toBe("browser screenshot evidence");
+    });
+
+    it.each(["foreign_task", "foreign_company", "wrong_job", "owner", "trigger", "receipt", "receipt_digest", "output_task", "output_artifact", "pending", "quarantine", "expired", "cookie"])("refuses browser evidence content and links after %s corruption", async (kind) => {
+      const p = await projected(TENANT_A, Buffer.from("browser evidence"), { browser: true, kind: "other" });
+      const db = guard().admin;
+      if (kind === "foreign_task") await db`UPDATE internal_agent_runs SET related_entity_id = ${await seedIssue(COMPANY_SIBLING)} WHERE id = ${p.crewRunId}`;
+      if (kind === "foreign_company") await db`UPDATE internal_agent_runs SET company_id = ${COMPANY_SIBLING} WHERE id = ${p.crewRunId}`;
+      if (kind === "wrong_job") await db`UPDATE internal_agent_runs SET distributed_job_id = NULL WHERE id = ${p.crewRunId}`;
+      if (kind === "owner") await db`UPDATE internal_agent_runs SET execution_owner = 'legacy' WHERE id = ${p.crewRunId}`;
+      if (kind === "trigger") await db`UPDATE internal_agent_runs SET trigger_source = 'task' WHERE id = ${p.crewRunId}`;
+      if (kind === "receipt") await db`UPDATE job_projection_receipts SET status = 'pending', applied_at = NULL WHERE job_id = ${p.fence.jobId} AND projection_kind = 'output_projection'`;
+      if (kind === "receipt_digest") await db`UPDATE job_projection_receipts SET source_digest = ${"f".repeat(64)} WHERE job_id = ${p.fence.jobId} AND projection_kind = 'output_projection'`;
+      if (kind === "output_task") await db`UPDATE task_outputs SET issue_id = ${await seedIssue(COMPANY)} WHERE id = ${p.outputId}`;
+      if (kind === "output_artifact") await db`UPDATE task_outputs SET external_id = ${randomUUID()} WHERE id = ${p.outputId}`;
+      if (kind === "pending") await db`UPDATE job_artifacts SET status = 'granted' WHERE id = ${p.artifactId}`;
+      if (kind === "quarantine") await db`UPDATE job_artifacts SET apply_status = 'conflict_quarantined' WHERE id = ${p.artifactId}`;
+      if (kind === "expired") await db`UPDATE job_artifacts SET expires_at = now() - interval '1 minute' WHERE id = ${p.artifactId}`;
+      if (kind === "cookie") await db`UPDATE job_artifacts SET kind = 'browser_cookie_state' WHERE id = ${p.artifactId}`;
+      await expect(p.reader.openContent(p.outputId, COMPANY)).rejects.toMatchObject({ status: 404 });
+      const operations = createJobOperationsService({ appDb: guard().app.db, operatorDb: guard().app.db });
+      expect((await operations.getJobDetail(ORG, COMPANY, p.fence.jobId))?.artifacts.find(a => a.id === p.artifactId)).not.toHaveProperty("outputId");
+    });
 
     it("delivers crew JSON output to its durable task and downloads it after terminal", async () => {
       const bytes = Buffer.from('{"result":"crew output"}');

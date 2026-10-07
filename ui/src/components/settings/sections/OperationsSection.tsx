@@ -9,6 +9,7 @@ import type {
   WorkerSummary,
 } from "@armyofagents/shared";
 import { useCompany } from "@/context/CompanyContext";
+import { taskOutputsApi } from "@/api/task-outputs";
 import { jobControlApi } from "@/api/job-control";
 import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
@@ -112,6 +113,9 @@ function JobDetailPanel({ organizationId, companyId, jobId }: { organizationId: 
               <span>{artifact.kind ?? "Artifact"}</span><span>{artifact.status ?? "Unknown"}</span></div>
             <div className="mt-1 text-muted-foreground">{artifact.sizeBytes == null ? "Size unavailable" : `${artifact.sizeBytes} bytes`}
               {artifact.expiresAt ? ` · Expires ${new Date(artifact.expiresAt).toISOString()}` : ""}</div>
+            {artifact.outputId && artifact.status === "committed" && artifact.kind !== "browser_cookie_state" &&
+              artifact.applyStatus !== "conflict_quarantined" && (!artifact.expiresAt || new Date(artifact.expiresAt).getTime() > Date.now())
+              ? <a className="mt-1 inline-block underline" href={taskOutputsApi.contentUrl(artifact.outputId)}>Open evidence</a> : null}
           </div>
         ))}
       </DetailGroup>
