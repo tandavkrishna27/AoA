@@ -135,6 +135,8 @@ export interface WorkerSupervisionIdentity {
 }
 
 export interface SupervisorDeps {
+  /** Expedite bounded control delivery while a guest waits for a decision. */
+  onBrowserDecisionPending?(leaseId: string, untilMs: number | null): void;
   readonly browserSelfModel?: WorkerSelfModel;
   /**
    * The DESKTOP/in-process provider (the `E2bSandboxProvider` on the self-hosted lane).
@@ -507,6 +509,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
   async function escalateCleanup(run: ActiveRun, reason: string): Promise<void> {
     browserControllers.get(run.leaseId)?.close();
     browserCredentialConsumers.get(run.leaseId)?.close();
+    deps.onBrowserDecisionPending?.(run.leaseId, null);
     run.effect.withdraw();
     if (run.cleanedUp) return;
 
@@ -1105,7 +1108,10 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         workerId: handoff.offer.workerId, jobId: handoff.offer.job.jobId, attempt: handoff.offer.job.attempt,
         leaseId: handoff.offer.leaseId, fenceToken: handoff.offer.fenceToken }, now, deadlineAt: execStartedAt + run.opDeadlineMs,
       scrubText: (text) => scrubOutputText(text, runCanaries),
-      emit: async (request) => { await events.runtimeDecisionRequested(request); },
+      emit: async (request) => {
+        await events.runtimeDecisionRequested(request);
+        deps.onBrowserDecisionPending?.(run.leaseId, Date.parse(request.expiresAt));
+      },
       deliver: (response) => deliverBrowserApproval({ effect: run.effect, sandboxId: created.sandboxId, response, now, ctx: run.makeCtx() }),
       ...(browserSessionBinding ? { credentialBinding: browserSessionBinding, deliverCredential: async () => {} } : {}),
     }) : null;
@@ -1660,11 +1666,15 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
       const consumer = browserCredentialConsumers.get(leaseId);
       if (!consumer) { if (grants.length) throw new Error("browser credential run unavailable"); return; }
       for (const grant of grants) await consumer.apply(grant);
+      if (grants.length) deps.onBrowserDecisionPending?.(leaseId, null);
     },
     async applyBrowserDecision(command) {
       const controller = browserControllers.get(command.leaseId);
       if (!controller) throw new Error("browser approval run unavailable");
       await controller.apply(command);
+      if (command.commandKind === "runtime_decision_result" && !controller.approvedCredential(command.result.requestId)) {
+        deps.onBrowserDecisionPending?.(command.leaseId, null);
+      }
     },
     onAuthorityRenewed(leaseId, capability): void {
       const run = runs.get(leaseId);
@@ -1715,6 +1725,7 @@ export function createSupervisor(deps: SupervisorDeps): Supervisor {
         browserControllers.delete(run.leaseId);
         browserCredentialConsumers.get(run.leaseId)?.close();
         browserCredentialConsumers.delete(run.leaseId);
+        deps.onBrowserDecisionPending?.(run.leaseId, null);
         run.effect.withdraw();
         runs.delete(run.leaseId);
       }

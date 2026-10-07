@@ -70,6 +70,20 @@ describe("fenced browser approval controller", () => {
     expect(deliverCredential).not.toHaveBeenCalled();
     expect(controller.approvedCredential(message.requestId)).toBeNull();
   });
+  it.each(["agent", "service", "system"] as const)("refuses matched %s allow-once as nonhuman", async principalType => {
+    const requests: PermissionRuntimeDecisionRequestV1[] = [];
+    const deliverCredential = vi.fn(async () => {});
+    const controller = createBrowserApprovalController({ identity, now: () => now, deadlineAt: now + 120_000,
+      scrubText: text => text, emit: async request => { requests.push(request); }, deliver: async () => {},
+      credentialBinding: { bindingId: identity.companyId, origin: "https://example.com", policyDigest: "a".repeat(64) }, deliverCredential });
+    await controller.requestCredentials({ type: "session_credentials_requested", bindingId: identity.companyId,
+      policyDigest: "a".repeat(64), requestId: message.requestId, expiresAt: message.expiresAt });
+    const command = setup().command(requests[0]);
+    if (command.commandKind === "runtime_decision_result") command.result.decidedBy = { principalType, principalId: "other" };
+    await expect(controller.apply(command)).rejects.toThrow("human");
+    expect(deliverCredential).not.toHaveBeenCalled();
+    expect(controller.approvedCredential(message.requestId)).toBeNull();
+  });
   it("emits a scrubbed frozen request once and delivers its matched decision", async () => {
     const ctx = setup();
     await ctx.controller.request({ ...message, intent: { ...message.intent, title: "credential-canary" } });

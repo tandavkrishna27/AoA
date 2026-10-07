@@ -126,6 +126,8 @@ export function createBrowserApprovalController(input: {
       const request = pending.get(command.result.requestId)?.request;
       if (!request || !matchRuntimeDecisionResultToRequestV1(request, command.result).ok ||
           input.now() >= Date.parse(request.expiresAt)) throw new Error("browser approval result mismatch");
+      if (request.toolName === "browser.session_credentials" && command.result.decision === "allow_once" &&
+          command.result.decidedBy.principalType !== "user") throw new Error("browser session requires human approval");
       const completion = request.toolName === "browser.session_credentials"
         ? command.result.decision === "allow_once" && input.deliverCredential
           ? input.deliverCredential(request)
