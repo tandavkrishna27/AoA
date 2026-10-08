@@ -723,3 +723,28 @@ or raise fairness thresholds to make the synthetic case pass.
 Correction verification: repository typecheck passed; the full suite passed
 2,523 files / 24,340 tests, with 227 files / 2,059 tests skipped. The targeted
 native PostgreSQL startup regression passed. Production build passed.
+
+### Same-source rebuilt daemon smoke — 7c1c35f95
+
+Built control-plane, worker and deterministic provider-fixture images from
+`7c1c35f95`, without compiled-source overlays, and booted the isolated Compose
+project `aoa-m4-daemon-7c1c35f95`. It has its own database, object storage,
+control-plane scratch, worker state, slot binding and generated runtime keys.
+The earlier local onboarding and diagnostic projects were not modified.
+
+The selected existing `m1-spine` test, `the DEPLOYED worker performs tenant A's
+journey`, passed (one test). Its durable evidence ties the lease and
+attempt-started/log/usage/terminal events to the enrolled deployed worker and
+records a succeeded terminal, applied attempt/cost/audit projections, and the
+stage-in environment probe. The provider is a deterministic local fixture;
+this does not execute Anthropic or E2B and is not a full M1 campaign rerun.
+Both Linux slot regressions passed against the rebuilt worker image (two
+tests): ownership contention/aliases/crash release and guarded-host identity
+persistence across restart.
+
+Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-smoke`,
+including `candidate.json` with actual image identities and mount destinations,
+and `m1-spine-evidence.json` with the worker-driven attempt. This establishes a
+current daemon execution baseline for the next load investigation. It does
+not establish noisy-neighbor fairness, a two-replica load-balanced journey,
+independent failure domains, full D5 workload floors, or recovery timing.
