@@ -250,3 +250,27 @@ have not run locally: Docker commands remain unresponsive, and the attempted
 full-schema JavaScript probe timed out before obtaining a container ID. No Docker
 restart, unrelated-container stop or speculative cleanup was performed. Complete
 typecheck/tests/build verification is running again with two test workers.
+
+### Stored-byte recovery verification (in progress)
+
+Added `runStoredManifestReconciliation` to read the restored bytes rather than
+trust checksum metadata. It applies the existing prefix/scope gate before any
+storage access, incrementally computes SHA-256 and byte length, closes streams,
+and aborts on read errors. The existing metadata-only verifier remains available
+for its callers; the recovery runbook now names the byte-verifying entry point.
+
+The new positive/missing/corrupt cases use real local-disk files. Additional cases
+reject foreign scope before access, forged hash/size metadata, interrupted reads
+and decoded string streams. The two initial cases failed against the unimplemented
+entry point, then passed; the complete manifest suite now passes 17 cases (12
+existing, five new). Independent review found no actionable issues. This proves
+the byte-verification component, not recovered DB integration, durable quarantine,
+serving denial or production D5 timing. Reads remain sequential and callers must
+keep services/writers stopped; caller-level cancellation/deadlines remain a gap.
+
+PR #686's first complete CI run passed every required consumer except the actual
+CLI fixture, which raced Docker PostgreSQL's temporary socket-only init server.
+Readiness now probes TCP, which only the final server exposes. The correction is
+in both recovery branches; fresh CI is running. The current full local suite began
+before the stored-byte changes, so it cannot prove these new cases or exact-head
+verification even if it passes.

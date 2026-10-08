@@ -99,10 +99,15 @@ alone do not supply the live staging result.
    control-plane + workers up migration-first. Record `T_full_service` (first successful
    lease on the recovered fleet).
 6. **Manifest reconciliation (the wired verifier over REAL objects).** Run the Lane-A
-   verifier over the recovered `status='committed'` manifest × live `headObject` probes —
-   wire `runManifestReconciliation`
+   verifier over the recovered `status='committed'` manifest × readable stored bytes —
+   wire `runStoredManifestReconciliation`
    (`server/src/services/disaster-recovery/manifest-reconciliation.ts`): `rows` = the
-   committed `job_artifacts` set, `headObject` = the live `StorageProvider.headObject`.
+   committed `job_artifacts` set, `storage` = the recovered `StorageProvider`.
+   This streams each in-scope object's bytes for SHA-256 and size; checksum metadata
+   alone is not recovery evidence. Foreign/unsafe prefixes are rejected before any
+   storage access. Read failures abort verification. Keep services/writers stopped
+   throughout verification; this helper does not itself persist quarantine or
+   authorize resuming serving.
    Assert verdict `recovered`, **zero** unresolved missing/mismatched. Record the
    reconciliation RTO (`T_recon_done − T_restore_start`).
 7. **Injected fault (DR04).** Delete ≥1 authoritative object and corrupt ≥1 (flip a byte)

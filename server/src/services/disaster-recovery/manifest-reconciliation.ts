@@ -18,6 +18,7 @@
 // cannot checksum is `hash_unverifiable`, never `verified`.
 
 import { expectedAttemptObjectPrefix, isSafeWorkspacePath, QUARANTINE_REASONS } from "@armyofagents/worker-protocol";
+import { createHash } from "node:crypto";
 import type { HeadObjectResult } from "../../storage/types.js";
 
 /**
@@ -169,6 +170,49 @@ export async function runManifestReconciliation(input: {
   const probes = new Map<string, HeadObjectResult>();
   for (const row of input.rows) {
     probes.set(row.objectKey, await input.headObject(row.objectKey));
+  }
+  return evaluateRecoveredManifestReconciliation(input.rows, probes);
+}
+
+/**
+ * Recovery verification against readable bytes, including stores without checksum
+ * metadata. Scope is checked before any object-store access. Storage/read errors
+ * abort the run; they never produce a recovered verdict or a partial promotion.
+ * Call while recovered services and writers remain stopped. This verifies bytes;
+ * callers still own durable quarantine and the decision to resume serving.
+ */
+export async function runStoredManifestReconciliation(input: {
+  rows: readonly RecoveredManifestRow[];
+  storage: Pick<import("../../storage/types.js").StorageProvider, "getObject" | "headObject">;
+}): Promise<RecoveredManifestReconciliation> {
+  const probes = new Map<string, HeadObjectResult>();
+  for (const row of input.rows) {
+    // Reuse the exact scope gate rather than probing a foreign object and only
+    // rejecting its metadata afterward. No probe already classifies as missing
+    // for an otherwise valid scope, so only wrong_prefix short-circuits here.
+    if (classifyObject(row, undefined) === "wrong_prefix") {
+      probes.set(row.objectKey, { exists: false });
+      continue;
+    }
+    const head = await input.storage.headObject({ objectKey: row.objectKey });
+    if (!head.exists) {
+      probes.set(row.objectKey, { exists: false });
+      continue;
+    }
+    const object = await input.storage.getObject({ objectKey: row.objectKey });
+    const hash = createHash("sha256");
+    let sizeBytes = 0;
+    try {
+      for await (const chunk of object.stream) {
+        if (!(chunk instanceof Uint8Array)) throw new Error("Recovered object stream must emit bytes");
+        hash.update(chunk);
+        sizeBytes += chunk.byteLength;
+        if (!Number.isSafeInteger(sizeBytes)) throw new Error("Recovered object size exceeds safe integer range");
+      }
+    } finally {
+      object.stream.destroy();
+    }
+    probes.set(row.objectKey, { exists: true, contentLength: sizeBytes, checksumSha256: hash.digest("hex") });
   }
   return evaluateRecoveredManifestReconciliation(input.rows, probes);
 }

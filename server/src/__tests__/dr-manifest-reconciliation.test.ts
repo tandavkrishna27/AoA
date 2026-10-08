@@ -13,9 +13,86 @@ import { describe, it, expect } from "vitest";
 import {
   evaluateRecoveredManifestReconciliation,
   runManifestReconciliation,
+  runStoredManifestReconciliation,
   type RecoveredManifestRow,
 } from "../services/disaster-recovery/manifest-reconciliation.js";
 import type { HeadObjectResult } from "../storage/types.js";
+import { createLocalDiskStorageProvider } from "../storage/local-disk-provider.js";
+import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
+
+describe("stored recovery bytes", () => {
+  it("verifies real files and refuses actual missing/corrupt bytes without trusting checksum metadata", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "aoa-dr-object-bytes-"));
+    try {
+      const storage = createLocalDiskStorageProvider(directory);
+      const body = Buffer.from("recovered company artifact\n");
+      const manifest = row({ sha256: createHash("sha256").update(body).digest("hex"), sizeBytes: body.length });
+      const put = (bytes: Buffer) => storage.putObject({ objectKey: manifest.objectKey, body: bytes, contentType: "text/plain", contentLength: bytes.length });
+      await put(body);
+      expect((await storage.headObject({ objectKey: manifest.objectKey })).checksumSha256).toBeUndefined();
+      expect((await runStoredManifestReconciliation({ rows: [manifest], storage })).verdict).toBe("recovered");
+      const corrupt = Buffer.from(body);
+      corrupt[0] = corrupt[0]! ^ 1;
+      await put(corrupt);
+      const rejected = await runStoredManifestReconciliation({ rows: [manifest], storage });
+      expect(rejected.objects[0]!.disposition).toBe("hash_mismatch");
+      expect(rejected.promoted).toEqual([]);
+      await storage.deleteObject({ objectKey: manifest.objectKey });
+      const missing = await runStoredManifestReconciliation({ rows: [manifest], storage });
+      expect(missing.objects[0]!.disposition).toBe("missing");
+      expect(missing.promoted).toEqual([]);
+    } finally {
+      if (path.dirname(directory) !== path.resolve(tmpdir()) || !path.basename(directory).startsWith("aoa-dr-object-bytes-")) throw new Error("Unsafe fixture cleanup path");
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a foreign scope before probing or reading any object", async () => {
+    const forbidden = async (): Promise<never> => { throw new Error("foreign object accessed"); };
+    const manifest = row({ objectKey: keyFor(OTHER_ORG, 1, "foreign.txt") });
+    const result = await runStoredManifestReconciliation({ rows: [manifest], storage: { getObject: forbidden, headObject: forbidden } });
+    expect(result.objects[0]!.disposition).toBe("wrong_prefix");
+    expect(result.verdict).toBe("failed");
+    expect(result.promoted).toEqual([]);
+  });
+
+  it("uses streamed hash and size even when supplied metadata claims a match", async () => {
+    const body = Buffer.from("actual recovered bytes");
+    const manifest = row({ sha256: createHash("sha256").update(body).digest("hex"), sizeBytes: body.length + 1 });
+    const storage = {
+      headObject: async () => ({ exists: true, contentLength: manifest.sizeBytes, checksumSha256: manifest.sha256 }),
+      getObject: async () => ({ stream: Readable.from([body.subarray(0, 5), body.subarray(5)]), contentLength: manifest.sizeBytes }),
+    };
+    const wrongSize = await runStoredManifestReconciliation({ rows: [manifest], storage });
+    expect(wrongSize.objects[0]!.disposition).toBe("size_mismatch");
+    const wrongHash = await runStoredManifestReconciliation({ rows: [{ ...manifest, sha256: HASH, sizeBytes: body.length }], storage });
+    expect(wrongHash.objects[0]!.disposition).toBe("hash_mismatch");
+    expect(wrongHash.promoted).toEqual([]);
+  });
+
+  it("aborts on a truncated read and closes the stream instead of returning partial success", async () => {
+    const stream = Readable.from((async function* () {
+      yield Buffer.from("partial");
+      throw new Error("object read interrupted");
+    })());
+    await expect(runStoredManifestReconciliation({ rows: [row()], storage: {
+      headObject: async () => probe(), getObject: async () => ({ stream }),
+    } })).rejects.toThrow("object read interrupted");
+    expect(stream.destroyed).toBe(true);
+  });
+
+  it("refuses decoded string streams that cannot prove the original bytes", async () => {
+    const stream = Readable.from(["decoded content"]);
+    await expect(runStoredManifestReconciliation({ rows: [row()], storage: {
+      headObject: async () => probe(), getObject: async () => ({ stream }),
+    } })).rejects.toThrow("must emit bytes");
+    expect(stream.destroyed).toBe(true);
+  });
+});
 
 const ORG = "11111111-1111-1111-1111-111111111111";
 const OTHER_ORG = "99999999-9999-9999-9999-999999999999";
