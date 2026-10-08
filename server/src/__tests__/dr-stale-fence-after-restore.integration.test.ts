@@ -13,6 +13,9 @@
  *   * the fence's lease is EXPIRED against a fresh DB clock (post-snapshot staleness);
  *   * the fence's lease ROW is ABSENT in the restored DB (a lease minted after the
  *     snapshot point) — the guard's locking read finds no row → stale_fence.
+ * A separate selected native case now performs actual full-schema backup/restore
+ * against the owned Docker fixture in tests/d1/m4-native-fence-restore.test.mjs.
+ * It supplements these modelled cases; it is not live D5 recovery evidence.
  * The POSITIVE CONTROL (a genuinely-active restored fence is ADMITTED) proves the
  * scenario reaches the gate rather than refusing at an earlier check (E1-F008).
  *
@@ -23,13 +26,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { join, dirname, basename, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import postgres, { type Sql } from "postgres";
 import {
   applyPendingMigrations,
   createOperatorDbConnection,
   createTenantAppDbConnection,
+  runDatabaseBackup,
+  runDatabaseRestore,
   type ActiveFenceRequest,
   type NonOwnerDbConnection,
 } from "@armyofagents/db";
@@ -165,6 +170,7 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
   let app: NonOwnerDbConnection | null = null;
   let operator: NonOwnerDbConnection | null = null;
   let setupError: unknown = null;
+  let adminUrl = "";
 
   function ctx() {
     if (setupError) throw new Error(`embedded-postgres setup failed: ${String(setupError)}`);
@@ -294,25 +300,38 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
   beforeAll(async () => {
     try {
       dataDir = await mkdtemp(join(tmpdir(), "aoa-dr-lane-b-"));
-      const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as { default: EmbeddedPostgresCtor };
-      const port = await allocateEmbeddedPgPort();
-      embedded = new EmbeddedPostgres({
-        databaseDir: join(dataDir, "db"),
-        user: "test",
-        password: "test",
-        port,
-        persistent: false,
-        initdbFlags: ["--encoding=UTF8", "--locale=C"],
-      });
-      await embedded.initialise();
-      await embedded.start();
-      const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
+      if (process.env.AOA_DR_NATIVE_FIXTURE === "owned-container-v1") {
+        adminUrl = process.env.AOA_DR_NATIVE_DATABASE_URL ?? "";
+        const url = new URL(adminUrl);
+        if (url.hostname !== "127.0.0.1" || url.pathname !== "/m4_fence_restore"
+          || !process.env.AOA_PG_DUMP_PATH || !process.env.AOA_PSQL_PATH) {
+          throw new Error("Native recovery test requires its owned loopback database and native tool wrappers");
+        }
+      } else {
+        const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as { default: EmbeddedPostgresCtor };
+        const port = await allocateEmbeddedPgPort();
+        embedded = new EmbeddedPostgres({
+          databaseDir: join(dataDir, "db"),
+          user: "test",
+          password: "test",
+          port,
+          persistent: false,
+          initdbFlags: ["--encoding=UTF8", "--locale=C"],
+        });
+        await embedded.initialise();
+        await embedded.start();
+        adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
+      }
       await applyPendingMigrations(adminUrl);
       admin = postgres(adminUrl, { max: 4 });
       await admin.unsafe(provisionTenantAppRoleLoginSql("aoa_app", PASSWORD));
       await admin.unsafe(provisionTenantAppRoleLoginSql("aoa_operator", PASSWORD));
-      app = createTenantAppDbConnection(adminUrl.replace("test:test", `aoa_app:${PASSWORD}`), { max: 16 });
-      operator = createOperatorDbConnection(adminUrl.replace("test:test", `aoa_operator:${PASSWORD}`), { max: 8 });
+      const appUrl = new URL(adminUrl);
+      appUrl.username = "aoa_app"; appUrl.password = PASSWORD;
+      const operatorUrl = new URL(adminUrl);
+      operatorUrl.username = "aoa_operator"; operatorUrl.password = PASSWORD;
+      app = createTenantAppDbConnection(appUrl.toString(), { max: 16 });
+      operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
       await admin`INSERT INTO organizations (id, name, slug) VALUES (${ORG}, 'REL-003 Lane B org', 'rel-003-lane-b')`;
       await admin`INSERT INTO companies (id, organization_id, name, issue_prefix)
         VALUES (${COMPANY}, ${ORG}, 'REL-003 Lane B company', 'RLB')`;
@@ -343,9 +362,50 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
     await operator?.close({ timeoutSeconds: 5 }).catch(() => {});
     await app?.close({ timeoutSeconds: 5 }).catch(() => {});
     await admin?.end().catch(() => {});
-    await embedded?.stop().catch(() => {});
-    if (dataDir) await rm(dataDir, { recursive: true, force: true }).catch(() => {});
+    // Preserve data if the owned server cannot stop; never delete a live cluster.
+    await embedded?.stop();
+    if (dataDir) {
+      if (dirname(resolve(dataDir)) !== resolve(tmpdir()) || !basename(dataDir).startsWith("aoa-dr-lane-b-")) {
+        throw new Error("Unsafe recovery fixture cleanup path");
+      }
+      await rm(dataDir, { recursive: true, force: true });
+    }
   }, 60_000);
+
+  it.skipIf(process.env.AOA_DR_NATIVE_FIXTURE !== "owned-container-v1")(
+    "actual native backup/restore rejects a post-snapshot fence and admits fresh authority", async () => {
+      ctx();
+      await resetRuntimeRows();
+      const backup = await runDatabaseBackup({
+        connectionString: adminUrl, backupDir: dataDir,
+        filenamePrefix: "m4-native-fence", backupEngine: "pg_dump",
+      });
+      expect(backup.sizeBytes).toBeGreaterThan(0);
+      const old = await activateLease(9_005);
+      await expect(callGuarded(old.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
+      // Close all consumers before destructive restore, then create fresh pools so
+      // prepared statements cannot retain references to dropped relation OIDs.
+      await operator!.close({ timeoutSeconds: 5 }); operator = null;
+      await app!.close({ timeoutSeconds: 5 }); app = null;
+      await admin!.end(); admin = null;
+      await runDatabaseRestore({ connectionString: adminUrl, backupFile: backup.backupFile });
+      admin = postgres(adminUrl, { max: 4 });
+      const appUrl = new URL(adminUrl);
+      appUrl.username = "aoa_app"; appUrl.password = PASSWORD;
+      const operatorUrl = new URL(adminUrl);
+      operatorUrl.username = "aoa_operator"; operatorUrl.password = PASSWORD;
+      app = createTenantAppDbConnection(appUrl.toString(), { max: 16 });
+      operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
+      // This absence is produced by restoring the actual earlier backup, not by
+      // deleting the lease in the scenario under test.
+      const [restored] = await admin`SELECT count(*)::int AS n FROM leases WHERE id = ${old.identity.leaseId}`;
+      expect(restored!.n).toBe(0);
+      await expect(callGuarded(old.identity, "acceptEvent")).rejects.toMatchObject({ code: "stale_fence" });
+      const fresh = await activateLease(9_006);
+      await expect(callGuarded(fresh.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
+      await expect(callGuarded(old.identity, "acceptEvent")).rejects.toMatchObject({ code: "stale_fence" });
+    }, 180_000,
+  );
 
   it("I9 (positive control): a genuinely-active restored fence is ADMITTED by the real gate", async () => {
     const { offer, identity } = await activateLease(9_001);

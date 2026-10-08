@@ -274,3 +274,21 @@ Readiness now probes TCP, which only the final server exposes. The correction is
 in both recovery branches; fresh CI is running. The current full local suite began
 before the stored-byte changes, so it cannot prove these new cases or exact-head
 verification even if it passes.
+
+### Native restored-fence regression (implemented, not yet executed)
+
+Added a selected case to the real fence integration scaffold and an owned Docker
+PostgreSQL fixture (`tests/d1/m4-native-fence-restore.test.mjs`). It migrates the
+current application schema, takes a native backup, mints and admits a real lease,
+closes all pools, restores the earlier backup, then checks that the old lease is
+absent and its fence is rejected. A freshly minted lease is admitted afterward.
+The native tools execute inside that same pinned PostgreSQL container, avoiding
+client/server version mismatch. The harness requires one passed selected case;
+an all-skipped Vitest result fails. The four existing modelled cases remain.
+
+Independent review found no actionable issues. Syntax, inventory (2,992 files),
+execution census (124 mjs files; 121 declared running) and citation checks pass.
+The new fixture is declared in PR CI shard one. It has not executed locally while
+Docker remains unresponsive; no passing native-fence result is claimed. This case
+still does not prove expired/generation fences across restore, object quarantine,
+the live recovered fleet, or D5 RPO/RTO. Full verification remains pending.
