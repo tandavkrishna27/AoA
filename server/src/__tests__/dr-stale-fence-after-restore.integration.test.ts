@@ -373,7 +373,7 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
   }, 60_000);
 
   it.skipIf(process.env.AOA_DR_NATIVE_FIXTURE !== "owned-container-v1")(
-    "actual native backup/restore rejects a post-snapshot fence and admits fresh authority", async () => {
+    "actual native backup/restore rejects stale fence authorities and admits fresh authority", async () => {
       ctx();
       await resetRuntimeRows();
       const backup = await runDatabaseBackup({
@@ -383,27 +383,52 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
       expect(backup.sizeBytes).toBeGreaterThan(0);
       const old = await activateLease(9_005);
       await expect(callGuarded(old.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
-      // Close all consumers before destructive restore, then create fresh pools so
-      // prepared statements cannot retain references to dropped relation OIDs.
-      await operator!.close({ timeoutSeconds: 5 }); operator = null;
-      await app!.close({ timeoutSeconds: 5 }); app = null;
-      await admin!.end(); admin = null;
-      await runDatabaseRestore({ connectionString: adminUrl, backupFile: backup.backupFile });
-      admin = postgres(adminUrl, { max: 4 });
-      const appUrl = new URL(adminUrl);
-      appUrl.username = "aoa_app"; appUrl.password = PASSWORD;
-      const operatorUrl = new URL(adminUrl);
-      operatorUrl.username = "aoa_operator"; operatorUrl.password = PASSWORD;
-      app = createTenantAppDbConnection(appUrl.toString(), { max: 16 });
-      operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
+      async function restore(backupFile: string) {
+        // Close all consumers before destructive restore, then create fresh pools
+        // so prepared statements cannot retain dropped relation OIDs.
+        await operator!.close({ timeoutSeconds: 5 }); operator = null;
+        await app!.close({ timeoutSeconds: 5 }); app = null;
+        await admin!.end(); admin = null;
+        await runDatabaseRestore({ connectionString: adminUrl, backupFile });
+        admin = postgres(adminUrl, { max: 4 });
+        const appUrl = new URL(adminUrl);
+        appUrl.username = "aoa_app"; appUrl.password = PASSWORD;
+        const operatorUrl = new URL(adminUrl);
+        operatorUrl.username = "aoa_operator"; operatorUrl.password = PASSWORD;
+        app = createTenantAppDbConnection(appUrl.toString(), { max: 16 });
+        operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
+      }
+      await restore(backup.backupFile);
       // This absence is produced by restoring the actual earlier backup, not by
       // deleting the lease in the scenario under test.
-      const [restored] = await admin`SELECT count(*)::int AS n FROM leases WHERE id = ${old.identity.leaseId}`;
+      const [restored] = await ctx().admin`SELECT count(*)::int AS n FROM leases WHERE id = ${old.identity.leaseId}`;
       expect(restored!.n).toBe(0);
       await expect(callGuarded(old.identity, "acceptEvent")).rejects.toMatchObject({ code: "stale_fence" });
       const fresh = await activateLease(9_006);
       await expect(callGuarded(fresh.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
       await expect(callGuarded(old.identity, "acceptEvent")).rejects.toMatchObject({ code: "stale_fence" });
+
+      // Capture expired authority in a real backup, then restore it. The expiry
+      // is prepared before the snapshot; no post-restore mutation fakes staleness.
+      await ctx().admin`UPDATE leases SET ack_deadline = clock_timestamp() - interval '2 seconds',
+        expires_at = clock_timestamp() - interval '1 second' WHERE id = ${fresh.identity.leaseId}`;
+      const expired = await runDatabaseBackup({ connectionString: adminUrl, backupDir: dataDir,
+        filenamePrefix: "m4-native-expired", backupEngine: "pg_dump" });
+      await ctx().admin`UPDATE leases SET ack_deadline = clock_timestamp() + interval '5 minutes',
+        expires_at = clock_timestamp() + interval '10 minutes' WHERE id = ${fresh.identity.leaseId}`;
+      await expect(callGuarded(fresh.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
+      await restore(expired.backupFile);
+      await expect(callGuarded(fresh.identity, "acceptEvent")).rejects.toMatchObject({ code: "stale_fence" });
+
+      const generation = await activateLease(9_007);
+      await expect(callGuarded(generation.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
+      await ctx().admin`UPDATE execution_targets SET device_generation = 2 WHERE id = ${TARGET}`;
+      const revoked = await runDatabaseBackup({ connectionString: adminUrl, backupDir: dataDir,
+        filenamePrefix: "m4-native-generation", backupEngine: "pg_dump" });
+      await ctx().admin`UPDATE execution_targets SET device_generation = 1 WHERE id = ${TARGET}`;
+      await expect(callGuarded(generation.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
+      await restore(revoked.backupFile);
+      await expect(callGuarded(generation.identity, "acceptEvent")).rejects.toMatchObject({ code: "target_revoked" });
     }, 180_000,
   );
 

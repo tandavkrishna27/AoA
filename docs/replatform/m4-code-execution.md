@@ -282,6 +282,10 @@ PostgreSQL fixture (`tests/d1/m4-native-fence-restore.test.mjs`). It migrates th
 current application schema, takes a native backup, mints and admits a real lease,
 closes all pools, restores the earlier backup, then checks that the old lease is
 absent and its fence is rejected. A freshly minted lease is admitted afterward.
+Two further native round trips capture expired authority and a generation cutoff.
+Each changes the live state back to admissible after backup, then restores the
+captured refusal and checks the real guard. Omitting those restore calls cannot
+pass the corresponding negative assertions.
 The native tools execute inside that same pinned PostgreSQL container, avoiding
 client/server version mismatch. The harness requires one passed selected case;
 an all-skipped Vitest result fails. The four existing modelled cases remain.
@@ -290,5 +294,13 @@ Independent review found no actionable issues. Syntax, inventory (2,992 files),
 execution census (124 mjs files; 121 declared running) and citation checks pass.
 The new fixture is declared in PR CI shard one. It has not executed locally while
 Docker remains unresponsive; no passing native-fence result is claimed. This case
-still does not prove expired/generation fences across restore, object quarantine,
-the live recovered fleet, or D5 RPO/RTO. Full verification remains pending.
+still needs observed execution and does not prove object quarantine, the live
+recovered fleet, or D5 RPO/RTO. Full verification remains pending.
+
+One additional restore policy gap needs a dedicated regression: a revocation
+that occurs after the backup is absent from the restored snapshot. The restore
+command currently does not itself invalidate restored worker authority, and the
+guard trusts the restored generation. The native cases above restore already-stale
+authority; they do not establish safe handling of post-backup revocations. Recovery
+must keep workers stopped until that stale-authority replay is prevented through
+the actual restore/re-enrollment procedure.

@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto';
 // Full current application schema and real tenant-role fence guard. Native tools
 // run in the owned PostgreSQL image so client/server versions always match. This
 // is an engineering recovery regression, not live D5 topology or RPO/RTO proof.
-test('native full-schema restore rejects post-snapshot fence authority', { timeout: 600000 }, async () => {
+test('native full-schema restore rejects stale fence authority', { timeout: 600000 }, async () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'aoa-m4-native-fence-'));
   const password = randomBytes(24).toString('hex');
   const owner = randomBytes(12).toString('hex');
@@ -68,6 +68,7 @@ child.on('exit', code => { process.exitCode = code ?? 1; });
     assert.equal(result.numPassedTests, 1, 'Selected native restore case must execute; a skip is not evidence');
     assert.equal(result.numFailedTests, 0);
     console.log(JSON.stringify({ result: 'PASS', passedNativeRestoreCases: 1,
+      scenarios: ['post-snapshot lease', 'expired snapshot lease', 'generation cutoff in snapshot'],
       limits: 'Disposable single-database engineering fixture; not live fleet, objects or D5 timings' }));
   } finally {
     if (id && /^[a-f0-9]{64}$/.test(id)) run('docker', ['stop', '-t', '3', id], { timeout: 20000 });
