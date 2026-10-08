@@ -58,3 +58,37 @@ Baseline: program merge 06b47679f48943f0904c543dc3a33bf737dabf2f.
 Read-only reconciliation and branch isolation are complete for this initial
 checkpoint. No product code changed and no tests, infrastructure, provider calls
 or restore operations were run during this audit.
+
+### Current-code baseline, 2026-10-08
+
+The follow-up audit ran 92 existing focused tests, all passing without skips:
+
+- 69 tests across worker enrollment/idempotency, custody, file-record persistence,
+  CLI restore input and rollback completeness.
+- 23 recovery tests across manifest reconciliation, staging rollout invariants,
+  stale fences and re-enrollment/revocation. Windows PostgreSQL execution was
+  explicitly enabled for the two integration files; those seven cases executed.
+
+Important evidence limits and concrete next work:
+
+- The stale-fence integration suite models restored state with older/absent lease
+  rows. It exercises the real fence guard, but does not call backup or restore.
+- The database package has a genuine JavaScript-format restore round-trip suite,
+  but it skips Windows unconditionally and invokes the library directly. CLI
+  restore-input tests do not exercise the actual operator command.
+- The staging image default remains the inert daemon. The opt-in
+  `worker-networked-host` composes `runContainerHost` and the networked per-run
+  provider. Fleet design must bind identity, event outbox and lease-candidate
+  state to the same exclusive worker slot and preserve opt-in dispatch.
+- The current template's `AOA_WORKER_TARGET_PROFILE_ID` is not an identity source
+  consumed by the daemon configuration. Enrollment obtains the target UUID from
+  the ticket. A service name or environment label cannot replace a unique ticket
+  and target binding.
+- The native organization target revoke route exists. Reuse its authorization,
+  generation and revocation machinery rather than deleting worker rows to enable
+  transfer or resetting identity files.
+
+The proposed fleet direction is distinct target/ticket/durable state per worker
+slot, bounded scale-out, drain and revoke on retirement, and restore of the old
+identity or a new target on replacement. Architectural design approval is
+pending; no implementation or deployment topology change has started.
