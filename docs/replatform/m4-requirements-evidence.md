@@ -112,3 +112,13 @@ M1b/Anthropic live verification remains deferred by user direction. Full D2's
 M3/M4 ownership remains unresolved in scope-triage; this audit does not silently
 assign it or add a campaign. Desktop-local coding remains a separate execution
 backend; a networked desktop slot currently delegates through the remote provider.
+
+
+Real-daemon follow-up (2026-10-09): rebuilt images executed both quiet and noisy
+organization jobs. A 15-second 2/s versus 20/s comparison with explicit 32-slot
+workers preserved quiet throughput (1.042 of baseline) and ACK-receipt delay
+(1.061x), but failed overall with 180/300 noisy jobs unresolved at the 30-second
+drain deadline. Both ratified provider profiles still cap concurrent operations
+at eight. Receipt transaction timestamps are a proxy; HTTP distributions and
+full D5 floors remain unmeasured. See m4-code-execution.md for retained failures,
+eventual completion and the next profile-capacity investigation.

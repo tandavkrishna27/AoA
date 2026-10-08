@@ -748,3 +748,53 @@ and `m1-spine-evidence.json` with the worker-driven attempt. This establishes a
 current daemon execution baseline for the next load investigation. It does
 not establish noisy-neighbor fairness, a two-replica load-balanced journey,
 independent failure domains, full D5 workload floors, or recovery timing.
+### Real-daemon fixed-arrival diagnostic — configuration limits remain
+
+Added a second enrolled daemon for the noisy organization, with independent
+state/slot volumes and a separate organization-scoped target. Both use the
+rebuilt `7c1c35f95` images and the local deterministic provider fixture. No
+production default or authority lock changed.
+
+The first 15-second baseline scheduled 30 quiet jobs at 2/s with the default
+single worker batch slot. Seven completed inside the window; only 21 succeeded by the end of the window plus
+30-second drain; nine were still pending/leased. The exploratory driver then
+failed an assertion that incorrectly assumed every pending row already had
+worker identity. Raw evidence was retained, the assertion was corrected to
+check identity when present, and a later scoped DB read proved all 30 succeeded.
+No loaded comparison or fairness conclusion was produced for this run.
+
+After all earlier jobs drained, both workers were explicitly configured with
+32 batch slots. Arrival rates remained 2/s quiet and 20/s noisy, for 15 seconds:
+
+| Measurement | Quiet baseline | Quiet under noisy load | Noisy |
+|---|---:|---:|---:|
+| Scheduled jobs | 30 | 30 | 300 |
+| Succeeded terminals timestamped inside window | 24 | 25 | 35 |
+| Throughput per second | 1.600 | 1.667 | 2.333 |
+| Queue-to-ACK-receipt p95 (ms) | 1,062.97 | 1,128.34 | 11,056.74 |
+| Succeeded by drain deadline | 30 | 30 | 120 |
+| Unresolved at drain deadline | 0 | 0 | 180 |
+
+Quiet ratios were 1.042 throughput and 1.061 receipt delay. **The diagnostic as
+a whole failed** because noisy work remained unresolved at its deadline. A
+later scoped DB read showed all 300 noisy jobs eventually succeeded; that does
+not replace the fixed-deadline failure. Actor checks on recorded lease/event
+rows matched each organization's expected deployed worker.
+
+The queue-delay proxy uses the DB `worker_operation_receipts.created_at`
+transaction timestamp for `lease_ack`, not response or commit timing. Terminal
+window attribution also uses DB transaction timestamps. This short probe does
+not measure HTTP request distributions or prove the full D5 fairness gate.
+
+Both target rows still ratify **eight provider concurrent operations**. The
+production leasing path refuses further admissible work when live occupancy
+reaches that profile ceiling (`deriveAdmissibleWorkloadTypes` in `job-leasing.ts`).
+The outbox drain's default interval is two seconds. These are confirmed
+configuration/code facts and plausible capacity constraints; their separate
+causal contribution is not isolated by this run. Worker slots alone do not
+raise the provider ceiling. The next capacity comparison needs correctly
+ratified test profiles and fresh enrollment, while retaining these failures.
+
+Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-comparison`
+and `daemon-7c1c35f95-capacity32` (cohorts, raw DB observations, report, source
+snapshot and candidate image/configuration manifest). Full D5 remains open.
