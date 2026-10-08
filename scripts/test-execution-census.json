@@ -617,6 +617,11 @@
       "status": "runs",
       "workflow": "pr.yml",
       "step": "M4 CLI recovery fallback"
+    },
+    "tests/d1/m4-native-fence-restore.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M4 native restored-fence regression"
     }
   }
 }

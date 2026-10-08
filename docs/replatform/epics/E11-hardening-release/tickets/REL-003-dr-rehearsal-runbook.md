@@ -50,6 +50,15 @@ includes PostgreSQL clients; the split control-plane image does not. The current
 JavaScript backup fallback does not serialize the full security-object set and
 cannot establish complete application-schema recovery.
 
+Automatic backup now refuses JavaScript fallback when PostgreSQL catalogs contain
+RLS/policies, table or column grants, type grants, nondefault schema permissions,
+functions, user triggers or default privileges. A missing or incompatible native
+tool therefore produces an error for the application schema rather than a
+misleading successful recovery backup. Provision clients compatible with the
+source/destination PostgreSQL versions, or configure `AOA_PG_DUMP_PATH` and
+`AOA_PSQL_PATH`. Explicit JavaScript portability exports remain a separate,
+limited contract; they are not full recovery backups.
+
 The command exists; E11-F002 remains open until the required actual rehearsal
 exercises it and establishes recovery. Input tests or direct library round trips
 alone do not supply the live staging result.
@@ -86,14 +95,26 @@ alone do not supply the live staging result.
 4. **Prior-release restore.** Restore the pre-0188 snapshot into the prior-release
    database via **`aoa db:restore --file <pre-0188-backup-file>`**, with the explicit
    operator-held destination above. Record restore start `T_restore_start`.
-5. **Forward recovery to candidate.** Re-run migrations forward to the candidate; bring
-   control-plane + workers up migration-first. Record `T_full_service` (first successful
-   lease on the recovered fleet).
+5. **Forward recovery to candidate, with worker traffic isolated.** Re-run migrations
+   forward to the candidate. Keep worker ingress blocked and workers stopped while
+   verifying objects and recovering authority. An older snapshot can lose a later
+   revocation; SQL restore alone is not authority recovery. Before reconnecting any
+   worker, re-enroll through the existing enrollment flow to advance every restored
+   target generation and issue fresh worker identity, or revoke/retire targets that
+   must remain disabled. Use the existing generation/revocation authorities, not
+   direct table edits. Complete this for the recovered fleet before worker traffic
+   or leasing resumes. Record `T_full_service` only after successful verification
+   and the first lease from recovered current authority.
 6. **Manifest reconciliation (the wired verifier over REAL objects).** Run the Lane-A
-   verifier over the recovered `status='committed'` manifest × live `headObject` probes —
-   wire `runManifestReconciliation`
+   verifier over the recovered `status='committed'` manifest × readable stored bytes —
+   wire `runStoredManifestReconciliation`
    (`server/src/services/disaster-recovery/manifest-reconciliation.ts`): `rows` = the
-   committed `job_artifacts` set, `headObject` = the live `StorageProvider.headObject`.
+   committed `job_artifacts` set, `storage` = the recovered `StorageProvider`.
+   This streams each in-scope object's bytes for SHA-256 and size; checksum metadata
+   alone is not recovery evidence. Foreign/unsafe prefixes are rejected before any
+   storage access. Read failures abort verification. Keep services/writers stopped
+   throughout verification; this helper does not itself persist quarantine or
+   authorize resuming serving.
    Assert verdict `recovered`, **zero** unresolved missing/mismatched. Record the
    reconciliation RTO (`T_recon_done − T_restore_start`).
 7. **Injected fault (DR04).** Delete ≥1 authoritative object and corrupt ≥1 (flip a byte)

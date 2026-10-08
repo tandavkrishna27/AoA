@@ -229,3 +229,82 @@ A new config regression failed before this change and passes afterward; CLI buil
 passes. Current focused unit total is seven, plus the live Docker CLI journey.
 The exact dynamic-SQL inventory regression also passes (one selected case; 19
 filtered cases are not claimed executed by that focused command).
+
+### Automatic fallback security guard (in progress)
+
+The reduced-worker full run terminated with ENOSPC while writing Vitest state
+(19,454 tests passed, one known inventory failure, seven infrastructure errors;
+356 files failed). It is not a passing run. A subsequent recursive typecheck and
+build passed, but the new fallback safeguard requires fresh complete verification.
+
+Automatic backup now rejects the portable fallback when omitted security objects
+are present. The regression first reproduced a misleading successful backup and
+then passed with the guard. An independent review found missing column/schema/type
+ACL detection; those catalogs are now included, with the ordinary public-schema
+ACL exempted. Four native/fallback unit cases and five COPY-parser cases pass;
+the CLI bundle case also passed in the initial focused run (ten total cases).
+
+The actual CLI fixture now checks independent column, schema and type grant cases,
+with a successful plain-schema backup before each injection. These added cases
+have not run locally: Docker commands remain unresponsive, and the attempted
+full-schema JavaScript probe timed out before obtaining a container ID. No Docker
+restart, unrelated-container stop or speculative cleanup was performed. Complete
+typecheck/tests/build verification is running again with two test workers.
+
+### Stored-byte recovery verification (in progress)
+
+Added `runStoredManifestReconciliation` to read the restored bytes rather than
+trust checksum metadata. It applies the existing prefix/scope gate before any
+storage access, incrementally computes SHA-256 and byte length, closes streams,
+and aborts on read errors. The existing metadata-only verifier remains available
+for its callers; the recovery runbook now names the byte-verifying entry point.
+
+The new positive/missing/corrupt cases use real local-disk files. Additional cases
+reject foreign scope before access, forged hash/size metadata, interrupted reads
+and decoded string streams. The two initial cases failed against the unimplemented
+entry point, then passed; the complete manifest suite now passes 17 cases (12
+existing, five new). Independent review found no actionable issues. This proves
+the byte-verification component, not recovered DB integration, durable quarantine,
+serving denial or production D5 timing. Reads remain sequential and callers must
+keep services/writers stopped; caller-level cancellation/deadlines remain a gap.
+
+PR #686's first complete CI run passed every required consumer except the actual
+CLI fixture, which raced Docker PostgreSQL's temporary socket-only init server.
+Readiness now probes TCP, which only the final server exposes. The correction is
+in both recovery branches. PR #686 passed required CI and merged into
+`docs/replatform-program` as `f77437a43a72be7d368718b4253f432b85197acb`.
+The local full run passed 24,318 tests (2,054 skipped) and build, but crossed source
+changes and therefore does not verify the latest commit. A subsequent recursive
+typecheck passed. PR #687 verification remains pending; its environment-variable
+documentation failure has been corrected for the two test-only fixture inputs.
+
+### Native restored-fence regression (implemented, not yet executed)
+
+Added a selected case to the real fence integration scaffold and an owned Docker
+PostgreSQL fixture (`tests/d1/m4-native-fence-restore.test.mjs`). It migrates the
+current application schema, takes a native backup, mints and admits a real lease,
+closes all pools, restores the earlier backup, then checks that the old lease is
+absent and its fence is rejected. A freshly minted lease is admitted afterward.
+Two further native round trips capture expired authority and a generation cutoff.
+Each changes the live state back to admissible after backup, then restores the
+captured refusal and checks the real guard. Omitting those restore calls cannot
+pass the corresponding negative assertions.
+The native tools execute inside that same pinned PostgreSQL container, avoiding
+client/server version mismatch. The harness requires one passed selected case;
+an all-skipped Vitest result fails. The four existing modelled cases remain.
+
+Independent review found no actionable issues. Syntax, inventory (2,992 files),
+execution census (124 mjs files; 121 declared running) and citation checks pass.
+The new fixture is declared in PR CI shard one. It has not executed locally while
+Docker remains unresponsive; no passing native-fence result is claimed. This case
+still needs observed execution and does not prove object quarantine, the live
+recovered fleet, or D5 RPO/RTO. Full verification remains pending.
+
+A fourth native round trip backs up an active lease, revokes its target, restores
+the older snapshot, then invokes the real enrollment generation authority before
+checking rejection of the old fence. Independent review found no actionable
+issues. This case is implemented but awaits native execution. Generic SQL restore
+does not invalidate authority: the runbook now explicitly blocks worker ingress
+and keeps workers stopped until object verification and authority recovery finish
+for every restored target. Actual fleet re-enrollment with fresh identity and
+enforcement of that isolation still require staging proof.
