@@ -24,12 +24,15 @@ native fixture executes full migrated-schema restore with four stale-authority
 scenarios and a current-authority positive control. These disposable engineering
 fixtures do not establish production recovery objectives.
 
-PR #688 supplies durable company-scoped artifact quarantine; PR #689 couples
-native database restore with real-file snapshot recovery and fault injection.
-Both remain under CI verification. At `d40998068`, recursive typecheck, 24,334
+PR #688 landed durable company-scoped artifact quarantine at
+`493e016285c692b334893f8513be42487879d93e`; PR #689 landed combined native
+database/file snapshot recovery at `b0576a77213089e4a073562bdbc72d012bf568ca`.
+Both have required CI green. At `d40998068`, recursive typecheck, 24,334
 local tests and production build pass. Separately enabled real-PostgreSQL
 migration readiness passes 4/4 after a reproduced replay failure was corrected
-with C14 guards. The combined native database/file execution remains pending.
+with C14 guards. Native CI explicitly reports two executed database/file recovery
+cases passed, alongside the four fence scenarios. This is an isolated PostgreSQL
+and local-file fixture, not external-store or running-fleet recovery.
 
 ## Requirement audit
 
@@ -50,24 +53,22 @@ file, declared CI lane or passing component test is not a measured D5 result.
 | D5-L04 API 5xx ≤0.1% | HTTP correctness tests assert individual responses | Complete load-run response denominator and error counts. |
 | D5-L05 submit/poll/event ACK p95 ≤750/1,000/500 ms | Route/component correctness does not establish percentiles | Measured latency distributions under the stated load. |
 | D5-L06 quota/spend cap, no double release | `job-quotas.integration.test.ts` drives real RLS-scoped capacity claims, shared legacy/distributed counting, racing releases, budget hard-stop and fail-closed storage; focused M4 baseline executed these cases | Same behavior throughout the candidate topology/load journey. |
-| D5-DR01 same-candidate DB restore + object reconciliation | Landed native full-schema/fence restore and CLI recovery fixtures; PR #689 couples native DB and real-file snapshots, requiring manifest and byte restoration before reconciliation (native execution pending). Earlier source/destination catalog probe matched 203 tables, 286 migration entries, 37 policies, 26 FORCE-RLS tables, seven functions and 187 grants | Pass combined native fixture, then execute the same release candidate against external stores and the recovered fleet. |
+| D5-DR01 same-candidate DB restore + object reconciliation | Landed CLI recovery and native full-schema/fence fixtures. PR #689 native CI passes both DB/file snapshot cases, requiring deleted manifests and files to be restored before bounded-role reconciliation. Earlier catalog probe matched 203 tables, 286 migration entries, 37 policies, 26 FORCE-RLS tables, seven functions and 187 grants | Execute the same release candidate against external stores and the recovered fleet. |
 | D5-DR02 DB RPO ≤15 min, full-service RTO ≤4 h | CLI fixture proves limited round-trip behavior | Declared fault, recoverable commit age and restored full-service timing on live substrate. |
 | D5-DR03 object RPO ≤15 min, reconciliation RTO ≤4 h | Wired verifier streams real stored bytes against the company-scoped DB manifest; local-file integration passes. No production timing is inferred | Actual recoverable external object versions and measured complete reconciliation against the recovered authoritative set. |
-| D5-DR04 hash/size/scope/prefix/identity, missing+corrupt injection, zero unresolved on success | Actual-byte SHA-256/size verification, unsafe-prefix refusal, real-file missing/corrupt injections and durable reader/replay denial pass locally. Combined native DB/file restore is wired into PR #689 CI | Execute combined native journey, then external-store recovered manifest/checkpoint identity and serving checks with signed capabilities isolated. |
-| D5-DR05 quarantine, never promote bad objects | Durable recovery quarantine implemented separately from orphan disposition, preserving committed identity; real PostgreSQL + local-file corruption/deletion regressions prove download/upload/commit replay denial, sticky repair refusal and one company audit. Offline operator entry point enforces bounded role and explicit scope | Latest-change verification and actual recovered-candidate journey, including existing signed URL isolation and every required object/consumer. Local component integration is not live D5 proof. |
+| D5-DR04 hash/size/scope/prefix/identity, missing+corrupt injection, zero unresolved on success | Actual-byte SHA-256/size verification, unsafe-prefix refusal and durable denial pass locally. Combined native DB/file restore with missing/corrupt injections passes CI; healthy governed replay rules out stale-authority masking | External-store recovered manifest/checkpoint identity and serving checks with signed capabilities isolated. |
+| D5-DR05 quarantine, never promote bad objects | Durable recovery quarantine preserves committed identity; native DB/file restore regressions pass download/upload/commit replay denial, sticky repair refusal and one company audit. Offline operator entry point enforces bounded role and explicit scope. Local full verification and required CI are green | Live recovered-candidate journey, including existing signed URL isolation and every required object/consumer. Engineering integration is not live D5 proof. |
 | D5-DR06 reject every pre-restore stale fence | Native CI at `068a74d23` actually restores full-schema backups and reaches the real tenant guard for post-snapshot leases, expired snapshot leases, captured generation cutoff and post-backup revocation followed by pre-serving generation advance. Fresh authority succeeds | Recovered running fleet and governed HTTP-route replay on the staging candidate; all target authority must advance before worker ingress resumes. |
 | D5-DR07 reenrollment/revocation and compatible rollout after restore | `dr-reenroll-revoke.integration.test.ts`, frozen baseline and staging rollout unit tests | Execute these on the recovered candidate and running workers, observing production revocation convergence. |
 
 ## Next code and test work
 
-1. Finish required CI and land quarantine plus the combined native DB/file recovery
-   extension. Fix failures without weakening readiness or authority assertions.
-2. Obtain the operator's staging environment/access method or run results. Execute
+1. Obtain the operator's staging environment/access method or run results. Execute
    the existing REL-003 runbook against external stores, using compatible native
    clients, explicit destinations, isolated worker traffic and current authority.
-3. Measure D5 topology, failover, broker catch-up, load/fairness and recovery at the
+2. Measure D5 topology, failover, broker catch-up, load/fairness and recovery at the
    stated scope. Local fixtures cannot supply those timings or workload floors.
-4. Keep M3's unresolved provider/application-session dependency visible. Do not
+3. Keep M3's unresolved provider/application-session dependency visible. Do not
    promote M4 until all explicit D5 requirements and its dependency are proven.
 
 M1b/Anthropic live verification remains deferred by user direction. Full D2's

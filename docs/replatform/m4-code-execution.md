@@ -362,7 +362,8 @@ that downloads alone cannot prove an active fence; the governed replay supplies
 that positive control. The complete local artifact suite passes 39 tests, and the
 two updated positive controls pass separately. Server typecheck passes.
 
-Native execution of this combined extension remains pending CI. Local Docker's
+Native execution of this combined extension passed CI at `d40998068`, reporting
+exactly two executed DB/file recovery cases plus the four fence scenarios. Local Docker's
 existing read-only process query remains unresponsive; no engine restart or
 unrelated container cleanup was attempted. The existing four-scenario native
 fence restore and CLI restore steps passed in CI at `b61e4e766`; that run's
@@ -392,5 +393,7 @@ At `d40998068`, recursive typecheck, full local tests (2,523 files / 24,334 test
 passed; 227 files / 2,058 tests skipped), and production build all pass. The
 complete artifact integration suite separately passes 39 cases, including the
 healthy governed replay control. Required CI and native combined execution are
-still pending at this record. Live staging access/results are outstanding;
+green at `d40998068`, including native combined execution. PR #688 merged at
+`493e016285c692b334893f8513be42487879d93e`; PR #689 merged at
+`b0576a77213089e4a073562bdbc72d012bf568ca`. Live staging access/results are outstanding;
 REL-003 reserves that substrate and spend to the operator. M4 remains open.
