@@ -4715,6 +4715,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobArtifacts.identifier, input.identifier));
       const [committed] = await tx.select().from(jobArtifacts)
         .where(and(identity, eq(jobArtifacts.status, "committed"))).limit(1).for("update");
+      if (committed?.recoveryQuarantinedAt != null) throw new ArtifactCommitRejection("tenant_mismatch");
       if (committed) return { ...committed, replayed: true };
       const [expired] = await tx.select({ id: jobArtifacts.id }).from(jobArtifacts)
         .where(and(identity, eq(jobArtifacts.status, "expired"))).limit(1).for("update");
@@ -4770,7 +4771,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobArtifacts.identifier, input.identifier),
         eq(jobArtifacts.status, "committed"),
       )).limit(1);
-      if (!existing) throw new ArtifactCommitRejection("tenant_mismatch");
+      if (!existing || existing.recoveryQuarantinedAt != null) throw new ArtifactCommitRejection("tenant_mismatch");
       // `replayed: true` — the row predates this call. Nothing here decided its
       // retention, so nothing here may audit one.
       return { ...existing, replayed: true };
@@ -4790,6 +4791,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobArtifacts.identifier, input.identifier),
         eq(jobArtifacts.kind, "workspace_patch"),
         eq(jobArtifacts.status, "committed"),
+        isNull(jobArtifacts.recoveryQuarantinedAt),
       )).limit(1);
       if (!target) throw new PatchApplyRejection("patch_not_committed");
       // Bind the parsed base/result digests to the immutable committed object: the
@@ -4830,6 +4832,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
           eq(jobArtifacts.jobId, input.jobId),
           eq(jobArtifacts.kind, "workspace_patch"),
           eq(jobArtifacts.applyStatus, "applied"),
+          isNull(jobArtifacts.recoveryQuarantinedAt),
           ne(jobArtifacts.identifier, input.identifier),
         ))
         .orderBy(desc(jobArtifacts.committedAt), desc(jobArtifacts.versionNumber))
@@ -4853,6 +4856,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
             eq(jobArtifacts.jobId, input.jobId),
             eq(jobArtifacts.kind, "workspace_snapshot"),
             eq(jobArtifacts.status, "committed"),
+            isNull(jobArtifacts.recoveryQuarantinedAt),
           ))
           .orderBy(desc(jobArtifacts.committedAt), desc(jobArtifacts.versionNumber))
           .limit(1);
@@ -4865,6 +4869,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
             eq(jobArtifacts.jobId, input.jobId),
             eq(jobArtifacts.kind, "workspace_snapshot"),
             eq(jobArtifacts.status, "committed"),
+            isNull(jobArtifacts.recoveryQuarantinedAt),
             eq(jobArtifacts.sha256, input.patchBaseManifestHash),
           ))
           .limit(1);

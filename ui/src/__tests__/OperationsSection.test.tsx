@@ -71,11 +71,14 @@ describe("OperationsSection (JOB-008 operator controls)", () => {
       { id: "c", identifier: "old", kind: "screenshot", status: "committed", outputId: "old", expiresAt: "2000-01-01T00:00:00Z" },
       { id: "d", identifier: "cookie", kind: "browser_cookie_state", status: "committed", outputId: "cookie" },
       { id: "e", identifier: "storage", kind: "browser_storage_state", status: "committed", outputId: "storage" },
+      { id: "f", identifier: "recovery-blocked", kind: "screenshot", status: "committed", outputId: "blocked",
+        recoveryQuarantinedAt: "2026-10-08T00:00:00Z", recoveryQuarantineReason: "hash_mismatch" },
     ] });
     const user = userEvent.setup(); renderSection();
     await user.click((await screen.findAllByRole("button", { name: /details/i }))[0]!);
     expect(await screen.findByRole("link", { name: "Open evidence" })).toHaveAttribute("href", "/api/task-outputs/output%2Fa/content");
     expect(screen.getAllByRole("link", { name: "Open evidence" })).toHaveLength(1);
+    expect(screen.getByText("Recovery quarantine: hash_mismatch")).toBeInTheDocument();
   });
 
   it("reconnects to durable browser evidence and answers native permission without run-wide choices", async () => {

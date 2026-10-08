@@ -134,7 +134,8 @@ export interface StageJobInputFilesInput {
 export type StagedInputRefusalReason =
   | "unknown_attempt"
   | "pointer_too_large"
-  | "conflicting_restage";
+  | "conflicting_restage"
+  | "recovery_quarantined";
 
 /**
  * A stage that could not honour its postcondition.
@@ -512,6 +513,7 @@ export interface StagedInputArtifactRow {
   readonly contentType: string | null;
   readonly kind: string | null;
   readonly status: string | null;
+  readonly recoveryQuarantinedAt?: Date | string | null;
 }
 
 /**
@@ -533,6 +535,8 @@ export function stagedInputPointersFromRows(
     if (row.status !== "committed") continue;
     if (row.kind !== STAGED_INPUT_ARTIFACT_KIND) continue;
     if (row.attempt !== attempt) continue;
+    if (row.recoveryQuarantinedAt != null) throw new StagedInputRefusedError("recovery_quarantined",
+      "required staged input is quarantined after recovery");
     const path = stagedPathFromMarker(row.contentType);
     if (!path || !row.objectKey || !row.sha256 || typeof row.sizeBytes !== "number") continue;
     pointers.push({

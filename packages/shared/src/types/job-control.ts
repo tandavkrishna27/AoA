@@ -170,6 +170,9 @@ export interface JobArtifactSummary {
   kind: string | null;
   status: string | null;
   applyStatus: string | null;
+  /** Sticky operator recovery denial; distinct from orphan and patch quarantine. */
+  recoveryQuarantinedAt?: string | Date | null;
+  recoveryQuarantineReason?: string | null;
   versionNumber: number | null;
   sizeBytes: number | null;
   sha256: string | null;

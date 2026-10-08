@@ -125,7 +125,7 @@
 // converted to symbols; the dated records carry a note pointing here instead.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { and, eq, sql, type AnyColumn, type SQL } from "drizzle-orm";
+import { isNull, and, eq, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import {
   heartbeatRuns,
@@ -515,7 +515,7 @@ export function createDrizzleE7RunVerifierStore(db: Db): E7RunVerifierStore {
             and(
               eq(jobArtifacts.jobId, run.distributedJobId),
               eq(jobArtifacts.kind, "workspace_patch"),
-              eq(jobArtifacts.status, "committed"),
+              eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt),
               eq(jobAttempts.id, attemptId),
               eq(jobAttempts.companyId, run.companyId),
             ),

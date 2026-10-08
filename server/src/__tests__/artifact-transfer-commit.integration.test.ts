@@ -30,6 +30,8 @@ import { createJobLeasingService, type VerifiedWorkerOperation } from "../servic
 import { createArtifactTransferGrantService } from "../services/artifact-transfer-grant.js";
 import { DEFAULT_MAX_ARTIFACT_BYTES } from "../services/artifact-size-ceiling.js";
 import { createArtifactCommitService } from "../services/artifact-commit.js";
+import { reconcileRecoveredArtifacts } from "../services/disaster-recovery/artifact-quarantine.js";
+import { executeArtifactRecovery } from "../cli/reconcile-recovered-artifacts.js";
 import type { StorageProvider, HeadObjectResult, PresignResult } from "../storage/types.js";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 
@@ -188,6 +190,8 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
   let app: NonOwnerDbConnection | null = null;
   let operator: NonOwnerDbConnection | null = null;
   let setupError: unknown = null;
+  let recoveryDatabaseUrl = "";
+  let ownerDatabaseUrl = "";
   let ordinalCounter = 6_000;
 
   function guardCtx() {
@@ -385,6 +389,8 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
       await embedded.initialise();
       await embedded.start();
       const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
+      ownerDatabaseUrl = adminUrl;
+      recoveryDatabaseUrl = adminUrl.replace("test:test", `aoa_app:${PASSWORD}`);
       await applyPendingMigrations(adminUrl);
       admin = postgres(adminUrl, { max: 4 });
       retentionSql = postgres(adminUrl, { max: 4 });
@@ -513,6 +519,75 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
     if (res.outcome !== "download_granted") return;
     expect(res.grant.method).toBe("GET");
     expect(res.grant.url.startsWith("https://")).toBe(true);
+  }, 60_000);
+
+  it.each(["corrupt", "missing"] as const)("REL-003: %s recovered bytes stay quarantined across downloads, upload and commit replay", async (fault) => {
+    const { app, admin } = guardCtx();
+    const { offer } = await activateLease();
+    const storage = makeStubStorage();
+    const grant = createArtifactTransferGrantService({ appDb: app.db, storage });
+    const commit = createArtifactCommitService({ appDb: app.db, storage });
+    const body = Buffer.from("immutable recovered evidence");
+    const digest = sha256(body);
+    const { artifactId, objectKey: key, request } = commitRequest(offer, { sizeBytes: body.length, sha256: digest });
+    storage.headResult = { exists: true, contentLength: body.length, checksumSha256: digest };
+    expect((await commit.commit({ auth: auth(crypto.randomUUID()), request })).outcome).toBe("committed");
+    const objects = createLocalDiskStorageProvider(join(dataDir, "recovery-objects"));
+    const put = (bytes: Buffer) => objects.putObject({ objectKey: key, body: bytes,
+      contentLength: bytes.length, contentType: "application/octet-stream" });
+    await put(body);
+    const healthy = commitRequest(offer, { sizeBytes: body.length, sha256: digest,
+      objectKey: objectKey(offer.job.jobId, "healthy-recovery-control.bin") });
+    expect((await commit.commit({ auth: auth(crypto.randomUUID()), request: healthy.request })).outcome).toBe("committed");
+    await objects.putObject({ objectKey: healthy.objectKey, body,
+      contentLength: body.length, contentType: "application/octet-stream" });
+    const recovery = () => executeArtifactRecovery({ appDatabaseUrl: recoveryDatabaseUrl, organizationId: ORG,
+      companyId: COMPANY, actorId: "recovery-operator", storage: objects });
+    await expect(executeArtifactRecovery({ appDatabaseUrl: ownerDatabaseUrl, organizationId: ORG,
+      companyId: COMPANY, actorId: "recovery-operator", storage: objects })).rejects.toThrow(/Refusing/);
+    await expect(reconcileRecoveredArtifacts({ appDb: app.db, organizationId: ORG, companyId: OTHER_COMPANY,
+      actorId: "recovery-operator", storage: objects })).rejects.toThrow(/company is absent/);
+    expect((await recovery()).verdict).toBe("recovered");
+    expect((await grant.grant({ auth: auth(crypto.randomUUID()),
+      request: grantRequest(offer, "download", { artifactId, expectedObjectKey: key }).request })).outcome).toBe("download_granted");
+    storage.presignCalls.length = 0;
+    if (fault === "missing") await objects.deleteObject({ objectKey: key });
+    else { const bad = Buffer.from(body); bad[0] = bad[0]! ^ 1; await put(bad); }
+    const rejected = await recovery();
+    expect(rejected.verdict).toBe("failed");
+    expect(rejected.promoted).toEqual([healthy.objectKey]);
+    const identity = { jobId: offer.job.jobId, attempt: offer.job.attempt, identifier: artifactId };
+    const row = await runInTenant(app.db, ORG, repos => repos.jobArtifacts.findEverCommitted(identity));
+    expect(row?.status).toBe("committed");
+    expect(row?.recoveryQuarantinedAt).toBeInstanceOf(Date);
+    expect(row?.recoveryQuarantineReason).toBe(fault === "missing" ? "missing" : "hash_mismatch");
+    expect(await runInTenant(app.db, ORG, repos => repos.jobArtifacts.findCommitted(identity))).toBeNull();
+    // A company or tenant cannot quarantine another company's identity.
+    const foreign = { id: row!.id, companyId: OTHER_COMPANY, objectKey: key,
+      sha256: digest, sizeBytes: body.length, reason: "missing" };
+    expect(await runInTenant(app.db, ORG, repos => repos.jobArtifacts.quarantineRecovered(foreign))).toBeNull();
+    expect(await runInTenant(app.db, OTHER_ORG, repos => repos.jobArtifacts.quarantineRecovered({ ...foreign, companyId: COMPANY }))).toBeNull();
+    // Repairing bytes never silently releases the same committed identity.
+    await put(body);
+    expect((await recovery()).verdict).toBe("failed");
+    for (const operation of ["upload", "download"] as const) {
+      expect((await grant.grant({ auth: auth(crypto.randomUUID()),
+        request: grantRequest(offer, operation, { artifactId, expectedObjectKey: key }).request })).outcome).toBe("rejected");
+    }
+    expect(storage.presignCalls).toHaveLength(0);
+    // The same authority still signs a healthy sibling. Quarantine denial must
+    // not be masked by an expired lease, revoked worker or blanket outage.
+    expect((await grant.grant({ auth: auth(crypto.randomUUID()),
+      request: grantRequest(offer, "download", { artifactId: healthy.artifactId,
+        expectedObjectKey: healthy.objectKey }).request })).outcome).toBe("download_granted");
+    expect((await commit.commit({ auth: auth(crypto.randomUUID()),
+      request: { ...request, idempotencyKey: crypto.randomUUID() } })).outcome).toBe("rejected");
+    const records = await admin`SELECT action, company_id FROM activity_log
+      WHERE action = 'artifact.recovery_quarantined' AND entity_id = ${row!.id}`;
+    expect(records).toHaveLength(1);
+    expect(records[0]!.company_id).toBe(COMPANY);
+    expect((await runInTenant(app.db, ORG, repos => repos.jobArtifacts.listForJob(offer.job.jobId)))
+      .filter(item => item.identifier === artifactId && item.status === "committed")).toHaveLength(1);
   }, 60_000);
 
   it("rejects a download grant when no committed artifact exists", async () => {

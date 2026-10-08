@@ -42,6 +42,11 @@ export const jobArtifacts = pgTable(
     fenceToken: text("fence_token"),
     versionNumber: integer("version_number"),
     status: text("status"),
+    // REL-003: sticky recovery denial on an EVER-COMMITTED identity. Keep status
+    // and its partial unique key intact so neither upload nor replay can reuse it.
+    // This is distinct from DAT-006 orphan quarantine and workspace-patch review.
+    recoveryQuarantinedAt: timestamp("recovery_quarantined_at", { withTimezone: true }),
+    recoveryQuarantineReason: text("recovery_quarantine_reason"),
     // DAT-003 — the workspace-PATCH apply/review disposition (E5, additive,
     // nullable). Populated ONLY on `kind='workspace_patch'` rows at apply time by
     // the fence-guarded `recordPatchApplyState` mutator: `base_manifest_hash` /

@@ -34,7 +34,7 @@
 // FENCE; the core refuses a Company its Organization does not own, and `upsertTaskOutputForIssue`
 // refuses an issue of any other Company.
 
-import { and, eq } from "drizzle-orm";
+import { isNull, and, eq } from "drizzle-orm";
 import {
   jobArtifacts,
   jobs,
@@ -156,7 +156,7 @@ export async function applyAcceptedOutputEvent(
       eq(jobArtifacts.jobId, ctx.jobId),
       eq(jobArtifacts.attempt, ctx.attemptNumber),
       eq(jobArtifacts.identifier, parsed.data.artifactId),
-      eq(jobArtifacts.status, "committed"),
+      eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt),
     ))
     .limit(1);
   if (!committed) throw new AcceptedOutputProjectionError("artifact_not_committed");

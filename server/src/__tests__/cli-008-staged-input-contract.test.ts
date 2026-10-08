@@ -22,6 +22,8 @@ import { jobEnvelopeV1Schema } from "@armyofagents/worker-protocol";
 import {
   STAGED_INPUT_EXTENSION_NAMESPACE as SERVER_NAMESPACE,
   stagedInputExtension,
+  stagedInputPointersFromRows,
+  stagedPathMarker,
   type StagedInputPointer,
 } from "../services/job-input-staging.js";
 
@@ -43,6 +45,15 @@ const POINTERS: StagedInputPointer[] = [
 ];
 
 describe("CLI-008 Unit B — the staged-input pointer crosses the E4-D01 boundary intact", () => {
+  it("refuses quarantined required input instead of advertising it or silently staging nothing", () => {
+    const row = { identifier: POINTERS[0]!.artifactId, attempt: 1, objectKey: POINTERS[0]!.objectKey,
+      sha256: POINTERS[0]!.sha256, sizeBytes: 12, contentType: stagedPathMarker("/home/user/input.json"),
+      kind: "staged_input", status: "committed", recoveryQuarantinedAt: null as Date | null };
+    expect(stagedInputPointersFromRows([row], 1)).toHaveLength(1);
+    row.recoveryQuarantinedAt = new Date();
+    expect(() => stagedInputPointersFromRows([row], 1)).toThrow(/recovery_quarantined/);
+    expect(stagedInputPointersFromRows([row], 2)).toEqual([]);
+  });
   it("★ the two independent namespace constants AGREE", () => {
     // A rename on either side is otherwise silent: the daemon reads no pointer, stages
     // nothing, and every run keeps succeeding without its files.
