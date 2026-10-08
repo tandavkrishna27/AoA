@@ -842,3 +842,50 @@ separate state volumes. Evidence: `C:\Users\TK\.codex\m4-local-evidence\replica-
 These six tests simulate worker HTTP calls; they do not establish a real-daemon
 failover through a production TLS load balancer, independent failure domains,
 or full D5 load/recovery timings. Full M4 remains open.
+### Actual daemon HTTP samples, without a product capacity change
+
+Review of the single-slot baseline confirmed that the enrolled snapshot is a
+hard server-side slot ceiling and live leases count until authoritative terminal
+state. The worker releases local execution slots before the durable outbox has
+necessarily uploaded that terminal. This explains why a one-slot fixture can
+remain unable to lease despite locally free resources; no capacity comparison,
+authority lock, frozen contract or product default was changed on this evidence.
+
+A temporary, opt-in daemon `fetch` preload measured poll, lease-ACK and event
+uploads through complete response-byte download, excluding JSON parsing. It
+emitted only closed operation names, status, transport-error flag, start time and
+duration. An isolated probe test passed, checking response-body preservation,
+error propagation and absence of URL/header/body/domain identity from output.
+
+The next 15-second 2/s quiet versus 20/s noisy run used 64-slot/64-operation
+profiles with two same-candidate replicas running, but all measured worker
+traffic still addressed replica A. Quiet throughput was 1.040 of baseline and
+ACK-receipt delay 0.951x. Noisy work again missed the diagnostic drain deadline:
+198/300 succeeded and 102 remained. A later scoped read showed all attempts for
+the two fixture organizations succeeded. The fixed-deadline failure is retained.
+
+Observed completed-request samples, cohorted by request start inside each window:
+
+| Caller / operation | Baseline p95 ms | Loaded p95 ms | Loaded samples |
+|---|---:|---:|---:|
+| Quiet poll | 101.92 | 133.79 | 39 |
+| Quiet lease ACK | 73.15 | 107.97 | 29 |
+| Quiet event upload | 97.25 | 74.26 | 26 |
+| Noisy poll | 39.59 (idle polls) | 175.92 | 70 |
+| Noisy lease ACK | unmeasured | 171.54 | 71 |
+| Noisy event upload | unmeasured | 116.36 | 55 |
+
+There were 112 baseline and 290 loaded completed-request samples, with no observed
+HTTP 5xx or transport errors. The completion-only probe cannot prove that a
+request lost to process death before its `finally` was counted, so this is **not
+a complete API error-rate denominator**. Submit latency is unmeasured; none of
+these percentiles establishes the full D5 load gate. Clone-body instrumentation
+also adds overhead. Temporary instrumentation was removed after drain; both
+workers returned healthy with their standard boot command.
+
+Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-http-timing`
+contains raw DB cohorts, the failed bounded report, observed HTTP samples and
+report, probe/analysis source snapshots, and candidate configuration. Further
+promotion still needs the original full-scale workload/churn, real TLS
+load-balanced failover, independent failure domains and operator-run recovery
+rehearsal. The available desktop is not evidence for those requirements.
