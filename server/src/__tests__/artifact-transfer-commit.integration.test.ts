@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import postgres, { type Sql } from "postgres";
@@ -12,6 +12,8 @@ import {
   applyPendingMigrations,
   createOperatorDbConnection,
   createTenantAppDbConnection,
+  runDatabaseBackup,
+  runDatabaseRestore,
   type NonOwnerDbConnection,
 } from "@armyofagents/db";
 import {
@@ -193,6 +195,21 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
   let recoveryDatabaseUrl = "";
   let ownerDatabaseUrl = "";
   let ordinalCounter = 6_000;
+
+  async function restoreDatabase(backupFile: string) {
+    await operator!.close({ timeoutSeconds: 5 }); operator = null;
+    await app!.close({ timeoutSeconds: 5 }); app = null;
+    await retentionSql!.end(); retentionSql = null; retentionDb = null;
+    await admin!.end(); admin = null;
+    await runDatabaseRestore({ connectionString: ownerDatabaseUrl, backupFile });
+    admin = postgres(ownerDatabaseUrl, { max: 4 });
+    retentionSql = postgres(ownerDatabaseUrl, { max: 4 });
+    retentionDb = drizzle(retentionSql) as Db;
+    app = createTenantAppDbConnection(recoveryDatabaseUrl, { max: 16 });
+    const operatorUrl = new URL(ownerDatabaseUrl);
+    operatorUrl.username = "aoa_operator"; operatorUrl.password = PASSWORD;
+    operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
+  }
 
   function guardCtx() {
     if (setupError) throw new Error(`embedded-postgres setup failed: ${String(setupError)}`);
@@ -380,25 +397,39 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
   beforeAll(async () => {
     try {
       dataDir = await mkdtemp(join(tmpdir(), "aoa-dat002-"));
-      const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as { default: EmbeddedPostgresCtor };
-      const port = await allocateEmbeddedPgPort();
-      embedded = new EmbeddedPostgres({
-        databaseDir: join(dataDir, "db"), user: "test", password: "test", port,
-        persistent: false, initdbFlags: ["--encoding=UTF8", "--locale=C"],
-      });
-      await embedded.initialise();
-      await embedded.start();
-      const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
+      let adminUrl: string;
+      if (process.env.AOA_DR_NATIVE_FIXTURE === "owned-container-v1") {
+        adminUrl = process.env.AOA_DR_NATIVE_DATABASE_URL ?? "";
+        const url = new URL(adminUrl);
+        if (url.hostname !== "127.0.0.1" || url.pathname !== "/m4_fence_restore"
+          || !process.env.AOA_PG_DUMP_PATH || !process.env.AOA_PSQL_PATH) {
+          throw new Error("Native artifact recovery requires the owned loopback fixture and native tools");
+        }
+      } else {
+        const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as { default: EmbeddedPostgresCtor };
+        const port = await allocateEmbeddedPgPort();
+        embedded = new EmbeddedPostgres({
+          databaseDir: join(dataDir, "db"), user: "test", password: "test", port,
+          persistent: false, initdbFlags: ["--encoding=UTF8", "--locale=C"],
+        });
+        await embedded.initialise();
+        await embedded.start();
+        adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
+      }
       ownerDatabaseUrl = adminUrl;
-      recoveryDatabaseUrl = adminUrl.replace("test:test", `aoa_app:${PASSWORD}`);
+      const appUrl = new URL(adminUrl);
+      appUrl.username = "aoa_app"; appUrl.password = PASSWORD;
+      recoveryDatabaseUrl = appUrl.toString();
       await applyPendingMigrations(adminUrl);
       admin = postgres(adminUrl, { max: 4 });
       retentionSql = postgres(adminUrl, { max: 4 });
       retentionDb = drizzle(retentionSql) as Db;
       await admin.unsafe(provisionTenantAppRoleLoginSql("aoa_app", PASSWORD));
       await admin.unsafe(provisionTenantAppRoleLoginSql("aoa_operator", PASSWORD));
-      app = createTenantAppDbConnection(adminUrl.replace("test:test", `aoa_app:${PASSWORD}`), { max: 16 });
-      operator = createOperatorDbConnection(adminUrl.replace("test:test", `aoa_operator:${PASSWORD}`), { max: 8 });
+      app = createTenantAppDbConnection(recoveryDatabaseUrl, { max: 16 });
+      const operatorUrl = new URL(adminUrl);
+      operatorUrl.username = "aoa_operator"; operatorUrl.password = PASSWORD;
+      operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
       await admin`INSERT INTO organizations (id, name, slug) VALUES (${ORG}, 'DAT-002 org', 'dat-002-org')`;
       await admin`INSERT INTO organizations (id, name, slug) VALUES (${OTHER_ORG}, 'DAT-002 other', 'dat-002-other')`;
       await admin`INSERT INTO companies (id, organization_id, name, issue_prefix)
@@ -522,11 +553,11 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
   }, 60_000);
 
   it.each(["corrupt", "missing"] as const)("REL-003: %s recovered bytes stay quarantined across downloads, upload and commit replay", async (fault) => {
-    const { app, admin } = guardCtx();
+    let { app, admin } = guardCtx();
     const { offer } = await activateLease();
     const storage = makeStubStorage();
-    const grant = createArtifactTransferGrantService({ appDb: app.db, storage });
-    const commit = createArtifactCommitService({ appDb: app.db, storage });
+    let grant = createArtifactTransferGrantService({ appDb: app.db, storage });
+    let commit = createArtifactCommitService({ appDb: app.db, storage });
     const body = Buffer.from("immutable recovered evidence");
     const digest = sha256(body);
     const { artifactId, objectKey: key, request } = commitRequest(offer, { sizeBytes: body.length, sha256: digest });
@@ -541,6 +572,24 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
     expect((await commit.commit({ auth: auth(crypto.randomUUID()), request: healthy.request })).outcome).toBe("committed");
     await objects.putObject({ objectKey: healthy.objectKey, body,
       contentLength: body.length, contentType: "application/octet-stream" });
+    if (process.env.AOA_DR_NATIVE_FIXTURE === "owned-container-v1") {
+      // Capture database and files at the same stopped-writer boundary. Change
+      // both afterward so neither restore can be omitted without failing.
+      const snapshot = join(dataDir, `object-snapshot-${fault}`);
+      await cp(join(dataDir, "recovery-objects"), snapshot, { recursive: true });
+      const backup = await runDatabaseBackup({ connectionString: ownerDatabaseUrl,
+        backupDir: dataDir, filenamePrefix: `artifact-${fault}`, backupEngine: "pg_dump" });
+      await admin`DELETE FROM job_artifacts WHERE job_id = ${offer.job.jobId}`;
+      await objects.deleteObject({ objectKey: key });
+      await objects.deleteObject({ objectKey: healthy.objectKey });
+      expect(await runInTenant(app.db, ORG, repos => repos.jobArtifacts.listForJob(offer.job.jobId))).toHaveLength(0);
+      await restoreDatabase(backup.backupFile);
+      await cp(snapshot, join(dataDir, "recovery-objects"), { recursive: true });
+      ({ app, admin } = guardCtx());
+      grant = createArtifactTransferGrantService({ appDb: app.db, storage });
+      commit = createArtifactCommitService({ appDb: app.db, storage });
+      expect(await runInTenant(app.db, ORG, repos => repos.jobArtifacts.listForJob(offer.job.jobId))).toHaveLength(2);
+    }
     const recovery = () => executeArtifactRecovery({ appDatabaseUrl: recoveryDatabaseUrl, organizationId: ORG,
       companyId: COMPANY, actorId: "recovery-operator", storage: objects });
     await expect(executeArtifactRecovery({ appDatabaseUrl: ownerDatabaseUrl, organizationId: ORG,
@@ -575,11 +624,13 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
         request: grantRequest(offer, operation, { artifactId, expectedObjectKey: key }).request })).outcome).toBe("rejected");
     }
     expect(storage.presignCalls).toHaveLength(0);
-    // The same authority still signs a healthy sibling. Quarantine denial must
-    // not be masked by an expired lease, revoked worker or blanket outage.
+    // Reads deliberately do not require the producer's live fence. Pair the
+    // healthy read with a governed commit replay to prove authority is active.
     expect((await grant.grant({ auth: auth(crypto.randomUUID()),
       request: grantRequest(offer, "download", { artifactId: healthy.artifactId,
         expectedObjectKey: healthy.objectKey }).request })).outcome).toBe("download_granted");
+    expect((await commit.commit({ auth: auth(crypto.randomUUID()),
+      request: { ...healthy.request, idempotencyKey: crypto.randomUUID() } })).outcome).toBe("committed");
     expect((await commit.commit({ auth: auth(crypto.randomUUID()),
       request: { ...request, idempotencyKey: crypto.randomUUID() } })).outcome).toBe("rejected");
     const records = await admin`SELECT action, company_id FROM activity_log

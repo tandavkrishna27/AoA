@@ -344,6 +344,31 @@ one company audit. The patch regression refuses before any object read.
 This is local DB/object integration, not an actual restored staging journey.
 Complete latest-change recursive typecheck/full suite/build remains pending.
 
+### Combined native database and file recovery regression
+
+At `d0554f2b3`, recursive typecheck, the full reduced-worker suite (2,523
+files / 24,334 tests passed; 227 files / 2,058 tests skipped), and production
+build passed. This is candidate-specific local verification, not live D5 proof.
+Independent review found no remaining actionable quarantine implementation issues.
+
+The native recovery fixture now also selects both real-file quarantine cases.
+Each snapshots the migrated database and object directory, deletes both manifest
+rows and files, restores both snapshots, and requires successful bounded-role
+reconciliation before injecting corruption or deletion. A healthy sibling read
+and a successful governed commit replay establish that artifact-specific denial
+is not masked by unavailable reads or stale worker authority. Review identified
+that downloads alone cannot prove an active fence; the governed replay supplies
+that positive control. The complete local artifact suite passes 39 tests, and the
+two updated positive controls pass separately. Server typecheck passes.
+
+Native execution of this combined extension remains pending CI. Local Docker's
+existing read-only process query remains unresponsive; no engine restart or
+unrelated container cleanup was attempted. The existing four-scenario native
+fence restore and CLI restore steps passed in CI at `b61e4e766`; that run's
+unrelated logging failure was corrected separately. External object storage,
+fleet reenrollment, signed-URL isolation and measured D5 recovery/HA/load remain
+unproven.
+
 PR #687 CI exposed a logging assertion failure reproduced locally: its placement
 namespace loaded before the test configured its log capture. Moving that runtime
 import after capture configuration passes the same assertion and the complete
