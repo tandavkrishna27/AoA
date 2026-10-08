@@ -798,3 +798,47 @@ ratified test profiles and fresh enrollment, while retaining these failures.
 Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-comparison`
 and `daemon-7c1c35f95-capacity32` (cohorts, raw DB observations, report, source
 snapshot and candidate image/configuration manifest). Full D5 remains open.
+### Larger provider profiles and two-replica contract replay
+
+Provisioned two fresh organization targets with correctly hashed 64-operation
+provider profiles and new tickets, slot bindings and state volumes. Both workers
+explicitly advertised 64 batch slots. Older jobs drained before their daemons
+were stopped; no existing identity/profile was rewritten. This is disposable
+fixture configuration, not a production default change.
+
+The same 15-second 2/s quiet versus 20/s noisy diagnostic then observed:
+
+| Measurement | Quiet baseline | Quiet loaded | Noisy |
+|---|---:|---:|---:|
+| Succeeded terminals timestamped inside window | 25 | 27 | 54 |
+| Throughput per second | 1.667 | 1.800 | 3.600 |
+| Queue-to-ACK-receipt p95 (ms) | 1,076.15 | 1,194.88 | 10,414.65 |
+| Succeeded by drain deadline | 30 | 30 | 201 |
+| Unresolved at drain deadline | 0 | 0 | 99 |
+
+Quiet ratios were 1.080 throughput and 1.110 receipt delay. The overall bounded
+diagnostic still failed on unfinished noisy work. The eight-operation ceiling
+was therefore not the sole capacity constraint; raising it does not establish
+full D5 performance. All earlier timestamp/proxy and workload/topology limits
+still apply. A subsequent scoped read showed no nonterminal attempts for these
+two organizations. Evidence, public profiles, driver snapshot and image
+identities: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-provider64`.
+
+After that measurement and drain, replica B was started from the identical
+rebuilt control-plane image, with its own scratch volume and the same fixture
+signing/secret authority. Both real daemons were stopped for the existing
+`e6f-11-two-replica.test.mjs` replay. All six CONTROL-PLANE tests passed:
+
+- Exactly one lease across concurrent A/B polls.
+- Shared concurrent organization-capacity claims stay under the cap.
+- ACK on A and terminal upload on B agree on the terminal.
+- Enrollment on A yields a session usable on B.
+- Cutting B's worker path preserves bounded progress through A.
+- A/B admission polls increment one shared rate-limit window.
+
+The final proxy readback showed all four fixture proxies enabled and zero
+toxics. Both replicas were healthy on the same actual image identity and
+separate state volumes. Evidence: `C:\Users\TK\.codex\m4-local-evidence\replica-7c1c35f95-contract`.
+These six tests simulate worker HTTP calls; they do not establish a real-daemon
+failover through a production TLS load balancer, independent failure domains,
+or full D5 load/recovery timings. Full M4 remains open.
