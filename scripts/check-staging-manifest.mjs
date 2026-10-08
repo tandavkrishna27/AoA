@@ -23,6 +23,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "./lib/yaml-lite.mjs";
+import { evaluateWorkerSlotInvariants } from "./lib/worker-slot-inventory.mjs";
 import {
   evaluateStagingManifestInvariants,
   evaluateShippedBootOverlayInvariants,
@@ -89,6 +90,7 @@ function main() {
   }
 
   const { violations } = evaluateStagingManifestInvariants(compose, { documentedEnvKeys });
+  violations.push(...evaluateWorkerSlotInvariants(compose, ["worker-a1", "worker-a2", "worker-b1", "worker-b2"]));
 
   if (violations.length > 0) {
     console.error(`FAIL: docker-compose.staging.yml violates ${violations.length} DEP-006 config-contract invariant(s):`);

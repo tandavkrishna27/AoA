@@ -76,6 +76,8 @@ export interface ProcessLike {
 }
 
 export interface BootstrapDeps {
+  /** Guarded slot host durability barrier; completes after enrollment, before session/poll. */
+  readonly onEnrollmentPersisted?: () => Promise<void>;
   readonly env: Env;
   readonly proc: ProcessLike;
   readonly createLogger?: typeof createWorkerLogger;
@@ -220,6 +222,10 @@ export interface BootstrapResult {
 }
 
 export async function bootstrapWorkerDaemon(deps: BootstrapDeps): Promise<BootstrapResult> {
+  if (deps.env.AOA_WORKER_SLOT_BINDING_DIR !== undefined && !deps.onEnrollmentPersisted) {
+    deps.proc.exit(1);
+    return { ok: false };
+  }
   const makeLogger = deps.createLogger ?? createWorkerLogger;
   const makeMetrics = deps.createMetricsFn ?? createMetrics;
   const startHealth = deps.startHealth ?? startHealthServer;
@@ -394,6 +400,7 @@ export async function bootstrapWorkerDaemon(deps: BootstrapDeps): Promise<Bootst
         // WRK-010 slice 2 — fires only on the ENROLLING boot; undefined on a non-composing boot.
         onSessionMinted: lifecycle?.onSessionMinted,
       });
+      await deps.onEnrollmentPersisted?.();
     } catch (err) {
       // The survivable branch is deliberately NARROW: only a network failure on
       // a device whose identity already existed. Widening it to "any enrolment
@@ -404,7 +411,7 @@ export async function bootstrapWorkerDaemon(deps: BootstrapDeps): Promise<Bootst
       // fine would restart-loop, and a restart loop is what walks an operator
       // into `--reset-identity`, which on the same target IS the permanent
       // lockout. See amendment A1.
-      if (err instanceof EnrollmentAuthorityError && !err.minted) {
+      if (err instanceof EnrollmentAuthorityError && !err.minted && !deps.onEnrollmentPersisted) {
         logger.error(
           { err, workerId: err.workerId, targetId: err.targetId },
           "worker-daemon could not obtain authority; running idle with the existing device identity",

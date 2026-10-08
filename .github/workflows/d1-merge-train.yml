@@ -400,6 +400,10 @@ jobs:
           # image is broken when it is not.
           AOA_DEP001_IMAGE_TEST=1 node --test docker/images/__tests__/image-contents.test.mjs
 
+      - name: M4 worker slot Linux lifecycle
+        run: |
+          AOA_M4_WORKER_IMAGE="$AOA_D1_WORKER_IMAGE" node --test tests/d1/m4-slot-ownership.test.mjs tests/d1/m4-slot-host.test.mjs
+
       - name: Reclaim build cache before D1 bring-up
         run: |
           set -euo pipefail

@@ -34,6 +34,8 @@ import { bootstrapWorkerDaemon, type ProcessLike } from "./worker-daemon.js";
 import { FileRecordStore } from "../identity/file-record-store.js";
 import { identityRecordCodec, receiptRecordCodec } from "../identity/record-codec.js";
 import type { SandboxProvider } from "../supervisor/provider.js";
+import { runSlotHost, SLOT_BINDING_DIR_ENV } from "./slot-host.js";
+import type { PreparedSlot } from "../identity/slot-binding.js";
 
 export type { ProcessLike };
 
@@ -100,6 +102,16 @@ export interface ContainerHostDeps {
 }
 
 export async function runContainerHost(deps: ContainerHostDeps): Promise<{ ok: boolean }> {
+  if (deps.env[SLOT_BINDING_DIR_ENV] !== undefined) {
+    return runSlotHost({ env: deps.env, proc: deps.proc, stateDir: resolveStateDir(deps.env),
+      log: deps.log ?? (message => process.stdout.write(`${message}\n`)),
+      start: hooks => runContainerHostBody({ ...deps, proc: hooks.proc }, hooks.onEnrollmentPersisted, hooks.validateIdentity),
+    });
+  }
+  return runContainerHostBody(deps);
+}
+
+async function runContainerHostBody(deps: ContainerHostDeps, onEnrollmentPersisted?: () => Promise<void>, validateIdentity?: PreparedSlot["validateIdentity"]): Promise<{ ok: boolean }> {
   const log = deps.log ?? ((message: string) => process.stdout.write(`${message}\n`));
   const bootstrap = deps.bootstrap ?? bootstrapWorkerDaemon;
   const stateDir = resolveStateDir(deps.env);
@@ -127,11 +139,19 @@ export async function runContainerHost(deps: ContainerHostDeps): Promise<{ ok: b
   const result = await bootstrap({
     env: deps.env,
     proc: deps.proc,
-    identityStore,
+    identityStore: validateIdentity ? {
+      load: () => identityStore.load(),
+      saveIfAbsent: record => {
+        validateIdentity(record, receiptStore.load());
+        return identityStore.saveIfAbsent(record);
+      },
+      clear: () => { throw new Error("guarded slot identity cannot be cleared"); },
+    } : identityStore,
     receiptStore,
     // Undefined for the shipped container; the daemon then refuses to compose
     // dispatch (`no_provider`) exactly as the desktop default does.
     provider: deps.provider,
+    onEnrollmentPersisted,
   });
   return { ok: result.ok };
 }

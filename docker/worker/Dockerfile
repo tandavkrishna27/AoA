@@ -158,6 +158,9 @@ RUN test -f /worker-app/dist/bin/container-host.js \
 # (`/worker-app`, the CMD) and the networked boot root (`/worker-net-app`, opt-in per service).
 # ---------------------------------------------------------------------------
 FROM base AS production
+# Guarded worker slots require the kernel-backed util-linux flock executable.
+# The pinned base supplies it; fail the build if a future base removes it.
+RUN test -x /usr/bin/flock
 ARG AOA_IMAGE_REVISION=unknown
 
 LABEL org.opencontainers.image.title="AoA Worker"
@@ -200,9 +203,9 @@ ENTRYPOINT ["worker-entrypoint.sh"]
 #
 # `runContainerHost` constructs its `FileRecordStore`s UNCONDITIONALLY, and `resolveCustody`
 # REFUSES `mounted_secret` custody when stores are present — exiting before the health socket
-# ever binds. Every deployed worker today is `mounted_secret` (D1 declares it explicitly; the
-# staging manifest does too), so a global repoint to the networked host would take the whole
-# fleet down on the next deploy.
+# ever binds. Existing mounted_secret deployments (including the D1 default) still need
+# this command. M4 staging slots opt into the guarded file_record host explicitly;
+# a global repoint would break existing mounted_secret deployments.
 #
 # The new bin is therefore OPT-IN PER SERVICE, via a compose `command:` override — the
 # entrypoint is `exec "$@"`, so `command: ["node", "/worker-net-app/dist/bin/networked-host.js"]`
