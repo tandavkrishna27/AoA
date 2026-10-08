@@ -1,7 +1,7 @@
 import type { DeviceIdentityRecord, DeviceEnrollmentReceipt } from "./device-identity-store.js";
 import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { open, realpath, readdir, link, rename, unlink } from "node:fs/promises";
+import { open, realpath, readdir, link, rename, unlink, lstat } from "node:fs/promises";
 import { join, relative, isAbsolute } from "node:path";
 export interface SlotBinding { v: 1; slotId: string; organizationId: string; targetId: string; stateIncarnationId: string; phase: "fresh" | "initializing" | "established"; workerId?: string }
 export interface PreparedSlot {
@@ -73,7 +73,12 @@ export async function prepareSlot(input: { bindingDir: string; stateDir: string 
   let binding = decodeBinding(await readRecord(join(bindingDir, BINDING)));
   const freshThisBoot = binding.phase === "fresh";
   if (freshThisBoot) {
-    if ((await readdir(stateDir)).some(name => name !== ".aoa-slot.lock")) throw new Error("fresh slot requires empty state; use explicit adoption");
+    const entries = await readdir(stateDir);
+    if (entries.some(name => name !== ".aoa-slot.lock" && name !== "tmp")) throw new Error("fresh slot requires empty state; use explicit adoption");
+    if (entries.includes("tmp")) {
+      const temporary = join(stateDir, "tmp");
+      if (!(await lstat(temporary)).isDirectory() || (await readdir(temporary)).length) throw new Error("fresh slot requires empty runtime tmp directory");
+    }
     binding = { ...binding, phase: "initializing" };
     await writeRecord(bindingDir, BINDING, binding, false);
     await writeRecord(stateDir, MARKER, { v: 1, stateIncarnationId: binding.stateIncarnationId }, true);

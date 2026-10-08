@@ -54,3 +54,7 @@ it("requires independently stored binding and refuses nonempty fresh state", asy
   await writeFile(join(stateDir, "identity.json"), "existing");
   await expect(prepareSlot({ bindingDir, stateDir })).rejects.toThrow(/empty/);
 });
+it("accepts only an empty runtime tmp directory prepared by the real image entrypoint", async () => {
+  await provision(); await mkdir(join(stateDir, "tmp"));
+  const prepared = await prepareSlot({ bindingDir, stateDir }); prepared.validateIdentity(null, null);
+});

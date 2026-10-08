@@ -2,17 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
 
 test('Linux slot lock: contention, aliases, crash release and unavailable holder', () => {
-  const modulePath = resolve('packages/worker-daemon/dist/identity/slot-ownership.js');
-  const bindingPath = resolve('packages/worker-daemon/dist/identity/slot-binding.js');
   const script = `
     import assert from 'node:assert/strict';
     import { mkdir, symlink, unlink, readFile } from 'node:fs/promises';
     import { spawn } from 'node:child_process';
-    import { acquireSlotOwnership } from '/fixture/slot-ownership.mjs';
-    import { provisionSlot, prepareSlot } from '/fixture/slot-binding.mjs';
+    import { acquireSlotOwnership } from '/worker-app/dist/identity/slot-ownership.js';
+    import { provisionSlot, prepareSlot } from '/worker-app/dist/identity/slot-binding.js';
     await mkdir('/tmp/state'); await mkdir('/tmp/binding');
     await symlink('/tmp/state', '/tmp/alias');
     const owner = await acquireSlotOwnership(['/tmp/state', '/tmp/binding']);
@@ -21,7 +18,7 @@ test('Linux slot lock: contention, aliases, crash release and unavailable holder
     const next = await acquireSlotOwnership(['/tmp/state']); await next.release();
     await assert.rejects(acquireSlotOwnership(['/tmp/state'], { executable: '/missing-flock' }), /holder/);
     const child = spawn(process.execPath, ['--input-type=module', '-e',
-      "import { acquireSlotOwnership } from '/fixture/slot-ownership.mjs'; await acquireSlotOwnership(['/tmp/state']); console.log('READY'); setInterval(()=>{},1000)"]);
+      "import { acquireSlotOwnership } from '/worker-app/dist/identity/slot-ownership.js'; await acquireSlotOwnership(['/tmp/state']); console.log('READY'); setInterval(()=>{},1000)"]);
     await new Promise((resolve, reject) => { child.stdout.once('data', resolve); child.once('error', reject); });
     child.kill('SIGKILL'); await new Promise(resolve => child.once('close', resolve));
     let recovered;
@@ -49,9 +46,7 @@ test('Linux slot lock: contention, aliases, crash release and unavailable holder
     const replay = await prepareSlot({bindingDir:'/tmp/records', stateDir:'/tmp/data'});
     assert.throws(()=>replay.validateIdentity(null,null), /missing/);
   `;
-  const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '--mount',
-    `type=bind,source=${modulePath},target=/fixture/slot-ownership.mjs,readonly`,
-    '--mount', `type=bind,source=${bindingPath},target=/fixture/slot-binding.mjs,readonly`,
-    'node:lts-trixie-slim', 'node', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 30000 });
+  const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '--user', 'node', '--entrypoint', 'node',
+    process.env.AOA_M4_WORKER_IMAGE ?? 'aoa-worker:m4-slots-local', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 30000 });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${result.error ?? ''}`);
 });
