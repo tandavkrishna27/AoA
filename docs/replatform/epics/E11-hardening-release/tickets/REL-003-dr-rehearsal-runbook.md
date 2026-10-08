@@ -41,6 +41,15 @@ The backup library produces SQL or compressed SQL. Its restore command uses `psq
 and supports the library's statement-breakpoint format via the JavaScript fallback.
 Do not treat an AoA `.sql.gz` backup as a custom-format `pg_restore` archive.
 
+For full application recovery, provision compatible `pg_dump` and `psql` on the
+operator host, and provision the destination's required database roles before
+restore. Native backups now preserve grants; the privileged restore identity must
+be able to apply them. Verify restored role privileges, functions, policies and
+FORCE RLS as well as row counts and migration history. The combined Docker image
+includes PostgreSQL clients; the split control-plane image does not. The current
+JavaScript backup fallback does not serialize the full security-object set and
+cannot establish complete application-schema recovery.
+
 The command exists; E11-F002 remains open until the required actual rehearsal
 exercises it and establishes recovery. Input tests or direct library round trips
 alone do not supply the live staging result.

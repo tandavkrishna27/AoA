@@ -50,6 +50,10 @@ for (const name of externalWorkspacePackages) {
   externals.add(name);
 }
 
+// npm consumers do not inherit this workspace's pnpm.patchedDependencies.
+// Bundle the patched driver so COPY rejection completes instead of hanging.
+externals.delete("postgres");
+
 /** @type {import('esbuild').BuildOptions} */
 export default {
   entryPoints: ["src/index.ts"],

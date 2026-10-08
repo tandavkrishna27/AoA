@@ -1,10 +1,7 @@
 diff --git a/src/connection.js b/src/connection.js
-index 1b1cccde43b4570d5d071d6ffaab2669b3c2065a..1a6717a8bd557555bc5a0a56aca8c07c82ef3fda 100644
 --- a/src/connection.js
 +++ b/src/connection.js
-@@ -252,6 +252,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
-   }
- 
+@@ -254,2 +254,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
    function nextWrite(fn) {
 +    // AoA patch: a write queued via setImmediate can fire AFTER the connection was
 +    // torn down and `socket` nulled (rapid teardown under heavy test churn), throwing
@@ -17,5 +14,19 @@ index 1b1cccde43b4570d5d071d6ffaab2669b3c2065a..1a6717a8bd557555bc5a0a56aca8c07c
 +      return false
 +    }
      const x = socket.write(chunk, fn)
-     nextWriteTimer !== null && clearImmediate(nextWriteTimer)
-     chunk = nextWriteTimer = null
+@@ -390,2 +400,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
+   function errored(err) {
++    // Complete pending COPY finalization on backend rejection or connection loss.
++    // Its query promise already resolved to the stream, so reject alone cannot
++    // notify pipeline after CopyDone has been sent.
++    if (final) {
++      const complete = final
++      final = null
++      complete(err)
++    }
+     stream && (stream.destroy(err), stream = null)
+@@ -870,3 +888,3 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
+         final = callback
+-        stream = null
++        // Retain the writable until CommandComplete/ErrorResponse acknowledges COPY.
+       }

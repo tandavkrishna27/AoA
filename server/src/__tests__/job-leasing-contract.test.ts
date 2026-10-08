@@ -5416,7 +5416,9 @@ describe("JOB-003 frozen worker-operation HTTP contract", () => {
       "packages/db/src/backup-lib.ts#runDatabaseBackup:.unsafe:5cf9416d39b4",
       "packages/db/src/backup-lib.ts#runDatabaseBackup:.unsafe:9466a8f59f88",
       "packages/db/src/backup-lib.ts#runDatabaseBackup:.unsafe:b40423ff6671",
-      "packages/db/src/backup-lib.ts#runDatabaseRestore:.unsafe:b111c6e1d318",
+      // Whole-instance operator restore applies SQL or streams COPY via the same reviewed parser.
+      "packages/db/src/backup-lib.ts#runDatabaseRestore:.unsafe:b58b56020c73",
+      "packages/db/src/backup-lib.ts#runDatabaseRestore:.unsafe:b58b56020c73",
       "packages/db/src/client.ts#applyPendingMigrationsManually:.unsafe:b111c6e1d318",
       "packages/db/src/client.ts#ensureMigrationJournalTable:.unsafe:36625b5007ab",
       "packages/db/src/client.ts#ensureMigrationJournalTable:.unsafe:72ea4f2f1e05",

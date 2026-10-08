@@ -612,6 +612,11 @@
       "status": "runs",
       "workflow": "d1-merge-train.yml",
       "step": "M4 worker slot Linux lifecycle"
+    },
+    "tests/d1/m4-cli-restore.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M4 CLI recovery fallback"
     }
   }
 }

@@ -4,10 +4,12 @@ import { createInterface } from "node:readline";
 import { spawn } from "node:child_process";
 import { open as openFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
+import { Readable } from "node:stream";
 import { createGunzip, createGzip } from "node:zlib";
 import postgres from "postgres";
 import type { BackupRetentionPolicy, BackupRetentionTieredPolicy } from "@armyofagents/shared";
 import { DEFAULT_BACKUP_RETENTION } from "@armyofagents/shared";
+import { parseRestoreCommands, type RestoreCommand } from "./backup-restore-commands.js";
 
 export type RunDatabaseBackupOptions = {
   connectionString: string;
@@ -390,7 +392,6 @@ async function runPgDumpBackup(opts: {
       "--clean",
       "--if-exists",
       "--no-owner",
-      "--no-privileges",
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
@@ -462,7 +463,7 @@ async function hasStatementBreakpoints(backupFile: string): Promise<boolean> {
   }
 }
 
-async function* readRestoreStatements(backupFile: string): AsyncGenerator<string> {
+async function* readRestoreStatements(backupFile: string): AsyncGenerator<RestoreCommand> {
   const raw = createReadStream(backupFile);
   const stream = backupFile.endsWith(".gz") ? raw.pipe(createGunzip()) : raw;
   stream.setEncoding("utf8");
@@ -470,30 +471,8 @@ async function* readRestoreStatements(backupFile: string): AsyncGenerator<string
     input: stream,
     crlfDelay: Infinity,
   });
-  let statementLines: string[] = [];
-
-  const flushStatement = () => {
-    const statement = statementLines.join("\n").trim();
-    statementLines = [];
-    return statement;
-  };
-
   try {
-    for await (const line of reader) {
-      if (line === STATEMENT_BREAKPOINT) {
-        const statement = flushStatement();
-        if (statement.length > 0) {
-          yield statement;
-        }
-        continue;
-      }
-      statementLines.push(line);
-    }
-
-    const trailingStatement = flushStatement();
-    if (trailingStatement.length > 0) {
-      yield trailingStatement;
-    }
+    yield* parseRestoreCommands(reader, STATEMENT_BREAKPOINT);
   } finally {
     reader.close();
     stream.destroy();
@@ -1070,8 +1049,13 @@ export async function runDatabaseRestore(opts: RunDatabaseRestoreOptions): Promi
 
   try {
     await sql`SELECT 1`;
-    for await (const statement of readRestoreStatements(opts.backupFile)) {
-      await sql.unsafe(statement).execute();
+    for await (const command of readRestoreStatements(opts.backupFile)) {
+      if (command.kind === "copy") {
+        const writable = await sql.unsafe(command.sql).writable();
+        await pipeline(Readable.from(command.rows), writable);
+      } else {
+        await sql.unsafe(command.sql).execute();
+      }
     }
   } catch (error) {
     const statementPreview = typeof error === "object" && error !== null && typeof (error as Record<string, unknown>).query === "string"
