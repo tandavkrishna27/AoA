@@ -107,19 +107,29 @@ alone do not supply the live staging result.
    and the first lease from recovered current authority.
 6. **Manifest reconciliation (the wired verifier over REAL objects).** Run the Lane-A
    verifier over the recovered `status='committed'` manifest × readable stored bytes —
-   wire `runStoredManifestReconciliation`
-   (`server/src/services/disaster-recovery/manifest-reconciliation.ts`): `rows` = the
-   committed `job_artifacts` set, `storage` = the recovered `StorageProvider`.
-   This streams each in-scope object's bytes for SHA-256 and size; checksum metadata
-   alone is not recovery evidence. Foreign/unsafe prefixes are rejected before any
-   storage access. Read failures abort verification. Keep services/writers stopped
-   throughout verification; this helper does not itself persist quarantine or
-   authorize resuming serving.
+   for **every restored company**, run
+   `pnpm exec tsx server/src/cli/reconcile-recovered-artifacts.ts --offline --organization <uuid> --company <uuid>`.
+   Set `AOA_APP_DATABASE_URL` explicitly to the recovered database's `aoa_app`
+   credentials; owner/superuser connections are rejected. Configure the existing
+   storage settings for the recovered store. The command loads that company's
+   authoritative committed manifest, streams actual bytes for SHA-256 and size,
+   and persists sticky recovery quarantine plus an atomic company activity record
+   for each invalid/missing/corrupt identity. Foreign/unsafe prefixes are rejected
+   before storage access. A read failure aborts without a successful report.
+   Quarantine retains the committed identity, blocks fresh download/upload/commit
+   replay and dependent consumers, and is not cleared by repairing bytes. Recover
+   a clean database/object snapshot or publish a new authorized artifact identity;
+   do not directly clear quarantine columns. Keep services/writers stopped and
+   isolate or expire outstanding signed store capabilities: the command cannot
+   retract an already issued URL or establish network isolation. `--offline` is
+   the operator's assertion of that state, not automatic isolation.
    Assert verdict `recovered`, **zero** unresolved missing/mismatched. Record the
    reconciliation RTO (`T_recon_done − T_restore_start`).
 7. **Injected fault (DR04).** Delete ≥1 authoritative object and corrupt ≥1 (flip a byte)
-   in the recovered store; re-run reconciliation → verdict `failed`, the two objects in
-   `quarantined` (`wrong_prefix`/`hash_mismatch`) or `missing`, **none in `promoted`**.
+   in the recovered store; re-run reconciliation → non-zero exit, verdict `failed`,
+   both identities in `blockedArtifactIds` with `hash_mismatch` or `missing`.
+   Verify download/upload/commit replay and dependent reads refuse them. A repeated
+   run stays failed even if bytes are repaired, and adds no duplicate quarantine audit.
 8. **Restore rollout (DR07).** Rolling-deploy the candidate across the ≥4 workers
    (parallelism 1, per the Lane-D-verified `docker-compose.staging.yml`) — verify N-1
    workers keep serving; re-enroll one worker (`advanceTargetGeneration`) and revoke one

@@ -77,6 +77,12 @@ export interface JobArtifactsRepository {
   insert(values: NewJobArtifact): Promise<JobArtifact>;
   getById(id: string): Promise<JobArtifact | null>;
   listForJob(jobId: string): Promise<JobArtifact[]>;
+  /** Operator recovery: authoritative rows in one company, including sticky quarantines. */
+  listCommittedForRecovery(input: { companyId: string }): Promise<JobArtifact[]>;
+  /** Compare the inspected immutable fingerprint under a row lock; never clear quarantine. */
+  quarantineRecovered(input: { id: string; companyId: string; objectKey: string | null;
+    sha256: string | null; sizeBytes: number | null; reason: string }):
+    Promise<{ artifact: JobArtifact; changed: boolean } | null>;
   /** DAT-002 — the tenant-scoped committed row for a (job, attempt, identifier),
    * used to prove object-existence when issuing a fence-independent download grant
    * (a committed artifact stays readable after lease loss). RLS scopes to the org. */
@@ -261,6 +267,25 @@ export function tenantRepositories(tx: Db): TenantRepositories {
       async listForJob(jobId) {
         return tx.select().from(jobArtifacts).where(eq(jobArtifacts.jobId, jobId));
       },
+      async listCommittedForRecovery(input) {
+        const rows = await tx.select({ artifact: jobArtifacts }).from(jobArtifacts)
+          .innerJoin(jobs, and(eq(jobs.id, jobArtifacts.jobId), eq(jobs.organizationId, jobArtifacts.organizationId)))
+          .where(and(eq(jobs.companyId, input.companyId), eq(jobArtifacts.status, "committed")));
+        return rows.map(row => row.artifact);
+      },
+      async quarantineRecovered(input) {
+        const [found] = await tx.select({ artifact: jobArtifacts }).from(jobArtifacts)
+          .innerJoin(jobs, and(eq(jobs.id, jobArtifacts.jobId), eq(jobs.organizationId, jobArtifacts.organizationId)))
+          .where(and(eq(jobArtifacts.id, input.id), eq(jobs.companyId, input.companyId),
+            eq(jobArtifacts.status, "committed"))).limit(1).for("update", { of: jobArtifacts });
+        if (!found || found.artifact.objectKey !== input.objectKey || found.artifact.sha256 !== input.sha256 ||
+            found.artifact.sizeBytes !== input.sizeBytes) return null;
+        if (found.artifact.recoveryQuarantinedAt != null) return { artifact: found.artifact, changed: false };
+        const [artifact] = await tx.update(jobArtifacts).set({ recoveryQuarantinedAt: sql`clock_timestamp()`,
+          recoveryQuarantineReason: input.reason, updatedAt: sql`clock_timestamp()` })
+          .where(eq(jobArtifacts.id, input.id)).returning();
+        return { artifact: artifact!, changed: true };
+      },
       // BRW-003a — ONE query, TWO names.
       //
       // `findCommitted` used to serve two callers that want OPPOSITE answers:
@@ -295,7 +320,8 @@ export function tenantRepositories(tx: Db): TenantRepositories {
         return row ?? null;
       },
       async findCommitted(input) {
-        return this.findByIdentityWithStatus(input, "committed");
+        const row = await this.findByIdentityWithStatus(input, "committed");
+        return row?.recoveryQuarantinedAt != null ? null : row;
       },
       async findEverCommitted(input) {
         return (

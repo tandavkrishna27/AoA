@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { isNull, and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { jobArtifacts, jobAttempts, serviceInstances, type Db, type TenantRepositories } from "@armyofagents/db";
 import { expectedAttemptObjectPrefix } from "@armyofagents/worker-protocol";
@@ -70,7 +70,7 @@ type Source = ServiceCheckpointRestore;
 async function loadArtifact(tx: Db, scope: Scope, source: Source, artifactId: string, sha256: string, size: number, now: Date) {
   const [row] = await tx.select().from(jobArtifacts).where(and(
     eq(jobArtifacts.organizationId, scope.organizationId), eq(jobArtifacts.jobId, source.sourceJobId),
-    eq(jobArtifacts.attempt, source.sourceAttempt), eq(jobArtifacts.identifier, artifactId), eq(jobArtifacts.status, "committed"),
+    eq(jobArtifacts.attempt, source.sourceAttempt), eq(jobArtifacts.identifier, artifactId), eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt),
   )).limit(1);
   if (!row || row.kind !== "service_checkpoint" || row.sensitivity !== "restricted" || !row.objectKey ||
       row.sha256 !== sha256 || row.sizeBytes !== size || (row.expiresAt && row.expiresAt <= now) ||

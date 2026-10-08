@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { isNull, and, desc, eq, sql } from "drizzle-orm";
 import { budgetPolicies, costEvents, jobArtifacts, jobAttempts, jobs, serviceInstances, type Db } from "@armyofagents/db";
 import type { ServiceRecoveryMetadata } from "@armyofagents/shared";
 import { readServiceCrashRecovery } from "./service-crash-recovery.js";
@@ -27,7 +27,7 @@ export async function readServiceRecoveryView(tx: Db, input: {
       eq(jobAttempts.organizationId, input.organizationId), eq(jobAttempts.companyId, input.companyId)))
     .innerJoin(jobArtifacts, and(eq(jobArtifacts.jobId, jobs.id), eq(jobArtifacts.organizationId, input.organizationId),
       eq(jobArtifacts.attempt, jobAttempts.attemptNumber), eq(jobArtifacts.kind, "service_checkpoint"),
-      eq(jobArtifacts.status, "committed"), eq(jobArtifacts.sensitivity, "restricted"), eq(jobArtifacts.contentType, "application/json"),
+      eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt), eq(jobArtifacts.sensitivity, "restricted"), eq(jobArtifacts.contentType, "application/json"),
       sql`${jobArtifacts.objectKey} IS NOT NULL`, sql`${jobArtifacts.sha256} ~ '^[a-f0-9]{64}$'`, sql`${jobArtifacts.sizeBytes} > 0`,
       sql`${jobArtifacts.leaseId} IS NULL`, sql`${jobArtifacts.fenceToken} IS NULL`))
     .where(and(scope, eq(serviceInstances.status, "stopped"), eq(serviceInstances.terminalizedBy, "worker_stopped")))

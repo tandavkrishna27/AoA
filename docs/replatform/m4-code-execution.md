@@ -308,3 +308,43 @@ does not invalidate authority: the runbook now explicitly blocks worker ingress
 and keeps workers stopped until object verification and authority recovery finish
 for every restored target. Actual fleet re-enrollment with fresh identity and
 enforcement of that isolation still require staging proof.
+
+CI run `37773327517` executed the native selected case at `e24db38fc` successfully:
+post-snapshot lease, expired snapshot lease and generation cutoff. The actual CLI
+fallback step also passed. The overall run was superseded; this is step-specific
+evidence, not a green latest-head claim. The fourth scenario awaits its own run.
+
+### Durable recovered-artifact quarantine
+
+Implemented a separate sticky recovery disposition on committed artifacts with
+Drizzle-generated migration `0286_mixed_jigsaw`. Status and the committed unique
+identity remain intact, so quarantine does not reopen upload or commit identity.
+Tenant repositories bind the company through its job, lock the inspected row and
+compare its object key/hash/size before quarantine. The recovery service validates
+company ownership, loads the actual authoritative manifest and streams real bytes.
+Quarantine and the company activity record commit together. Repairing bytes never
+silently releases quarantine; retries do not duplicate its audit.
+
+Download grants, commit replays, required staged inputs, patch apply/base selection,
+distributed results, task-output content and service checkpoint reads reject the
+recovery disposition. The operator UI surfaces it and removes its evidence link.
+The offline operator entry point requires explicit organization/company scope and
+`AOA_APP_DATABASE_URL`, asserts the connected bounded `aoa_app` role, uses existing
+storage configuration, closes its pool and exits nonzero for failed reconciliation.
+It does not isolate traffic or retract signed URLs; those remain runbook prerequisites.
+
+Independent review found and corrected a staged-input bypass and empty successful
+reports for missing/foreign companies; re-review found no remaining actionable
+issues. Current focused unit/UI coverage passes 51 tests across four files.
+With Windows real-PostgreSQL opt-in, the complete artifact transfer/commit,
+patch-apply and job-submission suites pass 95 tests. The new corruption/deletion
+cases use real files and the operator execution function against a non-owner DB
+connection, reject an owner URL, prove sticky download/upload/commit denial and
+one company audit. The patch regression refuses before any object read.
+This is local DB/object integration, not an actual restored staging journey.
+Complete latest-change recursive typecheck/full suite/build remains pending.
+
+PR #687 CI exposed a logging assertion failure reproduced locally: its placement
+namespace loaded before the test configured its log capture. Moving that runtime
+import after capture configuration passes the same assertion and the complete
+42-case job submission suite; no logging/redaction assertion was removed.

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { isNull, and, eq, sql } from "drizzle-orm";
 import { companies, issues, jobArtifacts, jobAttempts, jobEvents, jobProjectionReceipts, jobs, taskOutputs, type Db } from "@armyofagents/db";
 import { artifactPreparedPayloadV1Schema, expectedAttemptObjectPrefix } from "@armyofagents/worker-protocol";
 import { loadAcceptedOutputTarget } from "./job-accepted-output-projection.js";
@@ -61,7 +61,7 @@ export async function loadTaskOutputContentArtifact(tx: Db, input: { organizatio
   const [row] = await tx.select().from(jobArtifacts).where(and(
     eq(jobArtifacts.organizationId, organizationId), eq(jobArtifacts.jobId, bound.job.id),
     eq(jobArtifacts.attempt, bound.attempt.attemptNumber), eq(jobArtifacts.identifier, payload.data.artifactId),
-    eq(jobArtifacts.status, "committed"), eq(jobArtifacts.id, bound.output.externalId ?? "00000000-0000-0000-0000-000000000000"),
+    eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt), eq(jobArtifacts.id, bound.output.externalId ?? "00000000-0000-0000-0000-000000000000"),
   )).limit(1);
   if (!row || row.kind !== payload.data.kind || ["browser_cookie_state", "browser_storage_state"].includes(row.kind ?? "") || !row.objectKey || !row.contentType || !row.sha256 ||
       !/^[0-9a-f]{64}$/.test(row.sha256) || !Number.isSafeInteger(row.sizeBytes) || row.sizeBytes! < 0 ||

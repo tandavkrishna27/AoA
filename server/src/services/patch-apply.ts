@@ -148,6 +148,9 @@ export function createPatchApplyService(input: {
           attempt: request.attempt,
         });
         if (!request.objectKey.startsWith(prefix)) return rejected("malformed");
+        const committed = await repos.jobArtifacts.findCommitted({ jobId: request.jobId,
+          attempt: request.attempt, identifier: request.artifactId });
+        if (!committed || committed.objectKey !== request.objectKey || committed.kind !== "workspace_patch") return rejected("malformed");
 
         // Fetch + parse the committed patch object → its declared base/result digests.
         // The object is content-addressed + immutable (committed), and the mutator

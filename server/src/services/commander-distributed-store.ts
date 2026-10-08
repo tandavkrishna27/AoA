@@ -53,7 +53,7 @@ export function createCommanderExistingTurnReader(db: Db) {
       if (!attempt) throw new Error("Existing Commander attempt missing");
       const staged = await tx.select().from(jobArtifacts).where(and(eq(jobArtifacts.organizationId, organizationId),
         eq(jobArtifacts.jobId, run.distributedJobId!), eq(jobArtifacts.attempt, attempt.attemptNumber),
-        eq(jobArtifacts.kind, "staged_input"), eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.leaseId), isNull(jobArtifacts.fenceToken)));
+        eq(jobArtifacts.kind, "staged_input"), eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt), isNull(jobArtifacts.leaseId), isNull(jobArtifacts.fenceToken)));
       const [job] = await tx.select({ input: jobs.input }).from(jobs).where(and(eq(jobs.organizationId, organizationId),
         eq(jobs.companyId, input.companyId), eq(jobs.id, run.distributedJobId!))).limit(1);
       const distributedWarm = job?.input.command === "node" && Array.isArray(job.input.args) &&

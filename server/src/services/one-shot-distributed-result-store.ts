@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { isNull, and, desc, eq, inArray } from "drizzle-orm";
 import { jobs, jobAttempts, jobArtifacts, jobEvents, type Db } from "@armyofagents/db";
 import { expectedAttemptObjectPrefix, terminalEventPayloadV1Schema, artifactPreparedPayloadV1Schema, batchWorkloadV1Schema } from "@armyofagents/worker-protocol";
 import { submitJobSourceSchema } from "@armyofagents/shared";
@@ -73,7 +73,7 @@ export function createOneShotDistributedResultReader(appDb: Db, storage: Storage
       const [artifact] = await tx.select().from(jobArtifacts).where(and(
         eq(jobArtifacts.organizationId, scope.organizationId), eq(jobArtifacts.jobId, scope.jobId),
         eq(jobArtifacts.attempt, row.attempt.attemptNumber), eq(jobArtifacts.identifier, identifier),
-        eq(jobArtifacts.status, "committed"), eq(jobArtifacts.leaseId, prepared.leaseId), eq(jobArtifacts.fenceToken, prepared.fenceToken),
+        eq(jobArtifacts.status, "committed"), isNull(jobArtifacts.recoveryQuarantinedAt), eq(jobArtifacts.leaseId, prepared.leaseId), eq(jobArtifacts.fenceToken, prepared.fenceToken),
       )).limit(1);
       const prefix = expectedAttemptObjectPrefix({ organizationId: scope.organizationId, jobId: scope.jobId, attempt: row.attempt.attemptNumber });
       if (!artifact || artifact.objectKey !== `${prefix}${identifier}` || artifact.kind !== "other" ||

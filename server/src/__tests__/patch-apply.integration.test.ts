@@ -26,6 +26,7 @@ import { provisionTenantAppRoleLoginSql } from "../db/rls-tenant.js";
 import { createJobLeasingService, type VerifiedWorkerOperation } from "../services/job-leasing.js";
 import { createArtifactCommitService } from "../services/artifact-commit.js";
 import { createPatchApplyService } from "../services/patch-apply.js";
+import { runInTenant } from "../db/tenant-context.js";
 import type { StorageProvider, HeadObjectResult, GetObjectResult } from "../storage/types.js";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 
@@ -701,6 +702,25 @@ integration("DAT-003 workspace-patch apply/review", () => {
 
   // Review #2 — conflict_quarantined is STICKY: a re-invoked quarantined patch must
   // NOT auto-flip to applied even if the accepted base later coincides with its base.
+  it("REL-003: a recovery-quarantined patch is refused before reading its object", async () => {
+    const { app } = guardCtx();
+    const storage = makeMapStorage();
+    const { offer } = await activateLease();
+    await commitSnapshot(storage, offer, "1".repeat(64));
+    const patch = await commitPatch(storage, offer, { baseManifestHash: "1".repeat(64), resultManifestHash: "2".repeat(64) });
+    await runInTenant(app.db, ORG, async repos => {
+      const row = await repos.jobArtifacts.findEverCommitted({ jobId: offer.job.jobId,
+        attempt: offer.job.attempt, identifier: patch.artifactId });
+      expect(row).not.toBeNull();
+      expect(await repos.jobArtifacts.quarantineRecovered({ id: row!.id, companyId: COMPANY,
+        objectKey: row!.objectKey, sha256: row!.sha256, sizeBytes: row!.sizeBytes, reason: "hash_mismatch" })).not.toBeNull();
+    });
+    storage.getCalls.length = 0;
+    expect((await createPatchApplyService({ appDb: app.db, storage }).apply({ auth: auth(crypto.randomUUID()),
+      request: applyReq(offer, patch.artifactId, patch.key) })).outcome).toBe("rejected");
+    expect(storage.getCalls).toHaveLength(0);
+  }, 60_000);
+
   it("keeps a quarantined patch quarantined on re-apply even after the base advances to match it", async () => {
     const { app } = guardCtx();
     const storage = makeMapStorage();
