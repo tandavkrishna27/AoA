@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 test('Linux guarded host retains ownership after bootstrap and preserves identity across restart', () => {
   const script = `
     import assert from 'node:assert/strict';
-    import { mkdir, symlink } from 'node:fs/promises';
+    import { mkdir, symlink, writeFile, link } from 'node:fs/promises';
     import { runContainerHost } from '/worker-app/dist/bin/container-host.js';
     import { provisionSlot } from '/worker-app/dist/identity/slot-binding.js';
     import { generateDeviceKey, exportDevicePrivateKeyPkcs8Der } from '/worker-app/dist/identity/device-key.js';
@@ -39,6 +39,9 @@ test('Linux guarded host retains ownership after bootstrap and preserves identit
     await symlink('/tmp/escape.db','/worker/alias.db');
     assert.equal((await runContainerHost({env:{...env,AOA_WORKER_EVENT_OUTBOX_PATH:'/worker/alias.db'},proc,bootstrap,log(){}})).ok,false);
     assert.equal(calls,1,'invalid paths must refuse before bootstrap');
+    await mkdir('/worker/other-slot');
+    await writeFile('/worker/hardlink.db', 'fixture'); await link('/worker/hardlink.db','/worker/other-slot/shared-recovery.db');
+    assert.equal((await runContainerHost({env:{...env,AOA_WORKER_EVENT_OUTBOX_PATH:'/worker/hardlink.db'},proc,bootstrap:restart,log(){}})).ok,false,'hard-linked recovery state must refuse');
   `;
   const result = spawnSync('docker',['run','--rm','--network','none','--user','node',
     process.env.AOA_M4_WORKER_IMAGE ?? 'aoa-worker:m4-slots-local','node','--input-type=module','-e',script],{encoding:'utf8',timeout:30000});

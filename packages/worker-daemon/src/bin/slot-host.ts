@@ -1,5 +1,5 @@
 import { lstat, realpath } from "node:fs/promises";
-import { dirname, isAbsolute, relative } from "node:path";
+import { basename, dirname, isAbsolute, relative } from "node:path";
 import { loadWorkerConfig } from "../config/config.js";
 import { acquireSlotOwnership } from "../identity/slot-ownership.js";
 import { prepareSlot } from "../identity/slot-binding.js";
@@ -30,13 +30,22 @@ export async function runSlotHost(input: {
     const config = loadWorkerConfig(input.env);
     if (config.keyStoreMode !== "file_record" || config.targetScope !== "organization") throw new Error("slot host requires organization file_record custody");
     const stateDir = await realpath(input.stateDir);
+    const recoveryNames = new Set<string>();
+    const recoveryInodes = new Set<string>();
     for (const path of [config.eventOutboxPath, config.leaseCandidatePath]) {
       if (!path || !isAbsolute(path)) throw new Error("slot recovery paths are required");
       const parent = await realpath(dirname(path));
       const rel = relative(stateDir, parent);
       if (rel.startsWith("..") || isAbsolute(rel)) throw new Error("slot recovery path escapes state");
+      const canonicalName = join(parent, basename(path));
+      if (recoveryNames.has(canonicalName)) throw new Error("slot recovery paths must be distinct");
+      recoveryNames.add(canonicalName);
       try {
-        if ((await lstat(path)).isSymbolicLink()) throw new Error("slot recovery path is a symlink");
+        const info = await lstat(path);
+        if (!info.isFile() || info.nlink !== 1) throw new Error("slot recovery path must be an unaliased regular file");
+        const inode = `${info.dev}:${info.ino}`;
+        if (recoveryInodes.has(inode)) throw new Error("slot recovery files share an inode");
+        recoveryInodes.add(inode);
       } catch (err) { if (!(err && typeof err === "object" && "code" in err && err.code === "ENOENT")) throw err; }
     }
     ownership = await acquireSlotOwnership([bindingDir, stateDir]);

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { runContainerHost } from "../bin/container-host.js";
 import { provisionSlot } from "../identity/slot-binding.js";
 import { bootstrapWorkerDaemon } from "../bin/worker-daemon.js";
+import { EnrollmentAuthorityError } from "../enrollment/enroll-once.js";
 
 let root: string; let state: string; let binding: string;
 beforeEach(async () => { root = await mkdtemp(join(tmpdir(), "m4-host-")); state = join(root, "state"); binding = join(root, "binding"); await mkdir(state); await mkdir(binding); });
@@ -29,4 +30,17 @@ it("direct daemon invocation cannot ignore configured slot custody", async () =>
   const identityStore = { load: () => null, saveIfAbsent: () => "stored" as const, clear() {} };
   const result = await bootstrapWorkerDaemon({ env: env(), proc: { once: () => {}, exit }, startHealth, identityStore, receiptStore: identityStore });
   expect(result.ok).toBe(false); expect(startHealth).not.toHaveBeenCalled();
+});
+it("guarded enrollment failure cannot acquire a session through the legacy retry path", async () => {
+  const close = vi.fn(async () => {}); const ensureFresh = vi.fn(async () => { throw new Error("barrier bypassed"); });
+  const store = { load: () => null, saveIfAbsent: () => "stored" as const, clear() {} };
+  const result = await bootstrapWorkerDaemon({ env: { ...env(), AOA_WORKER_DISPATCH_ENABLED: "1" },
+    proc: { once() {}, exit() {} }, identityStore: store, receiptStore: store,
+    startHealth: (async () => ({ close })) as never,
+    makeRunProvider: (() => { throw new Error("dispatch bypassed"); }) as never,
+    onEnrollmentPersisted: async () => { throw new Error("must not reach without receipt"); },
+    enrollOnceFn: async () => { throw new EnrollmentAuthorityError({ minted: false, workerId: "persisted", targetId: "target", cause: new Error("transient") }); },
+    createLifecycleFn: (() => ({ store: { ensureFresh, isStopped: () => true } })) as never,
+  });
+  expect(result.ok).toBe(false); expect(ensureFresh).not.toHaveBeenCalled(); expect(close).toHaveBeenCalledOnce();
 });

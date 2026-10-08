@@ -54,7 +54,7 @@ by this Linux flock mechanism. There is no automatic cross-host volume failover.
    missing volumes fail rather than silently recreate established state. Binding
    mounts use `create_host_path: false` for the same reason.
 6. Review the render before using your normal deployment process. Dispatch stays
-   `false`; rendering/provisioning does not enable execution. Use the existing
+   `0` (disabled); rendering/provisioning does not enable execution. Use the existing
    governed deployment/provider configuration to enable dispatch only when its
    prerequisites are established. No rollout is authorized by this document.
 

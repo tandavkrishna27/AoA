@@ -14,7 +14,7 @@ test('renders guarded single-replica slots with separate external custody', () =
   assert.equal(worker.deploy.replicas, 1);
   assert.equal(worker.deploy.update_config.order, 'stop-first');
   assert.equal(worker.environment.AOA_WORKER_SLOT_BINDING_DIR, '/slot-binding');
-  assert.equal(worker.environment.AOA_WORKER_DISPATCH_ENABLED, 'false');
+  assert.equal(worker.environment.AOA_WORKER_DISPATCH_ENABLED, '0');
   assert.equal(result.volumes['aoa-desktop-1-state'].external, true);
   assert.equal(result.secrets['aoa-desktop-1-ticket'].file, '/srv/aoa/bindings/desktop-1/enrollment.ticket');
   assert.equal(worker.volumes[1].bind.create_host_path, false);

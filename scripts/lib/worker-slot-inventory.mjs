@@ -75,7 +75,7 @@ export function renderWorkerSlots(value) {
     environment: {
       AOA_WORKER_TARGET_SCOPE: 'organization', AOA_WORKER_KEY_STORE_MODE: 'file_record',
       AOA_WORKER_CONTROL_PLANE_URL: inventory.controlPlaneUrl, AOA_WORKER_PROVIDER_URL: inventory.providerUrl,
-      AOA_WORKER_DISPATCH_ENABLED: 'false', AOA_WORKER_STATE_DIR: '/worker',
+      AOA_WORKER_DISPATCH_ENABLED: '0', AOA_WORKER_STATE_DIR: '/worker',
       AOA_WORKER_SLOT_BINDING_DIR: '/slot-binding', AOA_WORKER_ENROLLMENT_CODE_FILE: '/run/secrets/enrollment-ticket',
       AOA_WORKER_EVENT_OUTBOX_PATH: '/worker/events.db', AOA_WORKER_LEASE_CANDIDATE_PATH: '/worker/lease-candidates.db',
     },

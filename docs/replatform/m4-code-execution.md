@@ -94,8 +94,9 @@ identity or a new target on replacement. The user selected Option 1. An independ
 sub-agent reviewed the written design; the three findings are corrected in
 `m4-docker-worker-slots-design.md`: explicit remote execution placement, an
 independently durable slot-binding protocol, and ownership of the remaining M4 HA
-evidence reconciliation. Revised written-spec review remains pending; no product
-implementation or deployment topology change has started. Desktop-local execution
+evidence reconciliation. The user approved the revised spec and implementation
+plan, then requested native execution after review. Implementation is underway in
+the isolated worktree; no deployment has been performed. Desktop-local execution
 is a separate deliverable, not established by running the networked worker locally.
 
 ### HA baseline and runbook correction, 2026-10-08
@@ -121,3 +122,37 @@ library's SQL/compressed-SQL format, and observes production revocation converge
 instead of claiming a missing scheduler and substituting manual ticks. Source,
 focused wiring tests and citation integrity support these corrections; no live
 rehearsal, recovery timing or finding closure is claimed.
+
+### Worker-slot implementation, 2026-10-08
+
+Fresh slots now have Linux kernel-backed exclusive ownership for both independent
+binding storage and worker state, an explicit fresh/initializing/established binding
+protocol, wrong-target identity refusal before persistence, and a persisted-receipt
+barrier before session acquisition. Recovery databases must be distinct unaliased
+regular files beneath the slot volume. Successful bootstrap retains ownership for
+the full runtime, including drain/shutdown; ownership loss terminates execution.
+
+The renderer emits distinct single-replica services, digest-pinned images, external
+state volumes, separate binding mounts and individual file-backed ticket references.
+The dormant staging template now has four distinct slots across its two failure
+domains. Fleet growth adds independently provisioned slots within bounds; cloning
+one identity by increasing its replicas is rejected. Dispatch remains disabled.
+
+Independent review found two issues: interrupted enrollment could bypass binding
+establishment through the legacy session retry, and hard-linked recovery files
+could alias state across directory locks. Both were reproduced with failing
+regressions and fixed. The rendered dispatch value was corrected to the strict
+parser's `0`, also with a failing regression. No repeat review gate was added.
+
+Current focused evidence: 26 daemon tests passing with one existing Windows skip;
+90 policy/render/census tests passing without skips; two non-root, networkless Linux
+image fixtures passing without skips, including the real worker entrypoint. The
+image was built from this worktree. Host fixture bootstrap is injected; it proves
+storage/composition, not a real cloud enrollment or desktop-local execution.
+
+Recursive typecheck, full tests and build are underway and are not yet claimed
+passing. Validated legacy adoption remains unimplemented: current receipt/ticket
+contracts have no authenticated organization metadata for it. Fresh guarded mode
+refuses nonempty legacy state; existing unguarded embedders remain unchanged.
+Operators can retire/revoke and provision a new target instead of resetting a
+bound identity. Actual CLI restore and the remaining HA evidence audit still remain.

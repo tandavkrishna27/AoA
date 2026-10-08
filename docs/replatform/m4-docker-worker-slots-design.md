@@ -1,7 +1,8 @@
 # M4 engineering slice: Docker worker slots and recovery
 
 Date: 2026-10-08
-Status: independent review findings corrected; revised written spec awaiting user review.
+Status: user approved revised written spec and implementation plan on 2026-10-08;
+native implementation underway. Validated legacy adoption remains an explicit gap.
 
 ## Outcome
 

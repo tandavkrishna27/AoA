@@ -411,7 +411,7 @@ export async function bootstrapWorkerDaemon(deps: BootstrapDeps): Promise<Bootst
       // fine would restart-loop, and a restart loop is what walks an operator
       // into `--reset-identity`, which on the same target IS the permanent
       // lockout. See amendment A1.
-      if (err instanceof EnrollmentAuthorityError && !err.minted) {
+      if (err instanceof EnrollmentAuthorityError && !err.minted && !deps.onEnrollmentPersisted) {
         logger.error(
           { err, workerId: err.workerId, targetId: err.targetId },
           "worker-daemon could not obtain authority; running idle with the existing device identity",
