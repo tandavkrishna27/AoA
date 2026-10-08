@@ -465,3 +465,46 @@ image (supporting regression evidence, not a rebuilt candidate fleet). Anthropic
 excluded. Single-desktop recovery is not two-failure-domain HA, external object
 store recovery, fleet reenrollment, or full D5 load/RPO/RTO evidence. Those remain
 open under the original M4 requirements.
+
+### Local distributed worker execution — 2026-10-08
+
+Built control-plane, worker and deterministic provider images from application
+commit `480b30000` under `*:m4-local-480b30000` tags. Started the isolated Compose
+project `aoa-m4-local-480b`, using D1 + spine topology and an ignored local override
+that adds independent guarded binding storage to the actual networked worker.
+All services became healthy. This stack has its own PostgreSQL, MinIO and test
+keys; it is separate from the native onboarding app on port 3210. No model API
+secrets, paid model calls, remote deployments or production image admission claims.
+
+The live spine run first passed 9/10 cases: its topology observation alone ignored
+the harness project/files/environment binding and failed to parse a render that
+lacked the required local environment. Added a regression in the existing harness
+binding suite (RED), switched topology observation to `composeBaseArgs()` while
+preserving the historical default spine override, and reran GREEN 21/21 binding
+checks. The actual full spine run then passed 10/10, zero skipped, in 43.2 seconds.
+This includes execution by the deployed guarded worker, usage/cost/audit projection,
+terminal events, cross-tenant refusal, disabled-tenant refusal and attributed drain.
+Independent review found no actionable finding. This is real local worker execution
+against the deterministic provider, not production E2B or desktop coding execution.
+
+A second organization-scoped target and guarded slot were explicitly provisioned
+with a distinct ticket, binding volume and state volume. Both slots became healthy,
+with distinct worker and target IDs and established bindings. Restarted both and
+compared identity hashes/IDs and binding state before/after: unchanged. A duplicate
+Compose worker process sharing the first slot refused startup; a direct call to the
+real ownership helper independently verified the held live lock. Refused startup
+left both established identities unchanged. The second slot keeps dispatch off;
+only the first slot's task execution is established by the spine run.
+
+Local evidence (outside version control; no tickets/private keys in these reports):
+- `C:\Users\TK\.codex\m4-local-evidence\spine\m1-spine-evidence.json`
+- `C:\Users\TK\.codex\m4-local-evidence\slots.json`
+- ignored configuration/keys under this worktree's `docker/d1/runtime-keys/`
+
+The original native app remains healthy on port 3210; its empty onboarding DB is
+not connected to these test workers. Full application typecheck/tests/build passed
+at `480b30000` as recorded above. This follow-up changes the harness and docs only;
+the binding suite and actual distributed journey were rerun after that harness fix.
+Full D5 load/fairness, two-domain HA, external recovery objectives and live fleet
+recovery/rollout remain open. One desktop cannot establish two independent failure
+domains. These successful tests do not shrink the M4 requirements.

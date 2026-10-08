@@ -53,6 +53,16 @@ const CLEAR = {
   AOA_E6F_HTTP_SERVICE: "",
 };
 
+test("spine topology observation honors the same isolated stack binding as its HTTP clients", () => {
+  const source = readFileSync(path.join(repoRoot, "tests/d1/m1-spine.test.mjs"), "utf8");
+  const snippet = source.slice(source.indexOf("  const composeArgs ="), source.indexOf("  const rendered ="));
+  const observeArgs = new Function("composeBaseArgs", "process", snippet + "\nreturn composeArgs;");
+  const explicit = ["compose", "-p", "isolated", "--env-file", "local.env", "-f", "base.yml", "-f", "slot.json"];
+  assert.deepEqual(observeArgs(() => [...explicit], { env: { AOA_E6F_COMPOSE_FILES: "base.yml;slot.json" } }), explicit);
+  assert.deepEqual(observeArgs(() => ["compose", "-f", "base.yml"], { env: {} }),
+    ["compose", "-f", "base.yml", "-f", "docker/d1/m1-spine.override.yml"]);
+});
+
 test("DEFAULT: with no override the binding is byte-for-byte the D1 lane's own argv", () => {
   const b = binding(CLEAR);
   assert.deepEqual(b.argv, ["compose", "-f", b.composeFile]);

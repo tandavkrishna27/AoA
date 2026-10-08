@@ -50,6 +50,7 @@ import path from "node:path";
 
 import {
   SKIP,
+  composeBaseArgs,
   LIVE,
   FAKE_PROVIDER_API_URL,
   FAKE_PROVIDER_CTL_URL,
@@ -239,7 +240,10 @@ test("m1-spine: every control-plane replica carries the F10 tenant set, and the 
     M1_SPINE_TENANTS.control.organizationId,
   ];
   const violations = [];
-  const composeArgs = ["compose", "-f", "docker-compose.d1.yml", "-f", "docker/d1/m1-spine.override.yml"];
+  const composeArgs = composeBaseArgs();
+  if (!process.env.AOA_E6F_COMPOSE_FILES?.trim()) {
+    composeArgs.push("-f", "docker/d1/m1-spine.override.yml");
+  }
   const rendered = JSON.parse(spawnSync("docker", [...composeArgs, "config", "--format", "json"], { encoding: "utf8" }).stdout);
   const runningServices = spawnSync("docker", [...composeArgs, "ps", "--services", "--status", "running"], { encoding: "utf8" }).stdout.split(/\r?\n/).filter(Boolean);
   const topology = observeFreezeTopology({

@@ -5,6 +5,22 @@ Updated 2026-10-08. M4 is **in progress**. The authoritative scope is
 Thresholds below come from `test-gates.md` §D5. This audit records existing
 requirements; it adds no certification process or scheduled campaign.
 
+## Local desktop execution
+
+Application candidate `480b30000` now has built local control-plane, worker and
+deterministic provider images. The isolated guarded-worker spine passed 10/10
+live checks with no skips, including worker execution, usage/cost/audit projection,
+tenant isolation and drain. Two guarded slots enrolled with distinct identities,
+preserved identity across restart and refused duplicate ownership. The second
+slot keeps dispatch disabled; task execution was proved on the first slot.
+The native UI on port 3210 uses a separate onboarding database and is not connected
+to this distributed test stack. See `m4-code-execution.md` for commands and evidence.
+
+This adds local lifecycle and execution evidence. Full D5 load/fairness, independent
+failure domains, production recovery objectives and recovered fleet rollout remain
+open. The deterministic provider does not establish production E2B execution or a
+desktop-local coding backend.
+
 ## What has landed
 
 PR #685 merged to `docs/replatform-program` at
