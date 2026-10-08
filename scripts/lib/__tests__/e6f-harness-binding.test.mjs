@@ -61,6 +61,9 @@ test("local load source rejects unbounded duration and duplicate tenant identiti
   const worker={tenantKey:'quiet',orgId:'org',workerId:'worker',targetId:'target',rate:2,jobIds:['job'],session:'secret',privateKeyPem:'key',publicKeyDer:'pub'};
   assert.throws(()=>buildLocalLoadSource({durationMs:Infinity,workers:[worker]},''),/bounded/);
   assert.throws(()=>buildLocalLoadSource({durationMs:1000,workers:[worker,worker]},''),/duplicate/);
+  for(const noisyStreams of [0,11,1.5,'1']) {
+    assert.throws(()=>buildLocalLoadSource({durationMs:1000,workers:[worker],noisyStreams},''),/bounded/);
+  }
   const source=buildLocalLoadSource({durationMs:1000,workers:[worker]},'// proof');
   assert.ok(source.includes('canonicalEventDigestInputV1'));
   assert.ok(source.includes('AbortSignal.timeout'));

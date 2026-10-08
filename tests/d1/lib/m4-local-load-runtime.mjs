@@ -1,6 +1,7 @@
 // Short, control-plane-only diagnostic. The harness plays workers; no provider
 // executes a job. Queue seeding is not an API submit-latency measurement.
 export function buildLocalLoadSource(params, proofSource) {
+  if (params.noisyStreams !== undefined && (!Number.isSafeInteger(params.noisyStreams) || params.noisyStreams < 1 || params.noisyStreams > 10)) throw Error('Load must be bounded');
   if (!Number.isSafeInteger(params.durationMs) || params.durationMs < 1000 || params.durationMs > 60000
     || !Array.isArray(params.workers) || !params.workers.length || params.workers.length > 20
     || params.workers.some(w => !Number.isSafeInteger(w.rate) || w.rate < 1 || w.rate > 100
@@ -49,8 +50,8 @@ async function runLoad(P) {
     start=Number(scheduled[0].origin_ms);
     if(Date.now()>=start)throw Error('schedule setup exceeded start margin');
     await sleep(start-Date.now());
-    await Promise.all(P.workers.flatMap(w=>Array.from({length:w.tenantKey==='noisy'?10:1},(_,stream)=>(async()=>{
-      const streams=w.tenantKey==='noisy'?10:1;
+    await Promise.all(P.workers.flatMap(w=>Array.from({length:w.tenantKey==='noisy'?(P.noisyStreams??10):1},(_,stream)=>(async()=>{
+      const streams=w.tenantKey==='noisy'?(P.noisyStreams??10):1;
       for(let index=stream;index<w.jobIds.length;index+=streams) {
         const due=start+index*1000/w.rate; await sleep(due-Date.now()+2);
         if(Date.now()>start+P.durationMs+10000){failures.push({tenantKey:w.tenantKey,stage:'deadline'});break;}

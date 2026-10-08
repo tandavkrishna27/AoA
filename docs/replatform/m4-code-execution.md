@@ -594,3 +594,46 @@ hook under full-suite load. Its isolated rerun passed all 7 tests in 8.66 s.
 No timeout setting was increased. This records a passing rerun, not a fully
 green full-suite invocation. Citation checks (397 enforced) and test inventory
 (2,993 files across 22 trees) passed. Production build passed.
+
+### 2026-10-09 — profiling and controlled concurrency comparisons
+
+Continued diagnosis without changing production behavior. A read-only diagnostic
+overlay timed repository calls and connection acquisition on the owned fixture
+candidate; it logged method names, counts and elapsed time only. Direct and
+proxied PostgreSQL `SELECT 1` p95 were 0.31 and 0.51 ms. During the profiled run,
+authority locking averaged 209 ms (max 849 ms), accepted-event processing
+131 ms (max 423 ms), and transaction acquisition 82 ms (max 914 ms). These
+aggregates include background transactions and are diagnostic observations,
+not request-level causal attribution. The profiled load still failed.
+
+Added bounded `AOA_M4_LOAD_NOISY_STREAMS` (1–10, default 10) so concurrency is
+explicit and can be varied independently of the unchanged 20/s versus 2/s
+scheduled arrival ratio. Invalid values failed the new assertion before the
+implementation, then the 25-test harness suite passed. The shipped worker's
+poll loop awaits each poll; ten overlapping poll loops for one identity are
+therefore an adversarial case, not a faithful model of its normal poll loop.
+The diagnostic still waits for terminal upload before its next poll, whereas
+the daemon hands execution to its supervisor; neither diagnostic variant
+establishes real-daemon throughput.
+
+| Experiment, 5-second window | Quiet throughput / baseline | Quiet delay / baseline | Poll / event ACK p95 | Result |
+|---|---:|---:|---:|---|
+| One noisy stream, original candidate/pool | 0.625 | 2.454x | 384 / 348 ms | FAIL |
+| Ten noisy streams, fixture pool 4→16 only | 0.111 | 2.448x | 2,464 / 2,190 ms | FAIL |
+
+The pool-size experiment produced 8 HTTP 5xx out of 37 request starts inside
+the measurement window. Increasing pool size alone did not fix the finding
+and is not being proposed as a production change. Both ignored temporary
+overlays were removed from the running service configuration afterward;
+the control plane was recreated from the original candidate and became healthy.
+No existing application data or unrelated Docker projects were changed.
+
+Sanitized evidence directories under `C:\Users\TK\.codex\m4-local-evidence`:
+`load-profile-methods-final` (including `method-timings.json`),
+`load-single-stream`, and `load-pool16`. Partial setup attempts are not counted
+as completed load runs. Full D5 remains open. Next investigation must separate
+whole transaction duration, time holding target/worker locks and request
+admission time, then reproduce using actual daemon polling/execution semantics.
+The earlier typecheck/build/full-suite results apply to the parent diagnostic
+slice; this follow-up reran the 25-test Node harness and live experiments,
+not another repository-wide typecheck/test/build invocation.
