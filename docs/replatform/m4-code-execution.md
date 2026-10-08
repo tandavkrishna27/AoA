@@ -172,3 +172,60 @@ stopped and removed; no existing database or container was reused or changed.
 Next recovery work must first correct and regression-test the packaged CLI's
 runtime dependency closure, then execute SQL/gzip and full-schema restored-fence
 journeys. This defect is separate from the reviewed worker-slot change.
+
+### Recovery fallback correction, 2026-10-08
+
+PR #685 merged into `docs/replatform-program` at
+`e1d9950e017a2210206fc3401db4285b409b8a20` after all required CI checks passed.
+
+The packaging conclusion above was too broad: `scripts/build-npm.sh` generates a
+publish manifest through `generate-npm-package-json.mjs`, which includes `zod`.
+The raw development bundle probe did not exercise that packaged artifact. The
+source operator command (`pnpm aoa`) starts successfully. No npm dependency change
+is justified by that probe.
+
+Actual CLI backup then exposed a recovery defect: without `pg_dump`, automatic
+backup emits COPY blocks, while restore without `psql` treated COPY rows as SQL.
+The new Docker CLI regression failed against the original code at the first data
+row and passes with streamed PostgreSQL COPY handling. Five parser tests cover
+text escapes, null markers, delimiter-like data, lazy row consumption, malformed
+terminators and SQL function bodies. SQL and gzip round trips retain a two-company
+fixture and the migration journal; missing files, corrupt gzip and truncated COPY
+fail, with existing data preserved. The test forces both PostgreSQL tools absent
+and is declared in PR CI. Each run owns and removes its disposable PostgreSQL
+container; production and development databases are untouched.
+
+Full-schema/security-object recovery, restored-fence execution and remaining HA
+requirements still need stronger evidence. This fixture does not establish those
+or production recovery timings. Final repository verification and independent
+review of this correction are underway.
+
+Independent review reproduced a driver-level hang when PostgreSQL rejected validly
+framed COPY data. A new invalid-UUID CLI regression timed out before the fix and
+passes with the existing postgres.js patch extended to retain the writable through
+backend acknowledgement and complete pending finalization on errors. The DB
+manifest pins the already-used patched 3.4.8 version; the lockfile was regenerated
+in an isolated manifest-only workspace, and a frozen offline production install
+applied the exact tested patch. Shared dependency directories were not modified.
+
+A native full-schema engineering probe then found grants lost by `--no-privileges`:
+203 tables, 286 migration entries, 37 policies, 26 FORCE-RLS tables, seven functions
+and two company rows restored, but application table grants fell from 187 to zero.
+A failing native-backup contract regression pinned this omission. After preserving
+native grants, the same source/destination probe matched all those counts, including
+187 grants. Current source was mounted into the existing combined Linux image;
+this is not a release-image, live D5 or functional restored-fence proof.
+
+Six focused unit cases and the actual CLI journey pass. The first full-suite rerun
+hit a native Node out-of-memory error; the reduced-worker rerun also exposed the
+expected exhaustive dynamic-SQL inventory change (one SQL execution site became
+two explicit SQL/COPY sites). Its exact allowlist was reconciled, without wildcard
+exceptions. Final verification remains underway. `m4-requirements-evidence.md`
+records every D5 requirement and the remaining evidence/gaps.
+
+The CLI now bundles the patched PostgreSQL driver: npm consumers do not inherit
+workspace pnpm patches, so leaving it external would reintroduce the COPY hang.
+A new config regression failed before this change and passes afterward; CLI build
+passes. Current focused unit total is seven, plus the live Docker CLI journey.
+The exact dynamic-SQL inventory regression also passes (one selected case; 19
+filtered cases are not claimed executed by that focused command).

@@ -35,7 +35,7 @@
   "dependencies": {
     "@armyofagents/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.5"
+    "postgres": "3.4.8"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

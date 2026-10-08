@@ -1215,6 +1215,10 @@ jobs:
       - name: Worker protocol package import smoke
         run: node scripts/check-worker-protocol-package.mjs
 
+      - name: M4 CLI recovery fallback
+        if: matrix.shard == 1
+        run: node --test tests/d1/m4-cli-restore.test.mjs
+
       # The half of scripts/check-w10a-sdk-capability-premise.mjs that needs an installed
       # dependency. Lives HERE, after `pnpm install`, for the same reason the worker-protocol
       # import smoke does: the dependency-free `policy` job cannot resolve `e2b` and runs the
