@@ -16,7 +16,10 @@
 import {
   loadAppliedMigrationIdentity,
   loadRequiredMigrationIdentity,
+  type Db,
+  type RequiredMigrationIdentity,
 } from "@armyofagents/db";
+import { sql } from "drizzle-orm";
 
 export interface SchemaCompatibilityInput {
   /** Image's required migration file hashes (journal order), from loadRequiredMigrationIdentity. */
@@ -84,4 +87,25 @@ export async function loadSchemaCompatibility(url: string): Promise<SchemaCompat
     appliedOrderedHashes: applied.orderedHashes,
     rawAppliedCount: applied.rawAppliedCount,
   });
+}
+
+/** Distributed startup already admits the canonical Drizzle ledger. Keep the
+ * immutable image identity, but read its live database rows on EVERY request.
+ * No cached readiness verdict, new connection, or migration-file hashing here. */
+export function createLiveSchemaCompatibilityReader(
+  db: Db,
+  required: RequiredMigrationIdentity,
+): () => Promise<SchemaCompatibility> {
+  const requiredOrderedHashes = Object.freeze([...required.orderedHashes]);
+  if (requiredOrderedHashes.length === 0) throw new Error("Missing required migration identity");
+  return async () => {
+    const rows = await db.execute<{ hash: string | null }>(sql`
+      SELECT hash FROM drizzle.__drizzle_migrations ORDER BY id
+    `);
+    return evaluateSchemaCompatibility({
+      requiredOrderedHashes,
+      appliedOrderedHashes: rows.map(row => row.hash ?? ""),
+      rawAppliedCount: rows.length,
+    });
+  };
 }

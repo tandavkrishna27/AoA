@@ -87,6 +87,16 @@ was 5.115x; poll/event ACK p95 were 2,412/1,923 ms. Zero observed HTTP 5xx
 does not offset these failures. This is an open finding for investigation,
 not D5-L01–L05 completion; see `m4-code-execution.md` for scope and evidence.
 
+2026-10-09 correction: profiling confirmed repeated migration-file reads and
+short-lived pool creation in the per-request readiness gate. The source fix
+keeps the image identity immutable and checks the live canonical ledger through
+the existing pool on every request. Unit and real PostgreSQL regressions verify
+continued corruption/newer-ledger refusal and recovery. With the compiled fix,
+the ten-loop adversarial case reached 90% quiet throughput and 316/274 ms
+poll/event p95 but still failed at 3.382x queue delay. A separate one-loop
+comparison passed at 100% throughput and 0.863x delay. This partial improvement
+does not close D5-L03 or substitute for actual daemon/fleet load evidence.
+
 1. Investigate local authority-lock and serving-pool contention using the new
    opt-in load diagnostic; reproduce realistic worker concurrency, fix only
    the confirmed cause, and retain the arrival ratio and thresholds on retest.

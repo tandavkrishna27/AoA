@@ -637,3 +637,53 @@ admission time, then reproduce using actual daemon polling/execution semantics.
 The earlier typecheck/build/full-suite results apply to the parent diagnostic
 slice; this follow-up reran the 25-test Node harness and live experiments,
 not another repository-wide typecheck/test/build invocation.
+
+### 2026-10-09 — confirmed readiness overhead and product correction
+
+Detailed profiling separated service/transaction time from middleware time.
+With one noisy stream, poll service averaged 33 ms and lease ACK 31 ms;
+the readiness gate before every API request averaged about 163 ms at baseline
+and 268–278 ms under load. It repeatedly read and hashed image migration files
+and opened short-lived PostgreSQL pools for schema inspection and ping. Thus
+the earlier lock/pool observations did not identify the whole root cause.
+
+Changed distributed readiness to retain the immutable image identity once and
+read live `drizzle.__drizzle_migrations` hashes, in ID order, through the
+existing owner pool on **every request**. The canonical ledger is already
+required by distributed startup. The PostgreSQL ping also reuses that pool.
+There is no cached successful readiness verdict or skipped database check.
+Legacy flag-off schema loading is unchanged. No schema, permissions or API
+response contract changed.
+
+RED: two new reader tests failed before implementation. GREEN: 17 focused
+readiness/gate tests, plus 5 actual Windows PostgreSQL tests, including a
+previously compatible ledger becoming divergent/newer and recovering after
+repair. Independent review found no actionable findings.
+
+Executed the compiled server correction as two read-only file mounts over
+the existing `f7077a695` fixture image, with all profiling/pool experiments
+removed. This is a tested source correction, not a newly built release image.
+Evidence includes source/compiled SHA-256 values in each `candidate.json`.
+Both comparisons retained 2/s quiet versus 20/s noisy scheduled arrivals and
+the original thresholds:
+
+| Five-second comparison | Quiet throughput / baseline | Quiet delay / baseline | Loaded poll / event ACK p95 | Result |
+|---|---:|---:|---:|---|
+| Ten overlapping noisy poll loops | 0.900 | 3.382x | 316 / 274 ms | FAIL: delay |
+| One noisy poll loop | 1.000 | 0.863x | 42 / 55 ms | PASS: bounded diagnostic |
+
+Both runs observed zero HTTP 5xx/transport errors. The ten-loop case improves
+substantially over 0.111 throughput and 2,412/1,923 ms poll/event p95, but its
+queue-delay failure remains open. The single-loop PASS must not replace or
+erase that adversarial failure. Neither simulates actual provider execution;
+the generator still waits for terminal upload before polling again. Full D5,
+the 20-org/duration/workload floors, both-replica load distribution, actual
+daemon execution and independent failure domains remain unproven.
+
+Evidence under `C:\Users\TK\.codex\m4-local-evidence`:
+`load-profile-transactions`, `load-profile-middleware`,
+`load-profile-readiness`, `load-readiness-fix`, and
+`load-readiness-fix-single`. Reports and raw measurements preserve failures.
+Repository-wide typecheck passed. The full Vitest invocation passed all
+2,523 executed files / 24,340 tests, with 227 files / 2,059 tests skipped.
+Production build passed. The final native PostgreSQL regression rerun passed all five tests, including live ledger changes and migration recovery. Independent review found no actionable issues in this correction.

@@ -15,9 +15,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import express from "express";
 import postgres, { type Sql } from "postgres";
-import { applyPendingMigrations } from "@armyofagents/db";
+import { applyPendingMigrations, loadRequiredMigrationIdentity, type Db } from "@armyofagents/db";
+import { drizzle } from "drizzle-orm/postgres-js";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
-import { loadSchemaCompatibility } from "../services/schema-compatibility.js";
+import { createLiveSchemaCompatibilityReader, loadSchemaCompatibility } from "../services/schema-compatibility.js";
 import { runMigrateJob } from "@armyofagents/db/migrate-job";
 import {
   buildReadinessProbe,
@@ -135,6 +136,8 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       const compat = await loadSchemaCompatibility(url);
       expect(compat.schemaCompatible).toBe(false);
       expect(compat.status).toBe("pending");
+      const readLive=createLiveSchemaCompatibilityReader(drizzle(db) as unknown as Db,await loadRequiredMigrationIdentity());
+      expect(await readLive()).toMatchObject({status:"pending",schemaCompatible:false});
 
       const app = buildGatedApp();
       // Tenant/app route is gated (503), but liveness + readiness still answer.
@@ -155,6 +158,28 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       const app = buildGatedApp();
       expect(await status(app, "/api/companies")).toBe(200);
       // App startup / readiness NEVER wrote the marker.
+      expect(await markerCount()).toBe(0);
+    });
+
+    it("checks the live ledger after every compatible result without reloading image files", async () => {
+      const admin=guard();
+      const read=createLiveSchemaCompatibilityReader(drizzle(admin) as unknown as Db,await loadRequiredMigrationIdentity());
+      expect((await read()).schemaCompatible).toBe(true);
+      const [tail]=await admin<{id:number;hash:string}[]>`SELECT id,hash FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1`;
+      try {
+        await admin`UPDATE drizzle.__drizzle_migrations SET hash=${'0'.repeat(64)} WHERE id=${tail.id}`;
+        expect(await read()).toMatchObject({schemaCompatible:false,reason:'divergent'});
+      } finally {
+        await admin`UPDATE drizzle.__drizzle_migrations SET hash=${tail.hash} WHERE id=${tail.id}`;
+      }
+      expect((await read()).schemaCompatible).toBe(true);
+      const [extra]=await admin<{id:number}[]>`INSERT INTO drizzle.__drizzle_migrations (hash,created_at) VALUES (${tail.hash},${Date.now()}) RETURNING id`;
+      try {
+        expect(await read()).toMatchObject({schemaCompatible:false,reason:'newer'});
+      } finally {
+        await admin`DELETE FROM drizzle.__drizzle_migrations WHERE id=${extra.id}`;
+      }
+      expect((await read()).schemaCompatible).toBe(true);
       expect(await markerCount()).toBe(0);
     });
 
