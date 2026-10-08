@@ -429,6 +429,23 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
       await expect(callGuarded(generation.identity, "acceptEvent")).resolves.toMatchObject({ guarded: true });
       await restore(revoked.backupFile);
       await expect(callGuarded(generation.identity, "acceptEvent")).rejects.toMatchObject({ code: "target_revoked" });
+
+      // A later revocation is not present in an older backup. The locked recovery
+      // procedure must advance authority BEFORE any worker traffic resumes.
+      const rollback = await activateLease(9_008);
+      const beforeRevocation = await runDatabaseBackup({ connectionString: adminUrl, backupDir: dataDir,
+        filenamePrefix: "m4-native-before-revocation", backupEngine: "pg_dump" });
+      const cutoff = await runInTenant(ctx().app.db, ORG, repos =>
+        repos.workerEnrollment.revokeTargetAuthority({ executionTargetId: TARGET, now: new Date() }));
+      expect(cutoff).toBe(2);
+      await expect(callGuarded(rollback.identity, "acceptEvent")).rejects.toMatchObject({ code: "target_revoked" });
+      await restore(beforeRevocation.backupFile);
+      // The real re-enrollment generation authority is part of recovery, not a
+      // direct UPDATE pretending that generic SQL restore invalidated old keys.
+      const advanced = await runInTenant(ctx().app.db, ORG, repos =>
+        repos.workerEnrollment.advanceTargetGeneration({ executionTargetId: TARGET, expectedGeneration: 1, now: new Date() }));
+      expect(advanced).toBe(2);
+      await expect(callGuarded(rollback.identity, "acceptEvent")).rejects.toMatchObject({ code: "target_revoked" });
     }, 180_000,
   );
 

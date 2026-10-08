@@ -68,7 +68,7 @@ child.on('exit', code => { process.exitCode = code ?? 1; });
     assert.equal(result.numPassedTests, 1, 'Selected native restore case must execute; a skip is not evidence');
     assert.equal(result.numFailedTests, 0);
     console.log(JSON.stringify({ result: 'PASS', passedNativeRestoreCases: 1,
-      scenarios: ['post-snapshot lease', 'expired snapshot lease', 'generation cutoff in snapshot'],
+      scenarios: ['post-snapshot lease', 'expired snapshot lease', 'generation cutoff in snapshot', 'post-backup revocation with pre-serving authority advance'],
       limits: 'Disposable single-database engineering fixture; not live fleet, objects or D5 timings' }));
   } finally {
     if (id && /^[a-f0-9]{64}$/.test(id)) run('docker', ['stop', '-t', '3', id], { timeout: 20000 });

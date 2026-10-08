@@ -271,9 +271,12 @@ keep services/writers stopped; caller-level cancellation/deadlines remain a gap.
 PR #686's first complete CI run passed every required consumer except the actual
 CLI fixture, which raced Docker PostgreSQL's temporary socket-only init server.
 Readiness now probes TCP, which only the final server exposes. The correction is
-in both recovery branches; fresh CI is running. The current full local suite began
-before the stored-byte changes, so it cannot prove these new cases or exact-head
-verification even if it passes.
+in both recovery branches. PR #686 passed required CI and merged into
+`docs/replatform-program` as `f77437a43a72be7d368718b4253f432b85197acb`.
+The local full run passed 24,318 tests (2,054 skipped) and build, but crossed source
+changes and therefore does not verify the latest commit. A subsequent recursive
+typecheck passed. PR #687 verification remains pending; its environment-variable
+documentation failure has been corrected for the two test-only fixture inputs.
 
 ### Native restored-fence regression (implemented, not yet executed)
 
@@ -297,10 +300,11 @@ Docker remains unresponsive; no passing native-fence result is claimed. This cas
 still needs observed execution and does not prove object quarantine, the live
 recovered fleet, or D5 RPO/RTO. Full verification remains pending.
 
-One additional restore policy gap needs a dedicated regression: a revocation
-that occurs after the backup is absent from the restored snapshot. The restore
-command currently does not itself invalidate restored worker authority, and the
-guard trusts the restored generation. The native cases above restore already-stale
-authority; they do not establish safe handling of post-backup revocations. Recovery
-must keep workers stopped until that stale-authority replay is prevented through
-the actual restore/re-enrollment procedure.
+A fourth native round trip backs up an active lease, revokes its target, restores
+the older snapshot, then invokes the real enrollment generation authority before
+checking rejection of the old fence. Independent review found no actionable
+issues. This case is implemented but awaits native execution. Generic SQL restore
+does not invalidate authority: the runbook now explicitly blocks worker ingress
+and keeps workers stopped until object verification and authority recovery finish
+for every restored target. Actual fleet re-enrollment with fresh identity and
+enforcement of that isolation still require staging proof.
