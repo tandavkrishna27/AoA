@@ -342,7 +342,8 @@ cases use real files and the operator execution function against a non-owner DB
 connection, reject an owner URL, prove sticky download/upload/commit denial and
 one company audit. The patch regression refuses before any object read.
 This is local DB/object integration, not an actual restored staging journey.
-Complete latest-change recursive typecheck/full suite/build remains pending.
+Latest corrected candidate verification is recorded below; this component
+integration alone does not establish live M4 completion.
 
 ### Combined native database and file recovery regression
 
@@ -361,7 +362,8 @@ that downloads alone cannot prove an active fence; the governed replay supplies
 that positive control. The complete local artifact suite passes 39 tests, and the
 two updated positive controls pass separately. Server typecheck passes.
 
-Native execution of this combined extension remains pending CI. Local Docker's
+Native execution of this combined extension passed CI at `d40998068`, reporting
+exactly two executed DB/file recovery cases plus the four fence scenarios. Local Docker's
 existing read-only process query remains unresponsive; no engine restart or
 unrelated container cleanup was attempted. The existing four-scenario native
 fence restore and CLI restore steps passed in CI at `b61e4e766`; that run's
@@ -373,3 +375,25 @@ PR #687 CI exposed a logging assertion failure reproduced locally: its placement
 namespace loaded before the test configured its log capture. Moving that runtime
 import after capture configuration passes the same assertion and the complete
 42-case job submission suite; no logging/redaction assertion was removed.
+
+### Corrected candidate verification and landing
+
+PR #687 merged into `docs/replatform-program` at
+`22fd322d9c6ae7e91058303f834c45b544dd6370` with all required CI green. Its native
+CLI restore and four-scenario fence restore steps both passed at `068a74d23`.
+
+PR #688's prior head exposed a real migration replay failure: generated migration
+0286 tried to add an existing column after the readiness fixture removed the last
+journal row. The unchanged opt-in integration suite reproduced it (1 failed,
+3 passed). C14 `IF NOT EXISTS` guards on the generated column additions correct
+the failure; the same suite then passes 4/4. No readiness assertion was removed.
+The correction is pushed to #688 at `8706b989d` and #689 at `d40998068`.
+
+At `d40998068`, recursive typecheck, full local tests (2,523 files / 24,334 tests
+passed; 227 files / 2,058 tests skipped), and production build all pass. The
+complete artifact integration suite separately passes 39 cases, including the
+healthy governed replay control. Required CI and native combined execution are
+green at `d40998068`, including native combined execution. PR #688 merged at
+`493e016285c692b334893f8513be42487879d93e`; PR #689 merged at
+`b0576a77213089e4a073562bdbc72d012bf568ca`. Live staging access/results are outstanding;
+REL-003 reserves that substrate and spend to the operator. M4 remains open.
