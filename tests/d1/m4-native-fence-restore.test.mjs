@@ -67,9 +67,23 @@ child.on('exit', code => { process.exitCode = code ?? 1; });
     assert.equal(result.success, true);
     assert.equal(result.numPassedTests, 1, 'Selected native restore case must execute; a skip is not evidence');
     assert.equal(result.numFailedTests, 0);
+    const artifactReport = path.join(directory, 'artifact-recovery-result.json');
+    run(process.execPath, ['node_modules/vitest/vitest.mjs', 'run',
+      'server/src/__tests__/artifact-transfer-commit.integration.test.ts',
+      '-t', 'recovered bytes stay quarantined', '--reporter=json', `--outputFile=${artifactReport}`], {
+      env: { ...process.env, AOA_DR_NATIVE_FIXTURE: 'owned-container-v1',
+        AOA_DR_NATIVE_DATABASE_URL: `postgres://postgres:${password}@127.0.0.1:${port}/m4_fence_restore`,
+        AOA_DR_FIXTURE_CONTAINER_ID: id, AOA_PG_DUMP_PATH: wrappers.pg_dump, AOA_PSQL_PATH: wrappers.psql },
+    });
+    const artifacts = JSON.parse(readFileSync(artifactReport, 'utf8'));
+    assert.equal(artifacts.success, true);
+    assert.equal(artifacts.numPassedTests, 2, 'Both native DB + object fault cases must execute');
+    assert.equal(artifacts.numFailedTests, 0);
     console.log(JSON.stringify({ result: 'PASS', passedNativeRestoreCases: 1,
+      passedDatabaseAndObjectRecoveryCases: artifacts.numPassedTests,
       scenarios: ['post-snapshot lease', 'expired snapshot lease', 'generation cutoff in snapshot', 'post-backup revocation with pre-serving authority advance'],
-      limits: 'Disposable single-database engineering fixture; not live fleet, objects or D5 timings' }));
+      objectScenarios: ['restored bytes corrupted', 'restored bytes missing', 'healthy sibling still accessible'],
+      limits: 'Disposable single-database + local-file engineering fixture; not live fleet, external object store or D5 timings' }));
   } finally {
     if (id && /^[a-f0-9]{64}$/.test(id)) run('docker', ['stop', '-t', '3', id], { timeout: 20000 });
   }
