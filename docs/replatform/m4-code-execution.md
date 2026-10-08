@@ -397,3 +397,17 @@ green at `d40998068`, including native combined execution. PR #688 merged at
 `493e016285c692b334893f8513be42487879d93e`; PR #689 merged at
 `b0576a77213089e4a073562bdbc72d012bf568ca`. Live staging access/results are outstanding;
 REL-003 reserves that substrate and spend to the operator. M4 remains open.
+
+### Existing testing host inspection
+
+The operator clarified that the September replatform server was deleted; only
+the main testing server remains, and authorized inspecting it and preparing a
+replatform deployment with recovery tests in a separate database. The existing
+testing deployment workflow now has an explicit read-only inspection mode using
+its existing GitHub-held SSH credentials. This mode skips the deployment job and
+reports only image/release metadata, disk space, backup file metadata, PostgreSQL
+version/migration count and HTTP status codes. It does not print runtime env or
+health bodies, create backups, restore data, migrate, restart or prune services.
+The normal deployment path still requires a tested main-history SHA; no branch
+deployment bypass is introduced. Inspection results and a concrete deployment
+path remain pending. One host cannot prove two-failure-domain HA.

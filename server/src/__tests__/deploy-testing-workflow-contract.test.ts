@@ -68,6 +68,31 @@ function runRevisionVerifier(testCase: string, deploySha: string) {
 }
 
 describe("testing deployment workflow contract", () => {
+  it("isolates read-only inspection from the main-only deployment job", () => {
+    const workflow = parse(repoFile(".github/workflows/deploy-testing.yml")) as any;
+    expect(workflow.on.workflow_dispatch.inputs.inspect_only).toMatchObject({ type: "boolean", default: false });
+    expect(workflow.jobs.deploy.if).toBe("github.ref == 'refs/heads/main' && !inputs.inspect_only");
+    expect(workflow.jobs.inspect.if).toBe("inputs.inspect_only");
+    const inspection = JSON.stringify(workflow.jobs.inspect);
+    expect(inspection).toContain("secrets.DEPLOY_SSH_KEY");
+    expect(inspection).not.toContain("secrets.DEPLOY_SSH_KEY1");
+    expect(inspection).not.toContain("secrets.ANTHROPIC_API_KEY");
+    expect(inspection).toContain("bash -s");
+  });
+
+  it("inspects only bounded metadata without dumping credentials or modifying remote state", () => {
+    const script = repoFile("scripts/deploy/inspect-testing-host.sh");
+    expect(script).toContain("set +x");
+    expect(script).toContain("--write-out '%{http_code}'");
+    expect(script).toContain("--output /dev/null");
+    expect(script).toContain("SELECT current_setting('server_version')");
+    expect(script).not.toMatch(/\b(?:pg_dump|restore|prune|restart|rm|eval)\b/);
+    expect(script).not.toContain(".Config.Env");
+    expect(script).not.toMatch(/\bcat\b/);
+    const result = spawnSync(BASH, ["-n", "scripts/deploy/inspect-testing-host.sh"], { cwd: REPO_ROOT, encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+  });
+
   it("requires an exact, tested SHA from main history", () => {
     const source = repoFile(".github/workflows/deploy-testing.yml");
     const verifier = repoFile("scripts/deploy/verify-testing-revision.sh");
