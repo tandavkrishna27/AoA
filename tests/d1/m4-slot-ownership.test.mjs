@@ -6,11 +6,13 @@ import { resolve } from 'node:path';
 
 test('Linux slot lock: contention, aliases, crash release and unavailable holder', () => {
   const modulePath = resolve('packages/worker-daemon/dist/identity/slot-ownership.js');
+  const bindingPath = resolve('packages/worker-daemon/dist/identity/slot-binding.js');
   const script = `
     import assert from 'node:assert/strict';
     import { mkdir, symlink, unlink, readFile } from 'node:fs/promises';
     import { spawn } from 'node:child_process';
     import { acquireSlotOwnership } from '/fixture/slot-ownership.mjs';
+    import { provisionSlot, prepareSlot } from '/fixture/slot-binding.mjs';
     await mkdir('/tmp/state'); await mkdir('/tmp/binding');
     await symlink('/tmp/state', '/tmp/alias');
     const owner = await acquireSlotOwnership(['/tmp/state', '/tmp/binding']);
@@ -41,9 +43,15 @@ test('Linux slot lock: contention, aliases, crash release and unavailable holder
     const last = await acquireSlotOwnership(['/tmp/z']);
     await assert.rejects(acquireSlotOwnership(['/tmp/a', '/tmp/z']), /owned/);
     const first = await acquireSlotOwnership(['/tmp/a']); await first.release(); await last.release();
+    await mkdir('/tmp/records'); await mkdir('/tmp/data');
+    await provisionSlot({ bindingDir:'/tmp/records', slotId:'desktop-1', organizationId:'a3000000-0000-4000-8000-000000000004', targetId:'a3000000-0000-4000-8000-000000000003' });
+    const prepared = await prepareSlot({bindingDir:'/tmp/records', stateDir:'/tmp/data'}); prepared.validateIdentity(null,null);
+    const replay = await prepareSlot({bindingDir:'/tmp/records', stateDir:'/tmp/data'});
+    assert.throws(()=>replay.validateIdentity(null,null), /missing/);
   `;
   const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '--mount',
     `type=bind,source=${modulePath},target=/fixture/slot-ownership.mjs,readonly`,
+    '--mount', `type=bind,source=${bindingPath},target=/fixture/slot-binding.mjs,readonly`,
     'node:lts-trixie-slim', 'node', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 30000 });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${result.error ?? ''}`);
 });
