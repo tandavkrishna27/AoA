@@ -687,3 +687,39 @@ Evidence under `C:\Users\TK\.codex\m4-local-evidence`:
 Repository-wide typecheck passed. The full Vitest invocation passed all
 2,523 executed files / 24,340 tests, with 227 files / 2,059 tests skipped.
 Production build passed. The final native PostgreSQL regression rerun passed all five tests, including live ledger changes and migration recovery. Independent review found no actionable issues in this correction.
+
+### Startup regression and longer contention probe
+
+CI at `c56fdb654` failed the native startup test
+`performs zero migration-loader, E3 environment, or serving-pool work in real flag-off bootstrap`:
+the new readiness construction loaded the image identity a second time. The
+correction shares the single startup-loaded identity with the readiness reader;
+flag-off still does not invoke that loader. The exact previously failing test
+passed locally with native PostgreSQL (one selected test; 76 unrelated tests
+skipped by the selection). This does not describe the latest CI as green.
+
+A separate 15-second, ten-loop run at `c56fdb654` reproduced the outstanding
+queue-delay failure: quiet throughput was 1.000 of baseline, queue-to-ACK p95
+was 365.49 ms versus 74.27 ms baseline (4.921x), and loaded poll/event ACK p95
+were 303.94/255.24 ms. It observed no HTTP 5xx or transport errors. The measured
+peak was eight active leases; this remains far below full D5's floor.
+
+Temporary transaction/repository profiling recorded mean pool-begin waits of
+49.6/51.0/51.5 ms for poll/ACK/admission operations and mean worker-authority
+lock calls of 32.9/35.1 ms for poll/ACK. These aggregate timing windows include
+setup and background work; they identify contention for further investigation,
+not a clean per-tenant causal attribution. Timing instrumentation was removed
+from the running control plane afterward. Evidence is preserved in
+`C:\Users\TK\.codex\m4-local-evidence\load-readiness-profile-15s`.
+
+The current adversarial generator runs ten poll loops against the same noisy
+worker. The production daemon awaits each poll and ACK, then hands execution to
+its supervisor without waiting for the terminal event (`poll-loop.ts`,
+`trackHandoff` and the main `pollOnce` loop). Therefore neither the ten-loop nor
+the one-loop generator is a substitute for a real daemon workload. Preserve
+this failure while adding actual-daemon evidence; do not weaken authority locks
+or raise fairness thresholds to make the synthetic case pass.
+
+Correction verification: repository typecheck passed; the full suite passed
+2,523 files / 24,340 tests, with 227 files / 2,059 tests skipped. The targeted
+native PostgreSQL startup regression passed. Production build passed.

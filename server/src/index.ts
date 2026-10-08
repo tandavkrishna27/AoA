@@ -609,12 +609,12 @@ if (migrationSummary === "pending migrations skipped") {
 
 // Corrective E2 successor to E2-D03: flag-on boot must prove both bounded roles
 // before any E3 route/work could start. There is deliberately no owner fallback.
-// Flag-off skips migration identity loading, URL reads, and pool allocation.
+const distributedMigrationIdentity = config.distributedExecutionEnabled ? await loadRequiredMigrationIdentity() : null;
 const distributedExecutionDatabases = config.distributedExecutionEnabled
   ? await openDistributedExecutionDatabases({
       enabled: true,
       ownerDb: db,
-      requiredMigrationIdentity: await loadRequiredMigrationIdentity(),
+      requiredMigrationIdentity: distributedMigrationIdentity!,
       appDatabaseUrl: process.env.AOA_APP_DATABASE_URL,
       operatorDatabaseUrl: process.env.AOA_OPERATOR_DATABASE_URL,
     })
@@ -903,8 +903,8 @@ await ensureControlPlaneExecutionTarget(db as any);
 // readiness verdict) rather than faking a healthy result.
 // TODO(DEP-003 follow-up): add a real MinIO reachability check (e.g. a bucket HEAD)
 // for cloud_auth deployments once StorageService exposes a health method.
-const readSchemaCompatibility = config.distributedExecutionEnabled
-  ? createLiveSchemaCompatibilityReader(db, await loadRequiredMigrationIdentity())
+const readSchemaCompatibility = distributedMigrationIdentity
+  ? createLiveSchemaCompatibilityReader(db, distributedMigrationIdentity)
   : () => loadSchemaCompatibility(activeDatabaseConnectionString);
 const readinessProbe = buildReadinessProbe({
   schemaCompatibility: readSchemaCompatibility,
