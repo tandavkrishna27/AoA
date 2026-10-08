@@ -1,7 +1,7 @@
 # DBR-001 — Operator database-restore entrypoint + live DR-restore rehearsal (E11-F002 successor)
 
 **Epic:** E11 · **Plan node:** `docs/replatform/program-design.md`, `#### DBR-001`
-**Depends on:** REL-003 · **Size:** (scope only) · **Status:** scoping
+**Depends on:** REL-003 · **Size:** (scope only) · **Status:** restore entrypoint shipped; live rehearsal owed
 **Owns:** finding **E11-F002** (`epics/E11-hardening-release/findings.md`)
 
 ---
@@ -10,11 +10,11 @@
 
 REL-003 (Sprint 9 unit 2) shipped the DR/migration rehearsal's **verification core** (the Lane A–E
 pure + embedded-PG verifiers) and the **operator runbook**, but it did **not** ship an operator
-invocation for the restore leg. `runDatabaseRestore` (`packages/db/src/backup-lib.ts`) has **zero
-production/CLI callers**, is **not** barrel-exported from `@armyofagents/db`, and **no `aoa
-db:restore` command exists** (only `aoa db:backup`). So a DR ticket whose acceptance says "prove
-database restore" has no operator invocation for the restore half — the runbook (step 4) names the
-exact `runDatabaseRestore`/`pg_restore` invocation as the interim, by hand.
+invocation for the restore leg at that checkpoint. **Reconciled 2026-10-08:**
+`cli/src/commands/db-restore.ts` now calls `runDatabaseRestore`, the database package
+barrel exports it, and `cli/src/index.ts` registers `aoa db:restore --file <path>`.
+The missing-command observation is historical. The remaining deliverable is to
+exercise this actual entrypoint and complete the live staging recovery proof.
 
 That residual is E11-F002 (MED, open). It is a concrete, buildable ticket — the natural successor.
 
@@ -26,7 +26,7 @@ catchable; this stub is the ticket that check points at. E11-F002's manifest ent
 
 ## What it must build (design written at sprint start, against the tree as it exists then)
 
-Two parts, in order:
+Two parts, in order (part 1 is already implemented):
 
 1. **A real operator restore entrypoint** — an `aoa db:restore` command, or an exercised harness
    wrapper over `runDatabaseRestore`/`pg_restore` that is barrel-exported and callable outside a
@@ -40,12 +40,11 @@ Two parts, in order:
 
 When a staging fleet with a database + object-store backup path is deployed (the same live-infra
 dependency the E7-1 canary campaign and the REL-003 rehearsal share). Until then E11-F002 stays
-**open** (MED) and the runbook's hand-run invocation is the interim.
+**open** (MED); the existing CLI is the restore invocation, not a missing dependency.
 
 ## Status
 
-Scoping stub. No design steps and no result doc yet — deliberately. Its full design is written at
-that sprint's start, per the go-book's "write the plan at sprint start" rule for work that would go
-stale if planned early. This is a **genuine scoping stub for a real residual** (the missing operator
-entrypoint + the owed live rehearsal), not a fig-leaf to satisfy the successor check — the review
-verified the residual is real and DBR-001 is a genuine inheritor.
+The operator entrypoint has shipped. Its focused input tests pass, but those tests
+do not establish an end-to-end command restore or live staging RPO/RTO. The M4
+execution ledger tracks the command round-trip work and keeps the operator rehearsal
+outstanding. No milestone completion or finding closure is granted by this correction.

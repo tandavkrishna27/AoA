@@ -27,26 +27,23 @@ If a session cannot reach live staging, it STOPS at "runbook prepared" and hands
 
 ---
 
-## E11-F002 — the restore invocation (there is no `aoa db:restore`)
+## E11-F002 — use the existing operator restore command
 
 `runDatabaseBackup` ships behind `aoa db:backup` (`cli/src/commands/db-backup.ts`).
-`runDatabaseRestore` (`packages/db/src/backup-lib.ts`) is exported from that module but has
-**zero production/CLI callers** and is **not** re-exported from the `@armyofagents/db`
-barrel — there is **no `aoa db:restore` command** (finding **E11-F002**). So the restore
-step here names the exact invocation explicitly, one of:
+`runDatabaseRestore` is barrel-exported and called by
+`cli/src/commands/db-restore.ts`; `cli/src/index.ts` registers the command.
+Use `aoa db:restore --file <backup-file>` with `DATABASE_URL` set privately to the
+intended restore destination. Connection resolution otherwise falls back to config
+or the local embedded database; verify the destination before invoking this destructive
+command. Never put the connection credential in committed evidence or shell arguments.
 
-- **`pg_restore`** for a custom-format dump: `pg_restore --clean --if-exists --no-owner
-  --dbname "$TARGET_DATABASE_URL" "$BACKUP_FILE"` (the operator supplies
-  `$TARGET_DATABASE_URL` and the backup file path; the backup's format is what
-  `runDatabaseBackup` produced).
-- **or a thin harness that calls `runDatabaseRestore({ connectionString, backupFile })`
-  directly** (the same signature its unit test drives —
-  `packages/db/src/__tests__/backup-lib-non-system-schemas.test.ts`), run via `tsx` from
-  the operator host.
+The backup library produces SQL or compressed SQL. Its restore command uses `psql`
+and supports the library's statement-breakpoint format via the JavaScript fallback.
+Do not treat an AoA `.sql.gz` backup as a custom-format `pg_restore` archive.
 
-E11-F002 resolves when a real operator restore entrypoint (an `aoa db:restore` command or
-an exercised harness wrapper) lands **and** this rehearsal exercises it; until then it is
-`open`, owned by REL-003, and this runbook is its interim resolution.
+The command exists; E11-F002 remains open until the required actual rehearsal
+exercises it and establishes recovery. Input tests or direct library round trips
+alone do not supply the live staging result.
 
 ---
 
@@ -78,8 +75,8 @@ an exercised harness wrapper) lands **and** this rehearsal exercises it; until t
    source) **and** the object-store snapshot (bucket versioning / copy) at a recorded
    fault instant `T_fault`.
 4. **Prior-release restore.** Restore the pre-0188 snapshot into the prior-release
-   database via the **E11-F002 restore invocation above** (`runDatabaseRestore` or
-   `pg_restore`). Record restore start `T_restore_start`.
+   database via **`aoa db:restore --file <pre-0188-backup-file>`**, with the explicit
+   operator-held destination above. Record restore start `T_restore_start`.
 5. **Forward recovery to candidate.** Re-run migrations forward to the candidate; bring
    control-plane + workers up migration-first. Record `T_full_service` (first successful
    lease on the recovered fleet).
@@ -98,10 +95,10 @@ an exercised harness wrapper) lands **and** this rehearsal exercises it; until t
    workers keep serving; re-enroll one worker (`advanceTargetGeneration`) and revoke one
    (`revokeExecutionTarget`, which writes the durable `execution_target_revocations`
    cutoff — B1) → the revoked worker's next governed request is refused within the D5/DSK
-   timing. **Tick the revocation fanout explicitly** — the
-   `execution_target_revocations` fanout worker
-   (`createExecutionTargetRevocationFanout`) has no production scheduler today (test-only
-   caller), so drive it by hand; do NOT assume live convergence (B3).
+   timing. Confirm the production convergence timer drains the durable
+   `execution_target_revocations` rows. `server/src/index.ts` now constructs
+   `createExecutionTargetRevocationFanout` and awaits its tick in the distributed
+   convergence loop; observe completion rather than substituting a manual tick.
 9. **Rollback exercise (timed).** Flip the MIG-002 dial back to legacy (no restart) and,
    for the schema, restore the pre-0188 snapshot (or single-org `revert0188`). **Assert
    deleting the marker row alone is NOT the rollback** (the tenant tables persist — the
