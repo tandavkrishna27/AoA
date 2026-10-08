@@ -536,6 +536,11 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
     const put = (bytes: Buffer) => objects.putObject({ objectKey: key, body: bytes,
       contentLength: bytes.length, contentType: "application/octet-stream" });
     await put(body);
+    const healthy = commitRequest(offer, { sizeBytes: body.length, sha256: digest,
+      objectKey: objectKey(offer.job.jobId, "healthy-recovery-control.bin") });
+    expect((await commit.commit({ auth: auth(crypto.randomUUID()), request: healthy.request })).outcome).toBe("committed");
+    await objects.putObject({ objectKey: healthy.objectKey, body,
+      contentLength: body.length, contentType: "application/octet-stream" });
     const recovery = () => executeArtifactRecovery({ appDatabaseUrl: recoveryDatabaseUrl, organizationId: ORG,
       companyId: COMPANY, actorId: "recovery-operator", storage: objects });
     await expect(executeArtifactRecovery({ appDatabaseUrl: ownerDatabaseUrl, organizationId: ORG,
@@ -550,7 +555,7 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
     else { const bad = Buffer.from(body); bad[0] = bad[0]! ^ 1; await put(bad); }
     const rejected = await recovery();
     expect(rejected.verdict).toBe("failed");
-    expect(rejected.promoted).toEqual([]);
+    expect(rejected.promoted).toEqual([healthy.objectKey]);
     const identity = { jobId: offer.job.jobId, attempt: offer.job.attempt, identifier: artifactId };
     const row = await runInTenant(app.db, ORG, repos => repos.jobArtifacts.findEverCommitted(identity));
     expect(row?.status).toBe("committed");
@@ -570,6 +575,11 @@ integration("DAT-002 artifact transfer-grant + fenced commit", () => {
         request: grantRequest(offer, operation, { artifactId, expectedObjectKey: key }).request })).outcome).toBe("rejected");
     }
     expect(storage.presignCalls).toHaveLength(0);
+    // The same authority still signs a healthy sibling. Quarantine denial must
+    // not be masked by an expired lease, revoked worker or blanket outage.
+    expect((await grant.grant({ auth: auth(crypto.randomUUID()),
+      request: grantRequest(offer, "download", { artifactId: healthy.artifactId,
+        expectedObjectKey: healthy.objectKey }).request })).outcome).toBe("download_granted");
     expect((await commit.commit({ auth: auth(crypto.randomUUID()),
       request: { ...request, idempotencyKey: crypto.randomUUID() } })).outcome).toBe("rejected");
     const records = await admin`SELECT action, company_id FROM activity_log
