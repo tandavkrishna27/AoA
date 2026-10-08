@@ -18,7 +18,9 @@ function run(cmd,args,options={}) {
 try {
  id=run('docker',['run','-d','--rm','-e',`POSTGRES_PASSWORD=${password}`,'-p','127.0.0.1::5432','postgres@sha256:0027bef26712baaee437a4ea48fdf3d2d2e2bc5f0d81615374408ca320f3c7e3']);
  if(!/^[a-f0-9]{64}$/.test(id)) throw new Error('invalid container ID');
- for(let n=0;n<50;n++) { const r=spawnSync('docker',['exec',id,'pg_isready','-U','postgres'],{encoding:'utf8'}); if(r.status===0)break; if(n===49)throw new Error('database not ready'); await new Promise(r=>setTimeout(r,200)); }
+ // The image's temporary init server accepts Unix sockets before restarting.
+ // Only the final server listens on TCP; socket readiness races that restart.
+ for(let n=0;n<50;n++) { const r=spawnSync('docker',['exec',id,'pg_isready','-h','127.0.0.1','-U','postgres'],{encoding:'utf8'}); if(r.status===0)break; if(n===49)throw new Error('database not ready'); await new Promise(r=>setTimeout(r,200)); }
  const mapping=run('docker',['port',id,'5432/tcp']);
  const port=Number(mapping.split(':').at(-1));
  if(!Number.isInteger(port))throw new Error('invalid port');
