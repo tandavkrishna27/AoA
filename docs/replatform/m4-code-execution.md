@@ -92,3 +92,27 @@ The proposed fleet direction is distinct target/ticket/durable state per worker
 slot, bounded scale-out, drain and revoke on retirement, and restore of the old
 identity or a new target on replacement. Architectural design approval is
 pending; no implementation or deployment topology change has started.
+
+### HA baseline and runbook correction, 2026-10-08
+
+Another 56 tests passed without skips across shared worker admission, organization
+quota/capacity claims, realtime broker recovery and worker polling/outbox drain.
+The three PostgreSQL integration files executed 15 cases with Windows integration
+explicitly enabled. A further three composition-root tests passed for revocation
+fanout wiring. Total focused baseline: 151 passing tests.
+
+The existing D1 two-replica lane proves control-plane HTTP races using a harness
+that acts as a worker, not multiple running worker daemons. The realtime lane
+proves shared PostgreSQL append/read/notification behavior; it does not measure a
+production load balancer's failover or the full D5 load/fairness floors. Preserve
+these evidence limits when planning the broader HA tests.
+
+Docker's Linux engine is available. Existing running containers belong to other
+work; none were stopped, reconfigured or reused, and no M4 test stack was started.
+
+The mutable DBR-001 design status and REL-003 operator runbook now acknowledge the
+shipped restore command. The runbook consumes `aoa db:restore --file`, matches the
+library's SQL/compressed-SQL format, and observes production revocation convergence
+instead of claiming a missing scheduler and substituting manual ticks. Source,
+focused wiring tests and citation integrity support these corrections; no live
+rehearsal, recovery timing or finding closure is claimed.
