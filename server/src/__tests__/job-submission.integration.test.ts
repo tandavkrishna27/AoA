@@ -23,7 +23,6 @@ import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { provisionTenantAppRoleLoginSql, TENANT_APP_ROLE } from "../db/rls-tenant.js";
 import { createCommanderRunJwt } from "../agent-auth-jwt.js";
 import { jobSubmissionService } from "../services/job-submission.js";
-import * as placementNamespace from "../services/job-placement.js";
 
 vi.mock("../services/aoa-marketplace.js", async (importActual) => {
   const actual = await importActual<typeof import("../services/aoa-marketplace.js")>();
@@ -38,6 +37,9 @@ vi.mock("../services/aoa-marketplace.js", async (importActual) => {
 const capturedLogDir = await mkdtemp(join(tmpdir(), "aoa-job-submission-logs-"));
 process.env.AOA_LOG_DIR = capturedLogDir;
 process.env.AOA_AGENT_JWT_SECRET = "job-submission-commander-jwt-secret";
+// Placement imports its transaction logger. Load it only after configuring the
+// real capture sink, otherwise the audit assertion reads a different log file.
+const placementNamespace = await import("../services/job-placement.js");
 const { createApp } = await import("../app.js");
 const { logger } = await import("../middleware/logger.js");
 
