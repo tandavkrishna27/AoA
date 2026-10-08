@@ -158,6 +158,9 @@ RUN test -f /worker-app/dist/bin/container-host.js \
 # (`/worker-app`, the CMD) and the networked boot root (`/worker-net-app`, opt-in per service).
 # ---------------------------------------------------------------------------
 FROM base AS production
+# Guarded worker slots require the kernel-backed util-linux flock executable.
+# The pinned base supplies it; fail the build if a future base removes it.
+RUN test -x /usr/bin/flock
 ARG AOA_IMAGE_REVISION=unknown
 
 LABEL org.opencontainers.image.title="AoA Worker"
