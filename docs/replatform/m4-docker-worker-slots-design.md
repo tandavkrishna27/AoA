@@ -1,7 +1,7 @@
-# M4 Docker worker slots and recovery
+# M4 engineering slice: Docker worker slots and recovery
 
 Date: 2026-10-08
-Status: proposed written spec; Option 1 direction approved, implementation pending review.
+Status: independent review findings corrected; revised written spec awaiting user review.
 
 ## Outcome
 
@@ -10,9 +10,13 @@ replaceable. The user's first practical journey is one cloud control room paired
 with one Docker worker on their desktop, submitting permitted work, receiving
 results, then restarting and reconnecting with the same identity.
 
-M4 supplies reliable fleet identity and recovery. It must not describe cloud-to-
-desktop execution as verified until the complete journey runs. Existing provider,
-credential and execution-policy prerequisites still apply.
+This slice supplies reliable fleet identity and recovery, plus an explicit audit
+of the remaining M4 HA requirements. The supported networked host delegates to
+adapter-manager, whose production provider is E2B. A desktop-hosted worker therefore
+does not establish desktop-local task execution. The user's local coding journey
+remains a separate deliverable until a supported local execution backend, isolation,
+mounts and credential boundary are designed and verified. Do not mark that journey
+complete using a fake provider or worker connectivity alone.
 
 ## Existing constraints
 
@@ -74,10 +78,11 @@ remains required even when local ownership is exclusive.
 
 - Normal restart: same target and intact state, reacquire exclusive ownership,
   replay persisted enrollment/outbox state and resume under current server fences.
-- First enrollment: explicitly provisioned fresh slot and valid unused ticket.
+- First enrollment: explicitly provisioned fresh slot and valid unused ticket,
+  governed by the independently durable binding protocol below.
 - Missing established state: stop and require recovery; never automatically mint a
-  replacement identity for a previously enrolled target. Persist a nonsecret slot
-  binding outside the disposable container so a lost state volume is detectable.
+  replacement identity for a previously enrolled target. The binding record must
+  survive loss of the state volume, not merely loss of the disposable container.
 - Corrupt identity or receipt: fail closed; never overwrite or reset automatically.
 - Retirement: stop new work, drain within existing bounded shutdown behavior,
   revoke target authority through the native route, confirm the old runtime has
@@ -88,6 +93,39 @@ remains required even when local ownership is exclusive.
   ticket and state volume. Do not reuse a copied live identity or infer that a
   network partition means the old worker stopped.
 
+### Independent slot binding protocol
+
+Provision a nonsecret binding record in a distinct operator-owned host directory,
+mounted separately from the worker state volume. It contains a version, slot ID,
+expected organization and target IDs, a random state-incarnation ID, lifecycle
+phase (`fresh`, `initializing`, `established`) and, once known, the worker ID.
+Never store tickets or private keys in this record. The generator references its
+path but cannot create or reset it as a side effect of rendering or worker boot.
+
+The operator explicitly creates `fresh` before first startup. After exclusive slot
+ownership, persist `initializing` atomically and durably before invoking enrollment.
+An `initializing` record with no identity refuses startup: a crash before the first
+identity write is intentionally indistinguishable from subsequent state loss and
+requires explicit operator inspection/reprovisioning. Do not silently retry minting.
+
+Enrollment retains its existing persist-identity-before-network invariant. If an
+identity exists during `initializing`, validate organization/target/incarnation,
+recover the same persisted enrollment attempt and receipt, then atomically persist
+`established` with the worker ID. A crash after server enrollment but before this
+transition reuses that identity and the existing idempotency mechanism.
+
+Every later boot requires the supplied binding, matching state-incarnation marker
+and matching identity. Missing binding, missing both identity and receipt, mismatched
+worker/target or a corrupt record refuses startup before network use. Existing legacy
+workers need an explicit validated adoption operation; never silently classify an
+existing deployment as fresh. The state-incarnation marker must be persisted before
+enrollment and validated during recovery. Atomic writes require fsync plus atomic
+replacement and directory durability on supported Linux storage.
+
+Lock ownership must cover both the independent binding and state directory. Reject
+duplicate references in the inventory and test bypass attempts through direct host
+invocation. No supported workflow copies an established binding to a second host.
+
 ## Deployment and desktop journey
 
 Supply an explicit desktop-worker example with a configurable cloud endpoint,
@@ -96,7 +134,13 @@ Keep credentials out of generated output, logs and image layers. Document outbou
 connectivity and TLS prerequisites using the actual transport's endpoint contract;
 do not promise inbound-port-free operation until source and a test establish it.
 
-Local project access requires explicit permitted mounts. Native desktop apps,
+This example proves desktop worker connectivity and identity continuity, with
+remote E2B execution when the production provider is selected. Mounting a project
+into the worker does not make it available inside a remote E2B sandbox. A future
+local execution backend must explicitly own execution isolation, project mounts,
+authentication and task lifecycle before local coding can be advertised.
+
+Local project access for such a backend requires explicit permitted mounts. Native desktop apps,
 personal-account credential brokerage and unrestricted host filesystem access are
 outside this change. A networked provider endpoint does not by itself prove that
 execution happens on the desktop; the journey must establish execution placement
@@ -130,10 +174,31 @@ substitute its timings for production RPO/RTO or cross-domain failure proof.
 6. Rendered manifests validate and preserve dispatch defaults and secret boundaries.
 7. Actual CLI backup/restore round-trip executes on isolated PostgreSQL; restored
    stale authority is rejected and corrupt/missing objects remain quarantined.
-8. Desktop example is validated; execution placement and end-to-end cloud evidence
-   are stated precisely, with unexecuted environment checks left visible.
+8. Desktop worker connectivity example is validated; remote execution placement is
+   stated explicitly. Local desktop execution remains a separate prerequisite,
+   and unexecuted end-to-end cloud checks stay visible.
 9. Run focused regressions, recursive typecheck, full test suite and build, then
    required PR CI. Record platform skips and proof limits explicitly.
+10. Maintain the M4 requirement-to-evidence matrix below, adding concrete source,
+    commands/results and remaining work in the execution ledger before hand-off.
+
+## M4 requirement-to-evidence ownership
+
+The implementer owns this matrix and the mutable `m4-code-execution.md` ledger.
+Full M4 is not complete merely because this slice passes its tests.
+
+| Requirement | Existing evidence | Work owned by this slice | Remaining environment proof |
+| --- | --- | --- | --- |
+| WRK-016 identity and retirement | Enrollment CAS/replay and native revoke tests | Exclusive slot ownership, binding protocol, fleet rendering, restart/retirement tests | Actual deployment-specific storage and worker lifecycle |
+| D5-HA01..02 execution ownership and failover | D1 two-control-plane HTTP race and replica-loss harness | Reconcile proofs; add regressions for confirmed correctness gaps | Production LB, accepted-write RPO and failover RTO |
+| D5-HA03 rolling drain and broker recovery | Drain/outbox and revocation-fanout tests | Reconcile current rollout, migration-first and fencing coverage | Production-equivalent rollout and outages |
+| D5-HA04 realtime recovery | Shared PG append/read, notification-loss safety polling | Map tests to catch-up behavior; address confirmed code gaps | Production catch-up timing |
+| D5-L01..06 load, fairness and capacity | Shared admission and quota/capacity races | Identify untested fairness/load behavior and implement deterministic correctness regressions where feasible | Stated topology, throughput, latency and error floors |
+| D5-DR01..07 backup, objects and stale authority | Modeled stale-fence PG tests, reconciliation/quarantine tests | Actual CLI restore round-trip, restored-state fences, object failure cases and protocol/revocation coverage audit | Production backup age, object availability, measured RPO/RTO and post-restore rollout |
+
+Record gaps as engineering work or environment-dependent proof, never as silently
+waived requirements. This is evidence reconciliation, not an extra certification
+campaign. Deterministic fixtures do not establish production performance.
 
 ## Delivery order
 

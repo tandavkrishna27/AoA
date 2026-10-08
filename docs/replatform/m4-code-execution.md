@@ -88,10 +88,15 @@ Important evidence limits and concrete next work:
   generation and revocation machinery rather than deleting worker rows to enable
   transfer or resetting identity files.
 
-The proposed fleet direction is distinct target/ticket/durable state per worker
+The selected fleet direction is distinct target/ticket/durable state per worker
 slot, bounded scale-out, drain and revoke on retirement, and restore of the old
-identity or a new target on replacement. Architectural design approval is
-pending; no implementation or deployment topology change has started.
+identity or a new target on replacement. The user selected Option 1. An independent
+sub-agent reviewed the written design; the three findings are corrected in
+`m4-docker-worker-slots-design.md`: explicit remote execution placement, an
+independently durable slot-binding protocol, and ownership of the remaining M4 HA
+evidence reconciliation. Revised written-spec review remains pending; no product
+implementation or deployment topology change has started. Desktop-local execution
+is a separate deliverable, not established by running the networked worker locally.
 
 ### HA baseline and runbook correction, 2026-10-08
 
