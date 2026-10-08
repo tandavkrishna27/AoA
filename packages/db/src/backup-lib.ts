@@ -620,6 +620,58 @@ export async function runDatabaseBackup(opts: RunDatabaseBackupOptions): Promise
 
     await sql`SELECT 1`;
 
+    // The portable writer does not serialize RLS, ACLs, routines or triggers.
+    // Never report a whole-database automatic backup as successful if restoring
+    // it would silently remove those controls. Explicit JavaScript exports are
+    // still available to callers implementing the separate portability contract.
+    if (backupEngine === "auto" && canUsePgDump) {
+      const [security] = await sql<{ unsupported: boolean }[]>`
+        SELECT (
+          EXISTS (
+            SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+              AND (c.relrowsecurity OR c.relforcerowsecurity OR c.relacl IS NOT NULL)
+          ) OR EXISTS (
+            SELECT 1 FROM pg_attribute a
+            JOIN pg_class c ON c.oid = a.attrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+              AND a.attacl IS NOT NULL
+          ) OR EXISTS (
+            SELECT 1 FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+              AND t.typacl IS NOT NULL
+          ) OR EXISTS (
+            SELECT 1 FROM pg_namespace n
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+              AND n.nspacl IS NOT NULL
+              AND NOT (
+                n.nspname = 'public'
+                AND n.nspacl @> (acldefault('n', n.nspowner) || makeaclitem(0, n.nspowner, 'USAGE', false))
+                AND n.nspacl <@ (acldefault('n', n.nspowner) || makeaclitem(0, n.nspowner, 'USAGE', false))
+              )
+          ) OR EXISTS (
+            SELECT 1 FROM pg_policy
+          ) OR EXISTS (
+            SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+              AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+          ) OR EXISTS (
+            SELECT 1 FROM pg_trigger WHERE NOT tgisinternal
+          ) OR EXISTS (
+            SELECT 1 FROM pg_default_acl
+          )
+        ) AS unsupported
+      `;
+      if (security?.unsupported !== false) {
+        throw new Error("A native PostgreSQL backup is required to preserve security objects. Install a compatible pg_dump or set AOA_PG_DUMP_PATH; automatic JavaScript fallback was refused.");
+      }
+    }
+
     const emit = (line: string) => writer.emit(line);
     const emitStatement = (statement: string) => {
       emit(statement);

@@ -50,6 +50,15 @@ includes PostgreSQL clients; the split control-plane image does not. The current
 JavaScript backup fallback does not serialize the full security-object set and
 cannot establish complete application-schema recovery.
 
+Automatic backup now refuses JavaScript fallback when PostgreSQL catalogs contain
+RLS/policies, table or column grants, type grants, nondefault schema permissions,
+functions, user triggers or default privileges. A missing or incompatible native
+tool therefore produces an error for the application schema rather than a
+misleading successful recovery backup. Provision clients compatible with the
+source/destination PostgreSQL versions, or configure `AOA_PG_DUMP_PATH` and
+`AOA_PSQL_PATH`. Explicit JavaScript portability exports remain a separate,
+limited contract; they are not full recovery backups.
+
 The command exists; E11-F002 remains open until the required actual rehearsal
 exercises it and establishes recovery. Input tests or direct library round trips
 alone do not supply the live staging result.

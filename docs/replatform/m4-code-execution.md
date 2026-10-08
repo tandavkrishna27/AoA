@@ -229,3 +229,24 @@ A new config regression failed before this change and passes afterward; CLI buil
 passes. Current focused unit total is seven, plus the live Docker CLI journey.
 The exact dynamic-SQL inventory regression also passes (one selected case; 19
 filtered cases are not claimed executed by that focused command).
+
+### Automatic fallback security guard (in progress)
+
+The reduced-worker full run terminated with ENOSPC while writing Vitest state
+(19,454 tests passed, one known inventory failure, seven infrastructure errors;
+356 files failed). It is not a passing run. A subsequent recursive typecheck and
+build passed, but the new fallback safeguard requires fresh complete verification.
+
+Automatic backup now rejects the portable fallback when omitted security objects
+are present. The regression first reproduced a misleading successful backup and
+then passed with the guard. An independent review found missing column/schema/type
+ACL detection; those catalogs are now included, with the ordinary public-schema
+ACL exempted. Four native/fallback unit cases and five COPY-parser cases pass;
+the CLI bundle case also passed in the initial focused run (ten total cases).
+
+The actual CLI fixture now checks independent column, schema and type grant cases,
+with a successful plain-schema backup before each injection. These added cases
+have not run locally: Docker commands remain unresponsive, and the attempted
+full-schema JavaScript probe timed out before obtaining a container ID. No Docker
+restart, unrelated-container stop or speculative cleanup was performed. Complete
+typecheck/tests/build verification is running again with two test workers.

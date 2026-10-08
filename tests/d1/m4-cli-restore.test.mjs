@@ -48,7 +48,23 @@ try {
  const invalid=path.join(dir,'invalid-copy.sql');
  writeFileSync(invalid,text.replace('11111111-1111-4111-8111-111111111111\t','invalid-uuid\t'));
  cli(['db:restore','--file',invalid],false);verify();
- const result={result:'PASS',cases:['CLI SQL restore','CLI gzip restore','migration journal preserved','two company fixture payloads preserved','missing file nonzero','corrupt gzip nonzero, data preserved','truncated COPY nonzero, transaction rolled back','invalid UUID COPY nonzero without timeout, transaction rolled back'],backupDirectory:dir,limits:'Synthetic fixture, not full application schema, stale fence recovery or production RPO/RTO'};
+ // Exercise the real PostgreSQL catalogs, including grants that leave relacl null.
+ sql("CREATE ROLE m4_backup_reader NOLOGIN; CREATE TYPE public.m4_backup_enum AS ENUM ('ready'); CREATE TABLE public.security_fixture(payload text);");
+ const securityCases = [
+   ['column grant', 'GRANT SELECT (payload) ON public.security_fixture TO m4_backup_reader;', 'DROP TABLE public.security_fixture;'],
+   ['schema grant', 'GRANT CREATE ON SCHEMA public TO m4_backup_reader;', 'REVOKE CREATE ON SCHEMA public FROM m4_backup_reader;'],
+   ['type grant', 'GRANT USAGE ON TYPE public.m4_backup_enum TO m4_backup_reader;', 'REVOKE USAGE ON TYPE public.m4_backup_enum FROM m4_backup_reader;'],
+ ];
+ for (const [name, grant, revoke] of securityCases) {
+   cli(['db:backup','--dir',dir,'--filename-prefix','before-' + name.split(' ')[0]]);
+   sql(grant);
+   const prefix = 'rejected-' + name.split(' ')[0];
+   const rejected = cli(['db:backup','--dir',dir,'--filename-prefix',prefix],false);
+   if (!/native PostgreSQL backup.*security objects/i.test(rejected.stderr + rejected.stdout)) throw new Error(`${name} did not reach the security fallback guard`);
+   if (readdirSync(dir).some(n => n.startsWith(prefix))) throw new Error(`${name} left a misleading backup file`);
+   sql(revoke);
+ }
+ const result={result:'PASS',cases:['CLI SQL restore','CLI gzip restore','migration journal preserved','two company fixture payloads preserved','missing file nonzero','corrupt gzip nonzero, data preserved','truncated COPY nonzero, transaction rolled back','invalid UUID COPY nonzero without timeout, transaction rolled back','column ACL refuses incomplete fallback','schema ACL refuses incomplete fallback','type ACL refuses incomplete fallback'],backupDirectory:dir,limits:'Synthetic fixture, not full application schema, stale fence recovery or production RPO/RTO'};
  writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 } finally { if(id&&/^[a-f0-9]{64}$/.test(id))run('docker',['stop','-t','3',id]); }
 
