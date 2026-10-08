@@ -150,9 +150,25 @@ image fixtures passing without skips, including the real worker entrypoint. The
 image was built from this worktree. Host fixture bootstrap is injected; it proves
 storage/composition, not a real cloud enrollment or desktop-local execution.
 
-Recursive typecheck, full tests and build are underway and are not yet claimed
-passing. Validated legacy adoption remains unimplemented: current receipt/ticket
+Recursive typecheck and build passed. The full ordinary suite passed: 24,306 tests
+passed and 2,054 skipped (2,519 files passed, 227 skipped); optional integration
+flags were unset. Validated legacy adoption remains unimplemented: current receipt/ticket
 contracts have no authenticated organization metadata for it. Fresh guarded mode
 refuses nonempty legacy state; existing unguarded embedders remain unchanged.
 Operators can retire/revoke and provision a new target instead of resetting a
 bound identity. Actual CLI restore and the remaining HA evidence audit still remain.
+
+### Actual CLI recovery probe, 2026-10-08
+
+A manual subprocess rehearsal used the current built `cli/dist/index.js` and a
+new disposable Docker PostgreSQL 17 instance bound only to loopback. The CLI
+failed before backup began: `ERR_MODULE_NOT_FOUND` for `zod`. The build externalizes
+transitive dependencies of bundled workspace packages, but the CLI manifest does
+not declare `zod`; this pnpm worktree has no CLI-visible installation of it.
+Build success therefore does not establish a runnable packaged CLI. No restore
+round trip or recovery timing is claimed. The owned disposable container was
+stopped and removed; no existing database or container was reused or changed.
+
+Next recovery work must first correct and regression-test the packaged CLI's
+runtime dependency closure, then execute SQL/gzip and full-schema restored-fence
+journeys. This defect is separate from the reviewed worker-slot change.
