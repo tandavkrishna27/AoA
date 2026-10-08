@@ -411,3 +411,57 @@ health bodies, create backups, restore data, migrate, restart or prune services.
 The normal deployment path still requires a tested main-history SHA; no branch
 deployment bypass is introduced. Inspection results and a concrete deployment
 path remain pending. One host cannot prove two-failure-domain HA.
+
+### Local desktop execution — 2026-10-08
+
+The user authorized moving local M4 execution forward while remote server access
+is unavailable. Docker is now responsive. Started the current worktree app on
+`http://127.0.0.1:3210` with `AOA_HOME=C:\Users\TK\.aoa-m4-local`,
+`AOA_INSTANCE_ID=m4-local`, loopback `local_trusted`, and no `DATABASE_URL`.
+This creates a separate embedded PostgreSQL instance and storage. Health and UI
+returned HTTP 200; the company list was empty. This is a local app instance,
+not proof of distributed worker enrollment or cloud control.
+
+Actual CLI SQL/gzip recovery passed locally, including rollback on truncated or
+invalid COPY, absent/corrupt backup refusal and security ACL fallback refusal.
+The native full-schema fixture initially failed because Windows skipped the suite;
+with `AOA_RUN_WIN_INTEGRATION=1` it exposed direct `.mjs` execution (`spawn EFTYPE`).
+Configured `.mjs`/`.cjs` PostgreSQL tool wrappers now execute through the current
+Node executable with separate arguments and no shell. Native binary behavior is
+unchanged. Focused regression: RED two failures / four passes, then GREEN six passes.
+Independent review found no actionable issue. The actual native restore then passed:
+four stale-authority scenarios, two DB + file fault cases and the healthy sibling
+control. The fixture owns disposable PostgreSQL containers and did not restore
+into the running local application database.
+
+Reproduce from the worktree in PowerShell:
+
+```powershell
+$env:AOA_RUN_WIN_INTEGRATION = '1'
+node --test tests/d1/m4-cli-restore.test.mjs
+node --test tests/d1/m4-native-fence-restore.test.mjs
+```
+
+Restart the isolated app in a separate terminal:
+
+```powershell
+$env:AOA_HOME = 'C:\Users\TK\.aoa-m4-local'
+$env:AOA_INSTANCE_ID = 'm4-local'
+$env:HOST = '127.0.0.1'
+$env:PORT = '3210'
+$env:AOA_DEPLOYMENT_MODE = 'local_trusted'
+$env:AOA_MIGRATION_AUTO_APPLY = 'true'
+Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+pnpm.cmd dev:once
+```
+
+Recursive typecheck passed. Full tests passed: 2,523 files / 24,338 tests, with
+227 files / 2,058 tests skipped. Production build passed after repairing the
+worktree-only postgres dependency junction: its old temporary target was gone.
+The replacement is isolated under C:\Users\TK\.codex\m4-local-runtime and uses
+postgres 3.4.8 with the repository patch; shared dependencies were not edited.
+Linux slot ownership/host fixtures passed 2/2 using the existing local worker
+image (supporting regression evidence, not a rebuilt candidate fleet). Anthropic live verification remains
+excluded. Single-desktop recovery is not two-failure-domain HA, external object
+store recovery, fleet reenrollment, or full D5 load/RPO/RTO evidence. Those remain
+open under the original M4 requirements.
