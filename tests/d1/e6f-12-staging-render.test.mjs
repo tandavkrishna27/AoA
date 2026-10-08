@@ -33,6 +33,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { SKIP } from "./lib/e6f-harness.mjs";
+import { evaluateWorkerSlotInvariants } from "../../scripts/lib/worker-slot-inventory.mjs";
 import { parseYaml } from "../../scripts/lib/yaml-lite.mjs";
 import {
   evaluateStagingManifestInvariants,
@@ -52,6 +53,12 @@ import {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const STAGING_COMPOSE = path.join(repoRoot, "docker-compose.staging.yml");
 const ENV_DOC = path.join(repoRoot, "docs", "deploy", "environment-variables.md");
+
+test("M4 staging slots have independent state and stop-first single ownership", { skip: SKIP }, () => {
+  const rendered = renderStaging();
+  assert.equal(rendered.status, 0, rendered.stderr);
+  assert.deepEqual(evaluateWorkerSlotInvariants(rendered.json, WORKER_SERVICES), []);
+});
 
 /** Render + validate the staging manifest with the real compose engine (JSON model). */
 function renderStaging() {

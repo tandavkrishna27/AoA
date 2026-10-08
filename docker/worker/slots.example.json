@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "min": 1,
+  "max": 8,
+  "workerImage": "example.invalid/aoa-worker@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "controlPlaneUrl": "https://aoa.example.com",
+  "providerUrl": "https://adapter-manager.example.com",
+  "slots": [{
+    "slotId": "desktop-1",
+    "organizationId": "a3000000-0000-4000-8000-000000000004",
+    "targetId": "a3000000-0000-4000-8000-000000000003",
+    "bindingDir": "/srv/aoa/bindings/desktop-1",
+    "volumeName": "aoa-desktop-1-state",
+    "enrollmentSecret": "aoa-desktop-1-ticket",
+    "failureDomain": "desktop"
+  }]
+}

@@ -597,6 +597,21 @@
       "status": "runs",
       "workflow": "pr.yml",
       "step": "Staging manifest config contract (DEP-006) + shipped CI boot lane (DEP-015)"
+    },
+    "scripts/render-worker-slots.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "M4 worker slot rendering"
+    },
+    "tests/d1/m4-slot-ownership.test.mjs": {
+      "status": "runs",
+      "workflow": "d1-merge-train.yml",
+      "step": "M4 worker slot Linux lifecycle"
+    },
+    "tests/d1/m4-slot-host.test.mjs": {
+      "status": "runs",
+      "workflow": "d1-merge-train.yml",
+      "step": "M4 worker slot Linux lifecycle"
     }
   }
 }

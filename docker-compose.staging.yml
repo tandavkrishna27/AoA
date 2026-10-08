@@ -167,28 +167,38 @@ services:
   # provider lifecycle is brokered through the adapter-management surface.
   worker-a1:
     image: "${AOA_STAGING_WORKER_IMAGE:-ghcr.io/meteoritelabs/aoa-worker:staging}"
+    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]
     environment:
       AOA_WORKER_TARGET_PROFILE_ID: "staging-worker-a1"
       AOA_WORKER_TARGET_SCOPE: "organization"
       AOA_WORKER_CONTROL_PLANE_URL: "${AOA_STAGING_CONTROL_PLANE_URL}"
       AOA_WORKER_S3_ENDPOINT: "${AOA_STAGING_S3_PRESIGN_ENDPOINT}"
-      AOA_WORKER_KEY_STORE_MODE: "mounted_secret"
+      AOA_WORKER_KEY_STORE_MODE: "file_record"
       AOA_WORKER_HEALTH_PORT: "9464"
-      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/worker-enrollment-code"
+      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/enrollment-ticket"
+      AOA_WORKER_STATE_DIR: "/worker"
+      AOA_WORKER_SLOT_BINDING_DIR: "/slot-binding"
+      AOA_WORKER_EVENT_OUTBOX_PATH: "/worker/events.db"
+      AOA_WORKER_LEASE_CANDIDATE_PATH: "/worker/lease-candidates.db"
     labels:
       com.aoa.failure-domain: "domain-a"
-      com.aoa.autoscaling-min: "2"
-      com.aoa.autoscaling-max: "8"
+      com.aoa.autoscaling-min: "1"
+      com.aoa.autoscaling-max: "1"
       com.aoa.drain-hook: "SIGTERM: stop polling; finish/relinquish in-flight leases within the visibility timeout; exit 0"
     deploy:
-      replicas: 2
+      replicas: 1
       update_config:
         parallelism: 1
-        order: "start-first"
+        order: "stop-first"
         max_failure_ratio: 0
       rollback_config:
         parallelism: 1
         order: "stop-first"
+    volumes:
+      - {type: "volume", source: "worker-a1-state", target: "/worker"}
+      - {type: "bind", source: "/srv/aoa/bindings/worker-a1", target: "/slot-binding", bind: {create_host_path: false}}
+    secrets:
+      - {source: "worker-a1-ticket", target: "enrollment-ticket"}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -205,28 +215,38 @@ services:
 
   worker-a2:
     image: "${AOA_STAGING_WORKER_IMAGE:-ghcr.io/meteoritelabs/aoa-worker:staging}"
+    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]
     environment:
       AOA_WORKER_TARGET_PROFILE_ID: "staging-worker-a2"
       AOA_WORKER_TARGET_SCOPE: "organization"
       AOA_WORKER_CONTROL_PLANE_URL: "${AOA_STAGING_CONTROL_PLANE_URL}"
       AOA_WORKER_S3_ENDPOINT: "${AOA_STAGING_S3_PRESIGN_ENDPOINT}"
-      AOA_WORKER_KEY_STORE_MODE: "mounted_secret"
+      AOA_WORKER_KEY_STORE_MODE: "file_record"
       AOA_WORKER_HEALTH_PORT: "9464"
-      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/worker-enrollment-code"
+      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/enrollment-ticket"
+      AOA_WORKER_STATE_DIR: "/worker"
+      AOA_WORKER_SLOT_BINDING_DIR: "/slot-binding"
+      AOA_WORKER_EVENT_OUTBOX_PATH: "/worker/events.db"
+      AOA_WORKER_LEASE_CANDIDATE_PATH: "/worker/lease-candidates.db"
     labels:
       com.aoa.failure-domain: "domain-a"
-      com.aoa.autoscaling-min: "2"
-      com.aoa.autoscaling-max: "8"
+      com.aoa.autoscaling-min: "1"
+      com.aoa.autoscaling-max: "1"
       com.aoa.drain-hook: "SIGTERM: stop polling; finish/relinquish in-flight leases within the visibility timeout; exit 0"
     deploy:
-      replicas: 2
+      replicas: 1
       update_config:
         parallelism: 1
-        order: "start-first"
+        order: "stop-first"
         max_failure_ratio: 0
       rollback_config:
         parallelism: 1
         order: "stop-first"
+    volumes:
+      - {type: "volume", source: "worker-a2-state", target: "/worker"}
+      - {type: "bind", source: "/srv/aoa/bindings/worker-a2", target: "/slot-binding", bind: {create_host_path: false}}
+    secrets:
+      - {source: "worker-a2-ticket", target: "enrollment-ticket"}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -244,28 +264,38 @@ services:
   # --- workers, failure domain B ---------------------------------------------
   worker-b1:
     image: "${AOA_STAGING_WORKER_IMAGE:-ghcr.io/meteoritelabs/aoa-worker:staging}"
+    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]
     environment:
       AOA_WORKER_TARGET_PROFILE_ID: "staging-worker-b1"
       AOA_WORKER_TARGET_SCOPE: "organization"
       AOA_WORKER_CONTROL_PLANE_URL: "${AOA_STAGING_CONTROL_PLANE_URL}"
       AOA_WORKER_S3_ENDPOINT: "${AOA_STAGING_S3_PRESIGN_ENDPOINT}"
-      AOA_WORKER_KEY_STORE_MODE: "mounted_secret"
+      AOA_WORKER_KEY_STORE_MODE: "file_record"
       AOA_WORKER_HEALTH_PORT: "9464"
-      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/worker-enrollment-code"
+      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/enrollment-ticket"
+      AOA_WORKER_STATE_DIR: "/worker"
+      AOA_WORKER_SLOT_BINDING_DIR: "/slot-binding"
+      AOA_WORKER_EVENT_OUTBOX_PATH: "/worker/events.db"
+      AOA_WORKER_LEASE_CANDIDATE_PATH: "/worker/lease-candidates.db"
     labels:
       com.aoa.failure-domain: "domain-b"
-      com.aoa.autoscaling-min: "2"
-      com.aoa.autoscaling-max: "8"
+      com.aoa.autoscaling-min: "1"
+      com.aoa.autoscaling-max: "1"
       com.aoa.drain-hook: "SIGTERM: stop polling; finish/relinquish in-flight leases within the visibility timeout; exit 0"
     deploy:
-      replicas: 2
+      replicas: 1
       update_config:
         parallelism: 1
-        order: "start-first"
+        order: "stop-first"
         max_failure_ratio: 0
       rollback_config:
         parallelism: 1
         order: "stop-first"
+    volumes:
+      - {type: "volume", source: "worker-b1-state", target: "/worker"}
+      - {type: "bind", source: "/srv/aoa/bindings/worker-b1", target: "/slot-binding", bind: {create_host_path: false}}
+    secrets:
+      - {source: "worker-b1-ticket", target: "enrollment-ticket"}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -282,28 +312,38 @@ services:
 
   worker-b2:
     image: "${AOA_STAGING_WORKER_IMAGE:-ghcr.io/meteoritelabs/aoa-worker:staging}"
+    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]
     environment:
       AOA_WORKER_TARGET_PROFILE_ID: "staging-worker-b2"
       AOA_WORKER_TARGET_SCOPE: "organization"
       AOA_WORKER_CONTROL_PLANE_URL: "${AOA_STAGING_CONTROL_PLANE_URL}"
       AOA_WORKER_S3_ENDPOINT: "${AOA_STAGING_S3_PRESIGN_ENDPOINT}"
-      AOA_WORKER_KEY_STORE_MODE: "mounted_secret"
+      AOA_WORKER_KEY_STORE_MODE: "file_record"
       AOA_WORKER_HEALTH_PORT: "9464"
-      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/worker-enrollment-code"
+      AOA_WORKER_ENROLLMENT_CODE_FILE: "/run/secrets/enrollment-ticket"
+      AOA_WORKER_STATE_DIR: "/worker"
+      AOA_WORKER_SLOT_BINDING_DIR: "/slot-binding"
+      AOA_WORKER_EVENT_OUTBOX_PATH: "/worker/events.db"
+      AOA_WORKER_LEASE_CANDIDATE_PATH: "/worker/lease-candidates.db"
     labels:
       com.aoa.failure-domain: "domain-b"
-      com.aoa.autoscaling-min: "2"
-      com.aoa.autoscaling-max: "8"
+      com.aoa.autoscaling-min: "1"
+      com.aoa.autoscaling-max: "1"
       com.aoa.drain-hook: "SIGTERM: stop polling; finish/relinquish in-flight leases within the visibility timeout; exit 0"
     deploy:
-      replicas: 2
+      replicas: 1
       update_config:
         parallelism: 1
-        order: "start-first"
+        order: "stop-first"
         max_failure_ratio: 0
       rollback_config:
         parallelism: 1
         order: "stop-first"
+    volumes:
+      - {type: "volume", source: "worker-b2-state", target: "/worker"}
+      - {type: "bind", source: "/srv/aoa/bindings/worker-b2", target: "/slot-binding", bind: {create_host_path: false}}
+    secrets:
+      - {source: "worker-b2-ticket", target: "enrollment-ticket"}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -376,3 +416,25 @@ networks:
   # Egress to the EXTERNAL provider control API (adapter-manager ONLY).
   provider-ctl-net:
     internal: false
+
+# M4: provision each slot explicitly. Scale the fleet by adding unique slots,
+# not replicas sharing credentials. These volumes must already exist.
+volumes:
+  worker-a1-state:
+    external: true
+  worker-a2-state:
+    external: true
+  worker-b1-state:
+    external: true
+  worker-b2-state:
+    external: true
+
+secrets:
+  worker-a1-ticket:
+    file: "/srv/aoa/bindings/worker-a1/enrollment.ticket"
+  worker-a2-ticket:
+    file: "/srv/aoa/bindings/worker-a2/enrollment.ticket"
+  worker-b1-ticket:
+    file: "/srv/aoa/bindings/worker-b1/enrollment.ticket"
+  worker-b2-ticket:
+    file: "/srv/aoa/bindings/worker-b2/enrollment.ticket"

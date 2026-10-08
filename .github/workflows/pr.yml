@@ -548,6 +548,9 @@ jobs:
           node --test scripts/lib/__tests__/execution-census.test.mjs
           node scripts/check-execution-census.mjs
 
+      - name: M4 worker slot rendering
+        run: node --test scripts/render-worker-slots.test.mjs
+
       - name: Dispatch-composition declaration guards (WRK-008 slice 2b)
         run: |
           # 9a: the D1 workers cannot enable dispatch on ANY of the four landable gates without an

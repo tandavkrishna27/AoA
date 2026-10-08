@@ -156,6 +156,7 @@ function validCompose() {
 // The documented-env-key set the module needs for §2.6. In the corpus we build it
 // by hand (every env key the fixture uses); Layer 1 uses the REAL doc file.
 const FIXTURE_DOCUMENTED_ENV_KEYS = new Set([
+  "AOA_WORKER_STATE_DIR", "AOA_WORKER_SLOT_BINDING_DIR", "AOA_WORKER_EVENT_OUTBOX_PATH", "AOA_WORKER_LEASE_CANDIDATE_PATH",
   "HOST",
   "PORT",
   "AOA_DEPLOYMENT_MODE",
