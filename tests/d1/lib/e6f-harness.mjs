@@ -3948,3 +3948,12 @@ try {
 `;
   return dexecModule("control-plane", script);
 }
+
+/** Bounded local control-plane diagnostic; simulated workers, never full D5 proof. */
+export async function runLocalControlPlaneLoad(params) {
+  const { buildLocalLoadSource } = await import('./m4-local-load-runtime.mjs');
+  return dexecModule('load-runner', buildLocalLoadSource(params, DEVICE_PROOF_SNIPPET), {
+    timeout: params.durationMs + 120000,
+    secrets: params.workers.flatMap(w => [w.session, w.privateKeyPem]),
+  });
+}

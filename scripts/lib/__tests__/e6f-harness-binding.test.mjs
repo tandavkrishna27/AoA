@@ -25,6 +25,46 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { percentile95, summarizeLoadPhase, compareQuietTenants } from "../m4-load-measurements.mjs";
+
+test("load measurements count failed attempts, exclude late completions and use nearest-rank p95", () => {
+  assert.equal(percentile95([]), null);
+  assert.equal(percentile95([1, 2, NaN]), null);
+  assert.equal(percentile95(Array.from({length:100},(_,i)=>i+1)),95);
+  const summary = summarizeLoadPhase({durationMs:1000,tenantKeys:['quiet'],requests:[
+    {kind:'poll',status:503,latencyMs:12,startedAtMs:0},{kind:'poll',status:200,latencyMs:2,startedAtMs:2},{kind:'events',status:0,latencyMs:15,startedAtMs:3}],
+    completions:[{tenantKey:'quiet',completedAtMs:900,queueToAckMs:5},{tenantKey:'quiet',completedAtMs:1001,queueToAckMs:1}]});
+  assert.equal(summary.totalRequests,3); assert.equal(summary.http5xxRate,1/3);
+  assert.equal(summary.transportErrors,1); assert.equal(summary.tenants.quiet.completed,1);
+  assert.equal(summary.pollP95Ms,12);
+});
+
+test("load request cohort excludes drain starts but retains slow in-window failures", () => {
+  const summary=summarizeLoadPhase({durationMs:1000,tenantKeys:[],completions:[],requests:[
+    {kind:'poll',status:503,latencyMs:2000,startedAtMs:999,completedAtMs:2999},
+    {kind:'poll',status:500,latencyMs:20,startedAtMs:1000,completedAtMs:1020}]});
+  assert.equal(summary.totalRequests,1);
+  assert.equal(summary.http5xx,1);
+  assert.equal(summary.pollP95Ms,2000);
+  assert.equal(summary.drainRequestCount,1);
+});
+
+test("quiet fairness fails on starvation, missing baseline, or excessive delay without aggregate masking", () => {
+  const baseline={tenants:{a:{throughputPerSecond:10,queueToAckP95Ms:10},b:{throughputPerSecond:10,queueToAckP95Ms:10}}};
+  const loaded={tenants:{a:{throughputPerSecond:9,queueToAckP95Ms:20},b:{throughputPerSecond:8.9,queueToAckP95Ms:20.1}}};
+  assert.deepEqual(compareQuietTenants(baseline,loaded,['a','b']).map(x=>x.passed),[true,false]);
+  assert.equal(compareQuietTenants({tenants:{}},loaded,['a'])[0].passed,false);
+});
+
+test("local load source rejects unbounded duration and duplicate tenant identities before Docker use", async () => {
+  const { buildLocalLoadSource } = await import("../../../tests/d1/lib/m4-local-load-runtime.mjs");
+  const worker={tenantKey:'quiet',orgId:'org',workerId:'worker',targetId:'target',rate:2,jobIds:['job'],session:'secret',privateKeyPem:'key',publicKeyDer:'pub'};
+  assert.throws(()=>buildLocalLoadSource({durationMs:Infinity,workers:[worker]},''),/bounded/);
+  assert.throws(()=>buildLocalLoadSource({durationMs:1000,workers:[worker,worker]},''),/duplicate/);
+  const source=buildLocalLoadSource({durationMs:1000,workers:[worker]},'// proof');
+  assert.ok(source.includes('canonicalEventDigestInputV1'));
+  assert.ok(source.includes('AbortSignal.timeout'));
+});
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const harness = path.join(repoRoot, "tests", "d1", "lib", "e6f-harness.mjs");

@@ -79,12 +79,23 @@ file, declared CI lane or passing component test is not a measured D5 result.
 
 ## Next code and test work
 
-1. Obtain the operator's staging environment/access method or run results. Execute
+Local load update (2026-10-08): the bounded attempt-terminal diagnostic at
+`f7077a695` reproduced a fairness/latency failure with one quiet organization
+at 2 scheduled arrivals/s and one noisy organization at 20/s. With a separate
+generator, quiet throughput was 0.111 of baseline and p95 queue-to-ACK delay
+was 5.115x; poll/event ACK p95 were 2,412/1,923 ms. Zero observed HTTP 5xx
+does not offset these failures. This is an open finding for investigation,
+not D5-L01–L05 completion; see `m4-code-execution.md` for scope and evidence.
+
+1. Investigate local authority-lock and serving-pool contention using the new
+   opt-in load diagnostic; reproduce realistic worker concurrency, fix only
+   the confirmed cause, and retain the arrival ratio and thresholds on retest.
+2. Obtain the operator's staging environment/access method or run results. Execute
    the existing REL-003 runbook against external stores, using compatible native
    clients, explicit destinations, isolated worker traffic and current authority.
-2. Measure D5 topology, failover, broker catch-up, load/fairness and recovery at the
+3. Measure D5 topology, failover, broker catch-up, load/fairness and recovery at the
    stated scope. Local fixtures cannot supply those timings or workload floors.
-3. Keep M3's unresolved provider/application-session dependency visible. Do not
+4. Keep M3's unresolved provider/application-session dependency visible. Do not
    promote M4 until all explicit D5 requirements and its dependency are proven.
 
 M1b/Anthropic live verification remains deferred by user direction. Full D2's

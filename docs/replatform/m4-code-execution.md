@@ -508,3 +508,89 @@ the binding suite and actual distributed journey were rerun after that harness f
 Full D5 load/fairness, two-domain HA, external recovery objectives and live fleet
 recovery/rollout remain open. One desktop cannot establish two independent failure
 domains. These successful tests do not shrink the M4 requirements.
+
+### 2026-10-08 — local load diagnostic exposes an open fairness failure
+
+Added opt-in `scripts/m4-local-load.mjs` and
+`docker/d1/m4-load.override.yml`. The driver requires a disposable
+`aoa-m4-load-*` Compose project, seeds separate organizations, enrolls signed
+fixture workers, schedules quiet arrivals at 2/s and noisy arrivals at 20/s,
+and drives actual poll, lease ACK and terminal-event routes. It verifies durable
+**attempt** terminals, not end-to-end job/task completion. A shared database
+origin controls availability; request metrics include requests started in the
+fixed window and their late responses, with drain starts counted separately.
+The generator runs separately from both serving replicas.
+
+Application candidate: `f7077a695`; diagnostic source remains a follow-up to
+that candidate. Fresh owned project: `aoa-m4-load-f7077`. The previous worker
+project/images/volumes were absent from the Docker engine at this session's
+start; earlier successful slot restart evidence remains historical, not proof
+that those identities still exist. The native onboarding app is separate.
+
+Executed quota/admission/retry/rate-limit PostgreSQL regressions: **16/16 pass**.
+Measurement/binding regressions: **25/25 pass**, including RED then GREEN for
+the request-window regression. Independent review found no remaining issue in
+the measurement fixes. Three 5-second live diagnostics **failed**; preserving
+the first failure, corrected measurements, and separate-generator comparison.
+
+Separate-generator result (one quiet org plus one noisy org):
+
+| Measurement | Quiet baseline | Loaded |
+|---|---:|---:|
+| Quiet attempt terminals per second | 1.8 | 0.2 |
+| Quiet queue-to-lease-ACK p95 | 510 ms | 2,609 ms |
+| Poll p95 | 214 ms | 2,412 ms |
+| Event ACK p95 | 197 ms | 1,923 ms |
+| HTTP 5xx / request starts within window | 0 / 29 | 0 / 37 |
+
+Quiet throughput ratio **0.111**, delay ratio **5.115**: below the 0.9
+throughput floor and above the 2x delay ceiling. The driver
+also recorded 11 stream-deadline failures; 41 accepted terminal uploads matched
+41 durable succeeded attempts after draining, with zero unresolved active
+attempts tracked by the driver. This does not establish completion of all
+scheduled jobs. SQL snapshots during load
+observed target/worker authority queries waiting on transaction/tuple locks;
+the serving pool is configured with four connections. Lock contention and
+pool queuing are a hypothesis, not a confirmed root cause or a reason to
+increase pool size without testing. No production behavior was changed.
+
+Next: profile connection wait versus transaction/authority-lock time, reproduce
+with realistic worker poll/event concurrency and both serving replicas, then
+add a failing regression for the confirmed cause before implementing a fix.
+Retest the same arrival ratio and thresholds before increasing tenant count.
+
+Evidence outside version control:
+`C:\Users\TK\.codex\m4-local-evidence\load-smoke\report.json`,
+`load-smoke-corrected\report.json`, and `load-separated\report.json` under
+the same evidence directory, with corresponding sanitized raw measurements.
+The diagnostic always reports `fullD5Satisfied: false`: SQL queue scheduling
+does not measure submit latency, fixture workers do not execute providers,
+and this run does not establish 20 organizations, 100 active leases,
+10,000 events/minute, 60 minutes plus churn, HA or external recovery objectives.
+
+Repeat against the existing disposable stack (PowerShell; use a fresh output
+directory to preserve failures):
+
+```powershell
+$env:AOA_D1_LIVE='1'
+$env:AOA_E6F_COMPOSE_PROJECT='aoa-m4-load-f7077'
+$env:AOA_E6F_COMPOSE_ENV_FILE='docker/d1/runtime-keys/m4-load.env'
+$env:AOA_E6F_COMPOSE_FILES='docker-compose.d1.yml;docker/d1/m4-load.override.yml'
+$env:AOA_M4_LOAD_DURATION_MS='5000'
+# Optional: AOA_M4_LOAD_OUTPUT; otherwise a fresh UUID directory under TEMP.
+node scripts/m4-local-load.mjs
+```
+
+The overlay's `load-runner` must already be started with these same Compose
+files, project and candidate-image env file. The driver never starts production
+services or uses provider credentials. A nonzero exit preserves the report and
+does not waive the failed thresholds.
+
+Verification for this diagnostic follow-up: recursive typecheck passed; the
+full Vitest invocation returned nonzero with 2,522 files / 24,337 tests passed,
+227 files / 2,059 tests skipped and one suite setup timeout:
+`cloud-plugin-process-composition.test.ts` exceeded its 30-second app-import
+hook under full-suite load. Its isolated rerun passed all 7 tests in 8.66 s.
+No timeout setting was increased. This records a passing rerun, not a fully
+green full-suite invocation. Citation checks (397 enforced) and test inventory
+(2,993 files across 22 trees) passed. Production build passed.
