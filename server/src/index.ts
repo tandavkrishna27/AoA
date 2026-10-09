@@ -26,7 +26,7 @@ import detectPort from "detect-port";
 import postgres from "postgres";
 import { createApp } from "./app.js";
 import { buildReadinessProbe } from "./routes/readiness.js";
-import { loadSchemaCompatibility } from "./services/schema-compatibility.js";
+import { createLiveSchemaCompatibilityReader, loadSchemaCompatibility } from "./services/schema-compatibility.js";
 import { createAdmittedOrganizationIdsLister } from "./services/admitted-organizations.js";
 import { setDistributedRolloutPort } from "./services/distributed-rollout-port.js";
 import { setProviderCredentialBrokerDb } from "./services/provider-resolution-deps.js";
@@ -609,12 +609,12 @@ if (migrationSummary === "pending migrations skipped") {
 
 // Corrective E2 successor to E2-D03: flag-on boot must prove both bounded roles
 // before any E3 route/work could start. There is deliberately no owner fallback.
-// Flag-off skips migration identity loading, URL reads, and pool allocation.
+const distributedMigrationIdentity = config.distributedExecutionEnabled ? await loadRequiredMigrationIdentity() : null;
 const distributedExecutionDatabases = config.distributedExecutionEnabled
   ? await openDistributedExecutionDatabases({
       enabled: true,
       ownerDb: db,
-      requiredMigrationIdentity: await loadRequiredMigrationIdentity(),
+      requiredMigrationIdentity: distributedMigrationIdentity!,
       appDatabaseUrl: process.env.AOA_APP_DATABASE_URL,
       operatorDatabaseUrl: process.env.AOA_OPERATOR_DATABASE_URL,
     })
@@ -894,8 +894,8 @@ await ensureControlPlaneExecutionTarget(db as any);
 // control plane must 503 tenant/app routes until the DB schema is compatible.
 // Single-binary startup applies migrations BEFORE listen (`ensureMigrations` above),
 // so the gate stays fully DORMANT (gateEnabled false) and startup behavior is
-// unchanged. The probe closures are lazy — invoked only on `/api/ready` or when the
-// gate fires — so building them adds no startup cost.
+// unchanged. Distributed mode captures the immutable image identity once; the
+// probe still reads live database compatibility on every request through the gate.
 //
 // MinIO/object-store health is NOT wired here: StorageService exposes no reachability
 // ping and object storage is a hard dependency only on cloud_auth. Leaving
@@ -903,17 +903,17 @@ await ensureControlPlaneExecutionTarget(db as any);
 // readiness verdict) rather than faking a healthy result.
 // TODO(DEP-003 follow-up): add a real MinIO reachability check (e.g. a bucket HEAD)
 // for cloud_auth deployments once StorageService exposes a health method.
+const readSchemaCompatibility = distributedMigrationIdentity
+  ? createLiveSchemaCompatibilityReader(db, distributedMigrationIdentity)
+  : () => loadSchemaCompatibility(activeDatabaseConnectionString);
 const readinessProbe = buildReadinessProbe({
-  schemaCompatibility: () => loadSchemaCompatibility(activeDatabaseConnectionString),
+  schemaCompatibility: readSchemaCompatibility,
   checkPostgres: async () => {
-    const probeSql = postgres(activeDatabaseConnectionString, { max: 1 });
     try {
-      await probeSql`SELECT 1`;
+      await db.execute(sql`SELECT 1`);
       return true;
     } catch {
       return false;
-    } finally {
-      await probeSql.end();
     }
   },
   // checkMinio intentionally omitted — see the TODO above.

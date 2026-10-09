@@ -3,6 +3,11 @@ name: Deploy testing
 on:
   workflow_dispatch:
     inputs:
+      inspect_only:
+        description: Read-only host metadata inspection; skips deployment, backups, cleanup and migrations
+        required: false
+        default: false
+        type: boolean
       deploy_sha:
         description: Full reviewed commit SHA from main to deploy or roll back to
         required: true
@@ -50,8 +55,50 @@ env:
   DEPLOY_PUBLIC_URL: https://testing.armyofagents.org
 
 jobs:
+  inspect:
+    if: inputs.inspect_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout inspection script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inspect the existing testing host without mutation
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PASSPHRASE: ${{ secrets.DEPLOY_PASSPHRASE }}
+        run: |
+          set -Eeuo pipefail
+          set +x
+          umask 077
+          key="$RUNNER_TEMP/aoa-inspect-key"
+          askpass="$RUNNER_TEMP/aoa-inspect-askpass"
+          known_hosts="$RUNNER_TEMP/aoa-inspect-known-hosts"
+          cleanup() {
+            rm -f -- "$key" "$askpass" "$known_hosts"
+            if [[ -n "${SSH_AGENT_PID:-}" ]]; then ssh-agent -k >/dev/null; fi
+          }
+          trap cleanup EXIT
+          [[ -n "$DEPLOY_SSH_KEY" ]] || { echo 'Missing deployment key'; exit 1; }
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key"
+          printf '%s\n' '#!/bin/sh' 'printf "%s\n" "$DEPLOY_PASSPHRASE"' > "$askpass"
+          chmod 600 "$key"
+          chmod 700 "$askpass"
+          eval "$(ssh-agent -s)"
+          DISPLAY=:0 SSH_ASKPASS="$askpass" SSH_ASKPASS_REQUIRE=force ssh-add "$key" </dev/null
+          # Same temporary host-key enrollment as the existing deployment path.
+          ssh-keyscan -T 10 -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" > "$known_hosts"
+          test -s "$known_hosts"
+          ssh -p "$DEPLOY_PORT" -i "$key" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o ForwardAgent=no \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$known_hosts" -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" 'bash -s' < scripts/deploy/inspect-testing-host.sh
+
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && !inputs.inspect_only
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:

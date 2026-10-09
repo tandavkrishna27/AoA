@@ -397,3 +397,495 @@ green at `d40998068`, including native combined execution. PR #688 merged at
 `493e016285c692b334893f8513be42487879d93e`; PR #689 merged at
 `b0576a77213089e4a073562bdbc72d012bf568ca`. Live staging access/results are outstanding;
 REL-003 reserves that substrate and spend to the operator. M4 remains open.
+
+### Existing testing host inspection
+
+The operator clarified that the September replatform server was deleted; only
+the main testing server remains, and authorized inspecting it and preparing a
+replatform deployment with recovery tests in a separate database. The existing
+testing deployment workflow now has an explicit read-only inspection mode using
+its existing GitHub-held SSH credentials. This mode skips the deployment job and
+reports only image/release metadata, disk space, backup file metadata, PostgreSQL
+version/migration count and HTTP status codes. It does not print runtime env or
+health bodies, create backups, restore data, migrate, restart or prune services.
+The normal deployment path still requires a tested main-history SHA; no branch
+deployment bypass is introduced. Inspection results and a concrete deployment
+path remain pending. One host cannot prove two-failure-domain HA.
+
+### Local desktop execution — 2026-10-08
+
+The user authorized moving local M4 execution forward while remote server access
+is unavailable. Docker is now responsive. Started the current worktree app on
+`http://127.0.0.1:3210` with `AOA_HOME=C:\Users\TK\.aoa-m4-local`,
+`AOA_INSTANCE_ID=m4-local`, loopback `local_trusted`, and no `DATABASE_URL`.
+This creates a separate embedded PostgreSQL instance and storage. Health and UI
+returned HTTP 200; the company list was empty. This is a local app instance,
+not proof of distributed worker enrollment or cloud control.
+
+Actual CLI SQL/gzip recovery passed locally, including rollback on truncated or
+invalid COPY, absent/corrupt backup refusal and security ACL fallback refusal.
+The native full-schema fixture initially failed because Windows skipped the suite;
+with `AOA_RUN_WIN_INTEGRATION=1` it exposed direct `.mjs` execution (`spawn EFTYPE`).
+Configured `.mjs`/`.cjs` PostgreSQL tool wrappers now execute through the current
+Node executable with separate arguments and no shell. Native binary behavior is
+unchanged. Focused regression: RED two failures / four passes, then GREEN six passes.
+Independent review found no actionable issue. The actual native restore then passed:
+four stale-authority scenarios, two DB + file fault cases and the healthy sibling
+control. The fixture owns disposable PostgreSQL containers and did not restore
+into the running local application database.
+
+Reproduce from the worktree in PowerShell:
+
+```powershell
+$env:AOA_RUN_WIN_INTEGRATION = '1'
+node --test tests/d1/m4-cli-restore.test.mjs
+node --test tests/d1/m4-native-fence-restore.test.mjs
+```
+
+Restart the isolated app in a separate terminal:
+
+```powershell
+$env:AOA_HOME = 'C:\Users\TK\.aoa-m4-local'
+$env:AOA_INSTANCE_ID = 'm4-local'
+$env:HOST = '127.0.0.1'
+$env:PORT = '3210'
+$env:AOA_DEPLOYMENT_MODE = 'local_trusted'
+$env:AOA_MIGRATION_AUTO_APPLY = 'true'
+Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
+pnpm.cmd dev:once
+```
+
+Recursive typecheck passed. Full tests passed: 2,523 files / 24,338 tests, with
+227 files / 2,058 tests skipped. Production build passed after repairing the
+worktree-only postgres dependency junction: its old temporary target was gone.
+The replacement is isolated under C:\Users\TK\.codex\m4-local-runtime and uses
+postgres 3.4.8 with the repository patch; shared dependencies were not edited.
+Linux slot ownership/host fixtures passed 2/2 using the existing local worker
+image (supporting regression evidence, not a rebuilt candidate fleet). Anthropic live verification remains
+excluded. Single-desktop recovery is not two-failure-domain HA, external object
+store recovery, fleet reenrollment, or full D5 load/RPO/RTO evidence. Those remain
+open under the original M4 requirements.
+
+### Local distributed worker execution — 2026-10-08
+
+Built control-plane, worker and deterministic provider images from application
+commit `480b30000` under `*:m4-local-480b30000` tags. Started the isolated Compose
+project `aoa-m4-local-480b`, using D1 + spine topology and an ignored local override
+that adds independent guarded binding storage to the actual networked worker.
+All services became healthy. This stack has its own PostgreSQL, MinIO and test
+keys; it is separate from the native onboarding app on port 3210. No model API
+secrets, paid model calls, remote deployments or production image admission claims.
+
+The live spine run first passed 9/10 cases: its topology observation alone ignored
+the harness project/files/environment binding and failed to parse a render that
+lacked the required local environment. Added a regression in the existing harness
+binding suite (RED), switched topology observation to `composeBaseArgs()` while
+preserving the historical default spine override, and reran GREEN 21/21 binding
+checks. The actual full spine run then passed 10/10, zero skipped, in 43.2 seconds.
+This includes execution by the deployed guarded worker, usage/cost/audit projection,
+terminal events, cross-tenant refusal, disabled-tenant refusal and attributed drain.
+Independent review found no actionable finding. This is real local worker execution
+against the deterministic provider, not production E2B or desktop coding execution.
+
+A second organization-scoped target and guarded slot were explicitly provisioned
+with a distinct ticket, binding volume and state volume. Both slots became healthy,
+with distinct worker and target IDs and established bindings. Restarted both and
+compared identity hashes/IDs and binding state before/after: unchanged. A duplicate
+Compose worker process sharing the first slot refused startup; a direct call to the
+real ownership helper independently verified the held live lock. Refused startup
+left both established identities unchanged. The second slot keeps dispatch off;
+only the first slot's task execution is established by the spine run.
+
+Local evidence (outside version control; no tickets/private keys in these reports):
+- `C:\Users\TK\.codex\m4-local-evidence\spine\m1-spine-evidence.json`
+- `C:\Users\TK\.codex\m4-local-evidence\slots.json`
+- ignored configuration/keys under this worktree's `docker/d1/runtime-keys/`
+
+The original native app remains healthy on port 3210; its empty onboarding DB is
+not connected to these test workers. Full application typecheck/tests/build passed
+at `480b30000` as recorded above. This follow-up changes the harness and docs only;
+the binding suite and actual distributed journey were rerun after that harness fix.
+Full D5 load/fairness, two-domain HA, external recovery objectives and live fleet
+recovery/rollout remain open. One desktop cannot establish two independent failure
+domains. These successful tests do not shrink the M4 requirements.
+
+### 2026-10-08 — local load diagnostic exposes an open fairness failure
+
+Added opt-in `scripts/m4-local-load.mjs` and
+`docker/d1/m4-load.override.yml`. The driver requires a disposable
+`aoa-m4-load-*` Compose project, seeds separate organizations, enrolls signed
+fixture workers, schedules quiet arrivals at 2/s and noisy arrivals at 20/s,
+and drives actual poll, lease ACK and terminal-event routes. It verifies durable
+**attempt** terminals, not end-to-end job/task completion. A shared database
+origin controls availability; request metrics include requests started in the
+fixed window and their late responses, with drain starts counted separately.
+The generator runs separately from both serving replicas.
+
+Application candidate: `f7077a695`; diagnostic source remains a follow-up to
+that candidate. Fresh owned project: `aoa-m4-load-f7077`. The previous worker
+project/images/volumes were absent from the Docker engine at this session's
+start; earlier successful slot restart evidence remains historical, not proof
+that those identities still exist. The native onboarding app is separate.
+
+Executed quota/admission/retry/rate-limit PostgreSQL regressions: **16/16 pass**.
+Measurement/binding regressions: **25/25 pass**, including RED then GREEN for
+the request-window regression. Independent review found no remaining issue in
+the measurement fixes. Three 5-second live diagnostics **failed**; preserving
+the first failure, corrected measurements, and separate-generator comparison.
+
+Separate-generator result (one quiet org plus one noisy org):
+
+| Measurement | Quiet baseline | Loaded |
+|---|---:|---:|
+| Quiet attempt terminals per second | 1.8 | 0.2 |
+| Quiet queue-to-lease-ACK p95 | 510 ms | 2,609 ms |
+| Poll p95 | 214 ms | 2,412 ms |
+| Event ACK p95 | 197 ms | 1,923 ms |
+| HTTP 5xx / request starts within window | 0 / 29 | 0 / 37 |
+
+Quiet throughput ratio **0.111**, delay ratio **5.115**: below the 0.9
+throughput floor and above the 2x delay ceiling. The driver
+also recorded 11 stream-deadline failures; 41 accepted terminal uploads matched
+41 durable succeeded attempts after draining, with zero unresolved active
+attempts tracked by the driver. This does not establish completion of all
+scheduled jobs. SQL snapshots during load
+observed target/worker authority queries waiting on transaction/tuple locks;
+the serving pool is configured with four connections. Lock contention and
+pool queuing are a hypothesis, not a confirmed root cause or a reason to
+increase pool size without testing. No production behavior was changed.
+
+Next: profile connection wait versus transaction/authority-lock time, reproduce
+with realistic worker poll/event concurrency and both serving replicas, then
+add a failing regression for the confirmed cause before implementing a fix.
+Retest the same arrival ratio and thresholds before increasing tenant count.
+
+Evidence outside version control:
+`C:\Users\TK\.codex\m4-local-evidence\load-smoke\report.json`,
+`load-smoke-corrected\report.json`, and `load-separated\report.json` under
+the same evidence directory, with corresponding sanitized raw measurements.
+The diagnostic always reports `fullD5Satisfied: false`: SQL queue scheduling
+does not measure submit latency, fixture workers do not execute providers,
+and this run does not establish 20 organizations, 100 active leases,
+10,000 events/minute, 60 minutes plus churn, HA or external recovery objectives.
+
+Repeat against the existing disposable stack (PowerShell; use a fresh output
+directory to preserve failures):
+
+```powershell
+$env:AOA_D1_LIVE='1'
+$env:AOA_E6F_COMPOSE_PROJECT='aoa-m4-load-f7077'
+$env:AOA_E6F_COMPOSE_ENV_FILE='docker/d1/runtime-keys/m4-load.env'
+$env:AOA_E6F_COMPOSE_FILES='docker-compose.d1.yml;docker/d1/m4-load.override.yml'
+$env:AOA_M4_LOAD_DURATION_MS='5000'
+# Optional: AOA_M4_LOAD_OUTPUT; otherwise a fresh UUID directory under TEMP.
+node scripts/m4-local-load.mjs
+```
+
+The overlay's `load-runner` must already be started with these same Compose
+files, project and candidate-image env file. The driver never starts production
+services or uses provider credentials. A nonzero exit preserves the report and
+does not waive the failed thresholds.
+
+Verification for this diagnostic follow-up: recursive typecheck passed; the
+full Vitest invocation returned nonzero with 2,522 files / 24,337 tests passed,
+227 files / 2,059 tests skipped and one suite setup timeout:
+`cloud-plugin-process-composition.test.ts` exceeded its 30-second app-import
+hook under full-suite load. Its isolated rerun passed all 7 tests in 8.66 s.
+No timeout setting was increased. This records a passing rerun, not a fully
+green full-suite invocation. Citation checks (397 enforced) and test inventory
+(2,993 files across 22 trees) passed. Production build passed.
+
+### 2026-10-09 — profiling and controlled concurrency comparisons
+
+Continued diagnosis without changing production behavior. A read-only diagnostic
+overlay timed repository calls and connection acquisition on the owned fixture
+candidate; it logged method names, counts and elapsed time only. Direct and
+proxied PostgreSQL `SELECT 1` p95 were 0.31 and 0.51 ms. During the profiled run,
+authority locking averaged 209 ms (max 849 ms), accepted-event processing
+131 ms (max 423 ms), and transaction acquisition 82 ms (max 914 ms). These
+aggregates include background transactions and are diagnostic observations,
+not request-level causal attribution. The profiled load still failed.
+
+Added bounded `AOA_M4_LOAD_NOISY_STREAMS` (1–10, default 10) so concurrency is
+explicit and can be varied independently of the unchanged 20/s versus 2/s
+scheduled arrival ratio. Invalid values failed the new assertion before the
+implementation, then the 25-test harness suite passed. The shipped worker's
+poll loop awaits each poll; ten overlapping poll loops for one identity are
+therefore an adversarial case, not a faithful model of its normal poll loop.
+The diagnostic still waits for terminal upload before its next poll, whereas
+the daemon hands execution to its supervisor; neither diagnostic variant
+establishes real-daemon throughput.
+
+| Experiment, 5-second window | Quiet throughput / baseline | Quiet delay / baseline | Poll / event ACK p95 | Result |
+|---|---:|---:|---:|---|
+| One noisy stream, original candidate/pool | 0.625 | 2.454x | 384 / 348 ms | FAIL |
+| Ten noisy streams, fixture pool 4→16 only | 0.111 | 2.448x | 2,464 / 2,190 ms | FAIL |
+
+The pool-size experiment produced 8 HTTP 5xx out of 37 request starts inside
+the measurement window. Increasing pool size alone did not fix the finding
+and is not being proposed as a production change. Both ignored temporary
+overlays were removed from the running service configuration afterward;
+the control plane was recreated from the original candidate and became healthy.
+No existing application data or unrelated Docker projects were changed.
+
+Sanitized evidence directories under `C:\Users\TK\.codex\m4-local-evidence`:
+`load-profile-methods-final` (including `method-timings.json`),
+`load-single-stream`, and `load-pool16`. Partial setup attempts are not counted
+as completed load runs. Full D5 remains open. Next investigation must separate
+whole transaction duration, time holding target/worker locks and request
+admission time, then reproduce using actual daemon polling/execution semantics.
+The earlier typecheck/build/full-suite results apply to the parent diagnostic
+slice; this follow-up reran the 25-test Node harness and live experiments,
+not another repository-wide typecheck/test/build invocation.
+
+### 2026-10-09 — confirmed readiness overhead and product correction
+
+Detailed profiling separated service/transaction time from middleware time.
+With one noisy stream, poll service averaged 33 ms and lease ACK 31 ms;
+the readiness gate before every API request averaged about 163 ms at baseline
+and 268–278 ms under load. It repeatedly read and hashed image migration files
+and opened short-lived PostgreSQL pools for schema inspection and ping. Thus
+the earlier lock/pool observations did not identify the whole root cause.
+
+Changed distributed readiness to retain the immutable image identity once and
+read live `drizzle.__drizzle_migrations` hashes, in ID order, through the
+existing owner pool on **every request**. The canonical ledger is already
+required by distributed startup. The PostgreSQL ping also reuses that pool.
+There is no cached successful readiness verdict or skipped database check.
+Legacy flag-off schema loading is unchanged. No schema, permissions or API
+response contract changed.
+
+RED: two new reader tests failed before implementation. GREEN: 17 focused
+readiness/gate tests, plus 5 actual Windows PostgreSQL tests, including a
+previously compatible ledger becoming divergent/newer and recovering after
+repair. Independent review found no actionable findings.
+
+Executed the compiled server correction as two read-only file mounts over
+the existing `f7077a695` fixture image, with all profiling/pool experiments
+removed. This is a tested source correction, not a newly built release image.
+Evidence includes source/compiled SHA-256 values in each `candidate.json`.
+Both comparisons retained 2/s quiet versus 20/s noisy scheduled arrivals and
+the original thresholds:
+
+| Five-second comparison | Quiet throughput / baseline | Quiet delay / baseline | Loaded poll / event ACK p95 | Result |
+|---|---:|---:|---:|---|
+| Ten overlapping noisy poll loops | 0.900 | 3.382x | 316 / 274 ms | FAIL: delay |
+| One noisy poll loop | 1.000 | 0.863x | 42 / 55 ms | PASS: bounded diagnostic |
+
+Both runs observed zero HTTP 5xx/transport errors. The ten-loop case improves
+substantially over 0.111 throughput and 2,412/1,923 ms poll/event p95, but its
+queue-delay failure remains open. The single-loop PASS must not replace or
+erase that adversarial failure. Neither simulates actual provider execution;
+the generator still waits for terminal upload before polling again. Full D5,
+the 20-org/duration/workload floors, both-replica load distribution, actual
+daemon execution and independent failure domains remain unproven.
+
+Evidence under `C:\Users\TK\.codex\m4-local-evidence`:
+`load-profile-transactions`, `load-profile-middleware`,
+`load-profile-readiness`, `load-readiness-fix`, and
+`load-readiness-fix-single`. Reports and raw measurements preserve failures.
+Repository-wide typecheck passed. The full Vitest invocation passed all
+2,523 executed files / 24,340 tests, with 227 files / 2,059 tests skipped.
+Production build passed. The final native PostgreSQL regression rerun passed all five tests, including live ledger changes and migration recovery. Independent review found no actionable issues in this correction.
+
+### Startup regression and longer contention probe
+
+CI at `c56fdb654` failed the native startup test
+`performs zero migration-loader, E3 environment, or serving-pool work in real flag-off bootstrap`:
+the new readiness construction loaded the image identity a second time. The
+correction shares the single startup-loaded identity with the readiness reader;
+flag-off still does not invoke that loader. The exact previously failing test
+passed locally with native PostgreSQL (one selected test; 76 unrelated tests
+skipped by the selection). This does not describe the latest CI as green.
+
+A separate 15-second, ten-loop run at `c56fdb654` reproduced the outstanding
+queue-delay failure: quiet throughput was 1.000 of baseline, queue-to-ACK p95
+was 365.49 ms versus 74.27 ms baseline (4.921x), and loaded poll/event ACK p95
+were 303.94/255.24 ms. It observed no HTTP 5xx or transport errors. The measured
+peak was eight active leases; this remains far below full D5's floor.
+
+Temporary transaction/repository profiling recorded mean pool-begin waits of
+49.6/51.0/51.5 ms for poll/ACK/admission operations and mean worker-authority
+lock calls of 32.9/35.1 ms for poll/ACK. These aggregate timing windows include
+setup and background work; they identify contention for further investigation,
+not a clean per-tenant causal attribution. Timing instrumentation was removed
+from the running control plane afterward. Evidence is preserved in
+`C:\Users\TK\.codex\m4-local-evidence\load-readiness-profile-15s`.
+
+The current adversarial generator runs ten poll loops against the same noisy
+worker. The production daemon awaits each poll and ACK, then hands execution to
+its supervisor without waiting for the terminal event (`poll-loop.ts`,
+`trackHandoff` and the main `pollOnce` loop). Therefore neither the ten-loop nor
+the one-loop generator is a substitute for a real daemon workload. Preserve
+this failure while adding actual-daemon evidence; do not weaken authority locks
+or raise fairness thresholds to make the synthetic case pass.
+
+Correction verification: repository typecheck passed; the full suite passed
+2,523 files / 24,340 tests, with 227 files / 2,059 tests skipped. The targeted
+native PostgreSQL startup regression passed. Production build passed.
+
+### Same-source rebuilt daemon smoke — 7c1c35f95
+
+Built control-plane, worker and deterministic provider-fixture images from
+`7c1c35f95`, without compiled-source overlays, and booted the isolated Compose
+project `aoa-m4-daemon-7c1c35f95`. It has its own database, object storage,
+control-plane scratch, worker state, slot binding and generated runtime keys.
+The earlier local onboarding and diagnostic projects were not modified.
+
+The selected existing `m1-spine` test, `the DEPLOYED worker performs tenant A's
+journey`, passed (one test). Its durable evidence ties the lease and
+attempt-started/log/usage/terminal events to the enrolled deployed worker and
+records a succeeded terminal, applied attempt/cost/audit projections, and the
+stage-in environment probe. The provider is a deterministic local fixture;
+this does not execute Anthropic or E2B and is not a full M1 campaign rerun.
+Both Linux slot regressions passed against the rebuilt worker image (two
+tests): ownership contention/aliases/crash release and guarded-host identity
+persistence across restart.
+
+Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-smoke`,
+including `candidate.json` with actual image identities and mount destinations,
+and `m1-spine-evidence.json` with the worker-driven attempt. This establishes a
+current daemon execution baseline for the next load investigation. It does
+not establish noisy-neighbor fairness, a two-replica load-balanced journey,
+independent failure domains, full D5 workload floors, or recovery timing.
+### Real-daemon fixed-arrival diagnostic — configuration limits remain
+
+Added a second enrolled daemon for the noisy organization, with independent
+state/slot volumes and a separate organization-scoped target. Both use the
+rebuilt `7c1c35f95` images and the local deterministic provider fixture. No
+production default or authority lock changed.
+
+The first 15-second baseline scheduled 30 quiet jobs at 2/s with the default
+single worker batch slot. Seven completed inside the window; only 21 succeeded by the end of the window plus
+30-second drain; nine were still pending/leased. The exploratory driver then
+failed an assertion that incorrectly assumed every pending row already had
+worker identity. Raw evidence was retained, the assertion was corrected to
+check identity when present, and a later scoped DB read proved all 30 succeeded.
+No loaded comparison or fairness conclusion was produced for this run.
+
+After all earlier jobs drained, both workers were explicitly configured with
+32 batch slots. Arrival rates remained 2/s quiet and 20/s noisy, for 15 seconds:
+
+| Measurement | Quiet baseline | Quiet under noisy load | Noisy |
+|---|---:|---:|---:|
+| Scheduled jobs | 30 | 30 | 300 |
+| Succeeded terminals timestamped inside window | 24 | 25 | 35 |
+| Throughput per second | 1.600 | 1.667 | 2.333 |
+| Queue-to-ACK-receipt p95 (ms) | 1,062.97 | 1,128.34 | 11,056.74 |
+| Succeeded by drain deadline | 30 | 30 | 120 |
+| Unresolved at drain deadline | 0 | 0 | 180 |
+
+Quiet ratios were 1.042 throughput and 1.061 receipt delay. **The diagnostic as
+a whole failed** because noisy work remained unresolved at its deadline. A
+later scoped DB read showed all 300 noisy jobs eventually succeeded; that does
+not replace the fixed-deadline failure. Actor checks on recorded lease/event
+rows matched each organization's expected deployed worker.
+
+The queue-delay proxy uses the DB `worker_operation_receipts.created_at`
+transaction timestamp for `lease_ack`, not response or commit timing. Terminal
+window attribution also uses DB transaction timestamps. This short probe does
+not measure HTTP request distributions or prove the full D5 fairness gate.
+
+Both target rows still ratify **eight provider concurrent operations**. The
+production leasing path refuses further admissible work when live occupancy
+reaches that profile ceiling (`deriveAdmissibleWorkloadTypes` in `job-leasing.ts`).
+The outbox drain's default interval is two seconds. These are confirmed
+configuration/code facts and plausible capacity constraints; their separate
+causal contribution is not isolated by this run. Worker slots alone do not
+raise the provider ceiling. The next capacity comparison needs correctly
+ratified test profiles and fresh enrollment, while retaining these failures.
+
+Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-comparison`
+and `daemon-7c1c35f95-capacity32` (cohorts, raw DB observations, report, source
+snapshot and candidate image/configuration manifest). Full D5 remains open.
+### Larger provider profiles and two-replica contract replay
+
+Provisioned two fresh organization targets with correctly hashed 64-operation
+provider profiles and new tickets, slot bindings and state volumes. Both workers
+explicitly advertised 64 batch slots. Older jobs drained before their daemons
+were stopped; no existing identity/profile was rewritten. This is disposable
+fixture configuration, not a production default change.
+
+The same 15-second 2/s quiet versus 20/s noisy diagnostic then observed:
+
+| Measurement | Quiet baseline | Quiet loaded | Noisy |
+|---|---:|---:|---:|
+| Succeeded terminals timestamped inside window | 25 | 27 | 54 |
+| Throughput per second | 1.667 | 1.800 | 3.600 |
+| Queue-to-ACK-receipt p95 (ms) | 1,076.15 | 1,194.88 | 10,414.65 |
+| Succeeded by drain deadline | 30 | 30 | 201 |
+| Unresolved at drain deadline | 0 | 0 | 99 |
+
+Quiet ratios were 1.080 throughput and 1.110 receipt delay. The overall bounded
+diagnostic still failed on unfinished noisy work. The eight-operation ceiling
+was therefore not the sole capacity constraint; raising it does not establish
+full D5 performance. All earlier timestamp/proxy and workload/topology limits
+still apply. A subsequent scoped read showed no nonterminal attempts for these
+two organizations. Evidence, public profiles, driver snapshot and image
+identities: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-provider64`.
+
+After that measurement and drain, replica B was started from the identical
+rebuilt control-plane image, with its own scratch volume and the same fixture
+signing/secret authority. Both real daemons were stopped for the existing
+`e6f-11-two-replica.test.mjs` replay. All six CONTROL-PLANE tests passed:
+
+- Exactly one lease across concurrent A/B polls.
+- Shared concurrent organization-capacity claims stay under the cap.
+- ACK on A and terminal upload on B agree on the terminal.
+- Enrollment on A yields a session usable on B.
+- Cutting B's worker path preserves bounded progress through A.
+- A/B admission polls increment one shared rate-limit window.
+
+The final proxy readback showed all four fixture proxies enabled and zero
+toxics. Both replicas were healthy on the same actual image identity and
+separate state volumes. Evidence: `C:\Users\TK\.codex\m4-local-evidence\replica-7c1c35f95-contract`.
+These six tests simulate worker HTTP calls; they do not establish a real-daemon
+failover through a production TLS load balancer, independent failure domains,
+or full D5 load/recovery timings. Full M4 remains open.
+### Actual daemon HTTP samples, without a product capacity change
+
+Review of the single-slot baseline confirmed that the enrolled snapshot is a
+hard server-side slot ceiling and live leases count until authoritative terminal
+state. The worker releases local execution slots before the durable outbox has
+necessarily uploaded that terminal. This explains why a one-slot fixture can
+remain unable to lease despite locally free resources; no capacity comparison,
+authority lock, frozen contract or product default was changed on this evidence.
+
+A temporary, opt-in daemon `fetch` preload measured poll, lease-ACK and event
+uploads through complete response-byte download, excluding JSON parsing. It
+emitted only closed operation names, status, transport-error flag, start time and
+duration. An isolated probe test passed, checking response-body preservation,
+error propagation and absence of URL/header/body/domain identity from output.
+
+The next 15-second 2/s quiet versus 20/s noisy run used 64-slot/64-operation
+profiles with two same-candidate replicas running, but all measured worker
+traffic still addressed replica A. Quiet throughput was 1.040 of baseline and
+ACK-receipt delay 0.951x. Noisy work again missed the diagnostic drain deadline:
+198/300 succeeded and 102 remained. A later scoped read showed all attempts for
+the two fixture organizations succeeded. The fixed-deadline failure is retained.
+
+Observed completed-request samples, cohorted by request start inside each window:
+
+| Caller / operation | Baseline p95 ms | Loaded p95 ms | Loaded samples |
+|---|---:|---:|---:|
+| Quiet poll | 101.92 | 133.79 | 39 |
+| Quiet lease ACK | 73.15 | 107.97 | 29 |
+| Quiet event upload | 97.25 | 74.26 | 26 |
+| Noisy poll | 39.59 (idle polls) | 175.92 | 70 |
+| Noisy lease ACK | unmeasured | 171.54 | 71 |
+| Noisy event upload | unmeasured | 116.36 | 55 |
+
+There were 112 baseline and 290 loaded completed-request samples, with no observed
+HTTP 5xx or transport errors. The completion-only probe cannot prove that a
+request lost to process death before its `finally` was counted, so this is **not
+a complete API error-rate denominator**. Submit latency is unmeasured; none of
+these percentiles establishes the full D5 load gate. Clone-body instrumentation
+also adds overhead. Temporary instrumentation was removed after drain; both
+workers returned healthy with their standard boot command.
+
+Evidence: `C:\Users\TK\.codex\m4-local-evidence\daemon-7c1c35f95-http-timing`
+contains raw DB cohorts, the failed bounded report, observed HTTP samples and
+report, probe/analysis source snapshots, and candidate configuration. Further
+promotion still needs the original full-scale workload/churn, real TLS
+load-balanced failover, independent failure domains and operator-run recovery
+rehearsal. The available desktop is not evidence for those requirements.

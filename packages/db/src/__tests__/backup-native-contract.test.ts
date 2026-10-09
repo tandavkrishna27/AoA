@@ -17,6 +17,24 @@ afterEach(async () => {
   if (directory && path.dirname(directory) === path.resolve(tmpdir())) await rm(directory, { recursive: true, force: true });
   spawn.mockReset();
   query.mockReset();
+  vi.unstubAllEnvs();
+});
+
+it.each(["mjs", "cjs"])("launches a configured %s PostgreSQL wrapper through Node without a shell", async (extension) => {
+  vi.stubEnv("AOA_PG_DUMP_PATH", path.join(tmpdir(), `native wrapper.${extension}`));
+  query.mockResolvedValue([{ value: 1 }]);
+  directory = await mkdtemp(path.join(tmpdir(), "aoa-native-backup-contract-"));
+  spawn.mockImplementation(() => {
+    const child = Object.assign(new EventEmitter(), {
+      stdout: Readable.from(["-- native SQL fixture\n"]), stderr: new PassThrough(),
+    });
+    setTimeout(() => child.emit("exit", 0, null), 5);
+    return child;
+  });
+  await runDatabaseBackup({ connectionString: "postgres://fixture.invalid/db", backupDir: directory, backupEngine: "pg_dump" });
+  expect(spawn.mock.calls[0]![0]).toBe(process.execPath);
+  expect(spawn.mock.calls[0]![1][0]).toBe(process.env.AOA_PG_DUMP_PATH);
+  expect(spawn.mock.calls[0]![2].shell).not.toBe(true);
 });
 
 it("keeps native schema grants so recovered application roles retain access", async () => {

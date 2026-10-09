@@ -5,10 +5,12 @@
  * readiness is DOWN; dependency health is reflected; and the gate 503s while
  * incompatible (never a crash) but always lets health/ready through.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import type { Db, RequiredMigrationIdentity } from "@armyofagents/db";
 import express from "express";
 import {
   evaluateSchemaCompatibility,
+  createLiveSchemaCompatibilityReader,
   type SchemaCompatibility,
 } from "../services/schema-compatibility.js";
 import {
@@ -19,6 +21,34 @@ import {
 } from "../routes/readiness.js";
 
 const HASHES = ["h0", "h1", "h2", "h3"];
+
+describe("live schema reader — immutable image, fresh database on every call", () => {
+  it("never caches a compatible verdict across ledger changes", async () => {
+    const execute=vi.fn()
+      .mockResolvedValueOnce(HASHES.map(hash=>({hash})))
+      .mockResolvedValueOnce(HASHES.slice(0,3).map(hash=>({hash})))
+      .mockResolvedValueOnce([...HASHES,'newer'].map(hash=>({hash})))
+      .mockResolvedValueOnce(['h0','changed','h2','h3'].map(hash=>({hash})))
+      .mockResolvedValueOnce(HASHES.map(hash=>({hash})));
+    const required={orderedHashes:[...HASHES],ledgerSha256:'fixture'};
+    const read=createLiveSchemaCompatibilityReader({execute} as unknown as Db,required);
+    required.orderedHashes[0]='mutated-caller-copy';
+    expect(await read()).toEqual({status:'compatible',schemaCompatible:true});
+    expect(await read()).toMatchObject({status:'pending',schemaCompatible:false});
+    expect(await read()).toMatchObject({reason:'newer',schemaCompatible:false});
+    expect(await read()).toMatchObject({reason:'divergent',schemaCompatible:false});
+    expect(await read()).toEqual({status:'compatible',schemaCompatible:true});
+    expect(execute).toHaveBeenCalledTimes(5);
+  });
+
+  it("fails closed on database errors and malformed ledger rows", async () => {
+    const execute=vi.fn().mockRejectedValueOnce(Error('unavailable')).mockResolvedValueOnce([{hash:null}]);
+    const read=createLiveSchemaCompatibilityReader({execute} as unknown as Db,
+      {orderedHashes:HASHES,ledgerSha256:'fixture'} as RequiredMigrationIdentity);
+    await expect(read()).rejects.toThrow('unavailable');
+    expect(await read()).toMatchObject({schemaCompatible:false,reason:'divergent'});
+  });
+});
 
 describe("evaluateSchemaCompatibility — pure serving gate", () => {
   it("is COMPATIBLE when applied == required", () => {

@@ -384,9 +384,13 @@ async function runPgDumpBackup(opts: {
   connectTimeout: number;
 }): Promise<void> {
   const pgDumpBin = process.env.AOA_PG_DUMP_PATH || process.env.PAPERCLIP_PG_DUMP_PATH || "pg_dump";
+  // Node wrappers are not directly executable on Windows. Keep arguments out of
+  // a shell and use the same Node runtime for explicit JavaScript tool paths.
+  const nodeWrapper = /\.(?:mjs|cjs)$/i.test(pgDumpBin);
   const child = spawn(
-    pgDumpBin,
+    nodeWrapper ? process.execPath : pgDumpBin,
     [
+      ...(nodeWrapper ? [pgDumpBin] : []),
       `--dbname=${opts.connectionString}`,
       "--format=plain",
       "--clean",
@@ -414,9 +418,11 @@ async function runPgDumpBackup(opts: {
 
 async function restoreWithPsql(opts: RunDatabaseRestoreOptions, connectTimeout: number): Promise<void> {
   const psqlBin = process.env.AOA_PSQL_PATH || process.env.PAPERCLIP_PSQL_PATH || "psql";
+  const nodeWrapper = /\.(?:mjs|cjs)$/i.test(psqlBin);
   const child = spawn(
-    psqlBin,
+    nodeWrapper ? process.execPath : psqlBin,
     [
+      ...(nodeWrapper ? [psqlBin] : []),
       `--dbname=${opts.connectionString}`,
       "--set=ON_ERROR_STOP=1",
       "--quiet",

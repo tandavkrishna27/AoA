@@ -5,6 +5,22 @@ Updated 2026-10-08. M4 is **in progress**. The authoritative scope is
 Thresholds below come from `test-gates.md` §D5. This audit records existing
 requirements; it adds no certification process or scheduled campaign.
 
+## Local desktop execution
+
+Application candidate `480b30000` now has built local control-plane, worker and
+deterministic provider images. The isolated guarded-worker spine passed 10/10
+live checks with no skips, including worker execution, usage/cost/audit projection,
+tenant isolation and drain. Two guarded slots enrolled with distinct identities,
+preserved identity across restart and refused duplicate ownership. The second
+slot keeps dispatch disabled; task execution was proved on the first slot.
+The native UI on port 3210 uses a separate onboarding database and is not connected
+to this distributed test stack. See `m4-code-execution.md` for commands and evidence.
+
+This adds local lifecycle and execution evidence. Full D5 load/fairness, independent
+failure domains, production recovery objectives and recovered fleet rollout remain
+open. The deterministic provider does not establish production E2B execution or a
+desktop-local coding backend.
+
 ## What has landed
 
 PR #685 merged to `docs/replatform-program` at
@@ -63,15 +79,46 @@ file, declared CI lane or passing component test is not a measured D5 result.
 
 ## Next code and test work
 
-1. Obtain the operator's staging environment/access method or run results. Execute
+Local load update (2026-10-08): the bounded attempt-terminal diagnostic at
+`f7077a695` reproduced a fairness/latency failure with one quiet organization
+at 2 scheduled arrivals/s and one noisy organization at 20/s. With a separate
+generator, quiet throughput was 0.111 of baseline and p95 queue-to-ACK delay
+was 5.115x; poll/event ACK p95 were 2,412/1,923 ms. Zero observed HTTP 5xx
+does not offset these failures. This is an open finding for investigation,
+not D5-L01–L05 completion; see `m4-code-execution.md` for scope and evidence.
+
+2026-10-09 correction: profiling confirmed repeated migration-file reads and
+short-lived pool creation in the per-request readiness gate. The source fix
+keeps the image identity immutable and checks the live canonical ledger through
+the existing pool on every request. Unit and real PostgreSQL regressions verify
+continued corruption/newer-ledger refusal and recovery. With the compiled fix,
+the ten-loop adversarial case reached 90% quiet throughput and 316/274 ms
+poll/event p95 but still failed at 3.382x queue delay. A separate one-loop
+comparison passed at 100% throughput and 0.863x delay. This partial improvement
+does not close D5-L03 or substitute for actual daemon/fleet load evidence.
+
+1. Investigate local authority-lock and serving-pool contention using the new
+   opt-in load diagnostic; reproduce realistic worker concurrency, fix only
+   the confirmed cause, and retain the arrival ratio and thresholds on retest.
+2. Obtain the operator's staging environment/access method or run results. Execute
    the existing REL-003 runbook against external stores, using compatible native
    clients, explicit destinations, isolated worker traffic and current authority.
-2. Measure D5 topology, failover, broker catch-up, load/fairness and recovery at the
+3. Measure D5 topology, failover, broker catch-up, load/fairness and recovery at the
    stated scope. Local fixtures cannot supply those timings or workload floors.
-3. Keep M3's unresolved provider/application-session dependency visible. Do not
+4. Keep M3's unresolved provider/application-session dependency visible. Do not
    promote M4 until all explicit D5 requirements and its dependency are proven.
 
 M1b/Anthropic live verification remains deferred by user direction. Full D2's
 M3/M4 ownership remains unresolved in scope-triage; this audit does not silently
 assign it or add a campaign. Desktop-local coding remains a separate execution
 backend; a networked desktop slot currently delegates through the remote provider.
+
+
+Real-daemon follow-up (2026-10-09): rebuilt images executed both quiet and noisy
+organization jobs. A 15-second 2/s versus 20/s comparison with explicit 32-slot
+workers preserved quiet throughput (1.042 of baseline) and ACK-receipt delay
+(1.061x), but failed overall with 180/300 noisy jobs unresolved at the 30-second
+drain deadline. Both ratified provider profiles still cap concurrent operations
+at eight. Receipt transaction timestamps are a proxy; HTTP distributions and
+full D5 floors remain unmeasured. See m4-code-execution.md for retained failures,
+eventual completion and the next profile-capacity investigation.

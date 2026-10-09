@@ -1,0 +1,12 @@
+# Disposable D1 diagnostics only: fixture owner credentials, never production.
+# Separate generator process/container from both serving replicas.
+services:
+  load-runner:
+    image: ${AOA_D1_CONTROL_PLANE_IMAGE:-aoa-control-plane:d1-local-unbuilt}
+    entrypoint: ["node", "-e", "setInterval(()=>{}, 3600000)"]
+    command: []
+    environment:
+      DATABASE_URL: "postgres://aoa:aoa@postgres:5432/aoa"
+    networks:
+      - control-net
+      - data-net
