@@ -22,7 +22,7 @@ This evidence qualifies the integrated source snapshot and its migration lineage
 The execution sequence records B00–B11 result packets. B12 is the next scheduled wave, but it is not ready for consumer implementation or runtime qualification as a whole:
 
 - Replatform still lacks an authoritative accepted output-slot binding with cancellation/claim transaction ownership for E2.2/2.a and worker publication.
-- Browser Use pipe attachment has not been selected and qualified without weakening the launch guard.
+- The official Playwright MCP attachment paths are CDP, a Playwright WebSocket endpoint, or browser-extension mode; none documents sharing a worker-owned browser object over a pipe. See the [focused compatibility finding](execution-browser-qualification-wave-results.md#focused-browser-use-compatibility-check-2026-10-11). An upstream worker-native adapter/design decision is still needed; the launch guard remains unchanged.
 - Cloud and local browser qualification environments and accountable owners are not established; the two tracks must be proven separately.
 
 Therefore B13 generated-worker publication must wait for the real E2.2/2.a producer. Do not invent a binding to keep the sequence moving. The immediate next action is a source-only gate/owner handoff with the replatform maintainer for the exact output-binding seam, plus separately identifying the Browser Use API/version and real cloud/local qualification owners. Once those facts exist, re-review at the new source revision, implement the bounded B12 packages, and qualify each placement independently. Independent V1 work can proceed only if its explicit predecessor edges and external gates are satisfied.

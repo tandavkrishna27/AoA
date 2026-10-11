@@ -22,9 +22,24 @@ The specific producer required by E2.2/2.a is still missing:
 
 Creating `universe_output_bindings` without that owner would create a second, ungrounded acceptance authority. This increment remains blocked until replatform exposes the exact admitted-job/attempt/slot, cancellation and claim-token transaction seam. When it exists, the planned replay, competing-attempt, stale-claim and cancel races must run against that real export.
 
+## Focused Browser Use compatibility check (2026-10-11)
+
+The official [Playwright MCP README](https://github.com/microsoft/playwright-mcp/blob/main/README.md) and [Playwright MCP browser connection guide](https://playwright.dev/mcp/configuration/browser-extension) document these ways to run or attach the MCP server:
+
+- Launch a browser owned by the MCP server.
+- Attach through `--cdp-endpoint` / `browser.cdpEndpoint` (CDP).
+- Attach through `--endpoint` / `browser.remoteEndpoint` to an existing Playwright server (WebSocket endpoint).
+- Use browser-extension mode to connect to a user's existing browser tabs.
+
+The official [Playwright `BrowserType` API](https://playwright.dev/docs/api/class-browsertype) likewise documents `connect()` using a Playwright WebSocket endpoint and `connectOverCDP()` using a CDP endpoint. It does not document attaching an independent MCP process to an already worker-owned `Browser`/`BrowserContext` object over an inherited pipe. Browser-extension mode is a different ownership and trust model, not evidence for worker-owned contained automation.
+
+**Disposition:** the currently documented `@playwright/mcp` attachment modes do not satisfy this packet's existing no-CDP/no-remote-WebSocket requirement for a worker-owned browser. Do not pin or enable the MCP attachment route as though it had passed. Preserve the launch guard. A worker-native, in-process Playwright adapter that owns its `BrowserContext` is a candidate for upstream design review; it would need its own exact ownership, admission, approval, process-isolation, cancellation, teardown and real local/cloud qualification evidence. This is a proposed alternative, not an accepted binding or an authorization to change the guard or runtime architecture.
+
+This narrows the missing input: the upstream browser owner must either identify a supported worker-native object-sharing/adapter seam that meets the current constraint, or bring a proposed security/architecture change for review. The E2.2/2.a accepted-output binding remains a separate blocker.
+
 ## E6.0/1.b — contained Browser Use attachment
 
-No Browser Use runtime/package is present in the re-reviewed manifests or lockfile, and the existing browser runtime has no reviewed interactive attachment API. The current pipe-based Playwright runner remains contained; `packages/browser-runtime/src/launch-guard.ts` must continue rejecting CDP ports, remote-debugging switches and exposed endpoints.
+No Browser Use runtime/package is present in the re-reviewed manifests or lockfile, and the existing browser runtime has no reviewed interactive attachment API. Its contained Playwright runner is a bounded launch/run/close path, not a long-lived MCP attachment API; its process pipes do not prove that an independent MCP process can share the worker-owned `Browser`/`BrowserContext`. `packages/browser-runtime/src/launch-guard.ts` must continue rejecting CDP ports, remote-debugging switches and exposed endpoints.
 
 Before implementation, qualification must pin the Browser Use version and prove it can attach to the worker-owned pipe/browser object without opening CDP or a remote WebSocket. If its supported API requires either endpoint, the adapter is blocked rather than weakening the guard.
 
