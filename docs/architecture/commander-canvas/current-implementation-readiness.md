@@ -5,9 +5,10 @@ This is the current status record for the Universe integration branch. It supers
 ## Integrated base
 
 - AoA remote branch: `codex/universe-interface`.
-- Current integrated commit: `9b8f2149fcfccae4754c6e0a1b6f5ed9569353e9` (`feat(universe): integrate canvas on qualified replatform base`).
+- Integrated source commit: `9b8f2149fcfccae4754c6e0a1b6f5ed9569353e9` (`feat(universe): integrate canvas on qualified replatform base`).
+- Current remote branch tip: `06203cfe5f77c11854648da4b2b9958868ab690a`, a documentation-only readiness update on the integrated source commit.
 - Parents: replatform `13b4e806f31a67c3c172f2216272570203132f8f` and prior Universe `095e8b1911a0e34b2ce30ac7d53ec1dfc7472ffd`.
-- The integration was a normal fast-forward of the remote Universe branch; both recorded parent revisions are ancestors. The remote was verified at the integrated commit after push.
+- The integration was a normal fast-forward of the remote Universe branch; both recorded parent revisions are ancestors. The remote was verified at the integrated commit after push and later advanced to the documentation-only tip above.
 - The candidate worktree was clean after integration. No force-push or reset was used.
 
 ## Verification carried into the integrated revision
