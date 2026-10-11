@@ -6,7 +6,7 @@ This is the current status record for the Universe integration branch. It supers
 
 - AoA remote branch: `codex/universe-interface`.
 - Integrated source commit: `9b8f2149fcfccae4754c6e0a1b6f5ed9569353e9` (`feat(universe): integrate canvas on qualified replatform base`).
-- Current remote branch tip: `06203cfe5f77c11854648da4b2b9958868ab690a`, a documentation-only readiness update on the integrated source commit.
+- Current remote branch tip: `40977bae6ae4e57b2f2f3eed4b63bde2674d984b`, a documentation-only browser-compatibility update on the integrated source commit. Verified against `origin/codex/universe-interface` on October 11, 2026.
 - Parents: replatform `13b4e806f31a67c3c172f2216272570203132f8f` and prior Universe `095e8b1911a0e34b2ce30ac7d53ec1dfc7472ffd`.
 - The integration was a normal fast-forward of the remote Universe branch; both recorded parent revisions are ancestors. The remote was verified at the integrated commit after push and later advanced to the documentation-only tip above.
 - The candidate worktree was clean after integration. No force-push or reset was used.
@@ -25,7 +25,7 @@ The execution sequence records B00–B11 result packets. B12 is the next schedul
 - The official Playwright MCP attachment paths are CDP, a Playwright WebSocket endpoint, or browser-extension mode; none documents sharing a worker-owned browser object over a pipe. See the [focused compatibility finding](execution-browser-qualification-wave-results.md#focused-browser-use-compatibility-check-2026-10-11). An upstream worker-native adapter/design decision is still needed; the launch guard remains unchanged.
 - Cloud and local browser qualification environments and accountable owners are not established; the two tracks must be proven separately.
 
-Therefore B13 generated-worker publication must wait for the real E2.2/2.a producer. Do not invent a binding to keep the sequence moving. The immediate next action is a source-only gate/owner handoff with the replatform maintainer for the exact output-binding seam, plus separately identifying the Browser Use API/version and real cloud/local qualification owners. Once those facts exist, re-review at the new source revision, implement the bounded B12 packages, and qualify each placement independently. Independent V1 work can proceed only if its explicit predecessor edges and external gates are satisfied.
+Therefore B13 generated-worker publication must wait for the real E2.2/2.a producer. Do not invent a binding to keep the sequence moving. The immediate next action is the [B12 upstream gate and owner request](b12-upstream-gate-request.md): obtain source evidence for the exact output-binding seam, resolve the worker-owned browser adapter choice, and identify real cloud/local qualification owners. Once those facts exist, re-review at the new source revision, implement the bounded B12 packages, and qualify each placement independently. Independent V1 work can proceed only if its explicit predecessor edges and external gates are satisfied.
 
 ## What this means for implementation readiness
 
