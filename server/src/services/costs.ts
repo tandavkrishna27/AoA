@@ -4,6 +4,7 @@ import { activityLog, agents, companies, costEvents, heartbeatRuns, issues, proj
 import { notFound, unprocessable } from "../errors.js";
 import { budgetService } from "./budgets.js";
 import { logger } from "../middleware/logger.js";
+import { lockBudgetAuthority } from "./budget-capacity.js";
 
 export interface CostDateRange {
   from?: Date;
@@ -65,6 +66,7 @@ export function costService(db: Db) {
       }
 
       const event = await db.transaction(async (tx) => {
+        await lockBudgetAuthority(tx as unknown as Db, companyId);
         const event = await tx
           .insert(costEvents)
           .values({

@@ -11,6 +11,7 @@ import {
   createDb,
   assertPrimaryDbBypassesRls,
   loadRequiredMigrationIdentity,
+  loadRequiredMigrationLineages,
   ensurePostgresDatabase,
   inspectMigrations,
   applyPendingMigrations,
@@ -96,6 +97,7 @@ import { buildCommanderLoginService } from "./services/commander-login-runtime.j
 import { initThreadEventListener } from "./services/thread-events.js";
 import { onBudgetExhausted } from "./services/budget-hooks.js";
 import { createStorageServiceFromConfig } from "./storage/index.js";
+import { universeIntakeService } from "./services/universe-intake.js";
 import { printStartupBanner } from "./startup-banner.js";
 import { getBoardClaimWarningUrl, initializeBoardClaimChallenge } from "./board-claim.js";
 import { tryRecoverOrphanPostgres } from "./postgres/embedded-orphan-recovery.js";
@@ -265,27 +267,18 @@ async function ensureMigrations(
     }
   }
   if (state.status === "upToDate") return "already applied";
+  if (state.status === "incompatible") {
+    throw new Error(`${label} has an incompatible migration history (${state.reason}); refusing to apply schema changes.`);
+  }
 
   if (state.status === "needsMigrations" && state.reason === "no-migration-journal-non-empty-db") {
-    logger.warn(
-      { tableCount: state.tableCount },
-      `${label} has existing tables but no migration journal. Run migrations manually to sync schema.`,
+    throw new Error(
+      `${label} has existing tables but no verifiable migration journal; refusing to guess a migration history. ` +
+        "Restore the journal from the matching database lineage or follow the documented recovery procedure.",
     );
-    const apply = autoApply ? true : await promptApplyMigrations(state.pendingMigrations);
-    if (!apply) {
-      logger.warn(
-        { pendingMigrations: state.pendingMigrations },
-        `${label} has pending migrations; continuing without applying. Run pnpm db:migrate to apply before startup.`,
-      );
-      return "pending migrations skipped";
-    }
-
-    logger.info({ pendingMigrations: state.pendingMigrations }, `Applying ${state.pendingMigrations.length} pending migrations for ${label}`);
-    await applyPendingMigrations(connectionString, {
-      deploymentMode: config.deploymentMode,
-    });
-    return "applied (pending migrations)";
   }
+
+  if (state.status !== "needsMigrations") return "already applied";
 
   const apply = autoApply ? true : await promptApplyMigrations(state.pendingMigrations);
   if (!apply) {
@@ -610,6 +603,7 @@ if (migrationSummary === "pending migrations skipped") {
 // Corrective E2 successor to E2-D03: flag-on boot must prove both bounded roles
 // before any E3 route/work could start. There is deliberately no owner fallback.
 const distributedMigrationIdentity = config.distributedExecutionEnabled ? await loadRequiredMigrationIdentity() : null;
+const distributedMigrationLineages = config.distributedExecutionEnabled ? await loadRequiredMigrationLineages() : null;
 const distributedExecutionDatabases = config.distributedExecutionEnabled
   ? await openDistributedExecutionDatabases({
       enabled: true,
@@ -852,7 +846,6 @@ if (config.devLocalIdentity) {
 
 const uiMode = config.uiDevMiddleware ? "vite-dev" : config.serveUi ? "static" : "none";
 const storageService = createStorageServiceFromConfig(config);
-
 // Browser credential cleanup continues through rollout rollback and tenant
 // suspension. It uses its own bounded metadata cursor, not the active-org list.
 const { createBrowserArtifactRetention } = await import("./services/browser-artifact-retention-sweep.js");
@@ -879,6 +872,13 @@ const stopBrowserRetention = () => {
 process.once("SIGTERM", stopBrowserRetention);
 process.once("SIGINT", stopBrowserRetention);
 void browserRetentionTick();
+const intakeReconciler = universeIntakeService(db, storageService);
+const reconcileUniverseIntakes = () => void intakeReconciler.reconcileExpired()
+  .then((count) => { if (count > 0) logger.info({ count }, "expired Universe intakes reconciled"); })
+  .catch((err: unknown) => logger.warn({ err }, "Universe intake reconciliation failed"));
+reconcileUniverseIntakes();
+const universeIntakeReconcileTimer = setInterval(reconcileUniverseIntakes, 15 * 60 * 1000);
+universeIntakeReconcileTimer.unref();
 const workQuestionSnapshotBackfill = await backfillWorkQuestionSnapshots(db as any);
 if (workQuestionSnapshotBackfill.updated > 0) {
   logger.info(workQuestionSnapshotBackfill, "work-question identity snapshot backfill complete");
@@ -904,7 +904,15 @@ await ensureControlPlaneExecutionTarget(db as any);
 // TODO(DEP-003 follow-up): add a real MinIO reachability check (e.g. a bucket HEAD)
 // for cloud_auth deployments once StorageService exposes a health method.
 const readSchemaCompatibility = distributedMigrationIdentity
-  ? createLiveSchemaCompatibilityReader(db, distributedMigrationIdentity)
+  ? createLiveSchemaCompatibilityReader(
+      db,
+      distributedMigrationIdentity,
+      distributedMigrationLineages!.lineages.map((lineage) => ({
+        id: lineage.id,
+        orderedHashes: lineage.entries.map((entry) => entry.hash),
+      })),
+      distributedMigrationLineages!.freshLineageId,
+    )
   : () => loadSchemaCompatibility(activeDatabaseConnectionString);
 const readinessProbe = buildReadinessProbe({
   schemaCompatibility: readSchemaCompatibility,

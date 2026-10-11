@@ -464,6 +464,21 @@ export {
 } from "./sidebar-preferences.js";
 
 export {
+  DEFAULT_UNIVERSE_PREFERENCES,
+  UNIVERSE_PREFERENCE_SECTIONS,
+  resolveUniversePreferences,
+  universePreferencesSchema,
+  universePreferencePatchSchema,
+  universePreferenceResetSchema,
+  type UniversePreferences,
+  type UniversePreferenceOverrides,
+  type PreferenceSection,
+  type UniversePreferencesSnapshot,
+  type UniversePreferencePatchInput,
+  type UniversePreferenceResetInput,
+} from "./universe-preferences.js";
+
+export {
   homeBoardLayoutItemSchema,
   homeBoardLayoutArraySchema,
   updateHomeBoardLayoutSchema,
@@ -473,6 +488,49 @@ export {
   type HomeBoardLayoutValidationResult,
   type UpdateHomeBoardLayout,
 } from "./home-board-layout.js";
+
+export {
+  UNIVERSE_REF_KINDS,
+  UNIVERSE_LAYOUT_SCHEMA_VERSION,
+  UNIVERSE_LAYOUT_MAX_PANELS,
+  UNIVERSE_LAYOUT_MAX_OPERATIONS,
+  UNIVERSE_LAYOUT_COORD_LIMIT,
+  UNIVERSE_LAYOUT_MIN_DIMENSION,
+  UNIVERSE_LAYOUT_MAX_DIMENSION,
+  UNIVERSE_LAYOUT_MIN_ZOOM,
+  UNIVERSE_LAYOUT_MAX_ZOOM,
+  rectSchema,
+  layoutOpSchema,
+  layoutPatchSchema,
+  universeLayoutDocumentSchema,
+  emptyUniverseLayoutDocument,
+  type UniverseRefKind,
+  type Rect,
+  type LayoutOp,
+  type LayoutPatch,
+  type LayoutAck,
+  type UniverseLayoutDocument,
+} from "./universe-layout.js";
+
+export {
+  UNIVERSE_DRAFT_DESTINATION_KINDS,
+  UNIVERSE_DRAFT_SCHEMA_VERSION,
+  UNIVERSE_DRAFT_MAX_TEXT,
+  UNIVERSE_DRAFT_MAX_ATTACHMENTS,
+  draftDestinationSchema,
+  draftPatchSchema,
+  universeDraftPayloadSchema,
+  pendingDraftAttemptSchema,
+  structuredDraftPatchSchema,
+  universeDraftPatchSchema,
+  type UniverseDraftDestinationKind,
+  type UniverseDraftDestination,
+  type UniverseDraftPatch,
+  type UniverseDraft,
+  type UniverseDraftPayload,
+  type PendingDraftAttempt,
+  type UniverseDraftPatchInput,
+} from "./universe-draft.js";
 
 export {
   INBOX_DISMISSAL_ITEM_KEY_REGEX,
@@ -569,3 +627,40 @@ export {
   type RuntimeDecisionAnswerInput,
   type RuntimeDecisionDetail,
 } from "./hub.js";
+
+export { checkpointDataSchema, checkpointPatchSchema, type CheckpointData, type CheckpointPatch, type CheckpointSnapshot } from "./universe-layout.js";
+export {
+  universeAttentionSourceRefSchema,
+  universeAttentionEntrySchema,
+  universeAttentionResponseSchema,
+  universeAttentionCheckpointInputSchema,
+  universeAttentionCheckpointSchema,
+  type UniverseAttentionSourceRef,
+  type UniverseAttentionEntry,
+  type UniverseAttentionResponse,
+  type UniverseAttentionCheckpointInput,
+  type UniverseAttentionCheckpoint,
+} from "./universe-attention.js";
+export {
+  universeSnapshotReferenceSchema,
+  universeSnapshotTaskSchema,
+  universeSnapshotOutputSchema,
+  universeReconciliationSnapshotSchema,
+  type UniverseReconciliationSnapshot,
+} from "./universe-reconciliation.js";
+export {
+  universeIntakeDestinationSchema,
+  beginUniverseIntakeSchema,
+  universeIntakeSnapshotSchema,
+  type UniverseIntakeDestination,
+  type BeginUniverseIntake,
+  type UniverseIntakeSnapshot,
+} from "./universe-intake.js";
+export {
+  FORMAT_DISPOSITIONS,
+  FORMAT_FAILURES,
+  formatCapabilitySchema,
+  type FormatDisposition,
+  type FormatCapability,
+  type FormatFailure,
+} from "./universe-formats.js";

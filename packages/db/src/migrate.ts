@@ -22,6 +22,9 @@ const before = await inspectMigrations(url);
 if (before.status === "upToDate") {
   console.log("No pending migrations");
 } else {
+  if (before.status === "incompatible") {
+    throw new Error(`Database migration history is incompatible: ${before.reason}`);
+  }
   console.log(`Applying ${before.pendingMigrations.length} pending migration(s)...`);
   await applyPendingMigrations(url, {
     deploymentMode: readDeploymentModeForMigration(),
@@ -29,7 +32,8 @@ if (before.status === "upToDate") {
 
   const after = await inspectMigrations(url);
   if (after.status !== "upToDate") {
-    throw new Error(`Migrations incomplete: ${after.pendingMigrations.join(", ")}`);
+    const detail = after.status === "incompatible" ? after.reason : after.pendingMigrations.join(", ");
+    throw new Error(`Migrations incomplete: ${detail}`);
   }
   console.log("Migrations complete");
 }

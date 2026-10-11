@@ -36,7 +36,7 @@ export interface PersistedActivity extends Omit<LogActivityInput, "details"> {
  * than adding a thirty-fifth direct insert.
  */
 export async function insertActivityLog(
-  db: Db,
+  db: Pick<Db, "insert">,
   input: LogActivityInput
 ): Promise<PersistedActivity> {
   assertUnreservedActivityNamespace(input);

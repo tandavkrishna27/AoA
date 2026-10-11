@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import * as schema from "./schema/index.js";
 import { assertMigrationSnapshotGate } from "./migration-snapshot-gate.js";
+import { classifyMigrationHistory, type RegisteredMigration } from "./migration-lineages.js";
+import { loadRequiredMigrationLineages } from "./migration-lineage-registry.js";
 
 const MIGRATIONS_FOLDER = fileURLToPath(new URL("./migrations", import.meta.url));
 const DRIZZLE_MIGRATIONS_TABLE = "__drizzle_migrations";
@@ -34,7 +36,7 @@ function splitMigrationStatements(content: string): string[] {
 }
 
 export type MigrationState =
-  | { status: "upToDate"; tableCount: number; availableMigrations: string[]; appliedMigrations: string[] }
+  | { status: "upToDate"; tableCount: number; availableMigrations: string[]; appliedMigrations: string[]; lineageId: string }
   | {
       status: "needsMigrations";
       tableCount: number;
@@ -42,6 +44,13 @@ export type MigrationState =
       appliedMigrations: string[];
       pendingMigrations: string[];
       reason: "no-migration-journal-empty-db" | "no-migration-journal-non-empty-db" | "pending-migrations";
+      lineageId?: string;
+    }
+  | {
+      status: "incompatible";
+      tableCount: number;
+      appliedMigrations: string[];
+      reason: "newer" | "unknown" | "divergent" | "ambiguous" | "unverifiable-ledger";
     };
 
 export function createDb(url: string) {
@@ -145,6 +154,9 @@ export interface RequiredMigrationIdentity {
   readonly ledgerSha256: string;
 }
 
+export { loadRequiredMigrationLineages } from "./migration-lineage-registry.js";
+export type { RequiredMigrationLineages } from "./migration-lineage-registry.js";
+
 /**
  * Produce the owner-side migration certificate from the checked-in Drizzle
  * journal and raw migration bytes. Database serial IDs are deliberately absent:
@@ -204,28 +216,19 @@ export interface AppliedMigrationIdentity {
  * incompatible" rollback case. Reads only; never mutates the database.
  */
 export async function loadAppliedMigrationIdentity(url: string): Promise<AppliedMigrationIdentity> {
-  const state = await inspectMigrations(url);
-  const appliedTags =
-    state.status === "upToDate" ? state.appliedMigrations : state.appliedMigrations;
-
-  const orderedHashes = await Promise.all(
-    appliedTags.map(async (fileName) =>
-      createHash("sha256")
-        .update(await readFile(new URL(`./migrations/${fileName}`, import.meta.url)))
-        .digest("hex")),
-  );
-
   const sql = postgres(url, { max: 1 });
   try {
     const migrationTableSchema = await discoverMigrationTableSchema(sql);
     let rawAppliedCount = 0;
+    let orderedHashes: string[] = [];
     if (migrationTableSchema) {
       const quotedSchema = quoteIdentifier(migrationTableSchema);
       const qualifiedTable = `${quotedSchema}.${quoteIdentifier(DRIZZLE_MIGRATIONS_TABLE)}`;
-      const rows = await sql.unsafe<{ count: number }[]>(
-        `SELECT count(*)::int AS count FROM ${qualifiedTable}`,
+      const rows = await sql.unsafe<{ hash: string }[]>(
+        `SELECT hash FROM ${qualifiedTable} ORDER BY id`,
       );
-      rawAppliedCount = Number(rows[0]?.count ?? 0);
+      rawAppliedCount = rows.length;
+      orderedHashes = rows.map((row) => row.hash);
     }
     return { orderedHashes: Object.freeze(orderedHashes), rawAppliedCount };
   } finally {
@@ -443,6 +446,10 @@ async function readMigrationFileContent(migrationFile: string): Promise<string> 
   return readFile(new URL(`./migrations/${migrationFile}`, import.meta.url), "utf8");
 }
 
+async function readRegisteredMigrationContent(migration: RegisteredMigration): Promise<string> {
+  return readFile(new URL(`./migrations/${migration.filePath}`, import.meta.url), "utf8");
+}
+
 async function orderMigrationsByJournal(migrationFiles: string[]): Promise<string[]> {
   const journalEntries = await listJournalMigrationEntries();
   const orderByFileName = new Map(journalEntries.map((entry) => [entry.fileName, entry.order]));
@@ -565,24 +572,20 @@ async function recordMigrationHistoryEntry(
 
 async function applyPendingMigrationsManually(
   url: string,
-  pendingMigrations: string[],
+  pendingMigrations: readonly RegisteredMigration[],
 ): Promise<void> {
   if (pendingMigrations.length === 0) return;
-
-  const orderedPendingMigrations = await orderMigrationsByJournal(pendingMigrations);
-  const journalEntries = await listJournalMigrationEntries();
-  const folderMillisByFileName = new Map(
-    journalEntries.map((entry) => [entry.fileName, normalizeFolderMillis(entry.folderMillis)]),
-  );
 
   const sql = postgres(url, { max: 1 });
   try {
     const { migrationTableSchema, columnNames } = await ensureMigrationJournalTable(sql);
     const qualifiedTable = `${quoteIdentifier(migrationTableSchema)}.${quoteIdentifier(DRIZZLE_MIGRATIONS_TABLE)}`;
 
-    for (const migrationFile of orderedPendingMigrations) {
-      const migrationContent = await readMigrationFileContent(migrationFile);
+    for (const migration of pendingMigrations) {
+      const migrationFile = migration.fileName;
+      const migrationContent = await readRegisteredMigrationContent(migration);
       const hash = createHash("sha256").update(migrationContent).digest("hex");
+      if (hash !== migration.hash) throw new Error(`Registered migration bytes changed: ${migration.filePath}`);
       const existingEntry = await migrationHistoryEntryExists(
         sql,
         qualifiedTable,
@@ -603,7 +606,7 @@ async function applyPendingMigrationsManually(
           columnNames,
           migrationFile,
           hash,
-          folderMillisByFileName.get(migrationFile) ?? Date.now(),
+          normalizeFolderMillis(migration.createdAt),
         );
       });
     }
@@ -828,8 +831,10 @@ export async function reconcilePendingMigrationHistory(
   const repairedMigrations: string[] = [];
 
   try {
-    const journalEntries = await listJournalMigrationEntries();
-    const folderMillisByFile = new Map(journalEntries.map((entry) => [entry.fileName, entry.folderMillis]));
+    const registry = await loadRequiredMigrationLineages();
+    const lineage = registry.lineages.find((candidate) => candidate.id === state.lineageId);
+    if (!lineage) return { repairedMigrations, remainingMigrations: state.pendingMigrations };
+    const pendingEntries = lineage.entries.slice(state.appliedMigrations.length);
     const migrationTableSchema = await discoverMigrationTableSchema(sql);
     if (!migrationTableSchema) {
       return { repairedMigrations, remainingMigrations: state.pendingMigrations };
@@ -838,13 +843,15 @@ export async function reconcilePendingMigrationHistory(
     const columnNames = await getMigrationTableColumnNames(sql, migrationTableSchema);
     const qualifiedTable = `${quoteIdentifier(migrationTableSchema)}.${quoteIdentifier(DRIZZLE_MIGRATIONS_TABLE)}`;
 
-    for (const migrationFile of state.pendingMigrations) {
-      const migrationContent = await readMigrationFileContent(migrationFile);
+    for (const migration of pendingEntries) {
+      const migrationFile = migration.fileName;
+      const migrationContent = await readRegisteredMigrationContent(migration);
       const alreadyApplied = await migrationContentAlreadyApplied(sql, migrationContent);
       if (!alreadyApplied) break;
 
       const hash = createHash("sha256").update(migrationContent).digest("hex");
-      const folderMillis = folderMillisByFile.get(migrationFile) ?? Date.now();
+      if (hash !== migration.hash) throw new Error(`Registered migration bytes changed: ${migration.filePath}`);
+      const folderMillis = migration.createdAt;
       const existingByHash = columnNames.has("hash")
         ? await sql.unsafe<{ created_at: string | number | null }[]>(
             `SELECT created_at FROM ${qualifiedTable} WHERE hash = ${quoteLiteral(hash)} ORDER BY created_at DESC LIMIT 1`,
@@ -934,7 +941,8 @@ export async function inspectMigrations(url: string): Promise<MigrationState> {
   const sql = postgres(url, { max: 1 });
 
   try {
-    const availableMigrations = await listMigrationFiles();
+    const registry = await loadRequiredMigrationLineages();
+    const freshLineage = registry.lineages.find((lineage) => lineage.id === registry.freshLineageId)!;
     const tableCountResult = await sql<{ count: number }[]>`
       select count(*)::int as count
       from information_schema.tables
@@ -949,31 +957,71 @@ export async function inspectMigrations(url: string): Promise<MigrationState> {
         return {
           status: "needsMigrations",
           tableCount,
-          availableMigrations,
+          availableMigrations: freshLineage.entries.map((entry) => entry.fileName),
           appliedMigrations: [],
-          pendingMigrations: availableMigrations,
+          pendingMigrations: freshLineage.entries.map((entry) => entry.fileName),
           reason: "no-migration-journal-non-empty-db",
+          lineageId: freshLineage.id,
         };
       }
 
       return {
         status: "needsMigrations",
         tableCount,
-        availableMigrations,
+        availableMigrations: freshLineage.entries.map((entry) => entry.fileName),
         appliedMigrations: [],
-        pendingMigrations: availableMigrations,
+        pendingMigrations: freshLineage.entries.map((entry) => entry.fileName),
         reason: "no-migration-journal-empty-db",
+        lineageId: freshLineage.id,
       };
     }
 
-    const appliedMigrations = await loadAppliedMigrations(sql, migrationTableSchema, availableMigrations);
-    const pendingMigrations = availableMigrations.filter((name) => !appliedMigrations.includes(name));
-    if (pendingMigrations.length === 0) {
+    const columnNames = await getMigrationTableColumnNames(sql, migrationTableSchema);
+    const qualifiedTable = `${quoteIdentifier(migrationTableSchema)}.${quoteIdentifier(DRIZZLE_MIGRATIONS_TABLE)}`;
+    let appliedHashes: string[];
+    if (columnNames.has("hash")) {
+      const rows = await sql.unsafe<{ hash: string | null }[]>(`SELECT hash FROM ${qualifiedTable} ORDER BY id`);
+      if (rows.some((row) => typeof row.hash !== "string" || row.hash.length === 0)) {
+        return { status: "incompatible", tableCount, appliedMigrations: [], reason: "unverifiable-ledger" };
+      }
+      appliedHashes = rows.map((row) => row.hash!);
+    } else if (columnNames.has("name")) {
+      const rows = await sql.unsafe<{ name: string | null }[]>(`SELECT name FROM ${qualifiedTable} ORDER BY id`);
+      const allEntries = registry.lineages.flatMap((lineage) => lineage.entries);
+      appliedHashes = [];
+      for (const row of rows) {
+        const candidates = allEntries.filter((entry) => entry.fileName === row.name);
+        const hashes = [...new Set(candidates.map((entry) => entry.hash))];
+        if (hashes.length !== 1) {
+          return { status: "incompatible", tableCount, appliedMigrations: [], reason: "unverifiable-ledger" };
+        }
+        appliedHashes.push(hashes[0]!);
+      }
+    } else {
+      return { status: "incompatible", tableCount, appliedMigrations: [], reason: "unverifiable-ledger" };
+    }
+
+    const classification = classifyMigrationHistory(appliedHashes, registry.lineages, registry.freshLineageId);
+    if (classification.status === "incompatible") {
+      return {
+        status: "incompatible",
+        tableCount,
+        appliedMigrations: [],
+        reason: classification.reason,
+      };
+    }
+    const appliedMigrations = classification.appliedEntries.map((entry) => entry.fileName);
+    const pendingMigrations = classification.pendingEntries.map((entry) => entry.fileName);
+    const availableMigrations = classification.lineageId === registry.freshLineageId
+      ? freshLineage.entries.map((entry) => entry.fileName)
+      : registry.lineages.find((lineage) => lineage.id === classification.lineageId)!.entries.map((entry) => entry.fileName);
+    if (classification.complete) {
       return {
         status: "upToDate",
         tableCount,
         availableMigrations,
         appliedMigrations,
+        lineageId: classification.lineageId,
       };
     }
 
@@ -984,6 +1032,7 @@ export async function inspectMigrations(url: string): Promise<MigrationState> {
       appliedMigrations,
       pendingMigrations,
       reason: "pending-migrations",
+      lineageId: classification.lineageId,
     };
   } finally {
     await sql.end();
@@ -1000,6 +1049,12 @@ export async function applyPendingMigrations(
 ): Promise<void> {
   const initialState = await inspectMigrations(url);
   if (initialState.status === "upToDate") return;
+  if (initialState.status === "incompatible") {
+    throw new Error(`Refusing to migrate an incompatible database history: ${initialState.reason}`);
+  }
+  if (initialState.reason === "no-migration-journal-non-empty-db") {
+    throw new Error("Refusing to migrate a non-empty database without a verifiable migration journal");
+  }
 
   // Finding #4: serialize concurrent-replica migrations. Cloud replicas
   // auto-apply on boot (non-TTY); hold a session-level advisory lock across
@@ -1019,6 +1074,12 @@ export async function applyPendingMigrations(
     // waited on the lock.
     const stateUnderLock = await inspectMigrations(url);
     if (stateUnderLock.status === "upToDate") return;
+    if (stateUnderLock.status === "incompatible") {
+      throw new Error(`Refusing to migrate an incompatible database history: ${stateUnderLock.reason}`);
+    }
+    if (stateUnderLock.reason === "no-migration-journal-non-empty-db") {
+      throw new Error("Refusing to migrate a non-empty database without a verifiable migration journal");
+    }
 
     // The backup gate belongs at the shared apply boundary, under the same
     // advisory lock as the migration itself. This covers server auto-apply,
@@ -1036,34 +1097,21 @@ export async function applyPendingMigrations(
         ),
     });
 
-    const sql = postgres(url, { max: 1 });
-    try {
-      const db = drizzlePg(sql);
-      await migratePg(db, { migrationsFolder: MIGRATIONS_FOLDER });
-    } finally {
-      await sql.end();
-    }
-
-    let state = await inspectMigrations(url);
-    if (state.status === "upToDate") return;
-
-    const repair = await reconcilePendingMigrationHistory(url);
-    if (repair.repairedMigrations.length > 0) {
-      state = await inspectMigrations(url);
-      if (state.status === "upToDate") return;
-    }
-
-    if (state.status !== "needsMigrations" || state.reason !== "pending-migrations") {
+    if (stateUnderLock.status !== "needsMigrations") {
       throw new Error("Migrations are still pending after attempted apply; run inspectMigrations for details.");
     }
-
-    await applyPendingMigrationsManually(url, state.pendingMigrations);
+    const registry = await loadRequiredMigrationLineages();
+    const lineage = registry.lineages.find((candidate) => candidate.id === stateUnderLock.lineageId);
+    if (!lineage) throw new Error("Selected migration lineage is unavailable");
+    const pendingSet = new Set(stateUnderLock.pendingMigrations);
+    const pendingEntries = lineage.entries.slice(stateUnderLock.appliedMigrations.length)
+      .filter((entry) => pendingSet.has(entry.fileName));
+    await applyPendingMigrationsManually(url, pendingEntries);
 
     const finalState = await inspectMigrations(url);
     if (finalState.status !== "upToDate") {
-      throw new Error(
-        `Failed to apply pending migrations: ${finalState.pendingMigrations.join(", ")}`,
-      );
+      const detail = finalState.status === "incompatible" ? finalState.reason : finalState.pendingMigrations.join(", ");
+      throw new Error(`Failed to apply pending migrations: ${detail}`);
     }
   } finally {
     // Every return after acquiring the lock is inside this try, so the finally

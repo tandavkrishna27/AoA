@@ -6,6 +6,7 @@ import { publishLiveEvent } from "./live-events.js";
 import { emitBudgetExhausted, type BudgetEnforcementScope } from "./budget-hooks.js";
 import { logger } from "../middleware/logger.js";
 import type { UpsertBudgetPolicy, ResolveBudgetIncident } from "@armyofagents/shared";
+import { lockBudgetAuthority } from "./budget-capacity.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,7 +175,10 @@ export function budgetService(db: Db) {
   return {
     // ----- upsertPolicy -----
     async upsertPolicy(companyId: string, input: UpsertBudgetPolicy) {
-      const existing = await db
+      return db.transaction(async (tx) => {
+      const txDb = tx as unknown as Db;
+      await lockBudgetAuthority(txDb, companyId);
+      const existing = await txDb
         .select()
         .from(budgetPolicies)
         .where(
@@ -191,7 +195,7 @@ export function budgetService(db: Db) {
       const now = new Date();
 
       if (existing) {
-        const [updated] = await db
+        const [updated] = await txDb
           .update(budgetPolicies)
           .set({
             amountCents: input.amountCents,
@@ -206,7 +210,7 @@ export function budgetService(db: Db) {
         return updated;
       }
 
-      const [created] = await db
+      const [created] = await txDb
         .insert(budgetPolicies)
         .values({
           companyId,
@@ -222,6 +226,7 @@ export function budgetService(db: Db) {
         .returning();
 
       return created;
+      });
     },
 
     // ----- listPolicies -----

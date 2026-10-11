@@ -63,9 +63,9 @@ describe("applyPendingMigrations advisory lock (concurrent-replica safety)", () 
     expect(body).toMatch(/finally\s*\{[\s\S]*pg_advisory_unlock\(/);
   });
 
-  it("acquires the lock BEFORE running the migrator", () => {
+  it("acquires the lock BEFORE running the selected-lineage migration runner", () => {
     const lockIdx = body.indexOf("pg_advisory_lock(");
-    const migrateIdx = body.indexOf("migratePg(");
+    const migrateIdx = body.indexOf("applyPendingMigrationsManually(");
     expect(lockIdx).toBeGreaterThan(-1);
     expect(migrateIdx).toBeGreaterThan(-1);
     expect(lockIdx).toBeLessThan(migrateIdx);
@@ -76,7 +76,7 @@ describe("applyPendingMigrations advisory lock (concurrent-replica safety)", () 
     // must be an inspectMigrations() call between lock acquisition and the
     // migrator run.
     const lockIdx = body.indexOf("pg_advisory_lock(");
-    const migrateIdx = body.indexOf("migratePg(");
+    const migrateIdx = body.indexOf("applyPendingMigrationsManually(");
     const underLock = body.slice(lockIdx, migrateIdx);
     expect(underLock).toContain("inspectMigrations(");
   });
@@ -85,13 +85,11 @@ describe("applyPendingMigrations advisory lock (concurrent-replica safety)", () 
     const lockIdx = body.indexOf("pg_advisory_lock(");
     const reinspectIdx = body.indexOf("const stateUnderLock = await inspectMigrations(");
     const gateIdx = body.indexOf("assertMigrationSnapshotGate(");
-    const migrateIdx = body.indexOf("migratePg(");
     const manualIdx = body.indexOf("applyPendingMigrationsManually(");
 
     expect(lockIdx).toBeGreaterThan(-1);
     expect(reinspectIdx).toBeGreaterThan(lockIdx);
     expect(gateIdx).toBeGreaterThan(reinspectIdx);
-    expect(gateIdx).toBeLessThan(migrateIdx);
     expect(gateIdx).toBeLessThan(manualIdx);
   });
 

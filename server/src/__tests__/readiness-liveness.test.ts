@@ -100,6 +100,19 @@ describe("evaluateSchemaCompatibility — pure serving gate", () => {
       }),
     ).toEqual({ status: "incompatible", schemaCompatible: false, reason: "divergent" });
   });
+
+  it("accepts the exact Universe history even though it diverges from the fresh-install history", () => {
+    expect(evaluateSchemaCompatibility({
+      requiredOrderedHashes: ["shared-0", "r-1", "r-2"],
+      requiredLineages: [
+        { id: "replatform", orderedHashes: ["shared-0", "r-1", "r-2"] },
+        { id: "universe", orderedHashes: ["shared-0", "u-1", "u-2", "u-3"] },
+      ],
+      freshLineageId: "replatform",
+      appliedOrderedHashes: ["shared-0", "u-1"],
+      rawAppliedCount: 2,
+    })).toEqual({ status: "pending", schemaCompatible: false, pendingCount: 2 });
+  });
 });
 
 const compatible: SchemaCompatibility = { status: "compatible", schemaCompatible: true };

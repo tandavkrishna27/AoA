@@ -10,6 +10,8 @@ export {
   type NonOwnerDbConnectionOptions,
   loadRequiredMigrationIdentity,
   type RequiredMigrationIdentity,
+  loadRequiredMigrationLineages,
+  type RequiredMigrationLineages,
   loadAppliedMigrationIdentity,
   type AppliedMigrationIdentity,
   ensurePostgresDatabase,

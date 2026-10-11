@@ -37,6 +37,8 @@ export interface ThreadWorkingAgent {
   activity?: string;
 }
 
+export type LiveEventHint = {seq?: number; referenceKey: string};
+
 interface LiveUpdatesContextValue {
   connectionState: LiveConnectionState;
   /** Subscribe the active WS to a thread's events (ref-counted). */
@@ -49,6 +51,8 @@ interface LiveUpdatesContextValue {
   onReconnect: (cb: () => void) => () => void;
   /** Register a callback fired when a visible hub item changes. Returns an unsubscribe fn. */
   onHubItemChanged: (cb: (itemId: string) => void) => () => void;
+  /** Read-only hint stream for canonical consumers such as Universe. */
+  onEventHint: (cb: (hint: LiveEventHint) => void) => () => void;
   /** Latest presence roster per thread (keyed by threadId). */
   presenceByThread: Record<string, ThreadPresenceMember[]>;
   /** Latest working-agents roster per thread (keyed by threadId). */
@@ -67,6 +71,7 @@ const NOOP_LIVE_UPDATES: LiveUpdatesContextValue = {
   sendPresence: () => {},
   onReconnect: () => () => {},
   onHubItemChanged: () => () => {},
+  onEventHint: () => () => {},
   presenceByThread: {},
   workingAgentsByThread: {},
 };
@@ -74,6 +79,14 @@ const NOOP_LIVE_UPDATES: LiveUpdatesContextValue = {
 /** Access the live-updates WS context (connection state, thread subscribe, presence). */
 export function useLiveUpdates(): LiveUpdatesContextValue {
   return useContext(LiveUpdatesContext) ?? NOOP_LIVE_UPDATES;
+}
+
+export function liveEventReferenceKey(event: Pick<LiveEvent, "type" | "payload">): string {
+  for (const field of ["issueId", "taskId", "artifactId", "itemId", "threadId", "conversationId"] as const) {
+    const value = readString(event.payload?.[field]);
+    if (value) return `${field}:${value}`;
+  }
+  return `event:${event.type}`;
 }
 
 const TOAST_COOLDOWN_WINDOW_MS = 10_000;
@@ -839,6 +852,7 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
   const subscribedThreadsRef = useRef<Map<string, number>>(new Map());
   const reconnectListenersRef = useRef<Set<() => void>>(new Set());
   const hubItemChangedListenersRef = useRef<Set<(itemId: string) => void>>(new Set());
+  const eventHintListenersRef = useRef<Set<(hint: LiveEventHint) => void>>(new Set());
   // MIG-003: the max durable per-company `seq` seen. Sent as `?sinceSeq=N` on
   // reconnect for gap recovery, and used to suppress duplicate seqs (overlapping
   // replay + live). 0 = fresh (no server replay; only future events).
@@ -919,6 +933,16 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
     return () => {
       hubItemChangedListenersRef.current.delete(cb);
     };
+  }, []);
+
+  const onEventHint = useCallback((cb: (hint: LiveEventHint) => void) => {
+    eventHintListenersRef.current.add(cb);
+    return () => { eventHintListenersRef.current.delete(cb); };
+  }, []);
+
+  const notifyEventHint = useCallback((event: LiveEvent & { seq?: number }) => {
+    const hint = { referenceKey: liveEventReferenceKey(event), ...(typeof event.seq === "number" ? { seq: event.seq } : {}) };
+    for (const cb of eventHintListenersRef.current) { try { cb(hint); } catch { /* isolate consumers */ } }
   }, []);
 
   const notifyHubItemChanged = useCallback((itemId: string) => {
@@ -1087,7 +1111,7 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
       }
       socketRef.current = null;
     };
-  }, [queryClient, selectedCompanyId, pushToast, sendRaw, notifyHubItemChanged]);
+  }, [queryClient, selectedCompanyId, pushToast, sendRaw, notifyHubItemChanged, notifyEventHint]);
 
   const contextValue = useMemo<LiveUpdatesContextValue>(
     () => ({
@@ -1097,6 +1121,7 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
       sendPresence,
       onReconnect,
       onHubItemChanged,
+      onEventHint,
       presenceByThread,
       workingAgentsByThread,
     }),
@@ -1107,6 +1132,7 @@ export function LiveUpdatesProvider({ children }: { children: ReactNode }) {
       sendPresence,
       onReconnect,
       onHubItemChanged,
+      onEventHint,
       presenceByThread,
       workingAgentsByThread,
     ],

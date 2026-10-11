@@ -214,7 +214,11 @@ describe("notificationPreferencesService", () => {
       { rules: [approvalRule] },
     );
 
-    expect(result.rules).toContainEqual(approvalRule);
+    expect(result.rules).toContainEqual({
+      ...approvalRule,
+      soundEnabled: false,
+      voiceEnabled: false,
+    });
     expect(result.rules).toHaveLength(DEFAULT_NOTIFICATION_PREFERENCES.rules.length);
     expect(result.rules).toContainEqual(
       DEFAULT_NOTIFICATION_PREFERENCES.rules.find(

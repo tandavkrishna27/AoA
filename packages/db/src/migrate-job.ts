@@ -27,6 +27,7 @@ export type MigrateJobReason =
   | "no_database_url"
   | "already_up_to_date"
   | "applied"
+  | "incompatible_history"
   | "unresolved_pending"
   | "exhausted_retries";
 
@@ -46,7 +47,11 @@ export interface MigrateJobResult {
 export interface MigrateJobDeps {
   url: string | undefined;
   applyMigrations?: (url: string, options: { deploymentMode?: DeploymentMode }) => Promise<void>;
-  inspect?: (url: string) => Promise<{ status: "upToDate" | "needsMigrations"; pendingMigrations?: string[] }>;
+  inspect?: (url: string) => Promise<{
+    status: "upToDate" | "needsMigrations" | "incompatible";
+    pendingMigrations?: string[];
+    reason?: string;
+  }>;
   deploymentMode?: DeploymentMode;
   /** Bounded retry ceiling. Never infinite — this is the "no destructive loop" guarantee. */
   maxAttempts?: number;
@@ -91,6 +96,11 @@ export async function runMigrateJob(deps: MigrateJobDeps): Promise<MigrateJobRes
         log({ phase: "up_to_date", attempt });
         return { ok: true, attempts: attempt, reason: attempt === 1 ? "already_up_to_date" : "applied" };
       }
+      if (before.status === "incompatible") {
+        const detail = `incompatible migration history: ${before.reason ?? "unknown reason"}`;
+        log({ phase: "failed", attempt, detail });
+        return { ok: false, attempts: attempt, reason: "incompatible_history" };
+      }
 
       await applyMigrations(url, { deploymentMode: deps.deploymentMode });
 
@@ -99,8 +109,13 @@ export async function runMigrateJob(deps: MigrateJobDeps): Promise<MigrateJobRes
         log({ phase: "applied", attempt });
         return { ok: true, attempts: attempt, reason: "applied" };
       }
+      if (after.status === "incompatible") {
+        const detail = `incompatible migration history after apply: ${after.reason ?? "unknown reason"}`;
+        log({ phase: "failed", attempt, detail });
+        return { ok: false, attempts: attempt, reason: "incompatible_history" };
+      }
       lastReason = "unresolved_pending";
-      log({ phase: "retry", attempt, pending: after.pendingMigrations?.length });
+      log({ phase: "retry", attempt, pending: after.status === "needsMigrations" ? after.pendingMigrations?.length : undefined });
     } catch (error) {
       lastReason = "exhausted_retries";
       log({

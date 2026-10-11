@@ -1,7 +1,7 @@
 // server/src/__tests__/helpers/migrated-database.ts
 //
 // The MINIMAL embedded-Postgres bootstrap for suites that need a real, fully-migrated
-// database and a real non-owner `aoa_app` connection — nothing more.
+// database and a real non-owner `aoa_app` connection â€” nothing more.
 //
 // `distributed-execution-db-startup.integration.test.ts` has a bootstrap too, but its
 // `beforeAll` is entangled with three extra databases and a legacy table-owner role
@@ -10,7 +10,7 @@
 // shared one: start it, use it, tear it down.
 //
 // Callers are responsible for skipping on Windows without AOA_RUN_WIN_INTEGRATION=1
-// (embedded-postgres cannot start on the `runneradmin` CI runner — Issue #114).
+// (embedded-postgres cannot start on the `runneradmin` CI runner â€” Issue #114).
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -33,19 +33,19 @@ type EmbeddedPostgresInstance = {
 type EmbeddedPostgresCtor = new (opts: Record<string, unknown>) => EmbeddedPostgresInstance;
 
 export type MigratedDatabase = {
-  /** Superuser/owner client. Seed through this — migrations run as the database owner. */
+  /** Superuser/owner client. Seed through this â€” migrations run as the database owner. */
   readonly admin: Sql;
   /** Drizzle Db on the NON-OWNER `aoa_app` login role. Read through this. */
   readonly appDb: Db;
   /**
-   * Drizzle Db on the NON-OWNER `aoa_operator` login role. ROUND 7 — the canary preflight's
+   * Drizzle Db on the NON-OWNER `aoa_operator` login role. ROUND 7 â€” the canary preflight's
    * definer functions grant EXECUTE to this role only, so the gate's own reads run here while
    * `appDb` stays the pool that must be DENIED.
    */
   readonly operatorDb: Db;
   /**
    * The connection URLs behind `admin` / `operatorDb`. ADDITIVE, for suites that must drive
-   * a real OPERATOR ENTRYPOINT as a subprocess — a CLI takes a DATABASE_URL, not a Db, and
+   * a real OPERATOR ENTRYPOINT as a subprocess â€” a CLI takes a DATABASE_URL, not a Db, and
    * proving that a `current_user` gate discriminates requires connecting as BOTH roles.
    */
   readonly adminUrl: string;
@@ -63,15 +63,8 @@ export async function startMigratedDatabase(
   const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as {
     default: EmbeddedPostgresCtor;
   };
-  const port = await allocateEmbeddedPgPort();
-  const embedded = new EmbeddedPostgres({
-    databaseDir: join(dataDir, "db"),
-    user: "test",
-    password: "test",
-    port,
-    persistent: false,
-    initdbFlags: ["--encoding=UTF8", "--locale=C"],
-  });
+  let port = 0;
+  let embedded: EmbeddedPostgresInstance | null = null;
   let admin: Sql | null = null;
   let app: NonOwnerDbConnection | null = null;
   let operator: NonOwnerDbConnection | null = null;
@@ -79,12 +72,34 @@ export async function startMigratedDatabase(
     await operator?.close({ timeoutSeconds: 5 }).catch(() => {});
     await app?.close({ timeoutSeconds: 5 }).catch(() => {});
     await admin?.end().catch(() => {});
-    await embedded.stop().catch(() => {});
+    await embedded?.stop().catch(() => {});
     await rm(dataDir, { recursive: true, force: true }).catch(() => {});
   };
   try {
-    await embedded.initialise();
-    await embedded.start();
+    // A PostgreSQL "ready" line can mean IPv6-only readiness when another
+    // fixture took the probed IPv4 port during initdb. Never migrate that URL:
+    // it may refuse the connection or belong to the competing cluster.
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      port = await allocateEmbeddedPgPort();
+      let startupLog = "";
+      embedded = new EmbeddedPostgres({
+        databaseDir: join(dataDir, "db"), user: "test", password: "test",
+        port, persistent: false,
+        initdbFlags: ["--encoding=UTF8", "--locale=C"],
+        onLog: (message: string) => {
+          startupLog = (startupLog + message).slice(-65_536);
+          console.log(message);
+        },
+      });
+      await embedded.initialise();
+      await embedded.start();
+      if (!/could not bind IPv4 address "127\.0\.0\.1": Address already in use/.test(startupLog)) break;
+      // stop() also removes this attempt's ephemeral cluster. Retry setup only;
+      // migration or assertion failures are never retried or weakened.
+      await embedded.stop();
+      embedded = null;
+      if (attempt === 3) throw new Error("Embedded PostgreSQL IPv4 startup collided on all 3 attempts");
+    }
     const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
     await applyPendingMigrations(adminUrl);
     admin = postgres(adminUrl, { max: 2 });

@@ -27,6 +27,7 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import { budgetPolicies, companies, costEvents } from "@armyofagents/db";
 import type { Db } from "@armyofagents/db";
 import { computeCostCents } from "./internal-agent/cost-model.js";
+import { lockBudgetAuthority } from "./budget-capacity.js";
 
 export interface OneShotBudgetPreflightParams {
   companyId: string;
@@ -178,6 +179,7 @@ export async function recordOneShotCliCost(
   const billingType = params.billingType ?? params.source ?? "unknown";
 
   return db.transaction(async (tx) => {
+    await lockBudgetAuthority(tx as unknown as Db, params.companyId);
     const write = tx
       .insert(costEvents)
       .values({

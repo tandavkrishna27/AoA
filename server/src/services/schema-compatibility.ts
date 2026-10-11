@@ -15,6 +15,7 @@
  */
 import {
   loadAppliedMigrationIdentity,
+  loadRequiredMigrationLineages,
   loadRequiredMigrationIdentity,
   type Db,
   type RequiredMigrationIdentity,
@@ -28,6 +29,9 @@ export interface SchemaCompatibilityInput {
   appliedOrderedHashes: readonly string[];
   /** Raw `__drizzle_migrations` row count — reveals a DB migrated past this image. */
   rawAppliedCount: number;
+  /** Alternative exact image histories accepted by this deployment. */
+  requiredLineages?: readonly { id: string; orderedHashes: readonly string[] }[];
+  freshLineageId?: string;
 }
 
 export type SchemaCompatibility =
@@ -42,8 +46,11 @@ export type SchemaCompatibility =
 export function evaluateSchemaCompatibility(
   input: SchemaCompatibilityInput,
 ): SchemaCompatibility {
-  const requiredLen = input.requiredOrderedHashes.length;
   const applied = input.appliedOrderedHashes;
+  const histories = input.requiredLineages?.length
+    ? input.requiredLineages
+    : [{ id: "default", orderedHashes: input.requiredOrderedHashes }];
+  const requiredLen = Math.max(...histories.map((history) => history.orderedHashes.length));
 
   // A DB with MORE applied migrations than the image knows (or more raw rows than
   // the image's whole ledger) has been migrated by a newer image — refuse to serve.
@@ -53,24 +60,28 @@ export function evaluateSchemaCompatibility(
 
   // The applied hashes must be an exact positional PREFIX of the required hashes.
   // Any mismatch means a replaced/diverged migration -> refuse to serve.
-  for (let i = 0; i < applied.length; i += 1) {
-    if (applied[i] !== input.requiredOrderedHashes[i]) {
-      return { status: "incompatible", schemaCompatible: false, reason: "divergent" };
-    }
-  }
-
   // Raw rows that did NOT resolve to image files within the known range (a diverged
   // or renamed migration) -> refuse to serve.
   if (input.rawAppliedCount !== applied.length) {
     return { status: "incompatible", schemaCompatible: false, reason: "divergent" };
   }
 
-  if (applied.length === requiredLen) {
+  const matches = histories.filter((history) =>
+    applied.every((hash, index) => history.orderedHashes[index] === hash),
+  );
+  if (matches.length === 0) {
+    return { status: "incompatible", schemaCompatible: false, reason: "divergent" };
+  }
+
+  const selected = matches.find((history) => history.id === input.freshLineageId) ??
+    (matches.length === 1 ? matches[0] : undefined);
+  if (!selected) return { status: "incompatible", schemaCompatible: false, reason: "divergent" };
+  if (applied.length === selected.orderedHashes.length) {
     return { status: "compatible", schemaCompatible: true };
   }
 
   // Applied is a strict prefix — the migration job has not finished. 503 until it does.
-  return { status: "pending", schemaCompatible: false, pendingCount: requiredLen - applied.length };
+  return { status: "pending", schemaCompatible: false, pendingCount: selected.orderedHashes.length - applied.length };
 }
 
 /**
@@ -78,14 +89,20 @@ export function evaluateSchemaCompatibility(
  * Read-only; never mutates the database.
  */
 export async function loadSchemaCompatibility(url: string): Promise<SchemaCompatibility> {
-  const [required, applied] = await Promise.all([
+  const [required, requiredLineages, applied] = await Promise.all([
     loadRequiredMigrationIdentity(),
+    loadRequiredMigrationLineages(),
     loadAppliedMigrationIdentity(url),
   ]);
   return evaluateSchemaCompatibility({
     requiredOrderedHashes: required.orderedHashes,
     appliedOrderedHashes: applied.orderedHashes,
     rawAppliedCount: applied.rawAppliedCount,
+    requiredLineages: requiredLineages.lineages.map((lineage) => ({
+      id: lineage.id,
+      orderedHashes: lineage.entries.map((entry) => entry.hash),
+    })),
+    freshLineageId: requiredLineages.freshLineageId,
   });
 }
 
@@ -95,6 +112,8 @@ export async function loadSchemaCompatibility(url: string): Promise<SchemaCompat
 export function createLiveSchemaCompatibilityReader(
   db: Db,
   required: RequiredMigrationIdentity,
+  requiredLineages?: readonly { id: string; orderedHashes: readonly string[] }[],
+  freshLineageId?: string,
 ): () => Promise<SchemaCompatibility> {
   const requiredOrderedHashes = Object.freeze([...required.orderedHashes]);
   if (requiredOrderedHashes.length === 0) throw new Error("Missing required migration identity");
@@ -106,6 +125,8 @@ export function createLiveSchemaCompatibilityReader(
       requiredOrderedHashes,
       appliedOrderedHashes: rows.map(row => row.hash ?? ""),
       rawAppliedCount: rows.length,
+      requiredLineages,
+      freshLineageId,
     });
   };
 }

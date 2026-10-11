@@ -70,6 +70,7 @@ import {
 } from "../config/distributed-execution.js";
 import { instanceSettingsService } from "./instance-settings.js";
 import { resolveWarmSandboxPreference, readAgentWarmOverride } from "./warm-sandbox-policy.js";
+import { lockBudgetAuthority } from "./budget-capacity.js";
 import { conflict, notFound, HttpError } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { publishLiveEvent, threadWorkingAgents, broadcastThreadPresence } from "./live-events.js";
@@ -2639,7 +2640,10 @@ export function heartbeatService(
     const additionalCostCents = Math.max(0, Math.round((result.costUsd ?? 0) * 100));
     const hasTokenUsage = inputTokens > 0 || outputTokens > 0 || cachedInputTokens > 0;
 
-    await db
+    await db.transaction(async (tx) => {
+      const txDb = tx as unknown as Db;
+      await lockBudgetAuthority(txDb, agent.companyId);
+      await txDb
       .update(agentRuntimeState)
       .set({
         adapterType: agent.adapterType,
@@ -2656,7 +2660,7 @@ export function heartbeatService(
       .where(eq(agentRuntimeState.agentId, agent.id));
 
     if (additionalCostCents > 0 || hasTokenUsage) {
-      await db.insert(costEvents).values({
+        await txDb.insert(costEvents).values({
         companyId: agent.companyId,
         agentId: agent.id,
         provider: result.provider ?? "unknown",
@@ -2669,7 +2673,7 @@ export function heartbeatService(
     }
 
     if (additionalCostCents > 0) {
-      await db
+        await txDb
         .update(agents)
         .set({
           spentMonthlyCents: sql`${agents.spentMonthlyCents} + ${additionalCostCents}`,
@@ -2677,10 +2681,12 @@ export function heartbeatService(
         })
         .where(eq(agents.id, agent.id));
 
-      // Budget alert checks
-      if (agent.budgetMonthlyCents > 0) {
-        await checkBudgetAlerts(agent, run);
-      }
+    }
+    });
+
+    // Alerts are evaluated after the authoritative charge transaction commits.
+    if (additionalCostCents > 0 && agent.budgetMonthlyCents > 0) {
+      await checkBudgetAlerts(agent, run);
     }
   }
 

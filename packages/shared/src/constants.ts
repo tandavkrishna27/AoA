@@ -266,8 +266,12 @@ export const SECRET_BINDING_TARGET_TYPES = [
   "plugin",
   "issue",
   "run",
+  "provider_connection",
 ] as const;
 export type SecretBindingTargetType = (typeof SECRET_BINDING_TARGET_TYPES)[number];
+
+export const SECRET_RESOLUTION_SCOPES = ["general", "voice_media"] as const;
+export type SecretResolutionScope = (typeof SECRET_RESOLUTION_SCOPES)[number];
 
 export const SECRET_ACCESS_OUTCOMES = ["success", "failure"] as const;
 export type SecretAccessOutcome = (typeof SECRET_ACCESS_OUTCOMES)[number];

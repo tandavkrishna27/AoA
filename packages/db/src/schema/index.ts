@@ -26,6 +26,13 @@ export * from "./company_user_profiles.js";
 export * from "./company_user_capability_documents.js";
 export { sidebarPreferences } from "./sidebar_preferences.js";
 export { homeBoardLayouts, type HomeBoardLayoutItem } from "./home_board_layouts.js";
+export {
+  universeLayouts,
+  universeLayoutOperations,
+  type UniverseLayoutDocument,
+  type UniverseLayoutPanel,
+} from "./universe_layouts.js";
+export { universeDrafts } from "./universe_drafts.js";
 export { viewerPreferences } from "./viewer_preferences.js";
 export { hubPreferences } from "./hub_preferences.js";
 export { hubAutopilotPolicies } from "./hub_autopilot_policies.js";
@@ -148,6 +155,7 @@ export { heartbeatRuns } from "./heartbeat_runs.js";
 export { heartbeatRunEvents } from "./heartbeat_run_events.js";
 export { heartbeatRunWatchdogDecisions } from "./heartbeat_run_watchdog_decisions.js";
 export { costEvents } from "./cost_events.js";
+export { budgetCapacityReservations, budgetCapacitySettlements } from "./budget_capacity_reservations.js";
 export { approvals } from "./approvals.js";
 export { approvalComments } from "./approval_comments.js";
 export { activityLog } from "./activity_log.js";
@@ -291,3 +299,8 @@ export {
 export { marketplaceCompanySettings } from "./marketplace_company_settings.js";
 export { marketplacePendingUpdates } from "./marketplace_pending_updates.js";
 export { pluginVersionSnapshots } from "./plugin_version_snapshots.js";
+
+export { universePanelCheckpoints } from "./universe_layouts.js";
+export { universeIntakes, universeIntakeParts } from "./universe_intakes.js";
+export { universePreferences } from "./universe_preferences.js";
+export { universeAttentionCheckpoints } from "./universe_attention.js";

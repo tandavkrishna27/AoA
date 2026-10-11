@@ -3,12 +3,13 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { drizzleOperatorStubs, makeTableProxy } from "./helpers/drizzle-mock.js";
 
-const { mockService, mockLogActivity } = vi.hoisted(() => ({
+const { mockService, mockLogActivity, mockUniverseAssetAccess } = vi.hoisted(() => ({
   mockService: {
     getById: vi.fn(),
     create: vi.fn(),
   },
   mockLogActivity: vi.fn(),
+  mockUniverseAssetAccess: vi.fn(),
 }));
 
 vi.mock("drizzle-orm", () => drizzleOperatorStubs());
@@ -18,6 +19,9 @@ vi.mock("@armyofagents/db", () => ({
 vi.mock("../services/index.js", () => ({
   assetService: () => mockService,
   logActivity: mockLogActivity,
+}));
+vi.mock("../services/universe-asset-access.js", () => ({
+  assertUniverseAssetAccess: mockUniverseAssetAccess,
 }));
 
 import { assetRoutes } from "../routes/assets.js";
@@ -86,6 +90,7 @@ describe("GET /assets/:assetId/meta", () => {
     expect(res.body.objectKey).toBeUndefined();
     expect(res.body.sha256).toBeUndefined();
     expect(mockService.getById).toHaveBeenCalledWith(assetId);
+    expect(mockUniverseAssetAccess).toHaveBeenCalledWith({}, assetId, expect.objectContaining({ type: "board" }));
   });
 
   it("returns 404 when the asset does not exist", async () => {

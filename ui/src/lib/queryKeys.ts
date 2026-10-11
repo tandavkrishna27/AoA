@@ -168,6 +168,25 @@ export const queryKeys = {
   },
   sidebarPreferences: (companyId: string) => ["sidebar-preferences", companyId] as const,
   homeBoardLayout: (companyId: string) => ["home-board-layout", companyId] as const,
+  universeLayout: (companyId: string, conversationId: string, ownerSession: string) =>
+    ["universe-layout", ownerSession, companyId, conversationId] as const,
+  universeSnapshot: (companyId: string, conversationId: string, ownerSession: string) =>
+    ["universe-snapshot", ownerSession, companyId, conversationId] as const,
+  universeDraft: (
+    companyId: string,
+    conversationId: string,
+    destinationKind: string,
+    destinationId: string,
+    ownerSession: string,
+  ) =>
+    [
+      "universe-draft",
+      ownerSession,
+      companyId,
+      conversationId,
+      destinationKind,
+      destinationId,
+    ] as const,
   viewerPreferences: (companyId: string) => ["viewer-preferences", companyId] as const,
   inboxDismissals: (companyId: string) => ["inbox-dismissals", companyId] as const,
   activity: (companyId: string) => ["activity", companyId] as const,
@@ -329,6 +348,7 @@ export const queryKeys = {
   },
   cockpit: (companyId: string) => ["cockpit", companyId] as const,
   cockpitCounts: (companyId: string) => ["cockpit", companyId, "counts"] as const,
+  universePreferences: (companyId: string) => ["universe-preferences", companyId] as const,
   plugins: {
     all: ["plugins"] as const,
     list: ["plugins", "list"] as const,
