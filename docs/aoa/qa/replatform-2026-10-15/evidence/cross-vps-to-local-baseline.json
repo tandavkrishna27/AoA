@@ -1,0 +1,22 @@
+{
+  "direction": "vps-to-local",
+  "label": "baseline",
+  "capturedAt": "2026-10-15T10:56:59.163Z",
+  "workers": [
+    {
+      "id": "e7f845bf-50db-41cc-b2b2-39925118bfff",
+      "status": "enrolled",
+      "device_generation": 1,
+      "last_seen_at": null,
+      "age_seconds": null
+    }
+  ],
+  "targets": [
+    {
+      "id": "e442d2da-3886-4969-9bd4-2106ef578bcb",
+      "status": "active",
+      "last_seen_at": "2026-10-15T10:43:14.517Z",
+      "device_generation": 1
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{"level":30,"time":1792076651626,"workerVersion":"0.1.0","protocolMin":1,"protocolMax":1,"keyStoreMode":"file_record","targetScope":"organization","msg":"worker-daemon starting"}
+{"level":30,"time":1792076651637,"workerId":"871a3bca-323e-4b90-a14d-9841cf39ee73","targetId":"2fabfe04-3f1e-43dc-ad75-347a31c9bb71","deviceGeneration":1,"deviceThumbprint":"6691fcbd2640ae90cd12f13f84e7997a68d4d22c4816cd393bf30c2f66c1d398","msg":"worker-daemon already enrolled; skipping control-plane enrollment"}
+{"level":30,"time":1792076652017,"expiresAtMs":1792077552017,"deviceGeneration":1,"msg":"worker-daemon session acquired"}
+{"level":30,"time":1792076652826,"step":"startup-reconcile","msg":"startup: running startup-reconcile"}
+{"level":30,"time":1792076652827,"reason":"lease_candidate_store_empty","msg":"startup-reconcile: the lease-candidate store is empty; this daemon held no lease when it last stopped"}
+{"level":30,"time":1792076652828,"reason":"sandbox_pass_skipped_container_path_f4","msg":"startup-reconcile: sandbox pass skipped; orphan reclamation rests on the provider-side reaper"}
+{"level":30,"time":1792076652828,"step":"startup-reconcile","outcome":"ok","msg":"startup: startup-reconcile complete"}
+{"level":30,"time":1792076652828,"workerId":"871a3bca-323e-4b90-a14d-9841cf39ee73","targetId":"2fabfe04-3f1e-43dc-ad75-347a31c9bb71","msg":"worker-daemon dispatch COMPOSED; heartbeat seeded; startup reconcile complete; leasing through the poll loop"}
+{"level":30,"time":1792076664180,"workerVersion":"0.1.0","protocolMin":1,"protocolMax":1,"keyStoreMode":"file_record","targetScope":"organization","msg":"worker-daemon starting"}
+{"level":30,"time":1792076664190,"workerId":"871a3bca-323e-4b90-a14d-9841cf39ee73","targetId":"2fabfe04-3f1e-43dc-ad75-347a31c9bb71","deviceGeneration":1,"deviceThumbprint":"6691fcbd2640ae90cd12f13f84e7997a68d4d22c4816cd393bf30c2f66c1d398","msg":"worker-daemon already enrolled; skipping control-plane enrollment"}
+{"level":30,"time":1792076664567,"expiresAtMs":1792077564567,"deviceGeneration":1,"msg":"worker-daemon session acquired"}
+{"level":30,"time":1792076665342,"step":"startup-reconcile","msg":"startup: running startup-reconcile"}
+{"level":30,"time":1792076665343,"reason":"lease_candidate_store_empty","msg":"startup-reconcile: the lease-candidate store is empty; this daemon held no lease when it last stopped"}
+{"level":30,"time":1792076665344,"reason":"sandbox_pass_skipped_container_path_f4","msg":"startup-reconcile: sandbox pass skipped; orphan reclamation rests on the provider-side reaper"}
+{"level":30,"time":1792076665344,"step":"startup-reconcile","outcome":"ok","msg":"startup: startup-reconcile complete"}
+{"level":30,"time":1792076665345,"workerId":"871a3bca-323e-4b90-a14d-9841cf39ee73","targetId":"2fabfe04-3f1e-43dc-ad75-347a31c9bb71","msg":"worker-daemon dispatch COMPOSED; heartbeat seeded; startup reconcile complete; leasing through the poll loop"}
+{"level":30,"time":1792076666331,"probeLine":"AOA-RUN-OUTPUT-PROBE arm=cross_34128010fea04f15a96347704018daa7 control=cross_34128010fea04f15a96347704018daa7","msg":"worker: run output redaction probe"}
+{"level":40,"time":1792076666439,"leaseId":"6db83153-da69-4e37-bdae-cb02441990cd","resourceLabelsHash":"6da9a0145bb039dcf5056e2b040ddd1326f65880b6d2322f1562e5fbaa9f6c4e","stage":"produce","reason":"producer_failed","exported":0,"msg":"supervisor: artifact export window did not complete (best-effort, E5-D07; attempt NOT failed)"}
+{"level":30,"time":1792076666513,"leaseId":"6db83153-da69-4e37-bdae-cb02441990cd","sandboxId":"fake-sbx-bf279c90-ef16-4843-b803-b9fb6433d5fc","providerOpId":"fake-destroy-20","resourceLabelsHash":"6da9a0145bb039dcf5056e2b040ddd1326f65880b6d2322f1562e5fbaa9f6c4e","cleanupStatus":"success","msg":"supervisor: run complete"}

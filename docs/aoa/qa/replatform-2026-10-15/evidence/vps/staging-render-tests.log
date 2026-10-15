@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: M4 staging slots have independent state and stop-first single ownership
+ok 1 - M4 staging slots have independent state and stop-first single ownership
+  ---
+  duration_ms: 382.343158
+  type: 'test'
+  ...
+# Subtest: E6F-12: docker compose config parses the staging manifest
+ok 2 - E6F-12: docker compose config parses the staging manifest
+  ---
+  duration_ms: 177.272571
+  type: 'test'
+  ...
+# Subtest: E6F-12: the invariant module agrees with the committed manifest
+ok 3 - E6F-12: the invariant module agrees with the committed manifest
+  ---
+  duration_ms: 22.411318
+  type: 'test'
+  ...
+# Subtest: E6F-12: rendered failure-domain split (1 CP + 2 workers per domain)
+ok 4 - E6F-12: rendered failure-domain split (1 CP + 2 workers per domain)
+  ---
+  duration_ms: 148.06667
+  type: 'test'
+  ...
+# Subtest: E6F-12: migrate gate + worker drain resolve
+ok 5 - E6F-12: migrate gate + worker drain resolve
+  ---
+  duration_ms: 157.388062
+  type: 'test'
+  ...
+# Subtest: E6F-12: provider-control credential confined to the adapter-management surface
+ok 6 - E6F-12: provider-control credential confined to the adapter-management surface
+  ---
+  duration_ms: 148.448071
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1369.259599

@@ -1,0 +1,992 @@
+AOA REPLATFORM TESTING AND REMAINING ACCEPTANCE
+15 October 2026
+Candidate 13b4e806f31a67c3c172f2216272570203132f8f
+
+STATUS AND SCOPE
+
+Both installations and substantial distributed engineering behavior are validated. The branch is not ready for release acceptance. Development gaps, reproducible failures, and operational campaigns remain.
+
+Candidate: 13b4e806f31a67c3c172f2216272570203132f8f. Reference: origin/docs/replatform-program. Report date: 15 October 2026, Asia/Calcutta. Evidence summary generated at 2026-10-15T16:40:36.893Z (UTC). All tests refer to this application revision unless a row explicitly describes earlier repository evidence.
+
+This is an engineering evidence report. No repository ticket, epic, rollout flag or release gate was formally promoted by this testing session. Passed checks below may be checked off at their stated scope; existing milestone completion is governed by the repository ledgers.
+
+This round extended the earlier checks with the complete normal Node 24 lane, explicitly enabled Windows integration tests, Linux worker-slot fixtures and the real CLI restore fixture. It is not possible to conclude that no further testing is possible: the remaining-work table identifies runnable campaigns, development dependencies, unsupported capabilities and infrastructure prerequisites separately.
+
+Application implementation was not changed or committed during testing; the local source worktree is clean. The VPS docker/images/allowlist.json intentionally contains development image-admission entries. Test scripts, private configuration, logs and this report are outside the product worktree. No release, merge or public rollout promotion is implied.
+
+INSTALLATIONS AND AUTHORITY BOUNDARIES
+
+Installation: Windows native application
+Address or project: http://127.0.0.1:3210
+Configuration: Node 24.19.0, embedded PostgreSQL, local_trusted; separate pinned Codex CLI 0.145.0 and AoA-scoped subscription login.
+
+Installation: Windows distributed fixture
+Address or project: Docker Desktop / aoa-replatform-test
+Configuration: Separate control plane, worker, reference provider, PostgreSQL, MinIO and fault proxy. Not the native app database.
+
+Installation: Public VPS application
+Address or project: https://testing.armyofagents.org
+Configuration: Helsinki Ubuntu 26.04.1 ARM64; Docker application, private PostgreSQL, Caddy TLS, Google sign-in; local_disk storage.
+
+Installation: VPS distributed fixture
+Address or project: Private Docker / aoa-replatform-test
+Configuration: Separate fixture database and MinIO. Two control-plane replicas used for selected tests; extra replica subsequently stopped.
+
+Installation: Real E2B
+Address or project: Candidate shipped transport / base template
+Configuration: Three bounded sandboxes total; lifecycle and capabilities only. Provider credential confined to provider-only execution boundary. No paid model API calls.
+
+HOW LOCAL AND VPS DELEGATION WAS TESTED
+
+A shared environment has one logical control-plane authority, which may have multiple replicas. Workers enroll into that authority. Two complete AoA installations with independent databases do not delegate to each other as peer applications.
+
+Both cross-host directions were tested as separate fixture environments. A private SSH tunnel carried control traffic; a test-only ingress bridge/host allowlist allowed the Docker Desktop path. This differs from the original hermetic network topology.
+
+The later successful VPS-to-PC job used the VPS test authority and a separate local Docker worker/reference provider. It did not use the public Google-authenticated app, the native port-3210 app, or the user’s personal Codex login. A real local Node environment probe and unique result marker establish where that bounded fixture executed; ordinary reference-provider output is scripted.
+
+The native local application independently completed a real Codex subscription Commander turn. Combining that personal subscription with a VPS-issued task needs the unimplemented device-local credential/execution path. Copying auth files to the VPS was not used.
+
+CHECKS THAT CAN BE MARKED DONE
+
+Local native installation and separate Docker fixture setup.
+
+VPS installation, DNS, HTTPS, Google sign-in and dummy application persistence.
+
+Current candidate build, recursive typecheck and policy checks.
+
+Bounded M1 reference-provider worker spine on both hosts, including attributed drain.
+
+Real MinIO integrity and stale-upload cleanup checks on both hosts.
+
+Selected two-replica lease/capacity/rate/event correctness checks.
+
+Bidirectional cross-host enrollment, heartbeat, disconnect/reconnect and restart identity.
+
+A VPS-issued fixture job actually executed by the local Docker worker/reference provider, with stopped-worker control and returned marker.
+
+Native Codex subscription login and real persisted Commander response, subject to the model configuration workaround.
+
+Real E2B lifecycle, supported/unsupported capability observations and cleanup.
+
+Linux worker-slot exclusive ownership and restart identity checks.
+
+CLI backup/restore fixture: SQL/gzip recovery and eleven integrity, rollback and security-fallback cases.
+
+TST-004 authentication/Commander validation is closed at the stated model-workaround scope. No other TST finding is silently resolved by isolated passing reruns.
+
+No new formal epic or full D1–D6 gate was closed by this session. E0/E1/E2 already have accepted historical closure; later code-complete ticket claims are limited by their own ledgers and current milestone reports.
+
+EXECUTED TEST INVENTORY
+
+ID: I01
+Check: Dependency installation
+Result: PASS
+What the result establishes: Frozen pnpm 9.15.4 workspace installation; isolated supported local runtime.
+Evidence: local-dependencies.log
+
+ID: I02
+Check: Production workspace build
+Result: PASS
+What the result establishes: Authoritative root pnpm build completed across the workspace.
+Evidence: local-workspace-build.log
+
+ID: I03
+Check: Recursive typecheck
+Result: PASS
+What the result establishes: Workspace recursive typecheck completed.
+Evidence: local-typecheck.log
+
+ID: I04
+Check: Policy, image admission and gate wiring
+Result: PASS
+What the result establishes: 205 tests, zero skips on each host; image/provenance/admission assertions and structural wiring regressions. Not full live security conformance.
+Evidence: local-policy-tests-exact.log;evidence/vps/policy-tests.log
+
+ID: I05
+Check: Real PostgreSQL migration readiness
+Result: PASS
+What the result establishes: 5/5 local native cases, including divergence/newer ledger and recovery behavior.
+Evidence: local-postgres-readiness.log
+
+ID: I06
+Check: Local native schema and file recovery
+Result: PASS
+What the result establishes: One composite test: full migrated schema restored, four stale-authority cases denied, fresh authority positive control, two missing/corrupt stored-byte recovery cases and healthy sibling access. Not external-store/fleet RPO/RTO.
+Evidence: local-native-restore-tests-attempt2.log
+
+ID: I07
+Check: M1 distributed spine on Windows
+Result: PASS AFTER RETRY
+What the result establishes: 10/10, zero skips in isolated final run. Worker executes reference-provider journey, events/cost/audit attribution, tenant denial, legacy control and MIG-009 drain. Earlier under-load 9/10 failures retained.
+Evidence: local-m1-spine-isolated.log;local-m1-spine-tests-node24.log
+
+ID: I08
+Check: M1 distributed spine on ARM64 VPS
+Result: PASS
+What the result establishes: 10/10, zero skips after installing missing harness host dependencies. Same product assertions.
+Evidence: evidence/vps/m1-spine-tests-attempt2.log
+
+ID: I09
+Check: Real MinIO artifact lifecycle
+Result: PASS
+What the result establishes: 3/3 on each host: actual upload/download, truncated upload refusal and orphan cleanup after fence loss.
+Evidence: local-artifact-store-tests.log;evidence/vps/artifact-store-tests.log
+
+ID: I10
+Check: Two-replica control-plane correctness
+Result: PASS
+What the result establishes: Six control-plane cases: one lease winner, shared capacity, terminal consistency, session usable across replicas, replica-loss convergence and shared rate window. Harness simulates workers.
+Evidence: evidence/vps/two-replica-tests.log
+
+ID: I11
+Check: Durable event fanout components
+Result: PASS
+What the result establishes: Three real-PostgreSQL cases: LISTEN/NOTIFY wake, cross-replica durable visibility and safety-poll recovery after dropped notification. Literal authenticated cross-replica socket delivery is outside this suite.
+Evidence: evidence/vps/two-replica-tests.log
+
+ID: I12
+Check: Images and development admission
+Result: PASS
+What the result establishes: ARM64 control-plane/worker/adapter-manager images and local AMD64 fixture images built; development signing-root admission with provenance/SBOM. Does not establish production signing or release promotion.
+Evidence: TEST-RESULTS.json
+
+ID: I13
+Check: Public network and authentication
+Result: PASS
+What the result establishes: DNS, valid HTTPS, HTTP redirect 308, health 200, signed-out companies request 401, real Google sign-in and dummy onboarding. Private database/harness ports remain loopback/internal.
+Evidence: evidence/final-app-health.json
+
+ID: I14
+Check: Public application data persistence
+Result: PASS
+What the result establishes: Dummy organization/company, department and unassigned task AOA-1 created and visible in Tasks. Not a completed public distributed agent job.
+Evidence: evidence/vps-dummy-task.jpg
+
+ID: I15
+Check: Native subscription authentication
+Result: PASS WITH CONFIGURATION WORKAROUND
+What the result establishes: Separate AoA CLI home successfully authenticated. Real verification and Commander turn used gpt-5.6-luna; exact AOA_SUBSCRIPTION_OK response persisted after reload. Default gpt-5.5 failed.
+Evidence: evidence/local-subscription-followup.json;evidence/local-subscription-model-override.json;evidence/local-subscription-commander.jpg
+
+ID: I16
+Check: Bidirectional cross-host worker connectivity
+Result: PASS
+What the result establishes: Local worker to VPS fixture authority, and VPS worker to local fixture authority: enrollment, signed heartbeat, private-tunnel partition, reconnection and restart preserving identity. Two independent experiments.
+Evidence: evidence/cross-vps-to-local-active.json;evidence/cross-vps-to-local-partition.json;evidence/cross-vps-to-local-recovered.json;evidence/cross-vps-to-local-restarted.json;evidence/vps/cross-local-to-vps-active.json;evidence/vps/cross-local-to-vps-partition.json;evidence/vps/cross-local-to-vps-recovered.json;evidence/vps/cross-local-to-vps-restarted.json
+
+ID: I17
+Check: VPS fixture job delegated to local worker
+Result: PASS WITH REFERENCE PROVIDER
+What the result establishes: Stopped-worker control: pending, zero leases/events. Starting the expected PC Docker worker alone leased and completed the job; a real local pinned-Node environment probe passed and a unique marker returned to VPS. Five events and exclusive worker identity recorded. Ordinary task output/usage is scripted. Public UI, arbitrary coding and personal-subscription delegation are not established. Artifact export emitted producer_failed.
+Evidence: evidence/vps/vps-issued-local-worker-job-cross-execution.json;evidence/cross-task-local-worker.log
+
+ID: I18
+Check: Real E2B bounded lifecycle
+Result: PASS
+What the result establishes: Six checks: create, stage/mutate/read file and stdout/stderr, credential absence in sandbox environment, command timeout, terminate/not-found/idempotent repeat and TTL expiry. Two initial sandboxes.
+Evidence: evidence/vps/e2b-bounded-smoke.log
+
+ID: I19
+Check: Real E2B capability resolution
+Result: PASS WITH UNSUPPORTED CAPABILITIES
+What the result establishes: Third sandbox: streaming byte-bound refusal, background handle/running state, graceful cancellation honestly unsupported, forced kill accepted and disappearance observed, invalid handle unknown. Graceful per-process cancellation and process-list exit-code observation remain unavailable.
+Evidence: evidence/vps/e2b-capability-smoke.log
+
+ID: I20
+Check: E2B cleanup
+Result: PASS
+What the result establishes: All three sandboxes reclaimed; complete tagged inventory returned zero remaining. No model calls; final billed dollar amount not queried.
+Evidence: evidence/vps/e2b-bounded-smoke.log;evidence/vps/e2b-capability-smoke.log
+
+ID: I21
+Check: Health latency and connectivity
+Result: PASS AT SMOKE SCALE
+What the result establishes: 100 requests per endpoint, concurrency 4, zero failures. Windows p95 about 4.7 ms local / 201.9 ms Helsinki HTTPS. VPS p95 about 22.7 ms loopback / 13.5 ms public HTTPS. Separate short samples; no workload throughput or D5 SLO claim.
+Evidence: evidence/http-smoke.json;evidence/vps/http-smoke-vps.json
+
+ID: I22
+Check: Linux durable worker slot ownership
+Result: PASS
+What the result establishes: 2/2 tests, zero skips in networkless disposable containers using candidate VPS worker image: contention/alias refusal, crash lock release, lock-holder loss, partial-lock rollback, identity/receipt validation, persistence after bootstrap and restart, unsafe path/hardlink refusal.
+Evidence: evidence/vps/m4-slot-tests.log
+
+ID: I23
+Check: Actual CLI database recovery
+Result: PASS AFTER SETUP CORRECTION
+What the result establishes: One composite fixture, 11 checks, zero skips: SQL/gzip restore, two-company data and migration journal preserved, missing/corrupt/truncated/invalid COPY refusal with rollback, and column/schema/type ACL refusal of incomplete fallback backups. Host Node 22.22.1; pinned disposable PostgreSQL. Initial missing CLI/shared dependency attempts retained. Not full-schema or timed fleet recovery.
+Evidence: evidence/vps/m4-cli-restore-tests-attempt3.log;evidence/vps/m4-cli-restore-tests.log;evidence/vps/m4-cli-restore-tests-attempt2.log
+
+ID: I24
+Check: Staging manifest rendered by Docker Compose
+Result: PASS
+What the result establishes: 6/6, zero skips: independent worker state/ownership, actual Compose parsing versus invariant evaluator, declared failure-domain split, migrate/drain dependencies, and provider-management credential confinement. Configuration validation only; no multi-host staging deployment.
+Evidence: evidence/vps/staging-render-tests.log
+
+ID: I25
+Check: Base D1 foundation checks on a fresh private VPS fixture
+Result: PASS AFTER SETUP CORRECTION
+What the result establishes: 34/34, zero skips: enrollment and restart identity; 100 lease races across at least two profiles; networked fake execution; cross-organization and stale-fence non-disclosure; worker/provider network denial and positive controls; three lease-fault cases; durable tenant-scoped telemetry; live collected evidence retention. Host orchestrator Node 22; application/worker images use their pinned runtime. First 15-pass/19-fail attempt mixed Docker project selectors and omitted the prerequisite evidence bundle. Corrected COMPOSE_PROJECT_NAME and collector prerequisite; unchanged assertions all passed.
+Evidence: evidence/vps/foundation-tests-attempt2.log;evidence/vps/foundation-tests.log
+
+ID: I26
+Check: Supplemental offline policy and static tooling
+Result: PASS AFTER GIT PREREQUISITE CORRECTION
+What the result establishes: 410/410, zero skips, plus seven static commands. Fault declarations, compose isolation, image dependency/static Dockerfile assertions, staging, provider cleanup/identity decisions, boot roots and host-spawn guard. Initial Dockerfile Git-owner precondition failure retained; only that unchanged file rerun under the checkout owner. Synthetic/static scope, no real provider or deployment.
+Evidence: evidence/offline-policy/summary.json
+
+ID: I27
+Check: Separate single-file triage of six Node 24 files
+Result: MIXED
+What the result establishes: Playwright dependency and composition import-hook failures reproduced; migration identity, job-contract and UI files passed. Artifact-export file exposed a different stalled-upload error-class assertion failure. Original full-suite failures remain. Parent database lane was still active; these are separate single-file runs, not an idle-machine experiment.
+Evidence: evidence/triage-node24/isolated-summary.json;evidence/triage-node24/triage-findings.json
+
+ID: I28
+Check: M1 reference-provider fault profile and injection control
+Result: PASS AT DECLARED REQUIRED SCOPE
+What the result establishes: 26/26 test callbacks pass, zero skips; independent evidence verdict exit 0. 30 required fault cases are represented by those callbacks. Suppressed-injection control passed: true. Profile complete: false; pending device-local production-reader company-predicate case is routed to M1a-D2-MECHANISM. Reference provider only; no D2/real-E2B claim.
+Evidence: evidence/fault-campaign-summary.json;evidence/vps/fault-profile-tests.log;evidence/vps/fault-profile-verdict.log;evidence/vps/fault-suppressed-tests.log
+
+ID: I29
+Check: POSIX signing/admission pipeline with stubbed Docker
+Result: PASS
+What the result establishes: 13/13, zero skips on Ubuntu ARM64 Node 24. Unchanged test against a disposable pristine HEAD snapshot of eleven required files; signing outputs and keys are synthetic and temp-local. The Docker shim never delegates to real Docker, no external provider calls, active VPS development allowlist unchanged. Not a production signing-root or published-image claim.
+Evidence: evidence/offline-policy/posix-summary.json;evidence/offline-policy/offline-posix-image-pipeline.log
+
+ID: I30
+Check: Shipped-boot and cleanup offline regression corpus
+Result: PASS
+What the result establishes: 248/248, zero skips: workflow/boot shape 67, shipped-boot decisions/scanning 116, cleanup evidence 65. Owned temp Git/process fixtures only; no real Docker/network/provider/credential/app operations. These supplement the earlier bounded offline lane's exclusions.
+Evidence: evidence/offline-nested/summary.json
+
+ID: I31
+Check: Explicit Windows real-database and native-process lane
+Result: FAIL; FINAL SUMMARY INTERRUPTED
+What the result establishes: 121 files pass / 2 fail / 0 skip; 1458 tests pass / 6 fail / 2 skip, derived from all123 per-file reports. Final global summary/native exit/uncaught-error count unavailable after PowerShell stderr reporting failed. Covers tenant/RLS, exact serving authority, jobs/fences/quotas/events/parity/drain, worker lifecycle, secrets, crew/output, browser broker, service/checkpoint and recovery components. This is component/integration coverage, not full provider-backed workload gates.
+Evidence: evidence/windows-opt-in-node24-summary.json;windows-opt-in-files.json;local-windows-opt-in-node24-decoded.log
+
+ID: I32
+Check: Complete normal supported-runtime Vitest suite
+Result: FAIL
+What the result establishes: 2518 files pass / 5 fail / 227 skip; 24332 tests pass / 4 fail / 2063 skip; 1 uncaught errors. Unchanged candidate; isolated Node 24 first on PATH, two maximum test workers. Separate single-file reruns do not replace this whole-lane verdict.
+Evidence: evidence/full-node24-summary.json;local-full-tests-node24.log
+
+ID: I33
+Check: Live built-image contents and least-privilege inspection
+Result: PASS
+What the result establishes: 9/9, zero skips. Candidate ARM64 CP/worker/adapter-manager digests and OCI revisions verified before tests. Disposable shell inspectors check non-root users, required bins, excluded app/test/CLI/Docker surfaces and tested provider-credential image configuration. No host mounts, app boot or provider keys; image records unchanged. The E2B SDK may exist outside adapter-manager by design; credential/control authority is the boundary.
+Evidence: evidence/image-contents/summary.json;evidence/image-contents/live-image-contents.log
+
+WHOLE-SUITE RESULTS AND EXPLICITLY ENABLED INTEGRATION TESTS
+
+Lane: Initial complete run using system Node 26
+Files: 2487 passed / 36 failed / 227 skipped
+Tests: 24012 passed / 325 failed / 2062 skipped
+Result: fail
+Evidence: local-full-tests.log
+
+Lane: Node 24 repeat of the 36 failed files
+Files: 34 passed / 2 failed / 0 skipped
+Tests: 479 passed / 2 failed / 15 skipped
+Result: mixed
+Evidence: local-node24-all-failed-files.log
+
+Lane: Complete normal Node 24 lane
+Files: 2518 passed / 5 failed / 227 skipped
+Tests: 24332 passed / 4 failed / 2063 skipped
+Result: Exit 1; 1 uncaught errors
+Evidence: local-full-tests-node24.log
+
+Lane: Explicit Windows opt-in lane on Node 24
+Files: 121 passed / 2 failed / 0 skipped
+Tests: 1458 passed / 6 failed / 2 skipped
+Result: All per-file results observed; final global summary/native exit/uncaught errors unavailable
+Evidence: local-windows-opt-in-node24-decoded.log
+
+INTERPRETING THE SUITE COUNTS
+
+The lanes overlap; their test counts must not be added into a unique-test total. A composite node:test recovery test contains multiple checks but is still one test. Counts labeled per host are independent executions of the same assertions.
+
+The initial Node 26 run is preserved as failed evidence. The supported Node 24 result supersedes it for the current normal-lane verdict; isolated repeats do not erase failures or establish the three-run stability requirement.
+
+The explicit Windows manifest selects the 123 test files that mention AOA_RUN_WIN_INTEGRATION, enables that flag, and executes serially with the real embedded PostgreSQL prerequisites. Its JSON manifest is retained. Any remaining skips are still excluded from the passing count.
+
+All123 Windows file reports completed, but the PowerShell5 wrapper raised NativeCommandError while Vitest wrote its final stderr report. Windows counts are therefore summed from those complete per-file reports; the final native exit, global uncaught-error count and final duration were not captured. Unknown is not zero. The original UTF16LE log and a decoded UTF8 copy are retained. Focused direct-Node runs capture final reports separately; they do not replace the whole-lane failure.
+
+The normal Windows suite leaves platform/live/integration opt-ins skipped. Full browser-provider acceptance, Linux kernel/socket assertions and other operating systems require their own lanes. Source-history test totals quoted in milestone documents are prior developer evidence, not counts from this session.
+
+FINAL SUITE FAILURE LOCATIONS
+
+Lane: Normal Node 24
+Failure headers: FAIL  |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 real-createApp() composition — import-constraint (E0-F005)
+FAIL  |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves
+FAIL  |@armyofagents/db| src/__tests__/required-migration-identity.test.ts > required migration identity > uses literal Drizzle journal array order when idx, tag, and when values all disagree
+FAIL  |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > maps one attempt-local typed static context from exact authority symbols with no laundering or injection
+FAIL  |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > calls update with archived status when Archive is confirmed via dialog
+
+Lane: Windows opt-in
+Failure headers: × distributed-execution non-owner startup gate > checks grant-option ACL tuples independently on every derived relation and non-dropped user column 300003ms
+× distributed-execution non-owner startup gate > keeps aoa_operator outside the drizzle migration schema 553ms
+× distributed-execution non-owner startup gate > proves the module-load sentinel reaches every guarded module while enabled 11646ms
+× distributed-execution non-owner startup gate > observes the child's fallback port without accepting unrelated requested-port health 11272ms
+× distributed-execution non-owner startup gate > threads the identical metrics instance through the real flag-on startup and app composition 13288ms
+× JOB-001 transactional job submission > emits only stable identifier metadata when a submission transaction fails 1025ms
+
+SEPARATE SINGLE-FILE TRIAGE
+
+File: packages/browser-runtime/src/__tests__/image-playwright-parity.test.ts
+Result: Exit 1
+Tests: Tests  1 failed | 3 passed (4)
+Duration: Duration  599ms (transform 40ms, setup 0ms, collect 54ms, tests 14ms, environment 0ms, prepare 163ms)
+Evidence: evidence/triage-node24/image-playwright-parity.test.log
+
+File: packages/db/src/__tests__/required-migration-identity.test.ts
+Result: Exit 0
+Tests: Tests  3 passed (3)
+Duration: Duration  5.36s (transform 987ms, setup 0ms, collect 62ms, tests 4.74s, environment 0ms, prepare 140ms)
+Evidence: evidence/triage-node24/required-migration-identity.test.log
+
+File: server/src/__tests__/cloud-plugin-process-composition.test.ts
+Result: Exit 1
+Tests: Tests  6 passed | 1 skipped (7)
+Duration: Duration  33.16s (transform 9.16s, setup 0ms, collect 2.45s, tests 30.11s, environment 0ms, prepare 183ms)
+Evidence: evidence/triage-node24/cloud-plugin-process-composition.test.log
+
+File: server/src/__tests__/job-leasing-contract.test.ts
+Result: Exit 0
+Tests: Tests  20 passed (20)
+Duration: Duration  113.03s (transform 2.57s, setup 0ms, collect 7.39s, tests 104.82s, environment 0ms, prepare 209ms)
+Evidence: evidence/triage-node24/job-leasing-contract.test.log
+
+File: ui/src/__tests__/ProjectDetailWorkspaces.test.tsx
+Result: Exit 0
+Tests: Tests  16 passed (16)
+Duration: Duration  9.14s (transform 1.12s, setup 213ms, collect 4.29s, tests 2.70s, environment 1.32s, prepare 200ms)
+Evidence: evidence/triage-node24/ProjectDetailWorkspaces.test.log
+
+File: packages/adapter-manager/src/__tests__/server-artifact-export.test.ts
+Result: Exit 1
+Tests: Tests  1 failed | 33 passed (34)
+Duration: Duration  7.24s (transform 1.07s, setup 0ms, collect 3.40s, tests 3.27s, environment 0ms, prepare 128ms)
+Evidence: evidence/triage-node24/server-artifact-export.test.log
+
+FOCUSED WINDOWS INTEGRATION REPRODUCTIONS
+
+Command filter: --maxWorkers=1 --minWorkers=1 --no-file-parallelism server/src/__tests__/job-submission.integration.test.ts
+Result: Native exit 0
+Test counts: Tests  42 passed (42)
+Evidence: evidence/windows-triage/submission-metadata.json
+
+Command filter: --maxWorkers=1 --minWorkers=1 --no-file-parallelism server/src/__tests__/distributed-execution-db-startup.integration.test.ts -t checks grant-option ACL tuples independently|keeps aoa_operator outside|proves the module-load sentinel|observes the.*fallback port|threads the identical metrics instance
+Result: Native exit 1
+Test counts: Tests  5 failed | 72 skipped (77)
+Evidence: evidence/windows-triage/startup-failures.json
+
+SUPPLEMENTAL OFFLINE POLICY DETAIL
+
+Scope: DEP-018 campaign declaration and synthetic evidence verdicts
+Tests: 57 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: DEP-002 topology isolation; includes check-d1-compose and ctl-allowlist cases
+Tests: 62 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: DEP-001 static split-image dependency closure
+Tests: 34 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: DEP-001 static split-image Dockerfiles and tracked COPY inputs
+Tests: 27 pass / 1 fail / 0 skip
+Result: First attempt Git precondition failed; corrected owner-context attempt passed 28/28.
+
+Scope: DEP-006 staging composition and DEP-015 shipped overlay invariants
+Tests: 66 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: DSK-003 synthetic installer staging manifest
+Tests: 22 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: M1 provider cleanup observer decisions using injected mock transport
+Tests: 107 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: M1 provider template/build identity decisions using injected mock transport
+Tests: 7 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: WRK-008 slice 2b dispatch composition declaration
+Tests: 5 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: WRK-008 slice 2b provider-free boot roots
+Tests: 5 pass / 0 fail / 0 skip
+Result: passed
+
+Scope: BRW-hostspawn-gate static discovery and synthetic spawn declarations
+Tests: 17 pass / 0 fail / 0 skip
+Result: passed
+
+FAULT PROFILE AND INTENTIONAL FAILURE CONTROL
+
+Execution: Required M1 fault cases
+Outcome: 30 required cases observed; 26 test callbacks passed. Independent checker exit 0.
+Evidence: evidence/vps/fault-profile-verdict.log
+
+Execution: Declared pending case
+Outcome: d1.credential.production_reader_company_predicate: structural; owner M1a-D2-MECHANISM, case d2m.credential.production_reader_company_predicate, per E6-D003; STRUCTURALLY UNAVAILABLE ON THIS LANE, and ROUTED by E6-D003 (planning session, F2) to the M1a-D2-MECHANISM profile -- it is NOT an oversight and NOT unowned. Measured at source: reaching this reader's decision needs authorizeSecretResolve to ADMIT, which needs a resolvable device_local credential; server/src/services/device-local-broker.ts holds failClosedDeviceLocalBroker and no other implementation in the tree, and the fenced route collapses every outcome to denied/malformed by design (it must not be an oracle). So on D1 an admitted read and a denied one are indistinguishable at every observable surface, and a case built here could not tell its two arms apart. Its sibling d1.tenant.legacy.provider_credentials proves the PREDICATE and the grant on the same non-owner pool, with both controls; this case is the reader's own invocation of it and is never a pass here.
+Evidence: ../../../../tests/d1/fault-matrix.json
+
+Execution: Suppressed-injection control
+Outcome: Node test exit 1 is expected to be nonzero. Control verdict: PASS: suppressed injections make the evidence verdict fail as required. The retained log must contain the evidence verdict and injection_did_not_fire.
+Evidence: evidence/vps/fault-suppressed-tests.log
+
+OBSERVED REQUIRED FAULT CASES
+
+Case: d1.reconcile.worker_startup_lease_probe
+Observed classification: startup_reconciler_fences_its_own_prior_lease
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.journey.A
+Observed classification: journey_priced_once_and_audited
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.tenant.journey.B
+Observed classification: journey_priced_once_and_audited
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.tenant.cross.events
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.read
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.lease
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.cancel
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.secrets
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.outputs
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.staged_inputs
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.legacy.cost_events
+Observed classification: filtered_by_query_predicate_not_rls
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.legacy.activity_log
+Observed classification: filtered_by_query_predicate_not_rls
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.legacy.task_outputs
+Observed classification: filtered_by_query_predicate_not_rls
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.legacy.provider_credentials
+Observed classification: filtered_by_query_predicate_not_rls
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.cross.cost_rows
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.tenant.control_refused
+Observed classification: legacy_for_organization_disabled
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.tenant.cross.tool_calls
+Observed classification: denied_with_same_tenant_positive_control
+Injection observed: true
+Positive control: true
+
+Case: d1.credential.lease_expired_redemption_refused
+Observed classification: redemption_refused_after_lease_end_with_live_lease_control
+Injection observed: true
+Positive control: true
+
+Case: d1.credential.wrong_lease_redemption_refused
+Observed classification: redemption_refused_on_foreign_lease_with_own_lease_control
+Injection observed: true
+Positive control: true
+
+Case: d1.redaction.planted_canary_scrubbed
+Observed classification: canary_scrubbed_while_unseeded_twin_leaks
+Injection observed: true
+Positive control: true
+
+Case: d1.cancel.unleased_attempt
+Observed classification: cancelled_directly_without_command
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.cancel.leased_attempt
+Observed classification: cancel_requested_with_fenced_command
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.provider.execute_deadline_exceeded
+Observed classification: ingest_classifies_provider_derived_terminal
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.fault.object_store.truncated_upload
+Observed classification: fenced_commit_refuses_unverifiable_object
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.cleanup.orphan_object_swept
+Observed classification: uncommitted_object_deleted
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.fault.link_cut.worker_to_control_plane
+Observed classification: lease_reclaimed_and_late_ack_refused
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.reconcile.expired_lease_reaped
+Observed classification: single_winner_retry_minted
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.restart.control_plane_process
+Observed classification: durable_lease_state_survives_restart
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.fault.link_cut.control_plane_to_postgres
+Observed classification: database_link_severed_and_restored
+Injection observed: true
+Positive control: Not a field for this case
+
+Case: d1.provider.worker_terminal_mapping
+Observed classification: worker_maps_provider_timeout_to_failed_terminal
+Injection observed: true
+Positive control: true
+
+GATE TICKET AND EPIC MAPPING
+
+Gate or ticket family: E0 / E1 / E2 foundations
+Evidence added or corroborated: Already recorded complete in repository at earlier accepted revisions. Current build/types/policy and tenant checks provide regression evidence only.
+Closure disposition: No new epic closure; full current D0 obligations remain separately assessed.
+
+Gate or ticket family: D0-R01 / D0-R02
+Evidence added or corroborated: Authoritative root build and recursive types pass. The root build invokes recursive package builds and the landed FND-005 network-free pinned-snapshot preflight; full supported-runtime test result is recorded separately.
+Closure disposition: Current Windows failures are advisory gate evidence, not an authoritative Linux CI baseline waiver. No DEC-03 waiver is established here; new/epic-touched required failures remain failures. D0-R02 root-build check may be checked off; its old additional input-hash requirement was explicitly conditional on FND-005 not having landed.
+
+Gate or ticket family: D0-R03 / D0-R04
+Evidence added or corroborated: Commands, logs, attempts and candidate identity retained; original failures preserved.
+Closure disposition: Three consecutive clean executions of the prescribed critical suite have not been established. Preserve skipped cases and runtime differences.
+
+Gate or ticket family: E6-D1-FOUNDATION / E6 deployment harness
+Evidence added or corroborated: Fresh base fixture passes 34/34: E6F-01 100 lease races across multiple profiles, networked execution, tenant denials, network segmentation, stale fences, lease faults, telemetry and evidence retention. Image admission and DEP-009-style components also repeated.
+Closure disposition: These named checks can be checked off. No formal E6 promotion or blanket foundation closure: remaining fault/image/tamper/migration requirements need their own joined evidence; cross-host tunnel overlays are separately scoped.
+
+Gate or ticket family: D1 / M1-D1-SPINE
+Evidence added or corroborated: I07/I08 check off the bounded M1 spine on both machines; I09/I10/I11 add artifact and shared-authority evidence.
+Closure disposition: Full D1 remains open: at least two workers, 20×10k operation seeds, 1,000 races, 100k adversarial events and complete lifecycle-fault/cleanup thresholds.
+
+Gate or ticket family: E3 durable jobs / JOB-003, JOB-007, JOB-009
+Evidence added or corroborated: Lease/placement/capacity regression evidence; real PostgreSQL opt-in results recorded separately.
+Closure disposition: No newly closed E3 ticket. Real cross-host job was pre-placed; it does not test arbitrary source placement from the public UI.
+
+Gate or ticket family: JOB-012 / JOB-013 / JOB-014
+Evidence added or corroborated: M1 spine validates exactly-once cost/usage/audit and run attribution for its reference-provider cohort.
+Closure disposition: Does not establish all production source/workload/model-provider parity.
+
+Gate or ticket family: E4 workers / WRK-016
+Evidence added or corroborated: I16 and I22 validate connectivity, durable identity, exclusive slot ownership and restart behavior.
+Closure disposition: WRK-016 engineering implementation is corroborated. Legacy adoption, fleet retirement/replacement and restored live-fleet journeys remain incomplete.
+
+Gate or ticket family: E5 / DAT-002 / DAT-008
+Evidence added or corroborated: Actual MinIO artifact integrity/orphan cleanup and opted-in worker-secret broker checks supply bounded evidence.
+Closure disposition: Do not mark all E5 security clauses complete. Provider-wide egress, every credential class, owner/target matrix and live revocation/rotation need their own proof.
+
+Gate or ticket family: E7 / CLI-001 / CLI-004 / D2
+Evidence added or corroborated: Real E2B lifecycle, credential absence and forced cleanup partially validate transport/capability behavior.
+Closure disposition: No D2 closure: no 120-job workload, three clean campaign runs, pinned coding template/model journey or full hostile isolation/rotation/outage matrix.
+
+Gate or ticket family: E8 / E8-F006 / BRW-008 / D3
+Evidence added or corroborated: Structural composition guard is included in the passing policy suite; public application browser interaction validates the AoA UI only.
+Closure disposition: Production browser-provider default-deny and application cookie-issuer compatibility remain unresolved. Host retirement and D3 stay gated.
+
+Gate or ticket family: E9 / SVC tickets / D4
+Evidence added or corroborated: Service component tests are included in the full suite and selected real PostgreSQL lane.
+Closure disposition: No 72-hour service continuity, sustained budget/recovery/partition campaign or D4 acceptance.
+
+Gate or ticket family: E10 / MIG-001 / MIG-005 / MIG-006 / MIG-007
+Evidence added or corroborated: Local native Commander subscription response passes with a test-company override; company-key sink implementation is documented in the branch.
+Closure disposition: Native response is not proof of distributed Commander/crew/extraction cutover, nor of personal device delegation. Opt-in integration results cover only named component paths.
+
+Gate or ticket family: MIG-009 drain
+Evidence added or corroborated: M1 spine on each host executes the attributed per-tenant drain/rollback CLI.
+Closure disposition: Bounded engineering drain check may be checked off; it does not replace rolling upgrade or restored fleet recovery.
+
+Gate or ticket family: E10-REALTIME-FOUNDATION
+Evidence added or corroborated: I11 proves three durable store/fanout behaviors on real PostgreSQL.
+Closure disposition: Full socket authorization/redaction/backpressure, 10k-event adversarial cohort and timed 15-minute broker outage/catch-up remain unexecuted.
+
+Gate or ticket family: E11 / REL-003 / DBR-001 / D5-DR
+Evidence added or corroborated: Native full-schema/file recovery and CLI recovery fixtures are recorded individually.
+Closure disposition: Local/disposable recovery correctness only. External-store restore, live current-authority replay, fleet reenrollment, RPO≤15min and RTO≤4h remain open.
+
+Gate or ticket family: DEP-009 / D5-HA01 to HA04
+Evidence added or corroborated: Two-replica correctness tests pass on one VPS.
+Closure disposition: No production TLS load-balancer failover timing, independent failure domains, rolling deployment or authenticated socket catch-up acceptance.
+
+Gate or ticket family: D5-L01 to L06 / M4
+Evidence added or corroborated: Health latency smoke passes; quota/component tests add correctness evidence. Branch performance diagnostics retain failures.
+Closure disposition: Full load/fairness acceptance open: 20 organizations, 2,000 queued jobs, 100 active leases, 10k events/min for 60min plus 15min churn; noisy/quiet comparisons and complete latency/error cohorts.
+
+Gate or ticket family: M5 / REL-005 / D6
+Evidence added or corroborated: No external-beta campaign performed.
+Closure disposition: D0–D5 same-candidate acceptance, ≥3 external organizations, 14-day window, workload floors, security/support/legal/rollback approvals and frozen support matrix remain open.
+
+Gate or ticket family: Optional DSK / desktop and mobility
+Evidence added or corroborated: Windows native application and Docker slot tests establish local installation and fixture behavior.
+Closure disposition: No signed installer/updater/keychain acceptance, device-local subscription broker or mobility release claim. Disabled combinations need same-candidate negative evidence if advertised as disabled.
+
+FINDINGS AND FOLLOW-UP ACTIONS
+
+Finding: TST-001 — Full supported-runtime test result is available
+Priority and status: P1; full supported-runtime lane executed; failures remain
+Evidence or limitation: See the corresponding executed check and retained attempt log.
+Action: Triage the retained full Node 24 failures and rerun the affected assertions, then the full required lane. Keep skipped/live cases explicit.
+
+Finding: TST-002 — Playwright parity test cannot resolve a transitive dependency
+Priority and status: P2; reproduced
+Evidence or limitation: packages/browser-runtime declares playwright but the test directly requires playwright-core/package.json; strict pnpm install reproduces module-not-found on Node 24 and 26.
+Action: Review dependency declaration/module resolution without masking the image/version parity assertion.
+
+Finding: TST-003 — Local M1 placement control and runtime log-sink tests are sensitive to test load
+Priority and status: P2; load-sensitive
+Evidence or limitation: See the corresponding executed check and retained attempt log.
+Action: Investigate fixture heartbeat freshness and asynchronous process observation. Isolated reruns pass; do not silently discard the original failures.
+
+Finding: TST-004 — Local subscription authentication and native Commander response validated
+Priority and status: P1; passed with company configuration workaround
+Evidence or limitation: App recognized auth.json, verify returned 200/verified, and user_message run completed with model gpt-5.6-luna. AOA_SUBSCRIPTION_OK persisted after reload.
+Action: Retain this test company model override until TST-008 is resolved. No OpenAI API key was needed.
+
+Finding: TST-005 — Public cloud personal-subscription/device execution is not implemented or accepted
+Priority and status: P1; capability gap / unvalidated
+Evidence or limitation: Cloud onboarding explicitly defers local CLI Commander; source documents company-key distributed paths separately from the unfinished full device credential broker.
+Action: Implement and validate the supported device-local credential broker path for the PC owner subscription, or separately validate a company-key distributed cohort. Native local Commander success does not establish this cloud-to-personal-device workflow.
+
+Finding: TST-006 — E2B transport does not support graceful per-process cancellation or exit-code observation through process listing
+Priority and status: P2; confirmed capability limit
+Evidence or limitation: See the corresponding executed check and retained attempt log.
+Action: Record an explicit capability disposition for workloads that require graceful cancellation/exit codes; forced kill was tested successfully.
+
+Finding: TST-007 — Release operational acceptance is incomplete
+Priority and status: P1; not executed
+Evidence or limitation: See the corresponding executed check and retained attempt log.
+Action: Complete the prescribed sustained capacity/churn campaign, failure-domain and recovery timing checks, upgrade/rollback on deployment topology, real provider fault/rotation rehearsals, and release acceptance owner sign-off. A single VPS with local_disk storage is not that topology.
+
+Finding: TST-008 — Hardcoded gpt-5.5 default breaks Codex subscription onboarding
+Priority and status: P1; reproduced; test company workaround applied
+Evidence or limitation: After successful login the hello probe returned HTTP 400: gpt-5.5 is not supported with ChatGPT authentication. Official retirement took effect 15 October 2026 at 00:30 IST. Setting test company model to gpt-5.6-luna from the pinned CLI model catalog made the identical probe pass.
+Action: Update default/model-availability handling and review CLI compatibility pins. Validate onboarding, Commander, crew and saved managed configurations against models actually available to that account/client. Product code was not changed.
+
+Finding: TST-009 — Native background crew path still needs validation
+Priority and status: P2; observed; cause not established
+Evidence or limitation: A sweep.steward background run failed after the successful Commander turn. Local setup logs also warn that the agent JWT signing secret is absent; this warning alone does not prove the failure cause.
+Action: Provision persistent local agent JWT signing configuration and validate crew authentication, available model resolution and actual tool calls before accepting the background crew path.
+
+Finding: TST-011 — Supported-runtime suite has hook, test-timeout and UI-state failures
+Priority and status: P2; composition import-hook timeout reproduced separately; migration, job-contract and UI files passed separately
+Evidence or limitation: cloud-plugin-process-composition beforeAll timed out at 30s; required-migration-identity test at 5s; job-leasing-contract static-context assertion at 30s; ProjectDetailWorkspaces Archive action saw a loading skeleton after earlier readiness waits. Full run: five failed files, four failed tests. Root causes are not established by timeout messages alone.
+Action: Investigate each unchanged assertion and repeat in isolation; preserve full-run failures and establish required stability before accepting the lane.
+
+Finding: TST-012 — Artifact-export queued-deadline test emits an unhandled rejection
+Priority and status: P2; observed in complete Node 24 lane
+Evidence or limitation: Vitest recorded one unhandled WireProtocolError in adapter-manager server-artifact-export queued request deadline case. The suite assertion counts alone do not capture this error. Source starts both promises then attaches rejection checks sequentially; scheduling is a hypothesis requiring controlled reproduction.
+Action: Reproduce and distinguish promise-observation timing from product deadline/error handling. Keep unhandled errors at zero in the accepted lane.
+
+Finding: TST-014 — Opt-in startup and serving-role validation has failures
+Priority and status: P2; five selected failures reproduced together; native final details captured
+Evidence or limitation: Broad lane reported five startup-file failures. Focused unchanged repeat: native exit1, five failed and72 filtered skips,346.78s. ACL sweep again exceeded300s. Operator-schema case expected operator_authority but received app_authority; all three child tests exited at app-authority before their sentinel/port/metrics assertions. The shared ACL mutation loop does not observe test abort and may continue after Vitest times out the outer promise; fixture cascade is strongly supported structurally, but an independent isolation experiment was not run.
+Action: Reproduce the expensive ACL case and verify teardown/state restoration before classifying later failures. Then isolate the operator and native child-server assertions on supported Windows and authoritative Linux CI. Preserve this lane and its skips; no baseline waiver is established.
+
+Finding: TST-015 — Submission-error metadata test captured an empty log delta
+Priority and status: P2; observed in broad lane; complete 42-test single-file repeat passed
+Evidence or limitation: JOB-001 metadata test failed at its first assertion: empty captured output did not contain job_submission_internal_error. The later sentinel/SQL/stack absence assertions were not reached; this is not demonstrated secret leakage. Separate direct-Node full-file run passed42/42 and the target passed664ms. Fixed-delay flush/read and swallowed read errors are possible contributors; cause unproven.
+Action: Investigate the log-capture sink/read/flush timing and preserve both attempts. Require reliable positive logging evidence before accepting the negative redaction assertions.
+
+Finding: TST-016 — Windows PowerShell interrupted final Vitest error reporting
+Priority and status: P2; capture wrapper corrected; original whole-lane final summary unavailable
+Evidence or limitation: All123 per-file reports are present (1458passed/6failed/2skipped), but PowerShell5 ErrorActionPreference=Stop raised NativeCommandError when Vitest wrote final stderr. Original UTF16LE log retained and decoded copy supplied. Counts are derived from file reports; native final exit/uncaught-error count were not captured. A direct Node child-output wrapper now captures both streams without that conversion.
+Action: Use the corrected capture wrapper for future complete-lane acceptance. Focused reproductions retain full native summaries; no repeat of the entire known-failing broad lane is necessary until fixes or a new acceptance candidate justify it.
+
+Finding: TST-013 — Artifact-export stalled-upload assertion returns a different error class
+Priority and status: P2; newly observed in separate single-file Node 24 execution
+Evidence or limitation: server-artifact-export.test.ts:487 expected WireProtocolError but received ResourceNotAvailableError. This file passed 33 tests and failed one. Export and destroy start concurrently; request ordering is plausible but not demonstrated. The separate queued-deadline case passed and emitted no unhandled error in this run.
+Action: Investigate ownership/destroy/export ordering and the intended error contract. Keep this result separate from TST-012 and preserve both full-run and single-file failures.
+
+Finding: TST-010 — Full fleet fairness and capacity acceptance remains open
+Priority and status: P1; existing branch finding; not remeasured by this session
+Evidence or limitation: M4 execution ledger retains ten-loop queue-delay failures and real-daemon noisy-work drain-deadline failures after the readiness optimization. Later quiet-tenant ratios improved at bounded scale; full D5 remains unproven.
+Action: Investigate remaining capacity/queue behavior using actual daemon/provider execution and retain fixed arrival ratios, deadlines and original failures. Run the full D5 topology/load campaign before promotion.
+
+EXISTING BRANCH PERFORMANCE FINDINGS
+
+The current M4 ledger retains a ten-loop synthetic queue-delay failure after the readiness optimization. It later adds real-daemon measurements with larger validated provider profiles: quiet throughput and delay ratios improved, while noisy work still missed the fixed drain deadline.
+
+Those are earlier developer runs preserved in the branch, not measurements newly reproduced by this test session. The latest quiet ratios cannot replace the unresolved noisy-work deadline or full-scale acceptance. The ledger also contains 112 baseline and 290 loaded completed-request HTTP samples; submit latency and a complete error-rate denominator remain unmeasured. Our zero-error health probes measure endpoint reachability/latency only.
+
+Helsinki round-trip delay is expected for the Windows client. Host-local and client-to-VPS percentiles are reported separately; neither is a substitute for submit/poll/event-ACK percentiles under the required job load.
+
+HOW TO READ THE REMAINING WORK
+
+Remaining rows have different prerequisites. Device execution and browser enforcement need development; provider capability rows need an honest disposition; operational campaigns need their declared infrastructure, credentials or calendar window. A failing test may need a fixture correction rather than a product fix. These are not sixteen demonstrated production defects.
+
+The targeted startup repeat reproduced all five selected failures together: an exhaustive ACL timeout followed by app-authority rejections on the shared fixture. This does not demonstrate four independent security failures. The submission logging repeat passed42/42; its original empty capture and the broad-lane failure remain retained.
+
+REMAINING TESTING AND WHY IT REMAINS
+
+ID: P01
+Dependency type: Development
+Work remaining: Personal subscription cloud-to-PC execution
+Required test or prerequisite: Implement the device-local credential broker and supported desktop execution backend, preserving owner/org/target/fence binding. Then submit from the actual public VPS app, execute with the PC subscription, test cancel/revoke/partition and return governed outputs. DSK-04 here is a gate clause; the separate DSK-004 ticket concerns updates/drain/rollback.
+Gate or finding: TST-005; MIG-001; gate DSK-04; M1/M2 ledger
+
+ID: P02
+Dependency type: Development
+Work remaining: Retired model default
+Required test or prerequisite: Replace hardcoded gpt-5.5 selection with supported model/default handling and validate stored configurations. Retest fresh login, verify, Commander, crew and extraction without a manual test-company workaround.
+Gate or finding: TST-008; native subscription evidence
+
+ID: P03
+Dependency type: Development investigation / test-harness reliability
+Work remaining: Supported-runtime failures and dependency declaration
+Required test or prerequisite: Resolve direct playwright-core parity-test resolution; investigate sink/flush capture, stale-heartbeat, import/AST timeout, UI-state, exhaustive ACL/startup and artifact-export assertions. Preserve the original broad-lane failures despite focused passes. Repeat required acceptance lanes with the corrected output capture after fixes.
+Gate or finding: TST-002; TST-003; TST-011–TST-016
+
+ID: P04
+Dependency type: Development / provider capability
+Work remaining: Browser sandbox-wide network enforcement
+Required test or prerequisite: Provide and verify actual default-deny enforcement covering all escape classes and immutable attestation. Then enable the governed browser cohort and execute D3. Host SOCKS proxy alone does not satisfy the documented boundary.
+Gate or finding: M3; BRW-008; E8; D3
+
+ID: P05
+Dependency type: Compatibility validation
+Work remaining: Application session issuer
+Required test or prerequisite: Prove production application cookie/session issuer compatibility with the encrypted broker/isolated guest lifecycle, including denial, expiry, withdrawal and revoke. Existing staged HTTPS fixtures do not settle this.
+Gate or finding: M3; browser session credentials
+
+ID: P06
+Dependency type: Development investigation
+Work remaining: Fairness, contention and capacity
+Required test or prerequisite: Retain the branch ten-loop queue-delay failure and real-daemon noisy backlog deadline failures. Isolate remaining causes and retest fixed arrivals/profiles/thresholds; include complete denominator and real worker/provider fleet. Later bounded quiet ratios improving does not erase missed noisy work.
+Gate or finding: M4 execution ledger; D5-L01–L05
+
+ID: P07
+Dependency type: Design gap
+Work remaining: Legacy worker-slot adoption
+Required test or prerequisite: Current receipt/ticket metadata does not support validated legacy adoption. Implement the required authenticated binding if adoption is a supported feature; otherwise test/document revoke-retire-new-target migration.
+Gate or finding: WRK-016; M4 requirement audit
+
+ID: P08
+Dependency type: Setup and diagnosis
+Work remaining: Native background crew
+Required test or prerequisite: Provision persistent signing configuration, identify the observed sweep.steward failure, validate account-available crew models and run an actual tool/task path. Missing JWT warning is a clue, not a proven cause.
+Gate or finding: TST-009
+
+ID: P09
+Dependency type: Capability disposition
+Work remaining: E2B graceful cancellation and exit codes
+Required test or prerequisite: Decide whether workload contracts require unsupported graceful process cancellation/exit-code inspection, negotiate honest capabilities and verify fallback behavior. Forced kill is tested.
+Gate or finding: TST-006; D2/D4 limit matrix
+
+ID: P10
+Dependency type: Additional engineering validation
+Work remaining: Remaining opt-in live/browser/platform suites
+Required test or prerequisite: Use the suite result and file manifest to identify skips and opt-in fixtures outside the executed lane. Linux kernel/socket browser checks, other operating systems and signed desktop install/update cannot be inferred from Windows normal tests.
+Gate or finding: Full suite and Windows opt-in manifests
+
+ID: P11
+Dependency type: Credentials / template / campaign ownership
+Work remaining: Real coding provider through distributed app
+Required test or prerequisite: Use a supported company-key credential cohort and pinned coding template; execute actual Commander, crew, extraction and task sources with cancellation, outputs, cost/audit and retention. Local personal subscription proof cannot substitute. Anthropic live verification remains explicitly deferred by repository direction.
+Gate or finding: M1b/M2; E7; D2
+
+ID: P12
+Dependency type: Campaign execution
+Work remaining: Full D1 adversarial coverage
+Required test or prerequisite: Run 20 seeds × 10,000 operations across ≥10 organizations; ≥1,000 concurrent lease/ACK/renew/replacement races; ≥100,000 events with ≥10,000 in each of six fault classes; ≥100 sandbox lifecycle faults. Cancellation must reach worker-visible terminal/force-kill within 30s and cleanup within 5min, with exact artifact integrity and zero final resource/event/authority leaks. Current bounded fixtures are a subset.
+Gate or finding: D1-00 through D1-07
+
+ID: P13
+Dependency type: Campaign ownership / execution / provider cost
+Work remaining: Full D2 coding campaign
+Required test or prerequisite: Resolve the documented M3-versus-M4 gate-owner decision first; this report does not assign it. Then at least 120 jobs across six 20-job outcome cohorts, three consecutive clean candidate campaigns, cancel/cleanup percentile limits, workspace integrity and provider outage/rotation/limit matrix. Keep spend bounded by a separately prepared campaign.
+Gate or finding: D2; scope-triage unresolved owner
+
+ID: P14
+Dependency type: Development dependent campaign
+Work remaining: Full D3 browser journeys
+Required test or prerequisite: After P04/P05, ≥100 journeys, three runs, approvals/denials/reconnect, uploads/downloads, credential rotation, private/metadata denial, artifact digest/order and bounded cancel/cleanup.
+Gate or finding: D3; M3
+
+ID: P15
+Dependency type: Calendar campaign
+Work remaining: Full D4 service continuity
+Required test or prerequisite: 72 consecutive hours, required replica/worker restarts, 15-minute partition, drain/generation/checkpoint/budget-stop and pause or provider outage route; prove fenced effects and cleanup.
+Gate or finding: D4; E9
+
+ID: P16
+Dependency type: Infrastructure
+Work remaining: Production-equivalent M4 substrate
+Required test or prerequisite: Provision ≥2 control planes behind production load balancing, ≥4 workers across ≥2 failure domains, external PostgreSQL/object storage, shared broker/admission, managed secrets/TLS/telemetry/backup/signing. Single Helsinki VPS is one failure domain.
+Gate or finding: D5-00
+
+ID: P17
+Dependency type: Infrastructure / operational rehearsal
+Work remaining: HA and upgrades
+Required test or prerequisite: On that topology: zero lost accepted writes/double execution, failover≤60s/RPO0, rolling deploy/drain/migration-first compatibility and timed socket catch-up≤5min. Nonidentical N/N-1 is required when protocol changes.
+Gate or finding: D5-HA01–HA04
+
+ID: P18
+Dependency type: Development investigation then sustained campaign
+Work remaining: Load and fairness
+Required test or prerequisite: Measure API submission/poll/event ACK, throughput and queue delays under the complete D5 workload, noisy org≥10×, quiet throughput≥90% and delay≤2× baseline; 5xx≤0.1%, p95≤750/1000/500ms and no double quota release.
+Gate or finding: D5-L01–L06
+
+ID: P19
+Dependency type: Infrastructure / recovery rehearsal
+Work remaining: Recovery and restored fleet
+Required test or prerequisite: External DB and versioned object restore on the candidate; exact recoverable commit/object age, RPO≤15min and full-service RTO≤4h, corrupt/missing quarantine, old-fence denial, signed URL isolation, reenrollment/revoke and compatible rollout.
+Gate or finding: REL-003; DBR-001; D5-DR01–DR07
+
+ID: P20
+Dependency type: Campaign and governance
+Work remaining: Release acceptance
+Required test or prerequisite: Satisfy same-candidate upstream gates and freeze the support matrix. Run 14 days with ≥3 external organizations, each advertising and exercising coding, browser and service. Campaign floors are ≥100 completed coding jobs, ≥50 browser journeys, ≥72 accumulated healthy service-hours and ≥1,000 completed attempts. Each advertised row needs ≥200 normal probes, availability ≥99.5% and ≥3 separately counted fail-closed denials. Meet incident/security, on-call/support/kill/cutover/rollback/legal/data requirements. Formal owner decisions remain separate from this report.
+Gate or finding: REL-005; M5; D6
+
+ID: P21
+Dependency type: Scope decision
+Work remaining: Desktop and mobility release matrix
+Required test or prerequisite: If disabled, prove routes/enrollment/leasing/update/handoff are off with no fallback. If enabled, test each advertised OS installer/signature/update/rollback/keychain/device broker, folder confinement, offline buffer, revocation and quarantine. Advertised mobility needs ≥10 successful handoffs and ≥3 fault cases per directed pair.
+Gate or finding: Conditional DSK and D6 support matrix
+
+ID: P22
+Dependency type: Development planning / operator-surface decision
+Work remaining: M5 release ticket work
+Required test or prerequisite: REL-001, REL-002 and REL-005 still lack their own ticket files at this candidate. Write their Step-0 plans and acceptance mappings; REL-002 remainder is unspecified. Resolve the kill-switch UI/drain-integration decision and operator surface. The authorized kill-switch API write path already exists and must not be duplicated.
+Gate or finding: E11 implementation plan; M5
+
+ID: P23
+Dependency type: Workflow and governance
+Work remaining: Program checkpoint and scheduled verdict
+Required test or prerequisite: At the governed M5 main-integration checkpoint, remove the owned cross-platform-weekly.yml@main block and obtain a successful scheduled verdict-bearing main run. DEP-013 consumer must read it and report zero findings. A canceled/failed/manual substitute does not satisfy this exit. No merge or publication was performed here.
+Gate or finding: M5 scope-triage; DEP-013; E6-F023
+
+SUGGESTED EXECUTION ORDER
+
+1. Resolve supported-runtime failures and the default-model issue; diagnose native crew setup. Repeat the normal and affected integration lanes, retaining old attempts.
+
+2. Choose the supported credential/execution cohort. For the requested public VPS-to-personal-PC workflow, implement and test the device-local broker/backend. Independently prove the company-key distributed task/Commander/crew/extraction journey with a pinned agent template.
+
+3. Resolve browser-provider enforcement and application-session compatibility; run governed browser journeys. Investigate outstanding real-daemon capacity/fairness behavior without weakening workload/deadline thresholds.
+
+4. Prepare the required external-store, multi-worker, two-failure-domain staging topology. Run exact D1/D2/D3 cohorts, 72-hour D4, then full load/HA/recovery/upgrade acceptance.
+
+5. Freeze the advertised support matrix and run D6 with external organizations and the required calendar window. Record formal owner acceptance on the exact candidate. A single-host engineering test cannot supply that acceptance.
+
+REPRODUCTION AND EVIDENCE ENTRY POINTS
+
+Local source: C:/Users/Dell/Desktop/aoa/replatform-testing. Local evidence: C:/Users/Dell/Desktop/aoa/testing-ops. VPS source: /opt/aoa-testing/source; evidence: /opt/aoa-testing/evidence.
+
+Local application: powershell -ExecutionPolicy Bypass -File C:/Users/Dell/Desktop/aoa/testing-ops/start-local.ps1
+
+Normal supported-runtime lane: put testing-ops/toolchain/node-v24.19.0-win-x64 first on PATH, clear AOA_RUN_WIN_INTEGRATION and provider key variables, then node node_modules/vitest/vitest.mjs run --maxWorkers=2 --minWorkers=1.
+
+Explicit Windows lane: powershell -ExecutionPolicy Bypass -File C:/Users/Dell/Desktop/aoa/testing-ops/run-windows-opt-in.ps1. Manifest: windows-opt-in-files.json. Serial execution avoids competing embedded database fixtures.
+
+M1 local fixture: testing-ops/run-harness.ps1 test. VPS: /opt/aoa-testing/run-harness.sh test. Required fixture variables are set by those scripts; do not run a live test against the public app database.
+
+VPS slot fixtures: AOA_M4_WORKER_IMAGE=aoa-test/worker:13b4e806f31a67c3c172f2216272570203132f8f node --test --test-concurrency=1 tests/d1/m4-slot-ownership.test.mjs tests/d1/m4-slot-host.test.mjs
+
+CLI recovery: node --test --test-concurrency=1 tests/d1/m4-cli-restore.test.mjs, with Docker and locked CLI/shared workspace dependencies present. This creates and stops its own disposable PostgreSQL.
+
+Policy subset: node --test --test-concurrency=1 scripts/lib/__tests__/image-admission.test.mjs scripts/lib/__tests__/m1-spine-assertions.test.mjs scripts/lib/__tests__/e6f-harness-binding.test.mjs scripts/check-gate-clause-wiring.test.mjs scripts/lib/__tests__/gate-clause-wiring.test.mjs
+
+TEST-RESULTS.json is the structured execution summary. Final suite summaries include commands’ exit results and final Vitest counts. Logs preserve original failures and subsequent attempts. Screenshots show public dummy-task persistence and the native subscribed Commander response.
+
+FINAL INSTALLATION STATE AND COST SCOPE
+
+The native Windows app and public HTTPS VPS app remain available. Standard private D1 fixture stacks remain. Temporary cross-host job/heartbeat probes and SSH tunnels, extra replica, and separate foundation/fault-campaign stacks are stopped; durable fixture data/identities retained.
+
+All E2B resources tagged by these tests were reclaimed. Three short-lived sandboxes were used, with no model API calls; local Commander used the signed-in subscription. No final dollar charge was retrieved.
+
+Google and E2B credentials remain in protected VPS configuration; no credential values are included here. Database/provider-management boundaries and separate fixture data remain important when extending these tests.
+
+The epic index and some early milestone checkpoints contain stale status prose. Use the current M1/M2, M3 and complete M4 execution ledgers alongside normative gates. In particular, an old E7 backlog label or a pre-sprint “no distributed job” paragraph is not the current execution status.
+
+AUTHORITATIVE REPOSITORY REFERENCES
+
+Reference: Gate definitions
+Path: ../../../replatform/test-gates.md
+
+Reference: Current M1 and M2 implementation
+Path: ../../../replatform/m1-m2-code-execution.md
+
+Reference: Current M3 implementation
+Path: ../../../replatform/m3-code-execution.md
+
+Reference: Current M4 implementation and later performance observations
+Path: ../../../replatform/m4-code-execution.md
+
+Reference: M4 requirement audit
+Path: ../../../replatform/m4-requirements-evidence.md
+
+Reference: Milestone scope allocation
+Path: ../../../replatform/epic-regrooming/scope-triage.md
+
+Reference: Evidence and closure policy
+Path: ../../../replatform/artifact-policy.md
+
+REPORT COMPANION FILES
+
+Artifact: Structured summary
+Path: TEST-RESULTS.json
+
+Artifact: Normal Node 24 counts
+Path: evidence/full-node24-summary.json
+
+Artifact: Windows integration counts
+Path: evidence/windows-opt-in-node24-summary.json
+
+Artifact: Windows integration file manifest
+Path: windows-opt-in-files.json
+

@@ -1,0 +1,11 @@
+✔ E6F-05 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) live MinIO: grant(upload) -> PUT -> commit -> grant(download) -> GET round-trip (4580.4116ms)
+✔ E6F-05 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) live MinIO: toxiproxy-truncated upload never commits (fail-closed on hash/size) (4194.8459ms)
+✔ E6F-14 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) live orphan sweep: fence lost mid-flight -> commit refuses -> the object is DELETED (5692.4838ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14656.2332

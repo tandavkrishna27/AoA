@@ -1,0 +1,28 @@
+{
+  "id": "provider-cleanup",
+  "kind": "test",
+  "file": "scripts/lib/__tests__/m1-provider-cleanup.test.mjs",
+  "scope": "M1 provider cleanup observer decisions using injected mock transport",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "scripts/lib/__tests__/m1-provider-cleanup.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:00.774Z",
+  "durationMs": 604,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {
+    "tests": 107,
+    "suites": 0,
+    "pass": 107,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: m1-spine: every control-plane replica carries the F10 tenant set, and the crew switch is off
+not ok 1 - m1-spine: every control-plane replica carries the F10 tenant set, and the crew switch is off
+  ---
+  duration_ms: 556.998852
+  type: 'test'
+  location: '/opt/aoa-testing/source/tests/d1/m1-spine.test.mjs:237:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Cannot find module 'typescript'
+    Require stack:
+    - /opt/aoa-testing/source/scripts/lib/m1-shipped-boot.mjs
+  code: 'MODULE_NOT_FOUND'
+  stack: |-
+    Module._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    Module._load (node:internal/modules/cjs/loader:1192:37)
+    TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    Module.require (node:internal/modules/cjs/loader:1463:12)
+    require (node:internal/modules/helpers:147:16)
+    observeFreezeTopology (file:///opt/aoa-testing/source/scripts/lib/m1-shipped-boot.mjs:311:14)
+    TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-spine.test.mjs:249:20)
+  ...
+# Subtest: m1-spine: tenant A — a handed-off attempt through the REAL ingest is priced once and audited
+ok 2 - m1-spine: tenant A — a handed-off attempt through the REAL ingest is priced once and audited
+  ---
+  duration_ms: 6409.306834
+  type: 'test'
+  ...
+# Subtest: m1-spine: tenant B — a handed-off attempt through the REAL ingest is priced once and audited
+ok 3 - m1-spine: tenant B — a handed-off attempt through the REAL ingest is priced once and audited
+  ---
+  duration_ms: 6417.717544
+  type: 'test'
+  ...
+# Subtest: m1-spine: the DEPLOYED worker performs tenant A's journey — lease, execute, events, terminal
+ok 4 - m1-spine: the DEPLOYED worker performs tenant A's journey — lease, execute, events, terminal
+  ---
+  duration_ms: 8424.212824
+  type: 'test'
+  ...
+# Subtest: m1-spine: ★ the worker-driven verdict REDS on tenant A's HARNESS-driven attempt (the control)
+ok 5 - m1-spine: ★ the worker-driven verdict REDS on tenant A's HARNESS-driven attempt (the control)
+  ---
+  duration_ms: 655.285833
+  type: 'test'
+  ...
+# Subtest: m1-spine: criterion 5 is observed for the worker-driven tenant and RECORDED unobserved for the others
+ok 6 - m1-spine: criterion 5 is observed for the worker-driven tenant and RECORDED unobserved for the others
+  ---
+  duration_ms: 320.713592
+  type: 'test'
+  ...
+# Subtest: m1-spine: the deployed worker is offered no work for tenant B or the control tenant
+ok 7 - m1-spine: the deployed worker is offered no work for tenant B or the control tenant
+  ---
+  duration_ms: 1011.91835
+  type: 'test'
+  ...
+# Subtest: m1-spine: tenant B cannot write to, acknowledge or read tenant A's attempt
+ok 8 - m1-spine: tenant B cannot write to, acknowledge or read tenant A's attempt
+  ---
+  duration_ms: 6332.594848
+  type: 'test'
+  ...
+# Subtest: m1-spine: the control tenant is refused distributed execution on every replica and stays legacy
+ok 9 - m1-spine: the control tenant is refused distributed execution on every replica and stays legacy
+  ---
+  duration_ms: 9176.010872
+  type: 'test'
+  ...
+# Subtest: m1-spine: the MIG-009 drain CLI rolls back live distributed work, per tenant and attributed
+ok 10 - m1-spine: the MIG-009 drain CLI rolls back live distributed work, per tenant and attributed
+  ---
+  duration_ms: 8106.872923
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 9
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47923.853129

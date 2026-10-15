@@ -1,0 +1,13 @@
+OK: docker-compose.d1.yml satisfies the DEP-002 network-segmentation matrix
+    (10 services incl. the DEP-009 control-plane-b replica, exact per-service
+     networks, no shared rw volume, healthchecks, service_healthy startup,
+     2 distinct worker profiles, toxiproxy in-path on 4 links, neither
+     control-plane replica in the fake control-endpoint allowlist).
+
+    Worker<->data isolation is NOT 'full network isolation'. It is:
+      (a) no DIRECT worker->postgres:5432 path (worker not on data-net),
+      (b) workers carry NO DB credential (cannot authenticate), and
+      (c) E2 FORCE-RLS gates any data access.
+    toxiproxy is a DELIBERATE multi-homed data-tier bridge; its :15432
+    listener is TCP-reachable from workers BY DESIGN — isolation does
+    not rely on hiding that port.

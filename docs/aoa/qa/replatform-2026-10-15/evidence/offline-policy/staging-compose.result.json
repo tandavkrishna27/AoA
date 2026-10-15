@@ -1,0 +1,28 @@
+{
+  "id": "staging-compose",
+  "kind": "test",
+  "file": "scripts/check-staging-manifest.test.mjs",
+  "scope": "DEP-006 staging composition and DEP-015 shipped overlay invariants",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "scripts/check-staging-manifest.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:00.191Z",
+  "durationMs": 355,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {
+    "tests": 66,
+    "suites": 0,
+    "pass": 66,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

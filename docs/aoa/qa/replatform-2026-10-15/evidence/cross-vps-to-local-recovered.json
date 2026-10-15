@@ -1,0 +1,22 @@
+{
+  "direction": "vps-to-local",
+  "label": "recovered",
+  "capturedAt": "2026-10-15T11:01:34.301Z",
+  "workers": [
+    {
+      "id": "e7f845bf-50db-41cc-b2b2-39925118bfff",
+      "status": "enrolled",
+      "device_generation": 1,
+      "last_seen_at": "2026-10-15T11:01:33.705Z",
+      "age_seconds": 0.577126
+    }
+  ],
+  "targets": [
+    {
+      "id": "e442d2da-3886-4969-9bd4-2106ef578bcb",
+      "status": "active",
+      "last_seen_at": "2026-10-15T11:01:19.869Z",
+      "device_generation": 1
+    }
+  ]
+}

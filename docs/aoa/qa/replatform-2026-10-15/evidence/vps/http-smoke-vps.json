@@ -1,0 +1,29 @@
+{
+  "capturedAt": "2026-10-15T11:06:15.455Z",
+  "results": [
+    {
+      "endpoint": "http://127.0.0.1:3210/api/health",
+      "client": "Helsinki-VPS-host",
+      "requests": 100,
+      "concurrency": 4,
+      "errors": [],
+      "durationMs": 261.246612,
+      "p50Ms": 8.714511000000016,
+      "p95Ms": 22.674759999999992,
+      "maxMs": 27.136177000000032,
+      "scope": "Health endpoint only; includes client network latency; not workload capacity or D5 acceptance"
+    },
+    {
+      "endpoint": "https://testing.armyofagents.org/api/health",
+      "client": "Helsinki-VPS-host",
+      "requests": 100,
+      "concurrency": 4,
+      "errors": [],
+      "durationMs": 486.9683359999999,
+      "p50Ms": 5.8371810000001005,
+      "p95Ms": 13.476207999999815,
+      "maxMs": 482.25275899999997,
+      "scope": "Health endpoint only; includes client network latency; not workload capacity or D5 acceptance"
+    }
+  ]
+}

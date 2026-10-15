@@ -1,0 +1,385 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from fake-provider.Dockerfile
+#1 transferring dockerfile: 7.57kB 0.0s done
+#1 DONE 0.1s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 1.0s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.1s done
+#3 CACHED
+
+#4 resolve image config for docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#4 DONE 0.9s
+
+#5 [internal] load metadata for docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#5 DONE 1.5s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 987B 0.0s done
+#6 DONE 0.1s
+
+#7 [internal] load build context
+#7 ...
+
+#8 [base 1/2] FROM docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#8 resolve docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d 0.1s done
+#8 DONE 0.2s
+
+#9 [base 2/2] RUN corepack enable
+#9 CACHED
+
+#7 [internal] load build context
+#7 ...
+
+#10 [production 1/5] WORKDIR /fake-app
+#10 DONE 0.3s
+
+#7 [internal] load build context
+#7 ...
+
+#11 docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#11 resolve docker.io/docker/buildkit-syft-scanner:stable-1 0.5s done
+#11 DONE 0.5s
+
+#7 [internal] load build context
+#7 transferring context: 24.71MB 4.7s
+#7 transferring context: 53.06MB 9.7s
+#7 transferring context: 87.29MB 14.9s
+#7 transferring context: 125.84MB 19.9s
+#7 transferring context: 165.43MB 24.9s
+#7 transferring context: 205.66MB 29.9s
+#7 transferring context: 242.77MB 35.0s
+#7 transferring context: 280.69MB 40.0s
+#7 transferring context: 296.25MB 42.0s done
+#7 DONE 42.0s
+
+#12 [wire-deps  1/11] WORKDIR /app
+#12 CACHED
+
+#13 [wire-deps  2/11] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+#13 CACHED
+
+#14 [wire-deps  3/11] COPY packages/adapter-manager/package.json packages/adapter-manager/
+#14 ...
+
+#15 [deps 3/6] COPY packages/sandbox-fake-provider/package.json packages/sandbox-fake-provider/
+#15 DONE 0.8s
+
+#14 [wire-deps  3/11] COPY packages/adapter-manager/package.json packages/adapter-manager/
+#14 DONE 0.7s
+
+#16 [wire-deps  4/11] COPY packages/provider-wire/package.json packages/provider-wire/
+#16 ...
+
+#17 [deps 4/6] COPY packages/worker-protocol/package.json packages/worker-protocol/
+#17 DONE 0.3s
+
+#16 [wire-deps  4/11] COPY packages/provider-wire/package.json packages/provider-wire/
+#16 DONE 0.4s
+
+#18 [wire-deps  5/11] COPY packages/sandbox-e2b-provider/package.json packages/sandbox-e2b-provider/
+#18 ...
+
+#19 [deps 5/6] COPY patches/ patches/
+#19 DONE 0.3s
+
+#18 [wire-deps  5/11] COPY packages/sandbox-e2b-provider/package.json packages/sandbox-e2b-provider/
+#18 DONE 0.3s
+
+#20 [wire-deps  6/11] COPY packages/worker-daemon/package.json packages/worker-daemon/
+#20 DONE 0.2s
+
+#21 [deps 6/6] RUN pnpm install --frozen-lockfile --prod --filter "@armyofagents/sandbox-fake-provider..."
+#21 ...
+
+#22 [wire-deps  7/11] COPY packages/worker-protocol/package.json packages/worker-protocol/
+#22 DONE 0.2s
+
+#23 [wire-deps  8/11] COPY packages/provider-capability/package.json packages/provider-capability/
+#23 DONE 0.1s
+
+#21 [deps 6/6] RUN pnpm install --frozen-lockfile --prod --filter "@armyofagents/sandbox-fake-provider..."
+#21 0.614 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-9.15.4.tgz
+#21 ...
+
+#24 [wire-deps  9/11] COPY packages/sandbox-provider-contract/package.json packages/sandbox-provider-contract/
+#24 DONE 0.2s
+
+#25 [wire-deps 10/11] COPY patches/ patches/
+#25 DONE 0.2s
+
+#21 [deps 6/6] RUN pnpm install --frozen-lockfile --prod --filter "@armyofagents/sandbox-fake-provider..."
+#21 5.243 Scope: 2 of 3 workspace projects
+#21 5.283 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#21 5.283 (Use `node --trace-deprecation ...` to show where the warning was created)
+#21 5.518 Lockfile is up to date, resolution step is skipped
+#21 5.684 Progress: resolved 1, reused 0, downloaded 0, added 0
+#21 5.699 .                                        |   +1 +
+#21 5.841 
+#21 5.841    ╭───────────────────────────────────────────────────────────────────╮
+#21 5.841    │                                                                   │
+#21 5.841    │                Update available! 9.15.4 → 12.11.2.                │
+#21 5.841    │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.11.2   │
+#21 5.841    │         Run "corepack install -g pnpm@12.11.2" to update.         │
+#21 5.841    │                                                                   │
+#21 5.841    ╰───────────────────────────────────────────────────────────────────╯
+#21 5.841 
+#21 5.993 Progress: resolved 1, reused 0, downloaded 1, added 1, done
+#21 6.085 Done in 2.1s
+#21 DONE 6.3s
+
+#26 [build 1/8] WORKDIR /app
+#26 DONE 0.4s
+
+#27 [wire-deps 11/11] RUN pnpm install --frozen-lockfile --filter "@armyofagents/adapter-manager..."
+#27 0.799 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-9.15.4.tgz
+#27 5.165 Scope: 7 of 8 workspace projects
+#27 5.224 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#27 5.224 (Use `node --trace-deprecation ...` to show where the warning was created)
+#27 5.560 Lockfile is up to date, resolution step is skipped
+#27 5.842 Progress: resolved 1, reused 0, downloaded 0, added 0
+#27 ...
+
+#28 [build 2/8] RUN npm install --global typescript@5.7.3 @types/node@24
+#28 ...
+
+#27 [wire-deps 11/11] RUN pnpm install --frozen-lockfile --filter "@armyofagents/adapter-manager..."
+#27 5.970 .                                        | +270 +++++++++++++++++++++++++++
+#27 6.843 Progress: resolved 270, reused 0, downloaded 20, added 18
+#27 6.966 
+#27 6.966    ╭───────────────────────────────────────────────────────────────────╮
+#27 6.966    │                                                                   │
+#27 6.966    │                Update available! 9.15.4 → 12.11.2.                │
+#27 6.966    │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.11.2   │
+#27 6.966    │         Run "corepack install -g pnpm@12.11.2" to update.         │
+#27 6.966    │                                                                   │
+#27 6.966    ╰───────────────────────────────────────────────────────────────────╯
+#27 6.966 
+#27 7.858 Progress: resolved 270, reused 0, downloaded 58, added 61
+#27 8.861 Progress: resolved 270, reused 0, downloaded 116, added 116
+#27 9.876 Progress: resolved 270, reused 0, downloaded 199, added 202
+#27 10.87 Progress: resolved 270, reused 0, downloaded 256, added 260
+#27 11.87 Progress: resolved 270, reused 0, downloaded 263, added 267
+#27 12.91 Progress: resolved 270, reused 0, downloaded 265, added 268
+#27 ...
+
+#28 [build 2/8] RUN npm install --global typescript@5.7.3 @types/node@24
+#28 7.497 
+#28 7.497 added 3 packages in 6s
+#28 7.507 npm notice
+#28 7.507 npm notice New major version of npm available! 11.17.0 -> 12.2.0
+#28 7.507 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+#28 7.507 npm notice To update run: npm install -g npm@12.2.0
+#28 7.507 npm notice
+#28 DONE 8.3s
+
+#27 [wire-deps 11/11] RUN pnpm install --frozen-lockfile --filter "@armyofagents/adapter-manager..."
+#27 13.51 Progress: resolved 270, reused 0, downloaded 266, added 270, done
+#27 14.17 .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+#27 14.18 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#27 14.34 .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+#27 ...
+
+#29 [build 3/8] COPY tsconfig.json ./
+#29 DONE 0.4s
+
+#27 [wire-deps 11/11] RUN pnpm install --frozen-lockfile --filter "@armyofagents/adapter-manager..."
+#27 14.37 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#27 14.63  WARN  Failed to create bin at /app/packages/adapter-manager/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#27 ...
+
+#30 [build 4/8] COPY packages/worker-protocol/ packages/worker-protocol/
+#30 DONE 0.3s
+
+#31 [build 5/8] COPY packages/sandbox-fake-provider/ packages/sandbox-fake-provider/
+#31 DONE 0.1s
+
+#27 [wire-deps 11/11] RUN pnpm install --frozen-lockfile --filter "@armyofagents/adapter-manager..."
+#27 14.63  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#27 14.63  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#27 14.63  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#27 15.28  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-capability/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#27 15.28  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/sandbox-e2b-provider/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#27 15.30  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-wire/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#27 15.32  WARN  Failed to create bin at /app/packages/adapter-manager/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/adapter-manager/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#27 15.33 Done in 11.3s
+#27 DONE 15.6s
+
+#32 [build 6/8] RUN ln -s "$(npm root -g)/@types" node_modules/@types || true
+#32 DONE 0.8s
+
+#33 [wire-build 1/8] WORKDIR /app
+#33 DONE 0.7s
+
+#34 [build 7/8] RUN tsc -p packages/worker-protocol/tsconfig.json   && tsc -p packages/sandbox-fake-provider/tsconfig.json   && test -f packages/sandbox-fake-provider/dist/index.js     || (echo "ERROR: sandbox-fake-provider build output missing" && exit 1)
+#34 ...
+
+#35 [wire-build 2/8] COPY . .
+#35 DONE 3.7s
+
+#36 [wire-build 3/8] RUN pnpm install --frozen-lockfile --filter "@armyofagents/adapter-manager..."
+#36 2.191 Scope: 8 of 35 workspace projects
+#36 2.228 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#36 2.228 (Use `node --trace-deprecation ...` to show where the warning was created)
+#36 2.505 Lockfile is up to date, resolution step is skipped
+#36 4.630  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 4.633  WARN  Failed to create bin at /app/packages/adapter-manager/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 4.634  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 4.634  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.428  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-capability/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.447  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/sandbox-e2b-provider/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.461  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-wire/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.472  WARN  Failed to create bin at /app/packages/adapter-manager/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/adapter-manager/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.481 Done in 4.3s
+#36 DONE 5.6s
+
+#34 [build 7/8] RUN tsc -p packages/worker-protocol/tsconfig.json   && tsc -p packages/sandbox-fake-provider/tsconfig.json   && test -f packages/sandbox-fake-provider/dist/index.js     || (echo "ERROR: sandbox-fake-provider build output missing" && exit 1)
+#34 ...
+
+#37 [wire-build 4/8] RUN pnpm --filter "@armyofagents/adapter-manager..." build
+#37 1.732 Scope: 8 of 35 workspace projects
+#37 1.748 packages/worker-protocol build$ tsc
+#37 ...
+
+#34 [build 7/8] RUN tsc -p packages/worker-protocol/tsconfig.json   && tsc -p packages/sandbox-fake-provider/tsconfig.json   && test -f packages/sandbox-fake-provider/dist/index.js     || (echo "ERROR: sandbox-fake-provider build output missing" && exit 1)
+#34 DONE 17.0s
+
+#38 [build 8/8] RUN pnpm --filter @armyofagents/sandbox-fake-provider deploy --prod /fake-app
+#38 1.561 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#38 1.561 (Use `node --trace-deprecation ...` to show where the warning was created)
+#38 1.721 Packages are copied from the content-addressable store to the virtual store.
+#38 1.721   Content-addressable store is at: /root/.local/share/pnpm/store/v3
+#38 1.721   Virtual store is at:             ../fake-app/node_modules/.pnpm
+#38 1.820 Progress: resolved 1, reused 0, downloaded 0, added 0
+#38 2.832 Progress: resolved 9, reused 2, downloaded 7, added 0
+#38 3.830 Progress: resolved 10, reused 2, downloaded 8, added 0
+#38 4.831 Progress: resolved 72, reused 2, downloaded 54, added 0
+#38 ...
+
+#37 [wire-build 4/8] RUN pnpm --filter "@armyofagents/adapter-manager..." build
+#37 12.14 packages/worker-protocol build: Done
+#37 12.16 packages/worker-daemon build$ tsc
+#37 12.16 packages/sandbox-fake-provider build$ tsc
+#37 ...
+
+#38 [build 8/8] RUN pnpm --filter @armyofagents/sandbox-fake-provider deploy --prod /fake-app
+#38 5.830 Progress: resolved 151, reused 2, downloaded 121, added 0
+#38 6.831 Progress: resolved 222, reused 2, downloaded 151, added 0
+#38 7.838 Progress: resolved 242, reused 2, downloaded 158, added 0
+#38 8.838 Progress: resolved 276, reused 2, downloaded 175, added 0
+#38 9.907 Progress: resolved 300, reused 2, downloaded 210, added 0
+#38 10.91 Progress: resolved 306, reused 2, downloaded 219, added 0
+#38 11.30 .                                        |   +2 +
+#38 11.91 Progress: resolved 307, reused 2, downloaded 220, added 0
+#38 ...
+
+#37 [wire-build 4/8] RUN pnpm --filter "@armyofagents/adapter-manager..." build
+#37 19.86 packages/sandbox-fake-provider build: Done
+#37 ...
+
+#38 [build 8/8] RUN pnpm --filter @armyofagents/sandbox-fake-provider deploy --prod /fake-app
+#38 12.91 Progress: resolved 307, reused 2, downloaded 221, added 0
+#38 13.91 Progress: resolved 307, reused 2, downloaded 221, added 1
+#38 14.18 Progress: resolved 307, reused 2, downloaded 221, added 2, done
+#38 14.25  WARN  Failed to create bin at /app/packages/fake-app/node_modules/.bin/vite. ENOENT: no such file or directory, open '/fake-app/node_modules/.pnpm/vite@6.4.3_@types+node@24.12.0_jiti@2.6.1_lightningcss@1.30.2_tsx@4.22.4_yaml@2.8.3/node_modules/vite/bin/vite.js'
+#38 14.25  WARN  Failed to create bin at /app/packages/fake-app/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/fake-app/node_modules/.pnpm/yaml@2.8.3/node_modules/yaml/bin.mjs'
+#38 14.25  WARN  Failed to create bin at /app/packages/fake-app/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/fake-app/node_modules/.pnpm/tsx@4.22.4/node_modules/tsx/dist/cli.mjs'
+#38 14.25  WARN  Failed to create bin at /app/packages/fake-app/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/fake-app/node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti-cli.mjs'
+#38 DONE 15.0s
+
+#37 [wire-build 4/8] RUN pnpm --filter "@armyofagents/adapter-manager..." build
+#37 ...
+
+#39 [production 2/5] COPY --chown=node:node --from=build /fake-app /fake-app
+#39 DONE 0.7s
+
+#37 [wire-build 4/8] RUN pnpm --filter "@armyofagents/adapter-manager..." build
+#37 25.14 packages/worker-daemon build: Done
+#37 25.14 packages/provider-capability build$ tsc
+#37 25.14 packages/sandbox-provider-contract build$ tsc
+#37 29.01 packages/provider-capability build: Done
+#37 29.28 packages/sandbox-provider-contract build: Done
+#37 29.28 packages/sandbox-e2b-provider build$ tsc
+#37 33.72 packages/sandbox-e2b-provider build: Done
+#37 33.72 packages/provider-wire build$ tsc
+#37 37.17 packages/provider-wire build: Done
+#37 37.17 packages/adapter-manager build$ tsc
+#37 42.61 packages/adapter-manager build: Done
+#37 DONE 42.7s
+
+#40 [wire-build 5/8] RUN pnpm --filter @armyofagents/adapter-manager deploy --prod /wire-app
+#40 2.064 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#40 2.064 (Use `node --trace-deprecation ...` to show where the warning was created)
+#40 2.291 Packages are copied from the content-addressable store to the virtual store.
+#40 2.291   Content-addressable store is at: /root/.local/share/pnpm/store/v3
+#40 2.291   Virtual store is at:             ../wire-app/node_modules/.pnpm
+#40 2.426 Progress: resolved 1, reused 0, downloaded 0, added 0
+#40 3.443 Progress: resolved 28, reused 25, downloaded 0, added 0
+#40 4.447 Progress: resolved 172, reused 156, downloaded 0, added 0
+#40 5.450 Progress: resolved 253, reused 177, downloaded 0, added 0
+#40 6.461 Progress: resolved 284, reused 207, downloaded 0, added 0
+#40 7.461 Progress: resolved 348, reused 264, downloaded 0, added 0
+#40 7.737  WARN  1 deprecated subdependencies found: glob@11.1.0
+#40 7.797 .                                        |  +56 ++++++
+#40 8.462 Progress: resolved 351, reused 267, downloaded 0, added 5
+#40 9.463 Progress: resolved 351, reused 267, downloaded 0, added 22
+#40 10.46 Progress: resolved 351, reused 267, downloaded 0, added 35
+#40 11.46 Progress: resolved 351, reused 267, downloaded 0, added 47
+#40 12.47 Progress: resolved 351, reused 267, downloaded 0, added 50
+#40 13.47 Progress: resolved 351, reused 267, downloaded 0, added 51
+#40 14.47 Progress: resolved 351, reused 267, downloaded 0, added 53
+#40 15.47 Progress: resolved 351, reused 267, downloaded 0, added 55
+#40 17.36 Progress: resolved 351, reused 267, downloaded 0, added 56
+#40 17.36 Progress: resolved 351, reused 267, downloaded 0, added 56, done
+#40 17.62  WARN  Failed to create bin at /app/packages/wire-app/node_modules/.bin/vite. ENOENT: no such file or directory, open '/wire-app/node_modules/.pnpm/vite@6.4.3_@types+node@24.12.0_jiti@2.6.1_lightningcss@1.30.2_tsx@4.22.4_yaml@2.8.3/node_modules/vite/bin/vite.js'
+#40 17.62  WARN  Failed to create bin at /app/packages/wire-app/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/wire-app/node_modules/.pnpm/yaml@2.8.3/node_modules/yaml/bin.mjs'
+#40 17.62  WARN  Failed to create bin at /app/packages/wire-app/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/wire-app/node_modules/.pnpm/tsx@4.22.4/node_modules/tsx/dist/cli.mjs'
+#40 17.62  WARN  Failed to create bin at /app/packages/wire-app/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/wire-app/node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti-cli.mjs'
+#40 DONE 18.0s
+
+#41 [wire-build 6/8] RUN node docker/apply-workspace-publish-config.mjs /wire-app/node_modules
+#41 0.677 applied publishConfig: @armyofagents/provider-capability (/wire-app/node_modules/.pnpm/@armyofagents+provider-capability@file+packages+provider-capability/node_modules/@armyofagents/provider-capability/package.json)
+#41 0.682 applied publishConfig: @armyofagents/provider-wire (/wire-app/node_modules/.pnpm/@armyofagents+provider-wire@file+packages+provider-wire/node_modules/@armyofagents/provider-wire/package.json)
+#41 0.760 apply-workspace-publish-config: promoted publishConfig on 2 @armyofagents package manifest(s)
+#41 DONE 0.8s
+
+#42 [wire-build 7/8] RUN test -f /wire-app/dist/server.js   || (echo "ERROR: adapter-manager wire server build output missing" && exit 1)
+#42 DONE 0.6s
+
+#43 [wire-build 8/8] RUN test -f /wire-app/node_modules/@armyofagents/worker-daemon/dist/supervisor/env-probe.js   || (echo "ERROR: worker-daemon env-probe build output missing in the wire tree" && exit 1)
+#43 DONE 0.7s
+
+#44 [production 3/5] COPY --chown=node:node --from=wire-build /wire-app /wire-app
+#44 DONE 2.0s
+
+#45 [production 4/5] COPY --chown=node:node docker/d1/fake-provider-entry.mjs /fake-app/fake-provider-entry.mjs
+#45 DONE 0.3s
+
+#46 [production 5/5] COPY --chown=node:node docker/d1/ctl-allowlist.mjs /fake-app/ctl-allowlist.mjs
+#46 DONE 0.2s
+
+#11 docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#11 CACHED
+
+#47 [linux/amd64] generating sbom using docker.io/docker/buildkit-syft-scanner:stable-1
+#47 0.616 time="2026-10-15T10:33:51Z" level=info msg="starting syft scanner for buildkit v1.12.0"
+#47 DONE 19.4s
+
+#48 exporting to image
+#48 exporting layers
+#48 exporting layers 2.8s done
+#48 exporting manifest sha256:31bcc392a29e5452572e4e6b9f865d6642ed75d05b95b635c00970be6edfca1e 0.1s done
+#48 exporting config sha256:7774fbcd2abe3fca0b0cbf3e329a669eef9329c6822cd23f88382453e0ab8f85 0.0s done
+#48 exporting attestation manifest sha256:fbee568cb49e203e53d449dadf1ec2f3268c7af029434e8fc557f77d48507345
+#48 exporting attestation manifest sha256:fbee568cb49e203e53d449dadf1ec2f3268c7af029434e8fc557f77d48507345 0.1s done
+#48 exporting manifest list sha256:06c40b1a930337100ebc9bd1c85c3d974cb054783449f4286446877e959c827d 0.1s done
+#48 naming to docker.io/aoa-test/fake-provider:13b4e806f
+#48 naming to docker.io/aoa-test/fake-provider:13b4e806f 0.0s done
+#48 unpacking to docker.io/aoa-test/fake-provider:13b4e806f
+#48 unpacking to docker.io/aoa-test/fake-provider:13b4e806f 2.6s done
+#48 DONE 7.0s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/xjdt4cdsulrypu5gs3831c3o6

@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-15T11:10:01.127Z",
+  "rows": [
+    {
+      "id": "e690e20a-16ab-4b74-85c5-27cb9854eb69",
+      "slug": "aoa-canary-e2b",
+      "status": "active",
+      "target_last_seen_at": "2026-10-15T10:44:25.129Z",
+      "target_age_seconds": 1535.980756,
+      "worker_id": "cca58768-6d33-4608-997e-23b6b74993f8",
+      "worker_status": "enrolled",
+      "worker_last_seen_at": "2026-10-15T10:44:35.814Z",
+      "worker_age_seconds": 1525.29528
+    }
+  ],
+  "interpretation": "Post-run snapshot only. Test placement freshness bound is 120 seconds; compare failure timing before attributing cause."
+}

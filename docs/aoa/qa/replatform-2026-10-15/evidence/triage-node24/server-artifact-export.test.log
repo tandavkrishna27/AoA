@@ -1,0 +1,59 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > SAME-TENANT POSITIVE CONTROL: Organization A digests + exports its OWN sandbox's output 79ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ F10 CROSS-ORGANIZATION: A's capability cannot DIGEST B's sandbox — uniform refusal, B's bytes never read 27ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ F10 CROSS-ORGANIZATION: A's capability cannot EXPORT B's sandbox — uniform refusal, nothing uploaded 27ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ another LEASE of the same Organization is refused too (a replaced attempt cannot read its successor's sandbox) 32ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > MISSING capability: both refused, nothing read or uploaded (never trusted on absence) 29ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > the cross-Organization refusal is BYTE-IDENTICAL to not-found (no cross-tenant existence oracle) 62ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > GATED-ONLY: an UNGATED (keyless) server 404s both ops — never a raw read or a raw upload 7ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a file that CHANGED after its digest is refused AT THE CAUSE (far side), nothing uploaded, no url/path/digest on the wire 23ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a forged grant whose url points at ANOTHER origin is refused — nothing read, nothing uploaded 15ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ F10: a grant for ANOTHER ORGANIZATION's object key is refused on the caller's own sandbox 12ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a grant for another ATTEMPT of the same job is refused (the key is bound to the capability's attempt) 13ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a grant whose url does not target its own objectKey is refused 12ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ FAIL-CLOSED: a server with NO configured upload origin refuses every export (digest still works) 26ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ the export budget is clamped to capability expiry minus the teardown reserve 15ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ inside the teardown reserve the export is refused WITHOUT dispatch 13ms
+ × |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a STALLED upload releases the sandbox lock at its budget, so the run's destroy is not stranded 27ms
+   → expected ResourceNotAvailableError: resource not a… to be an instance of WireProtocolError
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a STALLED sandbox READ also releases the lock at its budget, so destroy is not stranded 208ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ digest carries the CLAMPED budget to the provider, and is refused inside the reserve 34ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a SECOND successful export of the same objectKey is refused — the re-PUT never reaches the provider 29ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ positive control: a retry after a FAILED export is still allowed, and a DIFFERENT key always is 29ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a STALLED ownership inspection releases the lock at the op budget, so the next op is not stranded 217ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a stalled inspection on DIGEST is bounded the same way 222ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a REPLAY with the same idempotency key returns the recorded result; a DIFFERENT key is refused 31ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a detached locked section does NOT dispatch after its budget fired 1221ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ an EXPIRED upload grant is refused, and the redemption record outlives the grant's OWN claimed expiry 33ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ the ledger IS bounded: a record past the SERVER's retention is evicted 29ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a QUEUED request is measured from the deadline it was given, not from when it reaches the lock 410ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ the provider's budget is recomputed AFTER the ownership inspection 270ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > a FAR provider that declares artifactExportMode='none' declines honestly, as its own class 33ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > CLI-017-B — an SD-5 refusal keeps its class across the adapter-manager hop > a scanner that REFUSES surfaces as SandboxExportScannerRefusedError, and nothing is uploaded 18ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > CLI-017-B — an SD-5 refusal keeps its class across the adapter-manager hop > POSITIVE CONTROL - with a CLEAN scanner the same export succeeds over the same hop 15ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > CLI-017-B — an SD-5 refusal is CLASSIFIED and LOGGED, and still crosses with its class > the AM logs op=export_artifact cause=export_secret_refused, AND the driver still gets the class 17ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > CLI-017-B — an SD-5 refusal is CLASSIFIED and LOGGED, and still crosses with its class > POSITIVE CONTROL - a clean export logs NOTHING, so the log is not written on success 15ms
+ ✓ |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > CLI-017-B — an SD-5 refusal is CLASSIFIED and LOGGED, and still crosses with its class > an UNMODELLED failure on the same op is still classified and still distinguishable 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |packages/adapter-manager| src/__tests__/server-artifact-export.test.ts > DAT-009-3e — digest/export over the networked wire (gated owned ops) > ★ a STALLED upload releases the sandbox lock at its budget, so the run's destroy is not stranded
+AssertionError: expected ResourceNotAvailableError: resource not a… to be an instance of WireProtocolError
+ ❯ src/__tests__/server-artifact-export.test.ts:487:5
+    485|     const exporting = driver.exportArtifact(sandboxId, OUT_PATH, grant…
+    486|     const destroyed = driver.destroy(sandboxId, ctx("destroy-after-sta…
+    487|     await expect(exporting).rejects.toBeInstanceOf(WireProtocolError);
+       |     ^
+    488|     const result = await Promise.race([
+    489|       destroyed,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 33 passed (34)
+   Start at  21:40:22
+   Duration  7.24s (transform 1.07s, setup 0ms, collect 3.40s, tests 3.27s, environment 0ms, prepare 128ms)
+

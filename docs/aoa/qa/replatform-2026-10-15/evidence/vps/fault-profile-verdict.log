@@ -1,0 +1,3 @@
+OK: tests/d1/fault-matrix.json declares 3 gate profile(s) and 83 case(s) (47 required, 36 pending), each with an injection, an observer and an expected classification; every profile carries the F10 tenant matrix (journeys, nine denial surfaces, the
+    control tenant, and the four no-RLS legacy tables with positive + anti-vacuity controls).
+OK: /opt/aoa-testing/evidence/fault-campaign-profile/m1-fault-matrix-evidence.json — profile M1-D1-SPINE: 30/30 required case(s) fired and classified as declared, 1 pending. Profile INCOMPLETE (pending cases remain).

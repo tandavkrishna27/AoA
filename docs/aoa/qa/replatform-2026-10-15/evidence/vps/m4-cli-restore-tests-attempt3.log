@@ -1,0 +1,17 @@
+TAP version 13
+# {"result":"PASS","cases":["CLI SQL restore","CLI gzip restore","migration journal preserved","two company fixture payloads preserved","missing file nonzero","corrupt gzip nonzero, data preserved","truncated COPY nonzero, transaction rolled back","invalid UUID COPY nonzero without timeout, transaction rolled back","column ACL refuses incomplete fallback","schema ACL refuses incomplete fallback","type ACL refuses incomplete fallback"],"backupDirectory":"/tmp/aoa-m4-cli-restore-ccfdJq","limits":"Synthetic fixture, not full application schema, stale fence recovery or production RPO/RTO"}
+# Subtest: actual CLI restores automatic COPY backups as SQL and gzip without PostgreSQL tools
+ok 1 - actual CLI restores automatic COPY backups as SQL and gzip without PostgreSQL tools
+  ---
+  duration_ms: 68013.524138
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 68376.656108

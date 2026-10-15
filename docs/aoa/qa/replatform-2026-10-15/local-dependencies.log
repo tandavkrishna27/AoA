@@ -1,0 +1,81 @@
+npm warn Unknown project config "auto-install-peers". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+Scope: all 35 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +1490
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 1490, reused 499, downloaded 0, added 0
+
+   ╭───────────────────────────────────────────────────────────────────╮
+   │                                                                   │
+   │                Update available! 9.15.4 → 12.11.2.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.11.2   │
+   │                 Run "pnpm add -g pnpm" to update.                 │
+   │                                                                   │
+   ╰───────────────────────────────────────────────────────────────────╯
+
+Progress: resolved 1490, reused 1234, downloaded 0, added 0
+Progress: resolved 1490, reused 1389, downloaded 5, added 44
+Progress: resolved 1490, reused 1389, downloaded 6, added 205
+Progress: resolved 1490, reused 1389, downloaded 6, added 257
+Progress: resolved 1490, reused 1389, downloaded 6, added 342
+Progress: resolved 1490, reused 1389, downloaded 6, added 436
+Progress: resolved 1490, reused 1389, downloaded 6, added 538
+Progress: resolved 1490, reused 1389, downloaded 6, added 652
+Progress: resolved 1490, reused 1389, downloaded 6, added 832
+Progress: resolved 1490, reused 1389, downloaded 8, added 1048
+Progress: resolved 1490, reused 1389, downloaded 8, added 1183
+Progress: resolved 1490, reused 1389, downloaded 12, added 1320
+Progress: resolved 1490, reused 1389, downloaded 20, added 1389
+Progress: resolved 1490, reused 1389, downloaded 40, added 1414
+Progress: resolved 1490, reused 1389, downloaded 90, added 1478
+Progress: resolved 1490, reused 1389, downloaded 96, added 1485
+Progress: resolved 1490, reused 1389, downloaded 96, added 1488
+Progress: resolved 1490, reused 1389, downloaded 96, added 1489
+Progress: resolved 1490, reused 1389, downloaded 96, added 1490, done
+.../@embedded-postgres/windows-x64 postinstall$ node scripts/hydrate-symlinks.js
+.../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+.../@embedded-postgres/windows-x64 postinstall: Done
+.../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+.../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+.../es5-ext@0.10.64/node_modules/es5-ext postinstall$  node -e "try{require('./_postinstall')}catch(e){}" || exit 0
+.../es5-ext@0.10.64/node_modules/es5-ext postinstall: Done
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\adapter-manager\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\create-paperclip-plugin\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-file-browser-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-authoring-smoke-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-hello-world-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-kitchen-sink-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\provider-capability\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\provider-wire\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\sandbox-e2b-provider\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-keystore\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-networked-host\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\server\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\server\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\sdk\dist\dev-cli.js.EXE'
+
+devDependencies:
++ @changesets/cli 2.30.0
++ @playwright/test 1.59.1
++ cross-env 7.0.3
++ drizzle-orm 0.45.2
++ esbuild 0.28.1
++ tsx 4.22.4
++ typescript 5.9.3
++ vitest 3.2.6
+
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\create-paperclip-plugin\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\create-paperclip-plugin\node_modules\@armyofagents\plugin-sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-file-browser-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-file-browser-example\node_modules\@armyofagents\plugin-sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-authoring-smoke-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-authoring-smoke-example\node_modules\@armyofagents\plugin-sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-hello-world-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-hello-world-example\node_modules\@armyofagents\plugin-sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-kitchen-sink-example\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\plugins\examples\plugin-kitchen-sink-example\node_modules\@armyofagents\plugin-sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\provider-capability\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\provider-capability\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\sandbox-e2b-provider\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\sandbox-e2b-provider\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\provider-wire\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\provider-wire\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-keystore\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-keystore\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\adapter-manager\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\adapter-manager\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-networked-host\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\worker-networked-host\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\server\node_modules\.bin\paperclip-plugin-dev-server. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\server\node_modules\@armyofagents\plugin-sdk\dist\dev-cli.js.EXE'
+ WARN  Failed to create bin at C:\Users\Dell\Desktop\aoa\replatform-testing\server\node_modules\.bin\aoa-worker-daemon. ENOENT: no such file or directory, stat 'C:\Users\Dell\Desktop\aoa\replatform-testing\server\node_modules\@armyofagents\worker-daemon\dist\bin\worker-daemon.js.EXE'
+Done in 25.6s

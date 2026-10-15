@@ -1,0 +1,7 @@
+{"check":"real sandbox creation with 60-second TTL","status":"pass"}
+{"check":"staged file, real command mutation, readback, stdout and stderr","status":"pass"}
+{"check":"provider key absent from sandbox environment","status":"pass"}
+{"check":"positive command timeout","status":"pass"}
+{"check":"termination, provider not-found, repeat cleanup","status":"pass"}
+{"check":"short TTL expires on real provider","status":"pass"}
+{"run":"aoa-validation-20ccb3f9-3c7c-4d3d-8418-fc4a2ebd149f","elapsedMs":10817,"results":[{"name":"real sandbox creation with 60-second TTL","status":"pass"},{"name":"staged file, real command mutation, readback, stdout and stderr","status":"pass"},{"name":"provider key absent from sandbox environment","status":"pass"},{"name":"positive command timeout","status":"pass"},{"name":"termination, provider not-found, repeat cleanup","status":"pass"},{"name":"short TTL expires on real provider","status":"pass"}],"cleanup":{"inventoryComplete":true,"matchingResources":0,"unconfirmedOwnedResources":0},"scope":"Candidate transport smoke; excludes model execution and full distributed dispatch"}

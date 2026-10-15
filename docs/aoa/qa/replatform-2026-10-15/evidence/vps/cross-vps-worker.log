@@ -1,0 +1,43 @@
+{"level":30,"time":1792061942190,"workerVersion":"0.1.0","protocolMin":1,"protocolMax":1,"keyStoreMode":"file_record","targetScope":"organization","msg":"worker-daemon starting"}
+{"level":30,"time":1792061942201,"workerId":"e7f845bf-50db-41cc-b2b2-39925118bfff","targetId":"e442d2da-3886-4969-9bd4-2106ef578bcb","deviceGeneration":1,"deviceThumbprint":"b9f53ddcc936e38f5f01b0de1abc007d0dbbccd47647fbf75118cee0a7049239","msg":"worker-daemon already enrolled; skipping control-plane enrollment"}
+{"level":30,"time":1792061942585,"expiresAtMs":1792062842585,"deviceGeneration":1,"msg":"worker-daemon session acquired"}
+{"level":30,"time":1792061943376,"step":"startup-reconcile","msg":"startup: running startup-reconcile"}
+{"level":30,"time":1792061943377,"reason":"lease_candidate_store_empty","msg":"startup-reconcile: the lease-candidate store is empty; this daemon held no lease when it last stopped"}
+{"level":30,"time":1792061943381,"reason":"sandbox_pass_skipped_container_path_f4","msg":"startup-reconcile: sandbox pass skipped; orphan reclamation rests on the provider-side reaper"}
+{"level":30,"time":1792061943382,"step":"startup-reconcile","outcome":"ok","msg":"startup: startup-reconcile complete"}
+{"level":30,"time":1792061943384,"workerId":"e7f845bf-50db-41cc-b2b2-39925118bfff","targetId":"e442d2da-3886-4969-9bd4-2106ef578bcb","msg":"worker-daemon dispatch COMPOSED; heartbeat seeded; startup reconcile complete; leasing through the poll loop"}
+{"level":40,"time":1792061973584,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792061978592,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792061983596,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792061988603,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792061993611,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792061998616,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792062003622,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792062008627,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792062013632,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792062018639,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":40,"time":1792062023641,"msg":"worker heartbeat: beat failed; will retry"}
+{"level":30,"time":1792062092195,"signal":"SIGTERM","step":"lease-stop","msg":"shutdown: stopping lease-stop"}
+{"level":30,"time":1792062092196,"step":"lease-stop","outcome":"ok","msg":"shutdown: stopped lease-stop"}
+{"level":30,"time":1792062092196,"signal":"SIGTERM","step":"renewal-stop","msg":"shutdown: stopping renewal-stop"}
+{"level":30,"time":1792062092196,"step":"renewal-stop","outcome":"ok","msg":"shutdown: stopped renewal-stop"}
+{"level":30,"time":1792062092196,"signal":"SIGTERM","step":"lease-drain","msg":"shutdown: stopping lease-drain"}
+{"level":30,"time":1792062092196,"step":"lease-drain","outcome":"ok","msg":"shutdown: stopped lease-drain"}
+{"level":30,"time":1792062092196,"signal":"SIGTERM","step":"event-outbox-stop","msg":"shutdown: stopping event-outbox-stop"}
+{"level":30,"time":1792062092196,"step":"event-outbox-stop","outcome":"ok","msg":"shutdown: stopped event-outbox-stop"}
+{"level":30,"time":1792062092196,"signal":"SIGTERM","step":"event-outbox-flush","msg":"shutdown: stopping event-outbox-flush"}
+{"level":30,"time":1792062092197,"step":"event-outbox-flush","outcome":"ok","msg":"shutdown: stopped event-outbox-flush"}
+{"level":30,"time":1792062092197,"signal":"SIGTERM","step":"event-outbox-close","msg":"shutdown: stopping event-outbox-close"}
+{"level":30,"time":1792062092197,"step":"event-outbox-close","outcome":"ok","msg":"shutdown: stopped event-outbox-close"}
+{"level":30,"time":1792062092197,"signal":"SIGTERM","step":"heartbeat","msg":"shutdown: stopping heartbeat"}
+{"level":30,"time":1792062092197,"step":"heartbeat","outcome":"ok","msg":"shutdown: stopped heartbeat"}
+{"level":30,"time":1792062092197,"signal":"SIGTERM","step":"health-server","msg":"shutdown: stopping health-server"}
+{"level":30,"time":1792062092198,"step":"health-server","outcome":"ok","msg":"shutdown: stopped health-server"}
+{"level":30,"time":1792062092676,"workerVersion":"0.1.0","protocolMin":1,"protocolMax":1,"keyStoreMode":"file_record","targetScope":"organization","msg":"worker-daemon starting"}
+{"level":30,"time":1792062092691,"workerId":"e7f845bf-50db-41cc-b2b2-39925118bfff","targetId":"e442d2da-3886-4969-9bd4-2106ef578bcb","deviceGeneration":1,"deviceThumbprint":"b9f53ddcc936e38f5f01b0de1abc007d0dbbccd47647fbf75118cee0a7049239","msg":"worker-daemon already enrolled; skipping control-plane enrollment"}
+{"level":30,"time":1792062093084,"expiresAtMs":1792062993084,"deviceGeneration":1,"msg":"worker-daemon session acquired"}
+{"level":30,"time":1792062093862,"step":"startup-reconcile","msg":"startup: running startup-reconcile"}
+{"level":30,"time":1792062093865,"reason":"lease_candidate_store_empty","msg":"startup-reconcile: the lease-candidate store is empty; this daemon held no lease when it last stopped"}
+{"level":30,"time":1792062093867,"reason":"sandbox_pass_skipped_container_path_f4","msg":"startup-reconcile: sandbox pass skipped; orphan reclamation rests on the provider-side reaper"}
+{"level":30,"time":1792062093868,"step":"startup-reconcile","outcome":"ok","msg":"startup: startup-reconcile complete"}
+{"level":30,"time":1792062093869,"workerId":"e7f845bf-50db-41cc-b2b2-39925118bfff","targetId":"e442d2da-3886-4969-9bd4-2106ef578bcb","msg":"worker-daemon dispatch COMPOSED; heartbeat seeded; startup reconcile complete; leasing through the poll loop"}

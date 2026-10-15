@@ -1,0 +1,60 @@
+{
+  "scope": "One full-file reproduction after the complete real-PG lane, preserving test ordering after rollback controls. No assertions, timeouts, fixtures, dependencies, or application config changed. No retries.",
+  "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "command": "Node24 testing-ops/run-vitest-captured.mjs submission-metadata server/src/__tests__/job-submission.integration.test.ts",
+  "commandDetails": "submission-metadata.json contains full executable/argv, runtime, cwd, UTC start/end, exit code, and log path.",
+  "reproduction": {
+    "exitCode": 0,
+    "filesPassed": 1,
+    "testsPassed": 42,
+    "testsFailed": 0,
+    "testsSkipped": 0,
+    "unhandledErrorsReported": 0,
+    "vitestDurationSeconds": 39.29,
+    "targetTestDurationMs": 664,
+    "log": "submission-metadata.log",
+    "metadata": "submission-metadata.json"
+  },
+  "originalFailure": {
+    "log": "../../local-windows-opt-in-node24-decoded.log",
+    "summaryLines": [196906, 196907],
+    "test": "emits only stable identifier metadata when a submission transaction fails",
+    "durationMs": 1025,
+    "actualError": "expected '' to contain 'job_submission_internal_error'",
+    "classification": "Empty captured log delta at first expected-metadata assertion. Not a test timeout. No sentinel leakage demonstrated because later absence assertions did not execute.",
+    "firstFailedAssertion": "server/src/__tests__/job-submission.integration.test.ts:808"
+  },
+  "sourceEvidence": [
+    {
+      "file": "server/src/__tests__/job-submission.integration.test.ts",
+      "line": 188,
+      "observation": "flushCapturedLogs waits for logger.flush callback, sleeps a fixed 300ms, reads capturedLogDir/server.log, and returns empty string on any read exception."
+    },
+    {
+      "file": "server/src/__tests__/job-submission.integration.test.ts",
+      "line": 802,
+      "observation": "Test snapshots before capture, installs jobs failure trigger, submits sentinel-bearing fixture input, asserts HTTP500, then slices the second capture by before.length."
+    },
+    {
+      "file": "server/src/__tests__/job-submission.integration.test.ts",
+      "line": 808,
+      "observation": "First log assertion requires job_submission_internal_error; assertions for organization/company/source and absence of marker/source_intent/query/params/stack follow. Original failure stops at this first assertion."
+    },
+    {
+      "file": "server/src/middleware/logger.ts",
+      "line": 65,
+      "observation": "Normal logger uses pino transport with pino-pretty stdout and file targets. File destination is fixed when module resolves its log directory."
+    },
+    {
+      "file": "server/src/routes/job-control.ts",
+      "line": 214,
+      "observation": "Unexpected submission failure sets organizationId, companyId, sourceKind, replayed false, and fixed reasonCode on response before throwing to error middleware."
+    }
+  ],
+  "currentRunEvidence": {
+    "logLines": [3991, 4000],
+    "observation": "Target submission request produced HTTP500 job_submission_internal_error with stable organizationId/companyId/sourceKind/replayed/reasonCode plus sanitized HttpError type/message. All target assertions passed, including sentinel/query/params/stack exclusions."
+  },
+  "unresolved": "Original capture delta was empty. Exact cause has not been measured: async log delivery timing, capture sink binding, or a swallowed file-read error are hypotheses. Passing reproduction does not erase the original lane failure.",
+  "verification": "Post-run git status --short was empty at the pinned SHA. No further run was performed."
+}

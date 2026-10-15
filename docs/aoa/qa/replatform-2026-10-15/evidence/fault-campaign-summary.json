@@ -1,0 +1,211 @@
+{
+  "capturedAt": "2026-10-15T16:20:09.230Z",
+  "runtime": "isolated Node 24.19.0 ARM64",
+  "profile": {
+    "exitCode": 0,
+    "verdictExit": 0,
+    "counts": {
+      "total": 26,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "startedAt": "2026-10-15T15:59:50.561Z",
+    "finishedAt": "2026-10-15T16:09:46.914Z",
+    "declaredRequiredCases": 30,
+    "pendingCases": [
+      {
+        "caseId": "d1.credential.production_reader_company_predicate",
+        "kind": "structural",
+        "reason": "STRUCTURALLY UNAVAILABLE ON THIS LANE, and ROUTED by E6-D003 (planning session, F2) to the M1a-D2-MECHANISM profile -- it is NOT an oversight and NOT unowned. Measured at source: reaching this reader's decision needs authorizeSecretResolve to ADMIT, which needs a resolvable device_local credential; server/src/services/device-local-broker.ts holds failClosedDeviceLocalBroker and no other implementation in the tree, and the fenced route collapses every outcome to denied/malformed by design (it must not be an oracle). So on D1 an admitted read and a denied one are indistinguishable at every observable surface, and a case built here could not tell its two arms apart. Its sibling d1.tenant.legacy.provider_credentials proves the PREDICATE and the grant on the same non-owner pool, with both controls; this case is the reader's own invocation of it and is never a pass here.",
+        "owner": "M1a-D2-MECHANISM, case d2m.credential.production_reader_company_predicate, per E6-D003"
+      }
+    ],
+    "profileComplete": false,
+    "verdictText": "OK: tests/d1/fault-matrix.json declares 3 gate profile(s) and 83 case(s) (47 required, 36 pending), each with an injection, an observer and an expected classification; every profile carries the F10 tenant matrix (journeys, nine denial surfaces, the\n    control tenant, and the four no-RLS legacy tables with positive + anti-vacuity controls).\nOK: /opt/aoa-testing/evidence/fault-campaign-profile/m1-fault-matrix-evidence.json — profile M1-D1-SPINE: 30/30 required case(s) fired and classified as declared, 1 pending. Profile INCOMPLETE (pending cases remain).",
+    "cases": [
+      {
+        "caseId": "d1.reconcile.worker_startup_lease_probe",
+        "injectionFired": true,
+        "observedClassification": "startup_reconciler_fences_its_own_prior_lease",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.journey.A",
+        "injectionFired": true,
+        "observedClassification": "journey_priced_once_and_audited"
+      },
+      {
+        "caseId": "d1.tenant.journey.B",
+        "injectionFired": true,
+        "observedClassification": "journey_priced_once_and_audited"
+      },
+      {
+        "caseId": "d1.tenant.cross.events",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.read",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.lease",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.cancel",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.secrets",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.outputs",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.staged_inputs",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.legacy.cost_events",
+        "injectionFired": true,
+        "observedClassification": "filtered_by_query_predicate_not_rls",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.legacy.activity_log",
+        "injectionFired": true,
+        "observedClassification": "filtered_by_query_predicate_not_rls",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.legacy.task_outputs",
+        "injectionFired": true,
+        "observedClassification": "filtered_by_query_predicate_not_rls",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.legacy.provider_credentials",
+        "injectionFired": true,
+        "observedClassification": "filtered_by_query_predicate_not_rls",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.cross.cost_rows",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.tenant.control_refused",
+        "injectionFired": true,
+        "observedClassification": "legacy_for_organization_disabled"
+      },
+      {
+        "caseId": "d1.tenant.cross.tool_calls",
+        "injectionFired": true,
+        "observedClassification": "denied_with_same_tenant_positive_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.credential.lease_expired_redemption_refused",
+        "injectionFired": true,
+        "observedClassification": "redemption_refused_after_lease_end_with_live_lease_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.credential.wrong_lease_redemption_refused",
+        "injectionFired": true,
+        "observedClassification": "redemption_refused_on_foreign_lease_with_own_lease_control",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.redaction.planted_canary_scrubbed",
+        "injectionFired": true,
+        "observedClassification": "canary_scrubbed_while_unseeded_twin_leaks",
+        "positiveControlPassed": true
+      },
+      {
+        "caseId": "d1.cancel.unleased_attempt",
+        "injectionFired": true,
+        "observedClassification": "cancelled_directly_without_command"
+      },
+      {
+        "caseId": "d1.cancel.leased_attempt",
+        "injectionFired": true,
+        "observedClassification": "cancel_requested_with_fenced_command"
+      },
+      {
+        "caseId": "d1.provider.execute_deadline_exceeded",
+        "injectionFired": true,
+        "observedClassification": "ingest_classifies_provider_derived_terminal"
+      },
+      {
+        "caseId": "d1.fault.object_store.truncated_upload",
+        "injectionFired": true,
+        "observedClassification": "fenced_commit_refuses_unverifiable_object"
+      },
+      {
+        "caseId": "d1.cleanup.orphan_object_swept",
+        "injectionFired": true,
+        "observedClassification": "uncommitted_object_deleted"
+      },
+      {
+        "caseId": "d1.fault.link_cut.worker_to_control_plane",
+        "injectionFired": true,
+        "observedClassification": "lease_reclaimed_and_late_ack_refused"
+      },
+      {
+        "caseId": "d1.reconcile.expired_lease_reaped",
+        "injectionFired": true,
+        "observedClassification": "single_winner_retry_minted"
+      },
+      {
+        "caseId": "d1.restart.control_plane_process",
+        "injectionFired": true,
+        "observedClassification": "durable_lease_state_survives_restart"
+      },
+      {
+        "caseId": "d1.fault.link_cut.control_plane_to_postgres",
+        "injectionFired": true,
+        "observedClassification": "database_link_severed_and_restored"
+      },
+      {
+        "caseId": "d1.provider.worker_terminal_mapping",
+        "injectionFired": true,
+        "observedClassification": "worker_maps_provider_timeout_to_failed_terminal",
+        "positiveControlPassed": true
+      }
+    ]
+  },
+  "suppressed": {
+    "exitCode": 1,
+    "counts": {
+      "total": 26,
+      "passed": 14,
+      "failed": 12,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "controlPassed": true,
+    "result": "PASS: suppressed injections make the evidence verdict fail as required"
+  },
+  "scope": "Private M1-D1-SPINE reference-provider fault profile and suppressed-injection control. Not full D1 operation floors, real E2B/LLM fault campaign or public UI execution."
+}

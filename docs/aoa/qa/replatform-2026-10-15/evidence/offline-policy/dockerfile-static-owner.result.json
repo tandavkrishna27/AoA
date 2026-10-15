@@ -1,0 +1,30 @@
+{
+  "id": "dockerfile-static-owner",
+  "file": "docker/images/__tests__/dockerfile-static.test.mjs",
+  "command": [
+    "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "docker/images/__tests__/dockerfile-static.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:10:47.703Z",
+  "durationMs": 2198,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {
+    "tests": 28,
+    "suites": 0,
+    "pass": 28,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "trackedStatusUnchanged": true,
+  "trackedStatusClean": true,
+  "reason": "Explicit parent authorization after diagnosed ownership mismatch and successful plain Git verification with require_escalated; only this unchanged suite rerun under checkout owner identity."
+}

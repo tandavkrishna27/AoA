@@ -1,0 +1,25 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > renders a Workspaces tab button alongside other tabs 399ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > renders the Settings tab with Workspace & Runtime content 241ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > opens workspace source modals from Settings 1075ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > removes only the selected workspace source when a row has both local folder and repo 124ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > keeps department overview simple and moves controls out of the profile 77ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows workspace list when workspaces tab is active 48ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > fetches workspaces filtered by project ID 21ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows status badges for workspaces 87ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows mode badges for workspaces 77ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows empty state when no workspaces for this project 62ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows Workspaces tab for departments without explicit policy 61ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > workspace row navigates to workspace view on click 77ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows Archive button on active workspace rows 95ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > calls update with archived status when Archive is confirmed via dialog 125ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows archived workspaces in a collapsed section 81ms
+ ✓ |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > shows loading skeletons while fetching workspaces 47ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  21:40:12
+   Duration  9.14s (transform 1.12s, setup 213ms, collect 4.29s, tests 2.70s, environment 1.32s, prepare 200ms)
+

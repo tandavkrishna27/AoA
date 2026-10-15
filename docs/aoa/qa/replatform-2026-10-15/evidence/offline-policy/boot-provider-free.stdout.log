@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: the valid fixture has ZERO violations (non-vacuity anchor)
+ok 1 - the valid fixture has ZERO violations (non-vacuity anchor)
+  ---
+  duration_ms: 1.8098
+  type: 'test'
+  ...
+# Subtest: an UNDECLARED boot root fires a violation (a quietly-added third root)
+ok 2 - an UNDECLARED boot root fires a violation (a quietly-added third root)
+  ---
+  duration_ms: 0.3415
+  type: 'test'
+  ...
+# Subtest: a STALE declaration (declared root no longer found) fires a violation
+ok 3 - a STALE declaration (declared root no longer found) fires a violation
+  ---
+  duration_ms: 0.2027
+  type: 'test'
+  ...
+# Subtest: ★ a resolver that DEFAULTS to a provider (none-marker missing) fires a violation
+ok 4 - ★ a resolver that DEFAULTS to a provider (none-marker missing) fires a violation
+  ---
+  duration_ms: 0.2805
+  type: 'test'
+  ...
+# Subtest: an unreadable resolver source is a fail-closed violation, never a pass
+ok 5 - an unreadable resolver source is a fail-closed violation, never a pass
+  ---
+  duration_ms: 0.2305
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 114.6639

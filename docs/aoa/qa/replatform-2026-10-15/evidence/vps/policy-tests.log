@@ -1,0 +1,1256 @@
+TAP version 13
+# gate-clause-wiring: OK (29 wired clause(s), 5 declared dormant, 2 provider-capability claim(s) matched to source)
+#   DORMANT, on the record: E3-15-budget, E3-5-product-approval, E5-3-patch-quarantine, E5-6-denied-egress, E5-result-commit-worker
+# Subtest: countProductionCallers — a sentence is not a call site
+    # Subtest: ★ THE MUTATION — a symbol whose ONLY reference is a string literal counts ZERO
+    ok 1 - ★ THE MUTATION — a symbol whose ONLY reference is a string literal counts ZERO
+      ---
+      duration_ms: 5.254455
+      type: 'test'
+      ...
+    # Subtest: ★ POSITIVE CONTROL — a symbol with a REAL call keeps its count
+    ok 2 - ★ POSITIVE CONTROL — a symbol with a REAL call keeps its count
+      ---
+      duration_ms: 1.192643
+      type: 'test'
+      ...
+    # Subtest: ★ THE MUTATION, second case — its OWN error-message strings no longer inflate it
+    ok 3 - ★ THE MUTATION, second case — its OWN error-message strings no longer inflate it
+      ---
+      duration_ms: 0.972162
+      type: 'test'
+      ...
+    # Subtest: ★ POSITIVE CONTROL — a real call inside a template interpolation still counts
+    ok 4 - ★ POSITIVE CONTROL — a real call inside a template interpolation still counts
+      ---
+      duration_ms: 1.949686
+      type: 'test'
+      ...
+    # Subtest: an import specifier is still blanked — string stripping runs AFTER, never before
+    ok 5 - an import specifier is still blanked — string stripping runs AFTER, never before
+      ---
+      duration_ms: 1.101483
+      type: 'test'
+      ...
+    # Subtest: test paths are still excluded
+    ok 6 - test paths are still excluded
+      ---
+      duration_ms: 1.411124
+      type: 'test'
+      ...
+    1..6
+ok 1 - countProductionCallers — a sentence is not a call site
+  ---
+  duration_ms: 16.347725
+  type: 'suite'
+  ...
+# Subtest: stripStringLiterals — bounded mis-detection
+    # Subtest: drops quoted contents but keeps the delimiters
+    ok 1 - drops quoted contents but keeps the delimiters
+      ---
+      duration_ms: 1.033283
+      type: 'test'
+      ...
+    # Subtest: keeps template interpolations verbatim and drops the literal text
+    ok 2 - keeps template interpolations verbatim and drops the literal text
+      ---
+      duration_ms: 1.376443
+      type: 'test'
+      ...
+    # Subtest: ★ an unterminated quote is abandoned at the newline, never at EOF
+    ok 3 - ★ an unterminated quote is abandoned at the newline, never at EOF
+      ---
+      duration_ms: 1.443084
+      type: 'test'
+      ...
+    # Subtest: preserves newlines inside a multi-line template so line structure survives
+    ok 4 - preserves newlines inside a multi-line template so line structure survives
+      ---
+      duration_ms: 1.423524
+      type: 'test'
+      ...
+    1..4
+ok 2 - stripStringLiterals — bounded mis-detection
+  ---
+  duration_ms: 6.652858
+  type: 'suite'
+  ...
+# Subtest: load measurements count failed attempts, exclude late completions and use nearest-rank p95
+ok 3 - load measurements count failed attempts, exclude late completions and use nearest-rank p95
+  ---
+  duration_ms: 5.364054
+  type: 'test'
+  ...
+# Subtest: load request cohort excludes drain starts but retains slow in-window failures
+ok 4 - load request cohort excludes drain starts but retains slow in-window failures
+  ---
+  duration_ms: 1.356803
+  type: 'test'
+  ...
+# Subtest: quiet fairness fails on starvation, missing baseline, or excessive delay without aggregate masking
+ok 5 - quiet fairness fails on starvation, missing baseline, or excessive delay without aggregate masking
+  ---
+  duration_ms: 3.95681
+  type: 'test'
+  ...
+# Subtest: local load source rejects unbounded duration and duplicate tenant identities before Docker use
+ok 6 - local load source rejects unbounded duration and duplicate tenant identities before Docker use
+  ---
+  duration_ms: 5.641895
+  type: 'test'
+  ...
+# Subtest: spine topology observation honors the same isolated stack binding as its HTTP clients
+ok 7 - spine topology observation honors the same isolated stack binding as its HTTP clients
+  ---
+  duration_ms: 1.561764
+  type: 'test'
+  ...
+# Subtest: DEFAULT: with no override the binding is byte-for-byte the D1 lane's own argv
+ok 8 - DEFAULT: with no override the binding is byte-for-byte the D1 lane's own argv
+  ---
+  duration_ms: 320.377637
+  type: 'test'
+  ...
+# Subtest: OVERRIDE: the shipped-boot lane's project, two files and HTTP service all take effect
+ok 9 - OVERRIDE: the shipped-boot lane's project, two files and HTTP service all take effect
+  ---
+  duration_ms: 414.914135
+  type: 'test'
+  ...
+# Subtest: PARTIAL override: a project with no file list still addresses the default file
+ok 10 - PARTIAL override: a project with no file list still addresses the default file
+  ---
+  duration_ms: 427.85985
+  type: 'test'
+  ...
+# Subtest: an env file with no project or file override still reaches the default file
+ok 11 - an env file with no project or file override still reaches the default file
+  ---
+  duration_ms: 306.210118
+  type: 'test'
+  ...
+# Subtest: BLANK and whitespace-only values are treated as absent, not as an empty file argument
+ok 12 - BLANK and whitespace-only values are treated as absent, not as an empty file argument
+  ---
+  duration_ms: 324.021886
+  type: 'test'
+  ...
+# Subtest: the harness has NO remaining hardcoded compose-file argv
+ok 13 - the harness has NO remaining hardcoded compose-file argv
+  ---
+  duration_ms: 2.893728
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: a transient ACK retries the same operation with fresh signed proof
+ok 14 - runLeaseRace: a transient ACK retries the same operation with fresh signed proof
+  ---
+  duration_ms: 45.235204
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: ACK backpressure exhausts a bounded number of attempts
+ok 15 - runLeaseRace: ACK backpressure exhausts a bounded number of attempts
+  ---
+  duration_ms: 8.455623
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: ACK never sleeps past its offered deadline or sends an expired retry
+ok 16 - runLeaseRace: ACK never sleeps past its offered deadline or sends an expired retry
+  ---
+  duration_ms: 4.717493
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: unauthorized, stale fence and unknown failures are never retried
+ok 17 - runLeaseRace: unauthorized, stale fence and unknown failures are never retried
+  ---
+  duration_ms: 18.730211
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: throttled ACK retries and a zero hint cannot spin without waiting
+ok 18 - runLeaseRace: throttled ACK retries and a zero hint cannot spin without waiting
+  ---
+  duration_ms: 7.616301
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: an absent or expired ACK deadline sends no request
+ok 19 - runLeaseRace: an absent or expired ACK deadline sends no request
+  ---
+  duration_ms: 13.068716
+  type: 'test'
+  ...
+# Subtest: runLeaseRace: malformed retry hints never trigger another ACK
+ok 20 - runLeaseRace: malformed retry hints never trigger another ACK
+  ---
+  duration_ms: 19.723814
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: a transient ACK retries the same operation with fresh signed proof
+ok 21 - runReplicaRace: a transient ACK retries the same operation with fresh signed proof
+  ---
+  duration_ms: 6.345737
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: ACK backpressure exhausts a bounded number of attempts
+ok 22 - runReplicaRace: ACK backpressure exhausts a bounded number of attempts
+  ---
+  duration_ms: 6.641618
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: ACK never sleeps past its offered deadline or sends an expired retry
+ok 23 - runReplicaRace: ACK never sleeps past its offered deadline or sends an expired retry
+  ---
+  duration_ms: 6.036256
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: unauthorized, stale fence and unknown failures are never retried
+ok 24 - runReplicaRace: unauthorized, stale fence and unknown failures are never retried
+  ---
+  duration_ms: 9.885587
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: throttled ACK retries and a zero hint cannot spin without waiting
+ok 25 - runReplicaRace: throttled ACK retries and a zero hint cannot spin without waiting
+  ---
+  duration_ms: 5.141374
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: an absent or expired ACK deadline sends no request
+ok 26 - runReplicaRace: an absent or expired ACK deadline sends no request
+  ---
+  duration_ms: 8.244823
+  type: 'test'
+  ...
+# Subtest: runReplicaRace: malformed retry hints never trigger another ACK
+ok 27 - runReplicaRace: malformed retry hints never trigger another ACK
+  ---
+  duration_ms: 20.916897
+  type: 'test'
+  ...
+# Subtest: ★ claiming wired with ZERO callers FAILS — the whole point
+ok 28 - ★ claiming wired with ZERO callers FAILS — the whole point
+  ---
+  duration_ms: 8.948705
+  type: 'test'
+  ...
+# Subtest: wired with a real caller passes
+ok 29 - wired with a real caller passes
+  ---
+  duration_ms: 1.622245
+  type: 'test'
+  ...
+# Subtest: ★ unwired is ALLOWED but must say why, and is REPORTED on a green run
+ok 30 - ★ unwired is ALLOWED but must say why, and is REPORTED on a green run
+  ---
+  duration_ms: 1.029763
+  type: 'test'
+  ...
+# Subtest: ★ an unwired clause that GAINED a caller is surfaced, not silently tolerated
+ok 31 - ★ an unwired clause that GAINED a caller is surfaced, not silently tolerated
+  ---
+  duration_ms: 1.639285
+  type: 'test'
+  ...
+# Subtest: a symbol nobody measured fails rather than being assumed wired
+ok 32 - a symbol nobody measured fails rather than being assumed wired
+  ---
+  duration_ms: 1.207003
+  type: 'test'
+  ...
+# Subtest: a declaration with no symbol, or a bad status, is malformed
+ok 33 - a declaration with no symbol, or a bad status, is malformed
+  ---
+  duration_ms: 2.321446
+  type: 'test'
+  ...
+# Subtest: malformed input fails closed rather than reporting OK
+ok 34 - malformed input fails closed rather than reporting OK
+  ---
+  duration_ms: 0.839123
+  type: 'test'
+  ...
+# Subtest: ★ POSITIVE CONTROL — a fully-wired manifest is green and counts correctly
+ok 35 - ★ POSITIVE CONTROL — a fully-wired manifest is green and counts correctly
+  ---
+  duration_ms: 0.988003
+  type: 'test'
+  ...
+# Subtest: ★ expectedReferences allows a KNOWN-unreachable reference, and still catches a new one
+ok 36 - ★ expectedReferences allows a KNOWN-unreachable reference, and still catches a new one
+  ---
+  duration_ms: 2.449807
+  type: 'test'
+  ...
+# Subtest: the register as corrected matches source and passes
+ok 37 - the register as corrected matches source and passes
+  ---
+  duration_ms: 3.56973
+  type: 'test'
+  ...
+# Subtest: ★ THE MUTATION — a stale claim about ONE provider FAILS, and the other provider's claim stays GREEN
+ok 38 - ★ THE MUTATION — a stale claim about ONE provider FAILS, and the other provider's claim stays GREEN
+  ---
+  duration_ms: 1.868765
+  type: 'test'
+  ...
+# Subtest: ★ the PROSE is checked too — a correct structured claim beside a stale sentence still FAILS
+ok 39 - ★ the PROSE is checked too — a correct structured claim beside a stale sentence still FAILS
+  ---
+  duration_ms: 1.446644
+  type: 'test'
+  ...
+# Subtest: prose asserting a value NO claim declares is caught in the other direction
+ok 40 - prose asserting a value NO claim declares is caught in the other direction
+  ---
+  duration_ms: 0.750242
+  type: 'test'
+  ...
+# Subtest: ★ prose that names a watched property with NO claim at all is refused — the front-door loophole
+ok 41 - ★ prose that names a watched property with NO claim at all is refused — the front-door loophole
+  ---
+  duration_ms: 0.751722
+  type: 'test'
+  ...
+# Subtest: a clause that says nothing about a watched property is untouched
+ok 42 - a clause that says nothing about a watched property is untouched
+  ---
+  duration_ms: 0.670002
+  type: 'test'
+  ...
+# Subtest: a file that declares the property nowhere, or declares it twice, is REFUSED rather than guessed
+ok 43 - a file that declares the property nowhere, or declares it twice, is REFUSED rather than guessed
+  ---
+  duration_ms: 0.820883
+  type: 'test'
+  ...
+# Subtest: a malformed claim is reported and does not silently pass as a checked one
+ok 44 - a malformed claim is reported and does not silently pass as a checked one
+  ---
+  duration_ms: 0.853322
+  type: 'test'
+  ...
+# Subtest: malformed input is refused, not assumed clean
+ok 45 - malformed input is refused, not assumed clean
+  ---
+  duration_ms: 0.409802
+  type: 'test'
+  ...
+# Subtest: ★ the shipped register declares E5-2's artifactExportMode claims for BOTH providers
+ok 46 - ★ the shipped register declares E5-2's artifactExportMode claims for BOTH providers
+  ---
+  duration_ms: 2.747847
+  type: 'test'
+  ...
+# Subtest: admits a signed, allowlisted control-plane digest with matching provenance
+ok 47 - admits a signed, allowlisted control-plane digest with matching provenance
+  ---
+  duration_ms: 12.200394
+  type: 'test'
+  ...
+# Subtest: admits the worker image on its own allowlist entry
+ok 48 - admits the worker image on its own allowlist entry
+  ---
+  duration_ms: 2.205486
+  type: 'test'
+  ...
+# Subtest: rejects an UNSIGNED digest (fail-closed)
+ok 49 - rejects an UNSIGNED digest (fail-closed)
+  ---
+  duration_ms: 1.520485
+  type: 'test'
+  ...
+# Subtest: rejects an empty-string signature (fail-closed)
+ok 50 - rejects an empty-string signature (fail-closed)
+  ---
+  duration_ms: 1.376284
+  type: 'test'
+  ...
+# Subtest: rejects a TAMPERED digest that is no longer on the allowlist
+ok 51 - rejects a TAMPERED digest that is no longer on the allowlist
+  ---
+  duration_ms: 1.933365
+  type: 'test'
+  ...
+# Subtest: rejects an allowlisted digest whose signature was minted for a DIFFERENT digest
+ok 52 - rejects an allowlisted digest whose signature was minted for a DIFFERENT digest
+  ---
+  duration_ms: 2.068286
+  type: 'test'
+  ...
+# Subtest: rejects a signature by an UNTRUSTED key (forged, not the trust root)
+ok 53 - rejects a signature by an UNTRUSTED key (forged, not the trust root)
+  ---
+  duration_ms: 2.880088
+  type: 'test'
+  ...
+# Subtest: rejects a WRONG-provenance digest (source revision mismatch vs allowlist)
+ok 54 - rejects a WRONG-provenance digest (source revision mismatch vs allowlist)
+  ---
+  duration_ms: 2.956649
+  type: 'test'
+  ...
+# Subtest: rejects MISSING provenance (no source revision at all)
+ok 55 - rejects MISSING provenance (no source revision at all)
+  ---
+  duration_ms: 3.963011
+  type: 'test'
+  ...
+# Subtest: rejects a validly-signed digest that is NOT on the allowlist (admit-only-allowlisted)
+ok 56 - rejects a validly-signed digest that is NOT on the allowlist (admit-only-allowlisted)
+  ---
+  duration_ms: 3.65837
+  type: 'test'
+  ...
+# Subtest: rejects a malformed digest (not sha256:<64hex>)
+ok 57 - rejects a malformed digest (not sha256:<64hex>)
+  ---
+  duration_ms: 2.071405
+  type: 'test'
+  ...
+# Subtest: signature is load-bearing: valid bundle admits, same bundle without/with-forged signature is rejected
+ok 58 - signature is load-bearing: valid bundle admits, same bundle without/with-forged signature is rejected
+  ---
+  duration_ms: 3.522289
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: null
+ok 59 - fail-closed on garbage input: null
+  ---
+  duration_ms: 0.683561
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: undefined
+ok 60 - fail-closed on garbage input: undefined
+  ---
+  duration_ms: 0.20152
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: empty object
+ok 61 - fail-closed on garbage input: empty object
+  ---
+  duration_ms: 0.279361
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: number
+ok 62 - fail-closed on garbage input: number
+  ---
+  duration_ms: 0.158161
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: string
+ok 63 - fail-closed on garbage input: string
+  ---
+  duration_ms: 0.22384
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: missing allowlist
+ok 64 - fail-closed on garbage input: missing allowlist
+  ---
+  duration_ms: 0.168
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: missing trustRoot
+ok 65 - fail-closed on garbage input: missing trustRoot
+  ---
+  duration_ms: 0.131841
+  type: 'test'
+  ...
+# Subtest: fail-closed on garbage input: allowlist not array
+ok 66 - fail-closed on garbage input: allowlist not array
+  ---
+  duration_ms: 0.14548
+  type: 'test'
+  ...
+# Subtest: a corrupt PEM trust root is a rejection, not a crash
+ok 67 - a corrupt PEM trust root is a rejection, not a crash
+  ---
+  duration_ms: 2.178886
+  type: 'test'
+  ...
+# Subtest: canonicalSigningPayload is deterministic and binds digest + revision
+ok 68 - canonicalSigningPayload is deterministic and binds digest + revision
+  ---
+  duration_ms: 0.576601
+  type: 'test'
+  ...
+# Subtest: the tenant set is three DISTINCT Organizations: two enabled, one control (F10)
+ok 69 - the tenant set is three DISTINCT Organizations: two enabled, one control (F10)
+  ---
+  duration_ms: 14.267279
+  type: 'test'
+  ...
+# Subtest: the committed m1-spine override has zero violations (anchor)
+ok 70 - the committed m1-spine override has zero violations (anchor)
+  ---
+  duration_ms: 7.908701
+  type: 'test'
+  ...
+# Subtest: an override that sets the rollout on only ONE replica is refused
+ok 71 - an override that sets the rollout on only ONE replica is refused
+  ---
+  duration_ms: 1.804845
+  type: 'test'
+  ...
+# Subtest: BOTH assignments under ONE replica is refused — the count is per block (Codex P2)
+ok 72 - BOTH assignments under ONE replica is refused — the count is per block (Codex P2)
+  ---
+  duration_ms: 2.594847
+  type: 'test'
+  ...
+# Subtest: an override that arms the crew switch is refused
+ok 73 - an override that arms the crew switch is refused
+  ---
+  duration_ms: 1.632045
+  type: 'test'
+  ...
+# Subtest: an override that keeps worker-a in the default profile is refused (one-worker topology)
+ok 74 - an override that keeps worker-a in the default profile is refused (one-worker topology)
+  ---
+  duration_ms: 4.369452
+  type: 'test'
+  ...
+# Subtest: a replica with the declared tenant set and the crew switch off has zero violations (anchor)
+ok 75 - a replica with the declared tenant set and the crew switch off has zero violations (anchor)
+  ---
+  duration_ms: 1.456284
+  type: 'test'
+  ...
+# Subtest: a replica whose rollout differs from the declared value is refused
+ok 76 - a replica whose rollout differs from the declared value is refused
+  ---
+  duration_ms: 0.709162
+  type: 'test'
+  ...
+# Subtest: a replica on which the CONTROL tenant resolves to anything but off is refused
+ok 77 - a replica on which the CONTROL tenant resolves to anything but off is refused
+  ---
+  duration_ms: 2.313087
+  type: 'test'
+  ...
+# Subtest: a replica on which an ENABLED tenant resolves to off is refused
+ok 78 - a replica on which an ENABLED tenant resolves to off is refused
+  ---
+  duration_ms: 3.244489
+  type: 'test'
+  ...
+# Subtest: a replica with the crew switch ON, or set to an unparseable value, is refused
+ok 79 - a replica with the crew switch ON, or set to an unparseable value, is refused
+  ---
+  duration_ms: 0.943843
+  type: 'test'
+  ...
+# Subtest: a replica with the TOOL SURFACE armed, unparseable, or opted in per-Organization is refused (M1a freeze)
+ok 80 - a replica with the TOOL SURFACE armed, unparseable, or opted in per-Organization is refused (M1a freeze)
+  ---
+  duration_ms: 0.475161
+  type: 'test'
+  ...
+# Subtest: a replica with the deployment flag off is refused (the profile would run nothing distributed)
+ok 81 - a replica with the deployment flag off is refused (the profile would run nothing distributed)
+  ---
+  duration_ms: 0.481922
+  type: 'test'
+  ...
+# Subtest: D1 emits every locked freeze category and refuses a real excluded switch
+ok 82 - D1 emits every locked freeze category and refuses a real excluded switch
+  ---
+  duration_ms: 2.480527
+  type: 'test'
+  ...
+# Subtest: a well-formed enabled-tenant observation has zero violations (anchor)
+ok 83 - a well-formed enabled-tenant observation has zero violations (anchor)
+  ---
+  duration_ms: 2.712408
+  type: 'test'
+  ...
+# Subtest: NO cost row (the usage-suppressed positive control's state) is a cost violation carrying the marker
+ok 84 - NO cost row (the usage-suppressed positive control's state) is a cost violation carrying the marker
+  ---
+  duration_ms: 0.745602
+  type: 'test'
+  ...
+# Subtest: the expected charge is DERIVED, and equals 81 cents for the canned units at rate version 1
+ok 85 - the expected charge is DERIVED, and equals 81 cents for the canned units at rate version 1
+  ---
+  duration_ms: 0.835362
+  type: 'test'
+  ...
+# Subtest: a POSITIVE charge of the wrong AMOUNT is refused (Codex)
+ok 86 - a POSITIVE charge of the wrong AMOUNT is refused (Codex)
+  ---
+  duration_ms: 3.053569
+  type: 'test'
+  ...
+# Subtest: units that are not the canned ones are refused, so the amount expectation cannot detach
+ok 87 - units that are not the canned ones are refused, so the amount expectation cannot detach
+  ---
+  duration_ms: 0.916363
+  type: 'test'
+  ...
+# Subtest: a ZERO-cost row is refused
+ok 88 - a ZERO-cost row is refused
+  ---
+  duration_ms: 0.864602
+  type: 'test'
+  ...
+# Subtest: TWO cost rows for one attempt are refused (exactly one)
+ok 89 - TWO cost rows for one attempt are refused (exactly one)
+  ---
+  duration_ms: 0.474802
+  type: 'test'
+  ...
+# Subtest: a cost row attributed to ANOTHER tenant's Company is refused (F10 attribution)
+ok 90 - a cost row attributed to ANOTHER tenant's Company is refused (F10 attribution)
+  ---
+  duration_ms: 0.516041
+  type: 'test'
+  ...
+# Subtest: a pending, duplicated or foreign authoritative_cost receipt is refused
+ok 91 - a pending, duplicated or foreign authoritative_cost receipt is refused
+  ---
+  duration_ms: 0.501922
+  type: 'test'
+  ...
+# Subtest: an authoritative_cost receipt bound to a DIFFERENT event, or the wrong aggregate, is refused (Codex P2)
+ok 92 - an authoritative_cost receipt bound to a DIFFERENT event, or the wrong aggregate, is refused (Codex P2)
+  ---
+  duration_ms: 0.348721
+  type: 'test'
+  ...
+# Subtest: a missing, duplicated or foreign audit row is refused (JOB-017 named set)
+ok 93 - a missing, duplicated or foreign audit row is refused (JOB-017 named set)
+  ---
+  duration_ms: 0.713162
+  type: 'test'
+  ...
+# Subtest: a DUPLICATE accepted usage event is refused — exactly one, never >= 1
+ok 94 - a DUPLICATE accepted usage event is refused — exactly one, never >= 1
+  ---
+  duration_ms: 0.630522
+  type: 'test'
+  ...
+# Subtest: ZERO accepted usage events is refused, and distinctly from a duplicate
+ok 95 - ZERO accepted usage events is refused, and distinctly from a duplicate
+  ---
+  duration_ms: 0.374161
+  type: 'test'
+  ...
+# Subtest: a usage event of ANOTHER Organization never counts toward this tenant's one (F10)
+ok 96 - a usage event of ANOTHER Organization never counts toward this tenant's one (F10)
+  ---
+  duration_ms: 0.481681
+  type: 'test'
+  ...
+# Subtest: stored usage units that differ from the ones the provider reported are refused
+ok 97 - stored usage units that differ from the ones the provider reported are refused
+  ---
+  duration_ms: 0.362121
+  type: 'test'
+  ...
+# Subtest: a cost row whose tokens or key are not the accepted usage event's is refused
+ok 98 - a cost row whose tokens or key are not the accepted usage event's is refused
+  ---
+  duration_ms: 0.555561
+  type: 'test'
+  ...
+# Subtest: a POSITIVE charge priced from another model, provider or rate version is refused (Codex P2)
+ok 99 - a POSITIVE charge priced from another model, provider or rate version is refused (Codex P2)
+  ---
+  duration_ms: 0.671362
+  type: 'test'
+  ...
+# Subtest: a cost row rolled up to ANOTHER agent of the same Company is refused (Codex P2)
+ok 100 - a cost row rolled up to ANOTHER agent of the same Company is refused (Codex P2)
+  ---
+  duration_ms: 0.446441
+  type: 'test'
+  ...
+# Subtest: an audit row naming a DIFFERENT worker, or a non-system actor, is refused (Codex P2)
+ok 101 - an audit row naming a DIFFERENT worker, or a non-system actor, is refused (Codex P2)
+  ---
+  duration_ms: 0.522881
+  type: 'test'
+  ...
+# Subtest: activity_audit receipts keyed to the WRONG events, or the wrong aggregate, are refused (Codex P2)
+ok 102 - activity_audit receipts keyed to the WRONG events, or the wrong aggregate, are refused (Codex P2)
+  ---
+  duration_ms: 0.577082
+  type: 'test'
+  ...
+# Subtest: a receipt whose TARGET is an unrelated row is refused (Codex P2)
+ok 103 - a receipt whose TARGET is an unrelated row is refused (Codex P2)
+  ---
+  duration_ms: 0.774962
+  type: 'test'
+  ...
+# Subtest: SWAPPED audit receipt targets are refused — set equality would have passed them (Codex)
+ok 104 - SWAPPED audit receipt targets are refused — set equality would have passed them (Codex)
+  ---
+  duration_ms: 0.696042
+  type: 'test'
+  ...
+# Subtest: an audit row recording ANOTHER Organization is refused, even with the right Company (Codex P2)
+ok 105 - an audit row recording ANOTHER Organization is refused, even with the right Company (Codex P2)
+  ---
+  duration_ms: 0.562362
+  type: 'test'
+  ...
+# Subtest: a ledger without exactly one attempt_started and one terminal is refused, not skipped (Codex P2)
+ok 106 - a ledger without exactly one attempt_started and one terminal is refused, not skipped (Codex P2)
+  ---
+  duration_ms: 0.645082
+  type: 'test'
+  ...
+# Subtest: a journey the ingest did not fully accept is refused before cost is judged
+ok 107 - a journey the ingest did not fully accept is refused before cost is judged
+  ---
+  duration_ms: 0.528201
+  type: 'test'
+  ...
+# Subtest: a denied hostile pair with its same-tenant control has zero violations (anchor)
+ok 108 - a denied hostile pair with its same-tenant control has zero violations (anchor)
+  ---
+  duration_ms: 0.983082
+  type: 'test'
+  ...
+# Subtest: a foreign worker whose event upload is ACCEPTED is refused
+ok 109 - a foreign worker whose event upload is ACCEPTED is refused
+  ---
+  duration_ms: 0.32704
+  type: 'test'
+  ...
+# Subtest: a denial whose SAME-TENANT control also failed proves nothing and is refused
+ok 110 - a denial whose SAME-TENANT control also failed proves nothing and is refused
+  ---
+  duration_ms: 0.492121
+  type: 'test'
+  ...
+# Subtest: a hostile request that merely FAILED is not a denial (Codex P2)
+ok 111 - a hostile request that merely FAILED is not a denial (Codex P2)
+  ---
+  duration_ms: 0.659482
+  type: 'test'
+  ...
+# Subtest: a foreign worker acknowledging another tenant's lease is refused
+ok 112 - a foreign worker acknowledging another tenant's lease is refused
+  ---
+  duration_ms: 0.302001
+  type: 'test'
+  ...
+# Subtest: a foreign tenant scope that can READ the victim's events is refused, and an empty own-scope read voids it
+ok 113 - a foreign tenant scope that can READ the victim's events is refused, and an empty own-scope read voids it
+  ---
+  duration_ms: 0.894323
+  type: 'test'
+  ...
+# Subtest: hostile traffic that changed the victim's cost rows or usage events is refused
+ok 114 - hostile traffic that changed the victim's cost rows or usage events is refused
+  ---
+  duration_ms: 0.351881
+  type: 'test'
+  ...
+# Subtest: recording criterion 5 as unobserved, with no probe summary on the attempt, has zero violations (anchor)
+ok 115 - recording criterion 5 as unobserved, with no probe summary on the attempt, has zero violations (anchor)
+  ---
+  duration_ms: 0.614081
+  type: 'test'
+  ...
+# Subtest: a probe summary on the attempt while the record says unobserved is refused (the tripwire)
+ok 116 - a probe summary on the attempt while the record says unobserved is refused (the tripwire)
+  ---
+  duration_ms: 0.650721
+  type: 'test'
+  ...
+# Subtest: CLAIMING criterion 5 without a summary is refused
+ok 117 - CLAIMING criterion 5 without a summary is refused
+  ---
+  duration_ms: 0.2728
+  type: 'test'
+  ...
+# Subtest: a refused control tenant has zero violations (anchor)
+ok 118 - a refused control tenant has zero violations (anchor)
+  ---
+  duration_ms: 0.734882
+  type: 'test'
+  ...
+# Subtest: a control tenant placed distributed on ANY replica is refused
+ok 119 - a control tenant placed distributed on ANY replica is refused
+  ---
+  duration_ms: 0.28636
+  type: 'test'
+  ...
+# Subtest: a control tenant refused for the WRONG reason is refused (it must be the rollout)
+ok 120 - a control tenant refused for the WRONG reason is refused (it must be the rollout)
+  ---
+  duration_ms: 0.386081
+  type: 'test'
+  ...
+# Subtest: a positive control that is legacy, queued, failed or not lease-eligible is refused (Codex P1)
+ok 121 - a positive control that is legacy, queued, failed or not lease-eligible is refused (Codex P1)
+  ---
+  duration_ms: 0.999802
+  type: 'test'
+  ...
+# Subtest: a positive-control placement that ERRORED is not a decision, and voids the refusal
+ok 122 - a positive-control placement that ERRORED is not a decision, and voids the refusal
+  ---
+  duration_ms: 0.387161
+  type: 'test'
+  ...
+# Subtest: a control tenant whose STORED placement is leasable, or wrongly reasoned, is refused (Codex P2)
+ok 123 - a control tenant whose STORED placement is leasable, or wrongly reasoned, is refused (Codex P2)
+  ---
+  duration_ms: 0.681322
+  type: 'test'
+  ...
+# Subtest: a control tenant that was offered work, or that has events, cost or receipts, is refused
+ok 124 - a control tenant that was offered work, or that has events, cost or receipts, is refused
+  ---
+  duration_ms: 0.282681
+  type: 'test'
+  ...
+# Subtest: a control observation missing the RUNNING control plane's placement is refused
+ok 125 - a control observation missing the RUNNING control plane's placement is refused
+  ---
+  duration_ms: 0.380761
+  type: 'test'
+  ...
+# Subtest: a clean, attributed, selective drain has zero violations (anchor)
+ok 126 - a clean, attributed, selective drain has zero violations (anchor)
+  ---
+  duration_ms: 1.543804
+  type: 'test'
+  ...
+# Subtest: a drain CLI that did not exit 0 is refused
+ok 127 - a drain CLI that did not exit 0 is refused
+  ---
+  duration_ms: 0.565402
+  type: 'test'
+  ...
+# Subtest: a drained job with no audit row, or two, is refused (the audit is the rehearsal's evidence)
+ok 128 - a drained job with no audit row, or two, is refused (the audit is the rehearsal's evidence)
+  ---
+  duration_ms: 2.104286
+  type: 'test'
+  ...
+# Subtest: a drain audit row naming another tenant, or a different operator, is refused
+ok 129 - a drain audit row naming another tenant, or a different operator, is refused
+  ---
+  duration_ms: 0.946323
+  type: 'test'
+  ...
+# Subtest: a drain whose audit row exists but whose attempt did NOT move is refused (Codex P1)
+ok 130 - a drain whose audit row exists but whose attempt did NOT move is refused (Codex P1)
+  ---
+  duration_ms: 0.813922
+  type: 'test'
+  ...
+# Subtest: a drain that moved an already-terminal attempt is refused
+ok 131 - a drain that moved an already-terminal attempt is refused
+  ---
+  duration_ms: 0.525042
+  type: 'test'
+  ...
+# Subtest: the two branches differ, and each is pinned: unleased -> cancelled, leased -> cancel_requested + a cancel command
+ok 132 - the two branches differ, and each is pinned: unleased -> cancelled, leased -> cancel_requested + a cancel command
+  ---
+  duration_ms: 1.256563
+  type: 'test'
+  ...
+# Subtest: a LEASED attempt the drain left running is refused, even when the seeded pair moved (Codex P1)
+ok 133 - a LEASED attempt the drain left running is refused, even when the seeded pair moved (Codex P1)
+  ---
+  duration_ms: 0.425201
+  type: 'test'
+  ...
+# Subtest: a census attempt with no drain audit row, or one naming another tenant, is refused
+ok 134 - a census attempt with no drain audit row, or one naming another tenant, is refused
+  ---
+  duration_ms: 0.671522
+  type: 'test'
+  ...
+# Subtest: a SIBLING attempt of the same job left running is refused — state is keyed per attempt (Codex P1)
+ok 135 - a SIBLING attempt of the same job left running is refused — state is keyed per attempt (Codex P1)
+  ---
+  duration_ms: 0.588042
+  type: 'test'
+  ...
+# Subtest: a drain audit row that records no reason, or another one, is refused (Codex P2)
+ok 136 - a drain audit row that records no reason, or another one, is refused (Codex P2)
+  ---
+  duration_ms: 0.541401
+  type: 'test'
+  ...
+# Subtest: a NON-system actor on a census candidate's audit row is refused (Codex P2)
+ok 137 - a NON-system actor on a census candidate's audit row is refused (Codex P2)
+  ---
+  duration_ms: 0.537961
+  type: 'test'
+  ...
+# Subtest: a drain that also cancelled an already-terminal attempt is refused (it must be selective)
+ok 138 - a drain that also cancelled an already-terminal attempt is refused (it must be selective)
+  ---
+  duration_ms: 0.643842
+  type: 'test'
+  ...
+# Subtest: keyed shape: exactly one accepted usage event whose numbers are the run's stored usage passes
+ok 139 - keyed shape: exactly one accepted usage event whose numbers are the run's stored usage passes
+  ---
+  duration_ms: 0.804723
+  type: 'test'
+  ...
+# Subtest: POSITIVE CONTROL (keyed): a DUPLICATE or replayed usage event for the attempt is refused
+ok 140 - POSITIVE CONTROL (keyed): a DUPLICATE or replayed usage event for the attempt is refused
+  ---
+  duration_ms: 0.848162
+  type: 'test'
+  ...
+# Subtest: keyed shape: ZERO accepted usage events is refused, distinctly from a duplicate
+ok 141 - keyed shape: ZERO accepted usage events is refused, distinctly from a duplicate
+  ---
+  duration_ms: 0.310881
+  type: 'test'
+  ...
+# Subtest: keyed shape (F10): a SECOND Organization's usage never counts toward the first tenant's one
+ok 142 - keyed shape (F10): a SECOND Organization's usage never counts toward the first tenant's one
+  ---
+  duration_ms: 0.388321
+  type: 'test'
+  ...
+# Subtest: keyed shape: stored usage that is not the accepted event's numbers is refused
+ok 143 - keyed shape: stored usage that is not the accepted event's numbers is refused
+  ---
+  duration_ms: 1.107163
+  type: 'test'
+  ...
+# Subtest: keyed shape: an event with NO runtimeMillis leaves the wall-clock duration alone (the projector's fallback)
+ok 144 - keyed shape: an event with NO runtimeMillis leaves the wall-clock duration alone (the projector's fallback)
+  ---
+  duration_ms: 0.550041
+  type: 'test'
+  ...
+# Subtest: keyed shape: an accepted usage event with NO stored usage_json is refused
+ok 145 - keyed shape: an accepted usage event with NO stored usage_json is refused
+  ---
+  duration_ms: 0.375761
+  type: 'test'
+  ...
+# Subtest: the spine and the keyed lane share ONE implementation — neither re-implements the rule
+ok 146 - the spine and the keyed lane share ONE implementation — neither re-implements the rule
+  ---
+  duration_ms: 1.401044
+  type: 'test'
+  ...
+# Subtest: worker-driven: the ZERO-VIOLATION anchor — a real green run passes
+ok 147 - worker-driven: the ZERO-VIOLATION anchor — a real green run passes
+  ---
+  duration_ms: 1.165883
+  type: 'test'
+  ...
+# Subtest: worker-driven: every violation carries the marker, so the lane's control can grep its arm
+ok 148 - worker-driven: every violation carries the marker, so the lane's control can grep its arm
+  ---
+  duration_ms: 0.625041
+  type: 'test'
+  ...
+# Subtest: worker-driven: ★ an event produced by ANOTHER worker reds — the not-the-executor case
+ok 149 - worker-driven: ★ an event produced by ANOTHER worker reds — the not-the-executor case
+  ---
+  duration_ms: 0.551642
+  type: 'test'
+  ...
+# Subtest: worker-driven: ★★★ a WHOLLY harness-driven attempt reds on both the events and the lease
+ok 150 - worker-driven: ★★★ a WHOLLY harness-driven attempt reds on both the events and the lease
+  ---
+  duration_ms: 0.640522
+  type: 'test'
+  ...
+# Subtest: worker-driven: a lease taken by a second worker reds even when the events look right
+ok 151 - worker-driven: a lease taken by a second worker reds even when the events look right
+  ---
+  duration_ms: 0.552442
+  type: 'test'
+  ...
+# Subtest: worker-driven: no lease at all reds
+ok 152 - worker-driven: no lease at all reds
+  ---
+  duration_ms: 0.495241
+  type: 'test'
+  ...
+# Subtest: worker-driven: no events at all reds, and names the missing ones
+ok 153 - worker-driven: no events at all reds, and names the missing ones
+  ---
+  duration_ms: 0.398202
+  type: 'test'
+  ...
+# Subtest: worker-driven: a missing terminal reds (a run that never durably ended is not a journey)
+ok 154 - worker-driven: a missing terminal reds (a run that never durably ended is not a journey)
+  ---
+  duration_ms: 1.347163
+  type: 'test'
+  ...
+# Subtest: worker-driven: ★ a MISSING usage event does NOT red — that is the cost verdict's job
+ok 155 - worker-driven: ★ a MISSING usage event does NOT red — that is the cost verdict's job
+  ---
+  duration_ms: 0.486401
+  type: 'test'
+  ...
+# Subtest: worker-driven: an attempt placed on ANOTHER target reds
+ok 156 - worker-driven: an attempt placed on ANOTHER target reds
+  ---
+  duration_ms: 0.408721
+  type: 'test'
+  ...
+# Subtest: worker-driven: a non-succeeded attempt reds
+ok 157 - worker-driven: a non-succeeded attempt reds
+  ---
+  duration_ms: 0.368041
+  type: 'test'
+  ...
+# Subtest: worker-driven: NO deployed worker id is a violation, never a vacuous pass
+ok 158 - worker-driven: NO deployed worker id is a violation, never a vacuous pass
+  ---
+  duration_ms: 0.434321
+  type: 'test'
+  ...
+# Subtest: worker-driven: an unknown executor mode is refused
+ok 159 - worker-driven: an unknown executor mode is refused
+  ---
+  duration_ms: 0.410881
+  type: 'test'
+  ...
+# Subtest: worker-driven: the HARNESS control passes when the attempt really was harness-driven
+ok 160 - worker-driven: the HARNESS control passes when the attempt really was harness-driven
+  ---
+  duration_ms: 0.389122
+  type: 'test'
+  ...
+# Subtest: worker-driven: ★ the HARNESS control REDS if the attempt was in fact worker-driven
+ok 161 - worker-driven: ★ the HARNESS control REDS if the attempt was in fact worker-driven
+  ---
+  duration_ms: 0.312401
+  type: 'test'
+  ...
+# Subtest: env probe: a clean summary passes, and it is the SHARED verdict that judges it
+ok 162 - env probe: a clean summary passes, and it is the SHARED verdict that judges it
+  ---
+  duration_ms: 1.637484
+  type: 'test'
+  ...
+# Subtest: env probe: ★ NO summary reds — a probe that did not run must never read as a pass
+ok 163 - env probe: ★ NO summary reds — a probe that did not run must never read as a pass
+  ---
+  duration_ms: 0.347121
+  type: 'test'
+  ...
+# Subtest: env probe: a summary reporting a PRESENT credential class reds
+ok 164 - env probe: a summary reporting a PRESENT credential class reds
+  ---
+  duration_ms: 0.468201
+  type: 'test'
+  ...
+# Subtest: env probe: ★ a BLIND probe reds — the planted control must have turned red
+ok 165 - env probe: ★ a BLIND probe reds — the planted control must have turned red
+  ---
+  duration_ms: 0.424441
+  type: 'test'
+  ...
+# Subtest: env probe: an unreadable summary reds
+ok 166 - env probe: an unreadable summary reds
+  ---
+  duration_ms: 0.440642
+  type: 'test'
+  ...
+# Subtest: override: the COMMITTED file has zero violations (the anchor)
+ok 167 - override: the COMMITTED file has zero violations (the anchor)
+  ---
+  duration_ms: 0.688922
+  type: 'test'
+  ...
+# Subtest: override: ★ dropping dispatch from the deployed worker reds
+ok 168 - override: ★ dropping dispatch from the deployed worker reds
+  ---
+  duration_ms: 1.431324
+  type: 'test'
+  ...
+# Subtest: override: ★ dropping the DEP-017 probe reds (acceptance item 6 cannot be dropped quietly)
+ok 169 - override: ★ dropping the DEP-017 probe reds (acceptance item 6 cannot be dropped quietly)
+  ---
+  duration_ms: 1.033323
+  type: 'test'
+  ...
+# Subtest: override: ★ dropping the DEP-023 run-output probe reds (the E5 clause-5 streams cannot be dropped quietly)
+ok 170 - override: ★ dropping the DEP-023 run-output probe reds (the E5 clause-5 streams cannot be dropped quietly)
+  ---
+  duration_ms: 1.462204
+  type: 'test'
+  ...
+# Subtest: override: dropping the event outbox reds
+ok 171 - override: dropping the event outbox reds
+  ---
+  duration_ms: 1.303444
+  type: 'test'
+  ...
+# Subtest: override: leaving the worker on a boot root that injects NO provider reds
+ok 172 - override: leaving the worker on a boot root that injects NO provider reds
+  ---
+  duration_ms: 1.128883
+  type: 'test'
+  ...
+# Subtest: override: ★ arming dispatch on a SECOND service reds — M1-D1-SPINE is ONE deployed worker
+ok 173 - override: ★ arming dispatch on a SECOND service reds — M1-D1-SPINE is ONE deployed worker
+  ---
+  duration_ms: 0.920602
+  type: 'test'
+  ...
+# Subtest: override: ★★★ arming the wire WITHOUT the control-plane public key reds (an ungated provider)
+ok 174 - override: ★★★ arming the wire WITHOUT the control-plane public key reds (an ungated provider)
+  ---
+  duration_ms: 4.807054
+  type: 'test'
+  ...
+# Subtest: override: not arming the wire at all reds
+ok 175 - override: not arming the wire at all reds
+  ---
+  duration_ms: 1.968685
+  type: 'test'
+  ...
+# Subtest: override: ★ a worker pointed at a port the provider does not serve reds
+ok 176 - override: ★ a worker pointed at a port the provider does not serve reds
+  ---
+  duration_ms: 0.879242
+  type: 'test'
+  ...
+# Subtest: override: ★ dropping the capability MINT key reds (every run would die no_run_capability)
+ok 177 - override: ★ dropping the capability MINT key reds (every run would die no_run_capability)
+  ---
+  duration_ms: 1.608645
+  type: 'test'
+  ...
+# Subtest: override: ★ a seed that authorizes a DIFFERENT ticket than the worker presents reds
+ok 178 - override: ★ a seed that authorizes a DIFFERENT ticket than the worker presents reds
+  ---
+  duration_ms: 0.858162
+  type: 'test'
+  ...
+# Subtest: override: ★★★ committed key material reds, in both shapes
+ok 179 - override: ★★★ committed key material reds, in both shapes
+  ---
+  duration_ms: 1.517165
+  type: 'test'
+  ...
+# Subtest: override: the DEP-016 clauses still hold (this ticket extends them, it does not fork them)
+ok 180 - override: the DEP-016 clauses still hold (this ticket extends them, it does not fork them)
+  ---
+  duration_ms: 1.017483
+  type: 'test'
+  ...
+# Subtest: override: ★★★ mounting the runtime-keys DIRECTORY reds — the provider must not hold the private key
+ok 181 - override: ★★★ mounting the runtime-keys DIRECTORY reds — the provider must not hold the private key
+  ---
+  duration_ms: 0.745442
+  type: 'test'
+  ...
+# Subtest: override: ★ the PRIVATE half bound into the reference provider reds
+ok 182 - override: ★ the PRIVATE half bound into the reference provider reds
+  ---
+  duration_ms: 0.727282
+  type: 'test'
+  ...
+# Subtest: override: the PUBLIC half bound into the control plane reds too (the boundary is two-sided)
+ok 183 - override: the PUBLIC half bound into the control plane reds too (the boundary is two-sided)
+  ---
+  duration_ms: 0.684962
+  type: 'test'
+  ...
+# Subtest: override: a key mounted into ANY other service reds
+ok 184 - override: a key mounted into ANY other service reds
+  ---
+  duration_ms: 0.932522
+  type: 'test'
+  ...
+# Subtest: usage: the WORKER-DRIVEN arm pins the three token counts and lets the duration be measured
+ok 185 - usage: the WORKER-DRIVEN arm pins the three token counts and lets the duration be measured
+  ---
+  duration_ms: 0.866763
+  type: 'test'
+  ...
+# Subtest: usage: ★ the worker-driven arm still reds when a TOKEN count drifts from the canned units
+ok 186 - usage: ★ the worker-driven arm still reds when a TOKEN count drifts from the canned units
+  ---
+  duration_ms: 0.385841
+  type: 'test'
+  ...
+# Subtest: usage: ★ a missing or negative measured duration reds — the observer must have measured one
+ok 187 - usage: ★ a missing or negative measured duration reds — the observer must have measured one
+  ---
+  duration_ms: 0.460641
+  type: 'test'
+  ...
+# Subtest: usage: WITHOUT the arm the duration is still pinned (the harness path is unchanged)
+ok 188 - usage: WITHOUT the arm the duration is still pinned (the harness path is unchanged)
+  ---
+  duration_ms: 0.388681
+  type: 'test'
+  ...
+# Subtest: worker marker: it is DISTINCT from the cost and usage markers, in both directions
+ok 189 - worker marker: it is DISTINCT from the cost and usage markers, in both directions
+  ---
+  duration_ms: 0.296401
+  type: 'test'
+  ...
+# Subtest: worker marker: a worker-driven observation carries it on every COST and USAGE violation
+ok 190 - worker marker: a worker-driven observation carries it on every COST and USAGE violation
+  ---
+  duration_ms: 0.995043
+  type: 'test'
+  ...
+# Subtest: worker marker: ★ an AUDIT-only worker failure does NOT mint it (Codex P2, PR \#580)
+ok 191 - worker marker: ★ an AUDIT-only worker failure does NOT mint it (Codex P2, PR \#580)
+  ---
+  duration_ms: 0.743402
+  type: 'test'
+  ...
+# Subtest: worker marker: ★ the HARNESS path CANNOT produce it, however broken the attempt is
+ok 192 - worker marker: ★ the HARNESS path CANNOT produce it, however broken the attempt is
+  ---
+  duration_ms: 0.929082
+  type: 'test'
+  ...
+# Subtest: worker marker: a MALFORMED declaration fails closed — it reds, and without the marker
+ok 193 - worker marker: a MALFORMED declaration fails closed — it reds, and without the marker
+  ---
+  duration_ms: 0.765402
+  type: 'test'
+  ...
+# Subtest: worker marker: the PROFILE declares it exactly once, inside the EXECUTOR === "worker" block
+ok 194 - worker marker: the PROFILE declares it exactly once, inside the EXECUTOR === "worker" block
+  ---
+  duration_ms: 1.105963
+  type: 'test'
+  ...
+# Subtest: worker marker: the d1 lane's usage-suppressed control greps BOTH literals
+ok 195 - worker marker: the d1 lane's usage-suppressed control greps BOTH literals
+  ---
+  duration_ms: 0.874163
+  type: 'test'
+  ...
+# Subtest: D1 host jobs install the lockfile-pinned AST compiler before their Node preflights
+ok 196 - D1 host jobs install the lockfile-pinned AST compiler before their Node preflights
+  ---
+  duration_ms: 1.912165
+  type: 'test'
+  ...
+# Subtest: the fault-matrix job reserves time for action post-step cleanup
+ok 197 - the fault-matrix job reserves time for action post-step cleanup
+  ---
+  duration_ms: 1.069923
+  type: 'test'
+  ...
+1..197
+# tests 205
+# suites 2
+# pass 205
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 34973.005746

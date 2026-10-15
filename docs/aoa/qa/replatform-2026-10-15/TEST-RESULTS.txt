@@ -1,0 +1,110 @@
+AoA replatform validation — 15 October 2026
+Candidate: 13b4e806f31a67c3c172f2216272570203132f8f
+
+Substantial installation and engineering validation passed. Release acceptance remains incomplete; this is not a release sign-off.
+
+INSTALLATIONS
+Local: http://127.0.0.1:3210 — native Node 24 + embedded PostgreSQL. Docker runs the separate D1 test stack.
+VPS: https://testing.armyofagents.org — Google authentication, Caddy HTTPS, Docker app + private PostgreSQL.
+The public VPS and native local app use independent databases. Cross-host fixtures do not connect these user-facing apps into a shared environment.
+
+PASSED CHECKS
+- Frozen pnpm 9.15.4 install, full workspace build, recursive typecheck.
+- Policy/assertion/admission checks on both hosts (205 passed on each host).
+- Real local PostgreSQL migration readiness (5 passed).
+- Local native restore and stale authority rejection.
+- M1 distributed spine, both hosts (10 passed on each host).
+- Artifact store round-trip, truncated upload denial, stale upload orphan cleanup (3 passed on each host).
+- Two private VPS control-plane replicas: leases, capacity/rate windows, failover and durable events (9 passed).
+- ARM64 control-plane/worker/adapter-manager image build and test-key admission.
+- Public HTTPS and authentication.
+- Native local Codex subscription sign-in, onboarding and persisted Commander response.
+- VPS test control plane -> local worker job delegation and return result.
+- Additional offline policy and static tooling checks (410 passed).
+- POSIX image signing/admission pipeline with stubbed Docker (13 passed).
+- Shipped-boot shape, decision scanning and cleanup evidence offline regressions (248 passed).
+- Actual built-image least-privilege contents and candidate revision labels (9 passed).
+- M1 required fault cases and suppressed-injection control (one declared structural case remains pending) (26 passed).
+- Linux worker-slot exclusive ownership and restart identity (2 passed).
+- Staging manifest actual Docker Compose rendering and invariant checks (6 passed).
+- Fresh private base D1 foundation fixture (34 passed).
+- Actual CLI SQL/gzip backup and restore with rollback and ACL fallback refusal (1 passed).
+- Real E2B lifecycle: six checks; capability smoke: five checks. Three short-lived sandboxes, all cleanup confirmed, zero matching resources remaining. No model calls.
+- Both cross-host directions: enrollment, signed heartbeat, disconnect/reconnect, restart with same identity (original heartbeat phase).
+- Later VPS-issued fixture job -> local Docker worker: pending with worker stopped, then succeeded with that worker alone; real local Node env probe and unique return marker verified. Reference provider only; not the public UI/personal-subscription workflow.
+
+TEST SUITE LIMITS
+Full system-Node-26 suite: 24,012 pass / 325 fail / 2,062 skip, plus 38 uncaught errors; 2,750 files total.
+Repeat of the 36 failed files on Node 24: 34 files pass, two fail; 479 tests pass, two fail, 15 skip.
+The runtime log-sink case then passed alone with Node 24 also on PATH. The Playwright dependency failure remains reproducible.
+Local M1 suite initially passed 9/10 under load; fresh comparison 3/3 and complete isolated repeat 10/10 passed. Retained as a test reliability finding.
+Complete Node 24 suite: Tests  4 failed | 24332 passed | 2063 skipped (26399); Test Files  5 failed | 2518 passed | 227 skipped (2750); exit 1.
+Duration  1461.40s (transform 191.46s, setup 149.20s, collect 4009.71s, tests 1612.44s, environment 1292.96s, prepare 652.76s)
+Explicit Windows opt-in lane: Tests 1458 passed / 6 failed / 2 skipped (1466); derived; Test Files 121 passed / 2 failed / 0 skipped (123); derived; exit 1.
+Final Vitest duration unavailable; see log timestamps.
+Windows counts are derived from all123 complete file reports; PowerShell interrupted final global stderr reporting. Native final exit and uncaught-error count are unavailable. Focused direct-Node captures are separate evidence.
+Skipped cases are not passes. The detailed report maps remaining gates and development dependencies.
+
+PERFORMANCE SCOPE
+100 health requests per endpoint at concurrency 4; all succeeded. From Windows p95 was ~5ms local and ~202ms to Helsinki.
+From the Helsinki VPS p95 was ~23ms on loopback and ~13ms via the public HTTPS hostname. These are separate short samples, not comparable throughput/SLO benchmarks.
+
+FINDINGS / REMAINING ACCEPTANCE
+TST-001 P1 — Full supported-runtime test result is available [full supported-runtime lane executed; failures remain]
+Triage the retained full Node 24 failures and rerun the affected assertions, then the full required lane. Keep skipped/live cases explicit.
+
+TST-002 P2 — Playwright parity test cannot resolve a transitive dependency [reproduced]
+Review dependency declaration/module resolution without masking the image/version parity assertion.
+
+TST-003 P2 — Local M1 placement control and runtime log-sink tests are sensitive to test load [load-sensitive]
+Investigate fixture heartbeat freshness and asynchronous process observation. Isolated reruns pass; do not silently discard the original failures.
+
+TST-004 P1 — Local subscription authentication and native Commander response validated [passed with company configuration workaround]
+Retain this test company model override until TST-008 is resolved. No OpenAI API key was needed.
+
+TST-005 P1 — Public cloud personal-subscription/device execution is not implemented or accepted [capability gap / unvalidated]
+Implement and validate the supported device-local credential broker path for the PC owner subscription, or separately validate a company-key distributed cohort. Native local Commander success does not establish this cloud-to-personal-device workflow.
+
+TST-006 P2 — E2B transport does not support graceful per-process cancellation or exit-code observation through process listing [confirmed capability limit]
+Record an explicit capability disposition for workloads that require graceful cancellation/exit codes; forced kill was tested successfully.
+
+TST-007 P1 — Release operational acceptance is incomplete [not executed]
+Complete the prescribed sustained capacity/churn campaign, failure-domain and recovery timing checks, upgrade/rollback on deployment topology, real provider fault/rotation rehearsals, and release acceptance owner sign-off. A single VPS with local_disk storage is not that topology.
+
+TST-008 P1 — Hardcoded gpt-5.5 default breaks Codex subscription onboarding [reproduced; test company workaround applied]
+Update default/model-availability handling and review CLI compatibility pins. Validate onboarding, Commander, crew and saved managed configurations against models actually available to that account/client. Product code was not changed.
+
+TST-009 P2 — Native background crew path still needs validation [observed; cause not established]
+Provision persistent local agent JWT signing configuration and validate crew authentication, available model resolution and actual tool calls before accepting the background crew path.
+
+TST-011 P2 — Supported-runtime suite has hook, test-timeout and UI-state failures [composition import-hook timeout reproduced separately; migration, job-contract and UI files passed separately]
+Investigate each unchanged assertion and repeat in isolation; preserve full-run failures and establish required stability before accepting the lane.
+
+TST-012 P2 — Artifact-export queued-deadline test emits an unhandled rejection [observed in complete Node 24 lane]
+Reproduce and distinguish promise-observation timing from product deadline/error handling. Keep unhandled errors at zero in the accepted lane.
+
+TST-014 P2 — Opt-in startup and serving-role validation has failures [five selected failures reproduced together; native final details captured]
+Reproduce the expensive ACL case and verify teardown/state restoration before classifying later failures. Then isolate the operator and native child-server assertions on supported Windows and authoritative Linux CI. Preserve this lane and its skips; no baseline waiver is established.
+
+TST-015 P2 — Submission-error metadata test captured an empty log delta [observed in broad lane; complete 42-test single-file repeat passed]
+Investigate the log-capture sink/read/flush timing and preserve both attempts. Require reliable positive logging evidence before accepting the negative redaction assertions.
+
+TST-016 P2 — Windows PowerShell interrupted final Vitest error reporting [capture wrapper corrected; original whole-lane final summary unavailable]
+Use the corrected capture wrapper for future complete-lane acceptance. Focused reproductions retain full native summaries; no repeat of the entire known-failing broad lane is necessary until fixes or a new acceptance candidate justify it.
+
+TST-013 P2 — Artifact-export stalled-upload assertion returns a different error class [newly observed in separate single-file Node 24 execution]
+Investigate ownership/destroy/export ordering and the intended error contract. Keep this result separate from TST-012 and preserve both full-run and single-file failures.
+
+TST-010 P1 — Full fleet fairness and capacity acceptance remains open [existing branch finding; not remeasured by this session]
+Investigate remaining capacity/queue behavior using actual daemon/provider execution and retain fixed arrival ratios, deadlines and original failures. Run the full D5 topology/load campaign before promotion.
+
+CURRENT STATE
+User-facing local and HTTPS VPS apps remain running. Temporary cross-host probes/tunnels, the extra replica, and separate foundation/fault-campaign stacks are stopped; test identity/data volumes remain.
+Local onboarding and native subscription Commander reply are complete, with a per-company model override. The reply persisted after reload. VPS dummy onboarding and task persistence are complete.
+No application implementation changes or commits were made; local source worktree is clean. The VPS image allowlist contains development admission entries. Test setup/scripts/evidence are outside the source checkout in testing-ops.
+
+EVIDENCE
+TEST-RESULTS.json contains structured results and relative log paths. Evidence is under testing-ops/evidence, with copied non-secret VPS logs under evidence/vps.
+Local startup: powershell -ExecutionPolicy Bypass -File C:/Users/Dell/Desktop/aoa/testing-ops/start-local.ps1
+D1 checks: testing-ops/run-harness.ps1 status|test; VPS: /opt/aoa-testing/run-harness.sh status|test
+Provider credentials remain in protected VPS files, separate from both control planes and workers.

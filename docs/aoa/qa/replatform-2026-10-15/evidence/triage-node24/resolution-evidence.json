@@ -1,0 +1,16 @@
+{
+  "node": "v24.19.0",
+  "testLocation": "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\packages\\browser-runtime\\src\\__tests__\\image-playwright-parity.test.ts",
+  "directCoreError": {
+    "code": "MODULE_NOT_FOUND",
+    "message": "Cannot find module 'playwright-core/package.json'\nRequire stack:\n- C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\packages\\browser-runtime\\src\\__tests__\\image-playwright-parity.test.ts"
+  },
+  "playwright": {
+    "path": "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\.pnpm\\playwright@1.59.1\\node_modules\\playwright\\package.json",
+    "version": "1.59.1"
+  },
+  "transitiveCore": {
+    "path": "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\.pnpm\\playwright-core@1.59.1\\node_modules\\playwright-core\\package.json",
+    "version": "1.59.1"
+  }
+}

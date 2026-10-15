@@ -1,0 +1,10 @@
+{"result":"PASS","passedNativeRestoreCases":1,"passedDatabaseAndObjectRecoveryCases":2,"scenarios":["post-snapshot lease","expired snapshot lease","generation cutoff in snapshot","post-backup revocation with pre-serving authority advance"],"objectScenarios":["restored bytes corrupted","restored bytes missing","healthy sibling still accessible"],"limits":"Disposable single-database + local-file engineering fixture; not live fleet, external object store or D5 timings"}
+✔ native full-schema restore rejects stale fence authority (180160.3026ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 180367.3783

@@ -1,0 +1,28 @@
+{
+  "id": "provider-identity",
+  "kind": "test",
+  "file": "scripts/lib/__tests__/m1-provider-identity.test.mjs",
+  "scope": "M1 provider template/build identity decisions using injected mock transport",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "scripts/lib/__tests__/m1-provider-identity.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:01.379Z",
+  "durationMs": 246,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {
+    "tests": 7,
+    "suites": 0,
+    "pass": 7,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

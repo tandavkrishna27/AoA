@@ -1,0 +1,109 @@
+{
+  "candidate": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "runtime": "v24.19.0",
+  "scope": "Offline tests only. Owned temporary file/Git fixtures; workflow Docker/sudo shell functions stubbed; teardown subprocesses and provider fetch stubbed; no live apps, Docker, network, providers or credential access. Real checkout is read-only. Assertions unchanged; one attempt per file, sequential.",
+  "safetyNotes": [
+    "Shape candidate-binding fixture initializes and mutates only its owned mkdtemp Git repository, explicitly authorized by parent.",
+    "Global/system Git configuration disabled for fixtures; no repository configuration changed.",
+    "All temp paths redirected beneath this evidence directory."
+  ],
+  "clearedEnvironmentVariableNames": [
+    "GIT_CONFIG_COUNT",
+    "GIT_CONFIG_KEY_0",
+    "GIT_CONFIG_KEY_1",
+    "GIT_CONFIG_VALUE_0",
+    "GIT_CONFIG_VALUE_1",
+    "GIT_PAGER"
+  ],
+  "startedAt": "2026-10-15T16:18:55.260Z",
+  "results": [
+    {
+      "file": "scripts/check-m1-shipped-boot-shape.test.mjs",
+      "sourceSha256": "f45103d6835e3036f3580bde46556feca3b7f20f03cc5f9d53e4243293e53a5d",
+      "command": [
+        "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "scripts/check-m1-shipped-boot-shape.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:18:55.261Z",
+      "durationMs": 10505.8959,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "counts": {
+        "tests": 67,
+        "suites": 0,
+        "pass": 67,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "check-m1-shipped-boot-shape.log",
+      "failureHeaders": []
+    },
+    {
+      "file": "scripts/lib/__tests__/m1-shipped-boot.test.mjs",
+      "sourceSha256": "bc5f30cbb48fb4c03bfa87e9208ff563faff27b0c013c35a06ed86f83ef74388",
+      "command": [
+        "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "scripts/lib/__tests__/m1-shipped-boot.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:19:05.772Z",
+      "durationMs": 10055.116999999998,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "counts": {
+        "tests": 116,
+        "suites": 0,
+        "pass": 116,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "m1-shipped-boot.log",
+      "failureHeaders": []
+    },
+    {
+      "file": "scripts/lib/__tests__/m1-cleanup-evidence.test.mjs",
+      "sourceSha256": "e95c6514ea1b9cedb3dbcf06e42fbfb63280ba3ae27dcd3389516fe268bf9b8a",
+      "command": [
+        "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "scripts/lib/__tests__/m1-cleanup-evidence.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:19:15.829Z",
+      "durationMs": 21771.173300000002,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "counts": {
+        "tests": 65,
+        "suites": 0,
+        "pass": 65,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log": "m1-cleanup-evidence.log",
+      "failureHeaders": []
+    }
+  ],
+  "finishedAt": "2026-10-15T16:19:37.600Z",
+  "countParseNote": "Node 24 used its spec reporter. Counts parsed from retained final ℹ summary lines; tests were not rerun.",
+  "totals": {
+    "tests": 248,
+    "pass": 248,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

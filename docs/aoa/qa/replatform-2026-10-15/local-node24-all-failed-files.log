@@ -1,0 +1,353 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ❯ |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts (4 tests | 1 failed) 10ms
+   ✓ BRW-003b — image Playwright pin vs resolved Playwright > the Dockerfile pins an exact Playwright version 1ms
+   × BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves 7ms
+     → Cannot find module 'playwright-core/package.json'
+Require stack:
+- C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts
+   ✓ BRW-003b — image Playwright pin vs resolved Playwright > the image installs a browser, not just the module 0ms
+   ✓ BRW-003b — image Playwright pin vs resolved Playwright > the image ASSERTS chromium at build time, the way it already does for the CLIs 0ms
+ ✓ |@armyofagents/ui| src/components/marketplace/__tests__/DefaultCrewRosterRedirect.test.tsx (3 tests) 115ms
+ ✓ |@armyofagents/ui| src/__tests__/LobbySidebar.test.tsx (27 tests) 1885ms
+ ✓ |@armyofagents/server| src/__tests__/runtime-service-control.test.ts (59 tests) 6620ms
+   ✓ startRuntimeServicesForWorkspaceControl > rolls back an uncommitted batch when its activation fence is superseded  381ms
+   ✓ startRuntimeServicesForWorkspaceControl > validates the whole batch before committing any service  2316ms
+   ✓ startRuntimeServicesForWorkspaceControl > does not reuse a shared service after its effective command or cwd changes  500ms
+   ✓ startRuntimeServicesForWorkspaceControl > rolls back newly created services when a later service in the batch fails  310ms
+   ✓ startRuntimeServicesForWorkspaceControl > does not roll back a shared service adopted by a concurrent successful batch  1450ms
+   ✓ startRuntimeServicesForWorkspaceControl > does not reuse shared processes across companies or effective adapter environments  580ms
+ ✓ |@armyofagents/ui| src/__tests__/Lobby.test.tsx (16 tests) 565ms
+ ✓ |@armyofagents/ui| src/__tests__/GitPanel.test.tsx (36 tests) 6607ms
+   ✓ GitPanel > offers manual GitHub PR refresh from Git actions  587ms
+   ✓ GitPanel > keeps manual GitHub PR refresh available after a sync failure  311ms
+   ✓ GitPanel > asks for confirmation before committing when a run is active  841ms
+   ✓ GitPanel > asks for confirmation before pushing when a run is active, cancel prevents push, and continue performs it  794ms
+   ✓ GitPanel > review fixes — silent background sync, request review, draft, terminal polling > requests a review with the entered reviewers and toasts on success  587ms
+ ✓ |@armyofagents/ui| src/components/commander/cockpit/CommanderCockpitPanel.test.tsx (20 tests) 1495ms
+   ✓ CommanderCockpitPanel > ⚙ config popover can hide the running card  387ms
+ ✓ |@armyofagents/ui| src/onboarding/inflight/__tests__/LibrarianStep.test.tsx (18 tests) 1036ms
+[10:56:01] [31mERROR[39m: [36mfailed to release runtime services after startup error[39m
+    [35mrunId[39m: "run-release-fail"
+    err: {
+      "type": "Error",
+      "message": "lease release persistence failed",
+      "stack":
+          Error: lease release persistence failed
+              at Object.onConflictDoUpdate (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\__tests__\workspace-runtime.test.ts:1185:43)
+              at persistRuntimeServiceRecord (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:1791:6)
+              at releaseRuntimeServicesForRun (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:2742:13)
+              at ensureRuntimeServicesForRunUnlocked (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:2680:13)
+              at C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:2717:12
+              at acquire (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:189:38)
+              at C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:190:72
+              at withSingleRuntimeControlLock (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:169:12)
+              at acquire (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:190:12)
+              at C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:190:72
+    }
+stderr | src/__tests__/WorkspaceView.test.tsx > WorkspaceView — three-panel layout > shows a workspace error fallback when a panel render fails
+Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) {
+  [stack]: [Getter/Setter],
+  [message]: 'Synthetic workspace timeline render failure'
+}
+
+The above error occurred in the <WorkspaceTimeline> component.
+
+React will try to recreate this component tree from scratch using the error boundary you provided, WorkspaceErrorBoundary.
+
+Workspace render error Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) 
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:5:25)
+    at div (<anonymous>)
+    at Panel (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:100:13)
+    at div (<anonymous>)
+    at Group (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:92:13)
+    at div (<anonymous>)
+    at WorkspaceErrorBoundary (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceErrorBoundary.tsx:7:1)
+    at div (<anonymous>)
+    at WorkspaceLayout (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceLayout.tsx:36:3)
+    at WorkspaceView (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\pages\WorkspaceView.tsx:15:62)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Outlet (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7027:26)
+    at div (<anonymous>)
+    at LayoutStub (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:340:36)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Routes (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7097:3)
+    at Router (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7036:13)
+    at MemoryRouter (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6952:3)
+    at QueryClientProvider (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/@tanstack+react-query@5.90.21_react@19.2.4/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js:20:3)
+Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) {
+  [stack]: [Getter/Setter],
+  [message]: 'Synthetic workspace timeline render failure'
+}
+
+The above error occurred in the <WorkspaceTimeline> component.
+
+React will try to recreate this component tree from scratch using the error boundary you provided, WorkspaceErrorBoundary.
+
+Workspace render error Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) 
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:5:25)
+    at div (<anonymous>)
+    at Panel (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:100:13)
+    at div (<anonymous>)
+    at Group (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:92:13)
+    at div (<anonymous>)
+    at WorkspaceErrorBoundary (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceErrorBoundary.tsx:7:1)
+    at div (<anonymous>)
+    at WorkspaceLayout (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceLayout.tsx:36:3)
+    at WorkspaceView (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\pages\WorkspaceView.tsx:15:62)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Outlet (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7027:26)
+    at div (<anonymous>)
+    at LayoutStub (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:340:36)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Routes (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7097:3)
+    at Router (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7036:13)
+    at MemoryRouter (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6952:3)
+    at QueryClientProvider (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/@tanstack+react-query@5.90.21_react@19.2.4/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js:20:3)
+
+ ✓ |@armyofagents/ui| src/api/__tests__/braindump-api.test.ts (10 tests) 17ms
+[10:56:03] [33mWARN[39m: [36mruntime service log sink failed[39m
+    [35mruntimeService[39m: "log-sink"
+    [35mstream[39m: "stdout"
+    err: {
+      "type": "Error",
+      "message": "log persistence unavailable",
+      "stack":
+          Error: log persistence unavailable
+              at Object.<anonymous> (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\__tests__\workspace-runtime.test.ts:1365:13)
+              at Object.mockCall (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/@vitest+spy@3.2.6/node_modules/@vitest/spy/dist/index.js:96:15)
+              at Object.spy [as onLog] (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+              at Socket.<anonymous> (C:\Users\Dell\Desktop\aoa\replatform-testing\server\src\services\workspace-runtime.ts:2318:18)
+              at Socket.emit (node:events:509:28)
+              at addChunk (node:internal/streams/readable:563:12)
+              at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+              at Socket.Readable.push (node:internal/streams/readable:394:5)
+              at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+    }
+ ✓ |@armyofagents/ui| src/__tests__/WorkspaceRightPanel.test.tsx (17 tests) 5332ms
+   ✓ WorkspaceRightPanel cockpit contract > renders the software cockpit sections in the final order  530ms
+   ✓ WorkspaceRightPanel cockpit contract > renders the cockpit header with ticket identifier, actions, and collapse  728ms
+   ✓ WorkspaceRightPanel cockpit contract > shows Wake agent only after Process is expanded and never shows pause or cancel controls  404ms
+   ✓ WorkspaceRightPanel cockpit contract > wakes the assigned agent with the current issue payload  390ms
+   ✓ WorkspaceRightPanel cockpit contract > opens captured pending detected outputs from the sidebar artifacts section  674ms
+   ✓ WorkspaceRightPanel cockpit contract > dismisses pending detected outputs from the sidebar artifact actions menu  547ms
+ ✓ |@armyofagents/ui| src/__tests__/WorkspaceView.test.tsx (23 tests) 6053ms
+   ✓ WorkspaceView — route and page renders > renders the workspace layout when data loads  588ms
+   ✓ WorkspaceView — three-panel layout > opens a browser preview tab from a running workspace service  377ms
+   ✓ WorkspaceView — three-panel layout > uses the center header control to show and hide the preview panel without clearing tabs  461ms
+   ✓ WorkspaceView — three-panel layout > uses a consistent 42px chrome height across workspace panel headers  306ms
+   ✓ WorkspaceView — three-panel layout > opens an artifact preview tab from the artifacts section  482ms
+   ✓ WorkspaceView — left panel task navigator > shows group labels for non-empty groups  301ms
+   ✓ WorkspaceView — left panel task navigator > clicking a task updates selected task  535ms
+ ✓ |@armyofagents/ui| src/__tests__/InboxHub.test.tsx (41 tests | 2 skipped) 9384ms
+   ✓ InboxHub page > renders the hub at the canonical /inbox route  339ms
+   ✓ InboxHub page > writes canonical /inbox paths when lanes and items are selected  339ms
+   ✓ InboxHub page > answers runtime permission prompts from the hub viewer  308ms
+   ✓ InboxHub page > submits runtime work-question answers from the hub viewer  713ms
+   ✓ InboxHub page > optimistically clears the unread indicator on click (infinite-query paged cache)  303ms
+   ✓ InboxHub page > viewer can dismiss and snooze the selected item  446ms
+   ✓ InboxHub page > targets the selected hub row when multiple rows map to the same entity tab  372ms
+   ✓ InboxHub page > viewer can undo personal dismiss and snooze actions  627ms
+   ✓ InboxHub page > viewer resolves an item and can undo the server-backed action  491ms
+   ✓ InboxHub page > keeps server undo reachable after the resolved item leaves the active list  469ms
+   ✓ InboxHub page > viewer shows claim and release actions for board-pool items  378ms
+   ✓ InboxHub page > history controls request resolved and archived items inside the active lane  324ms
+   ✓ InboxHub page > bulk archives selected open items with optimistic versions  300ms
+   ✓ InboxHub page > passes search text to the list query  352ms
+   ✓ InboxHub page > caches a list item's tab so it survives a refetch that drops the row  441ms
+ ❯ |@armyofagents/server| src/__tests__/workspace-runtime.test.ts (53 tests | 1 failed | 13 skipped) 17980ms
+   ✓ runtime service process cleanup > uses taskkill tree mode for Windows runtime service cleanup 3ms
+   ✓ runtime service process cleanup > escalates a POSIX process group to SIGKILL and confirms exit 2ms
+   ✓ runtime service process cleanup > does not claim Windows tree termination when taskkill cannot confirm it 1ms
+   ↓ runtime service process cleanup > kills a detached process that ignores SIGTERM before reporting success
+   ✓ resolveRuntimeServiceReadinessOptions > uses the dev-server-aware readiness timeout when starting services 1ms
+   ✓ realizeExecutionWorkspace > creates and reuses a git worktree for an issue-scoped branch  728ms
+   ✓ realizeExecutionWorkspace > reuses a worktree created concurrently between path check and git add  794ms
+   ↓ realizeExecutionWorkspace > runs a configured provision command inside the derived worktree
+   ↓ realizeExecutionWorkspace > writes an isolated repo-local Paperclip config and worktree branding when provisioning
+   ↓ realizeExecutionWorkspace > records worktree setup and provision operations when a recorder is provided
+   ✓ realizeExecutionWorkspace > reuses an existing branch without resetting it when recreating a missing worktree  1029ms
+   ✓ realizeExecutionWorkspace > removes a created git worktree and branch during cleanup  642ms
+   ✓ realizeExecutionWorkspace > preserves a forged runtime-created local path outside approved roots 3ms
+   ✓ realizeExecutionWorkspace > keeps an unmerged runtime-created branch and warns instead of force deleting it  801ms
+   ↓ realizeExecutionWorkspace > records teardown and cleanup operations when a recorder is provided
+   ✓ ensureRuntimeServicesForRun > rejects and rolls back the whole run batch when an earlier service exits during later readiness  4826ms
+   ✓ ensureRuntimeServicesForRun > rolls back a shared manual service when a later run service fails  325ms
+   ✓ ensureRuntimeServicesForRun > serializes concurrent run acquisition so a failed batch rolls back before the next run starts  1696ms
+   ✓ ensureRuntimeServicesForRun > still rolls back a failed run batch when lease-release persistence fails  397ms
+   ✓ ensureRuntimeServicesForRun > releases every service lease even when an earlier persistence operation fails  418ms
+   ↓ ensureRuntimeServicesForRun > terminates a detached service when the final running-state persist fails
+   ↓ ensureRuntimeServicesForRun > keeps a stopped service retryable until its terminal state is durable
+   × ensureRuntimeServicesForRun > observes a rejecting runtime log sink without escaping the service lifecycle 1017ms
+     → expected "spy" to be called at least once
+   ↓ ensureRuntimeServicesForRun > blocks a queued shared start when failed readiness leaves the first process unresolved
+   ✓ ensureRuntimeServicesForRun > reuses shared runtime services across runs and starts a new service after release  3602ms
+   ↓ ensureRuntimeServicesForRun > does not leak parent Paperclip instance env into runtime service commands
+   ↓ ensureRuntimeServicesForRun > stops execution workspace runtime services by executionWorkspaceId
+   ↓ ensureRuntimeServicesForRun > confirms a SIGTERM-resistant descendant exits before completing a tracked stop
+   ↓ ensureRuntimeServicesForRun > keeps a readiness-failed process tracked when cleanup cannot be confirmed
+   ↓ ensureRuntimeServicesForRun > does not signal a stale PID after the readiness child already exited
+   ✓ ensureRuntimeServicesForRun > does not stop services in sibling directories when matching by workspace cwd  1447ms
+   ✓ normalizeAdapterManagedRuntimeServices > namespaces every adapter service identity branch by company 2ms
+   ✓ normalizeAdapterManagedRuntimeServices > fills workspace defaults and derives stable ids for adapter-managed services 1ms
+   ✓ normalizeAdapterManagedRuntimeServices > prefers execution workspace ids over cwd for execution-scoped adapter services 0ms
+   ✓ normalizeAdapterManagedRuntimeServices > deduplicates reports that resolve to the same stable service id 0ms
+   ✓ normalizeAdapterManagedRuntimeServices > uses the execution workspace and URL as the stable identity for preview services 0ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > does not probe adapter-managed loopback previews from a cloud control-plane replica 1ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > does not probe preview rows checked within the TTL 1ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > probes preview rows whose health check is stale 1ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > keeps an active adapter-managed preview recoverable after one failed probe 1ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > marks adapter-managed previews stopped after a consecutive failed probe 1ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > does not resurrect stopped adapter-managed previews even when the URL is reachable 0ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > marks reachable starting adapter-managed previews running and healthy 1ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > does not probe controllable local process services 0ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > limits concurrent preview probes without dropping previews 41ms
+   ✓ refreshAdapterManagedPreviewRuntimeServiceRows > deduplicates concurrent probes for the same preview service 31ms
+   ✓ refreshLocalProcessRuntimeServiceRows > probes stale local-process service URLs 1ms
+   ✓ refreshLocalProcessRuntimeServiceRows > does not resurrect stopped local-process services even when the URL is reachable 0ms
+   ✓ refreshLocalProcessRuntimeServiceRows > probes stale local-process URLs even when the process is still registered in memory 162ms
+   ✓ refreshLocalProcessRuntimeServiceRows > marks local-process services stopped after a consecutive failed probe 0ms
+   ✓ refreshLocalProcessRuntimeServiceRows > terminates a persisted local process before writing a health-driven stopped state 2ms
+   ✓ refreshLocalProcessRuntimeServiceRows > keeps an unverifiable local process active and tracked after failed health probes 1ms
+   ✓ refreshLocalProcessRuntimeServiceRows > does not probe, terminate, or update a foreign-owner local service 1ms
+ ✓ |@armyofagents/ui| src/onboarding/steps/__tests__/OrgStep.test.tsx (11 tests) 962ms
+ ✓ |@armyofagents/ui| src/pages/__tests__/Auth.test.tsx (14 tests) 720ms
+ ✓ |@armyofagents/ui| src/components/hub/__tests__/useHubTabs.test.tsx (19 tests) 66ms
+ ✓ |@armyofagents/ui| src/hooks/__tests__/useMemoryViewMode.test.tsx (8 tests) 52ms
+ ✓ |@armyofagents/ui| src/__tests__/useSidebarCollapsed.test.ts (9 tests) 45ms
+ ✓ |@armyofagents/ui| src/components/commander/useCommanderViewerCollapsed.test.ts (4 tests) 34ms
+ ✓ |@armyofagents/ui| src/hooks/__tests__/useRecentSkills.test.ts (6 tests) 38ms
+ ✓ |@armyofagents/ui| src/onboarding/steps/__tests__/CreateOrganizationStep.test.tsx (9 tests) 868ms
+   ✓ CreateOrganizationStep > requires an organization name  344ms
+ ✓ |@armyofagents/ui| src/__tests__/OpenInIdeButton.test.tsx (9 tests) 1720ms
+   ✓ OpenInIdeButton > opens dropdown and shows all five menu items  444ms
+ ✓ |@armyofagents/ui| src/__tests__/NewIssueDialog.responsible-human.test.tsx (9 tests) 3811ms
+   ✓ NewIssueDialog responsible human > sends selected responsible human separately from agent assignee on create  686ms
+   ✓ NewIssueDialog responsible human > omits responsibleUserId when the responsible human is blank or cleared  333ms
+   ✓ NewIssueDialog responsible human > clears the responsible human when the dialog company changes  542ms
+   ✓ NewIssueDialog responsible human > saves and restores a valid responsible human in the dialog draft  1207ms
+ ✓ |@armyofagents/ui| src/onboarding/__tests__/pendingTenant.test.ts (6 tests) 12ms
+ ✓ |@armyofagents/ui| src/onboarding/inflight/__tests__/InFlightFlow.test.tsx (8 tests) 1657ms
+   ✓ InFlightFlow (WS9 — In-flight sequencer) > advances through every surface in order on each onDone, persisting the step marker, then calls setFirstRunCompleted and the parent onDone  831ms
+   ✓ InFlightFlow (WS9 — In-flight sequencer) > keeps the step marker when the completion write fails, so a loop-back resumes at the final step (not from scratch)  485ms
+ ✓ |@armyofagents/ui| src/__tests__/IssuesList.planning-pill.test.tsx (2 tests) 413ms
+   ✓ IssuesList — Planning pill > renders Planning pill for a planning-mode issue  348ms
+ ✓ |@armyofagents/ui| src/__tests__/NewIssueDialog-workspacePolicy.test.tsx (2 tests) 1126ms
+   ✓ NewIssueDialog workspace policy > shows the department default workspace choice for a policy-enabled department once Advanced is expanded  453ms
+   ✓ NewIssueDialog workspace policy > sends reuse_existing workspace fields when a reusable workspace is selected  670ms
+ ✓ |@armyofagents/ui| src/__tests__/NewIssueDialog.advanced-disclosure.test.tsx (1 test) 623ms
+   ✓ NewIssueDialog — Advanced disclosure > hides advanced controls behind an Advanced disclosure and drops dead placeholders  621ms
+ ✓ |@armyofagents/ui| src/components/workspace/__tests__/WorkspaceRightPanel.test.tsx (3 tests) 857ms
+   ✓ WorkspaceRightPanel > limits saved expanded sections on first render  478ms
+stderr | src/components/InternalAgentPanel.bstates.test.tsx > Commander composer — B-states (mock §5) > drops a stale upload FAILURE after the user switches conversations mid-upload (round-10 #3)
+An update to AgentPanelContent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+stderr | src/components/InternalAgentPanel.bstates.test.tsx > Commander composer — B-states (mock §5) > drops a stale upload FAILURE after the user switches conversations mid-upload (round-10 #3)
+An update to AgentPanelContent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ |@armyofagents/ui| src/components/InternalAgentPanel.bstates.test.tsx (11 tests) 1694ms
+   ✓ Commander composer — B-states (mock §5) > raises the banner on send failure keeping the draft; Retry replays the IDENTICAL request incl. the same clientSubmissionId; retry-success clears  471ms
+ ✓ |@armyofagents/ui| src/__tests__/NewIssueDialog.planning-chip.test.tsx (2 tests) 638ms
+   ✓ NewIssueDialog — work-mode chip > switches to Planning when chip is clicked and Planning option selected  340ms
+ ✓ |@armyofagents/ui| src/components/commander/useCommanderCockpit.test.ts (4 tests) 34ms
+ ✓ |@armyofagents/ui| src/__tests__/storage-migrations-registry.test.ts (5 tests) 7ms
+ ✓ |@armyofagents/ui| src/__tests__/storage-migration.test.ts (5 tests) 5ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts (20 tests) 106877ms
+   ✓ JOB-003 frozen worker-operation HTTP contract > enforces an exhaustive authority-writer allowlist and target-worker-exclusive lock order  64601ms
+   ✓ JOB-003 frozen worker-operation HTTP contract > maps one attempt-local typed static context from exact authority symbols with no laundering or injection  15357ms
+   ✓ JOB-003 frozen worker-operation HTTP contract > keeps protected candidate facts immutable and certificate writers certificate-only  26536ms
+ ✓ |@armyofagents/ui| src/onboarding/__tests__/pendingOrganization.test.ts (2 tests) 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves
+Error: Cannot find module 'playwright-core/package.json'
+Require stack:
+- C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts
+ ❯ src/__tests__/image-playwright-parity.test.ts:41:23
+     39|   it("that pin equals the version this repo actually resolves", () => {
+     40|     const require_ = createRequire(import.meta.url);
+     41|     const resolved = (require_("playwright-core/package.json") as { ve…
+       |                       ^
+     42|     expect(imagePin()).toBe(resolved);
+     43|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@armyofagents/server| src/__tests__/workspace-runtime.test.ts > ensureRuntimeServicesForRun > observes a rejecting runtime log sink without escaping the service lifecycle
+AssertionError: expected "spy" to be called at least once
+ ❯ src/__tests__/workspace-runtime.test.ts:1387:42
+    1385|     });
+    1386| 
+    1387|     await vi.waitFor(() => expect(onLog).toHaveBeenCalled());
+       |                                          ^
+    1388|     await expect(stopRuntimeServicesForExecutionWorkspace({
+    1389|       executionWorkspaceId,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 34 passed (36)
+      Tests  2 failed | 479 passed | 15 skipped (496)
+   Start at  16:25:41
+   Duration  116.09s (transform 11.65s, setup 6.48s, collect 67.70s, tests 179.36s, environment 62.73s, prepare 7.10s)
+

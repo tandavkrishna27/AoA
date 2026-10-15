@@ -1,0 +1,352 @@
+TAP version 13
+# Subtest: D1 late expiry: initial future 60s lifetime is scoped to a fresh target and never changes existing expiries
+ok 1 - D1 late expiry: initial future 60s lifetime is scoped to a fresh target and never changes existing expiries
+  ---
+  duration_ms: 6.594
+  type: 'test'
+  ...
+# Subtest: D1 restart: nonnull locator lookup parameterizes all SQL operands
+ok 2 - D1 restart: nonnull locator lookup parameterizes all SQL operands
+  ---
+  duration_ms: 4.004
+  type: 'test'
+  ...
+# Subtest: D1 late expiry: actual control orders real expiry before parking and always restores only worker-b
+ok 3 - D1 late expiry: actual control orders real expiry before parking and always restores only worker-b
+  ---
+  duration_ms: 7.1758
+  type: 'test'
+  ...
+# Subtest: D1 late expiry: isolated paths and overlay recreate only worker-b and restore the original config
+ok 4 - D1 late expiry: isolated paths and overlay recreate only worker-b and restore the original config
+  ---
+  duration_ms: 4.9946
+  type: 'test'
+  ...
+# Subtest: D1 late expiry: runtime identity owns only the private profile and ticket before activation
+ok 5 - D1 late expiry: runtime identity owns only the private profile and ticket before activation
+  ---
+  duration_ms: 4.3502
+  type: 'test'
+  ...
+# Subtest: D1 late expiry: ownership errors stop activation, and a same-identity owner needs no privilege helper
+ok 6 - D1 late expiry: ownership errors stop activation, and a same-identity owner needs no privilege helper
+  ---
+  duration_ms: 17.7301
+  type: 'test'
+  ...
+# Subtest: D1 late expiry: activation failures retain bounded scrubbed diagnostics and configured override is not duplicated
+ok 7 - D1 late expiry: activation failures retain bounded scrubbed diagnostics and configured override is not duplicated
+  ---
+  duration_ms: 3.6034
+  type: 'test'
+  ...
+# Subtest: D1 restart: container probes render valid JavaScript and never mutate lease authority
+ok 8 - D1 restart: container probes render valid JavaScript and never mutate lease authority
+  ---
+  duration_ms: 3.9911
+  type: 'test'
+  ...
+# Subtest: D1 restart: fence attribution requires a new structured line for this lease and job
+ok 9 - D1 restart: fence attribution requires a new structured line for this lease and job
+  ---
+  duration_ms: 8.8395
+  type: 'test'
+  ...
+# Subtest: D1 restart: the actual suppressed callback completes its own work, never kills, and retains an unfired injection
+ok 10 - D1 restart: the actual suppressed callback completes its own work, never kills, and retains an unfired injection
+  ---
+  duration_ms: 5.4945
+  type: 'test'
+  ...
+# Subtest: D1 restart: workflow reset runs only this Compose stack and stops if teardown fails
+ok 11 - D1 restart: workflow reset runs only this Compose stack and stops if teardown fails
+  ---
+  duration_ms: 366.3589
+  type: 'test'
+  ...
+# Subtest: D1 restart: the required early case precedes journeys and the expired-ticket control
+ok 12 - D1 restart: the required early case precedes journeys and the expired-ticket control
+  ---
+  duration_ms: 16.939
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a complete matrix produces ZERO violations (the anchor)
+ok 13 - DEP-018 declaration: a complete matrix produces ZERO violations (the anchor)
+  ---
+  duration_ms: 3.1634
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a non-object, a wrong schemaVersion and a missing profiles array red
+ok 14 - DEP-018 declaration: a non-object, a wrong schemaVersion and a missing profiles array red
+  ---
+  duration_ms: 1.5559
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a MISSING gate profile reds — a fault matrix that skips a gate is not a campaign matrix
+ok 15 - DEP-018 declaration: a MISSING gate profile reds — a fault matrix that skips a gate is not a campaign matrix
+  ---
+  duration_ms: 2.8209
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: an unknown profile, a duplicate profile and a caseless profile red
+ok 16 - DEP-018 declaration: an unknown profile, a duplicate profile and a caseless profile red
+  ---
+  duration_ms: 3.5535
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a case without an id, a duplicate id, or that is not an object reds
+ok 17 - DEP-018 declaration: a case without an id, a duplicate id, or that is not an object reds
+  ---
+  duration_ms: 3.7714
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a case with no injection, no mechanism, or NO OBSERVER reds
+ok 18 - DEP-018 declaration: a case with no injection, no mechanism, or NO OBSERVER reds
+  ---
+  duration_ms: 4.2194
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a pending case needs a kind, a reason and an OWNER
+ok 19 - DEP-018 declaration: a pending case needs a kind, a reason and an OWNER
+  ---
+  duration_ms: 4.6768
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: dropping ANY of the nine cross-tenant surfaces reds, one code per surface
+ok 20 - DEP-018 declaration: dropping ANY of the nine cross-tenant surfaces reds, one code per surface
+  ---
+  duration_ms: 7.4044
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: dropping ANY of the four no-RLS legacy tables reds (E2-D03)
+ok 21 - DEP-018 declaration: dropping ANY of the four no-RLS legacy tables reds (E2-D03)
+  ---
+  duration_ms: 3.7811
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: two journeys for the SAME tenant do not satisfy F10 (Codex P2, PR \#573)
+ok 22 - DEP-018 declaration: two journeys for the SAME tenant do not satisfy F10 (Codex P2, PR \#573)
+  ---
+  duration_ms: 1.2908
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: too few per-tenant journeys, and a missing control tenant, red
+ok 23 - DEP-018 declaration: too few per-tenant journeys, and a missing control tenant, red
+  ---
+  duration_ms: 4.2936
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a denial without a positive control reds — 'denied' would not be distinguishable from 'nothing works'
+ok 24 - DEP-018 declaration: a denial without a positive control reds — 'denied' would not be distinguishable from 'nothing works'
+  ---
+  duration_ms: 1.5053
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a legacy-table case needs BOTH controls and a named production path
+ok 25 - DEP-018 declaration: a legacy-table case needs BOTH controls and a named production path
+  ---
+  duration_ms: 2.8628
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: malformed tenant cases red
+ok 26 - DEP-018 declaration: malformed tenant cases red
+  ---
+  duration_ms: 4.7279
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: dropping a required FAMILY reds, per profile
+ok 27 - DEP-018 declaration: dropping a required FAMILY reds, per profile
+  ---
+  duration_ms: 12.4986
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a complete bundle produces ZERO violations and reports the profile COMPLETE (the anchor)
+ok 28 - DEP-018 evidence: a complete bundle produces ZERO violations and reports the profile COMPLETE (the anchor)
+  ---
+  duration_ms: 2.6767
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: an injection that DID NOT FIRE is a failure, not a pass (acceptance 1)
+ok 29 - DEP-018 evidence: an injection that DID NOT FIRE is a failure, not a pass (acceptance 1)
+  ---
+  duration_ms: 2.2502
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a declared case with no evidence row, and an UNDECLARED case, both red (acceptance 4)
+ok 30 - DEP-018 evidence: a declared case with no evidence row, and an UNDECLARED case, both red (acceptance 4)
+  ---
+  duration_ms: 0.5298
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a classification that does not match the declared one reds
+ok 31 - DEP-018 evidence: a classification that does not match the declared one reds
+  ---
+  duration_ms: 0.3621
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a cross-tenant denial with no passing positive control reds
+ok 32 - DEP-018 evidence: a cross-tenant denial with no passing positive control reds
+  ---
+  duration_ms: 0.6001
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a legacy-table case whose predicate-removed read did NOT return the foreign row reds
+ok 33 - DEP-018 evidence: a legacy-table case whose predicate-removed read did NOT return the foreign row reds
+  ---
+  duration_ms: 0.4534
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a PENDING case is never counted as a pass, and a pending case that reported evidence reds
+ok 34 - DEP-018 evidence: a PENDING case is never counted as a pass, and a pending case that reported evidence reds
+  ---
+  duration_ms: 0.6806
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: an unreadable bundle, an undeclared profile, a missing cases array and a duplicate row red
+ok 35 - DEP-018 evidence: an unreadable bundle, an undeclared profile, a missing cases array and a duplicate row red
+  ---
+  duration_ms: 0.8786
+  type: 'test'
+  ...
+# Subtest: DEP-018: the fault-matrix lane REUSES DEP-016's verdicts and defines no rival of its own
+ok 36 - DEP-018: the fault-matrix lane REUSES DEP-016's verdicts and defines no rival of its own
+  ---
+  duration_ms: 5.2479
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: DROPPING the redaction case reds (E5 clause 5's floor)
+ok 37 - DEP-018 declaration: DROPPING the redaction case reds (E5 clause 5's floor)
+  ---
+  duration_ms: 2.6474
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a redaction case without a planted canary, without the unseeded control, missing a stream, or with no producer, each reds
+ok 38 - DEP-018 declaration: a redaction case without a planted canary, without the unseeded control, missing a stream, or with no producer, each reds
+  ---
+  duration_ms: 7.2128
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: DROPPING either lease-scoped refusal kind reds (E5 clause 4's floor)
+ok 39 - DEP-018 declaration: DROPPING either lease-scoped refusal kind reds (E5 clause 4's floor)
+  ---
+  duration_ms: 4.8976
+  type: 'test'
+  ...
+# Subtest: DEP-018 declaration: a refusal case with an unknown kind, or without its same-tenant control, reds
+ok 40 - DEP-018 declaration: a refusal case with an unknown kind, or without its same-tenant control, reds
+  ---
+  duration_ms: 4.1669
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a refusal row without its same-tenant control reds
+ok 41 - DEP-018 evidence: a refusal row without its same-tenant control reds
+  ---
+  duration_ms: 0.8235
+  type: 'test'
+  ...
+# Subtest: DEP-018 evidence: a redaction row reds when the canary was not scrubbed, when the SCRUBBER MARKER was not observed, or when a stream was empty
+ok 42 - DEP-018 evidence: a redaction row reds when the canary was not scrubbed, when the SCRUBBER MARKER was not observed, or when a stream was empty
+  ---
+  duration_ms: 2.6944
+  type: 'test'
+  ...
+# Subtest: E5 clause 5: the harness's mirrored REDACTION_MARKER still equals the worker daemon's own
+ok 43 - E5 clause 5: the harness's mirrored REDACTION_MARKER still equals the worker daemon's own
+  ---
+  duration_ms: 13.3045
+  type: 'test'
+  ...
+# Subtest: DEP-018: the committed tests/d1/fault-matrix.json satisfies every declaration invariant
+ok 44 - DEP-018: the committed tests/d1/fault-matrix.json satisfies every declaration invariant
+  ---
+  duration_ms: 1.4865
+  type: 'test'
+  ...
+# Subtest: DEP-026 evidence: a redaction case declaring an IN-RUN suppressed arm reds without a passing control
+ok 45 - DEP-026 evidence: a redaction case declaring an IN-RUN suppressed arm reds without a passing control
+  ---
+  duration_ms: 0.3907
+  type: 'test'
+  ...
+# Subtest: DEP-027 evidence: an IN-RUN arm must retain succeeded per-stream observations
+ok 46 - DEP-027 evidence: an IN-RUN arm must retain succeeded per-stream observations
+  ---
+  duration_ms: 0.2339
+  type: 'test'
+  ...
+# Subtest: DEP-027 evidence: a failed setup or marker on EITHER withheld stream reds artifact-only grading
+ok 47 - DEP-027 evidence: a failed setup or marker on EITHER withheld stream reds artifact-only grading
+  ---
+  duration_ms: 0.6589
+  type: 'test'
+  ...
+# Subtest: DEP-027 evidence: a retained foreign-tenant canary leak reds standalone grading
+ok 48 - DEP-027 evidence: a retained foreign-tenant canary leak reds standalone grading
+  ---
+  duration_ms: 0.3355
+  type: 'test'
+  ...
+# Subtest: DEP-027 evidence: either stream missing the verbatim inert control canary reds
+ok 49 - DEP-027 evidence: either stream missing the verbatim inert control canary reds
+  ---
+  duration_ms: 0.4408
+  type: 'test'
+  ...
+# Subtest: DEP-026 evidence: a redaction case that declares NO suppressed arm is REFUSED, not skipped
+ok 50 - DEP-026 evidence: a redaction case that declares NO suppressed arm is REFUSED, not skipped
+  ---
+  duration_ms: 0.3497
+  type: 'test'
+  ...
+# Subtest: DEP-026 evidence: an unknown suppressed-arm scope is REFUSED rather than read as exempt
+ok 51 - DEP-026 evidence: an unknown suppressed-arm scope is REFUSED rather than read as exempt
+  ---
+  duration_ms: 0.8122
+  type: 'test'
+  ...
+# Subtest: DEP-026 evidence: a JUSTIFIED `none` exemption passes without the row field; an UNJUSTIFIED one reds
+ok 52 - DEP-026 evidence: a JUSTIFIED `none` exemption passes without the row field; an UNJUSTIFIED one reds
+  ---
+  duration_ms: 1.8769
+  type: 'test'
+  ...
+# Subtest: DEP-026 declaration: a REQUIRED redaction case must declare its suppressed arm, well-formed
+ok 53 - DEP-026 declaration: a REQUIRED redaction case must declare its suppressed arm, well-formed
+  ---
+  duration_ms: 5.9386
+  type: 'test'
+  ...
+# Subtest: DEP-026 declaration: a PENDING redaction case need not declare it yet, but a malformed one still reds
+ok 54 - DEP-026 declaration: a PENDING redaction case need not declare it yet, but a malformed one still reds
+  ---
+  duration_ms: 1.9783
+  type: 'test'
+  ...
+# Subtest: DEP-026: the committed exemption's blockers are OPEN registered findings (production function + loader)
+ok 55 - DEP-026: the committed exemption's blockers are OPEN registered findings (production function + loader)
+  ---
+  duration_ms: 736.5036
+  type: 'test'
+  ...
+# Subtest: DEP-026: a PHANTOM blocker, a RESOLVED blocker, and ABSENT sources each red
+ok 56 - DEP-026: a PHANTOM blocker, a RESOLVED blocker, and ABSENT sources each red
+  ---
+  duration_ms: 33.8131
+  type: 'test'
+  ...
+# Subtest: DEP-026 ANTI-ORPHAN: every production declaration-checking path performs the blocker cross-reference
+ok 57 - DEP-026 ANTI-ORPHAN: every production declaration-checking path performs the blocker cross-reference
+  ---
+  duration_ms: 70.1149
+  type: 'test'
+  ...
+1..57
+# tests 57
+# suites 0
+# pass 57
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1613.0818

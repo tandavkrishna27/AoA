@@ -1,0 +1,12 @@
+{
+  "command": [
+    "git",
+    "rev-parse",
+    "--is-inside-work-tree"
+  ],
+  "exitCode": 128,
+  "stdout": "",
+  "stderr": "fatal: detected dubious ownership in repository at 'C:/Users/Dell/Desktop/aoa/replatform-testing'\n'C:/Users/Dell/Desktop/aoa/replatform-testing/.git' is owned by:\n\tDESKTOP-P9Q5FMV/Dell (S-1-5-21-1691893909-24709456-1634789834-1001)\nbut the current user is:\n\tDESKTOP-P9Q5FMV/CodexSandboxOffline (S-1-5-21-1691893909-24709456-1634789834-1015)\nTo add an exception for this directory, call:\n\n\tgit config --global --add safe.directory C:/Users/Dell/Desktop/aoa/replatform-testing\n",
+  "error": null,
+  "note": "Metadata diagnostic only, no test rerun. Sanitization omitted inherited Git safe-directory configuration; current sandbox identity differs from checkout owner."
+}

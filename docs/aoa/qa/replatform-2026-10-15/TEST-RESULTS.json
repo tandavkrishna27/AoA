@@ -1,0 +1,1945 @@
+{
+  "generatedAt": "2026-10-15T16:40:36.893Z",
+  "candidate": {
+    "ref": "origin/docs/replatform-program",
+    "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "productCodeChanged": false,
+    "localWorktreeClean": true,
+    "vpsGeneratedChange": "docker/images/allowlist.json contains local image admission entries"
+  },
+  "conclusion": "Substantial installation and engineering validation passed. Release acceptance remains incomplete; this is not a release sign-off.",
+  "installs": {
+    "local": {
+      "url": "http://127.0.0.1:3210",
+      "mode": "local_trusted",
+      "runtime": "isolated Node 24.19.0; separate pinned Codex CLI 0.145.0",
+      "database": "embedded PostgreSQL",
+      "start": "powershell -ExecutionPolicy Bypass -File C:/Users/Dell/Desktop/aoa/testing-ops/start-local.ps1",
+      "onboarding": "Completed. Subscription hello probe passed and a native Commander turn completed using gpt-5.6-luna. Exact reply persisted after reload."
+    },
+    "vps": {
+      "url": "https://testing.armyofagents.org",
+      "location": "Helsinki (user supplied)",
+      "mode": "cloud_auth",
+      "host": "Ubuntu 26.04.1 ARM64; Docker; Caddy HTTPS",
+      "database": "private pgvector PostgreSQL 18 container",
+      "storage": "local_disk for public web app; isolated MinIO for D1 tests",
+      "onboarding": "Google sign-in succeeded; dummy operator/organization/company/department/task saved and task visible in Tasks."
+    },
+    "testStacks": "Separate D1 control-plane/worker/provider/Postgres/MinIO stacks on both hosts. These use separate fixture data from both user-facing apps.",
+    "architecture": "Choose one control plane for each shared environment. Workers join that authority. Two full installs have independent databases; they do not federate. Both directions below are separate fixture experiments, not a configured shared native-local/public-VPS workspace."
+  },
+  "health": [
+    {
+      "base": "http://127.0.0.1:3210",
+      "httpStatus": 200,
+      "status": "ok",
+      "deploymentMode": "local_trusted",
+      "authReady": true,
+      "revision": "13b4e806f31a67c3c172f2216272570203132f8f",
+      "capturedAt": "2026-10-15T16:39:24.339Z"
+    },
+    {
+      "base": "https://testing.armyofagents.org",
+      "httpStatus": 200,
+      "status": "ok",
+      "deploymentMode": "cloud_auth",
+      "authReady": true,
+      "revision": "13b4e806f31a67c3c172f2216272570203132f8f",
+      "capturedAt": "2026-10-15T16:39:25.028Z"
+    }
+  ],
+  "completed": [
+    {
+      "check": "Frozen pnpm 9.15.4 install, full workspace build, recursive typecheck",
+      "status": "pass",
+      "logs": [
+        "local-dependencies.log",
+        "local-workspace-build.log",
+        "local-typecheck.log"
+      ]
+    },
+    {
+      "check": "Policy/assertion/admission checks on both hosts",
+      "status": "pass",
+      "passed": 205,
+      "skipped": 0,
+      "perHost": true,
+      "logs": [
+        "local-policy-tests-exact.log",
+        "evidence/vps/policy-tests.log"
+      ]
+    },
+    {
+      "check": "Real local PostgreSQL migration readiness",
+      "status": "pass",
+      "passed": 5,
+      "logs": [
+        "local-postgres-readiness.log"
+      ]
+    },
+    {
+      "check": "Local native restore and stale authority rejection",
+      "status": "pass",
+      "detail": "Full-schema restore with four stale-authority scenarios, corrupted/missing object recovery and healthy sibling access; engineering fixture, not D5 live-fleet recovery.",
+      "logs": [
+        "local-native-restore-tests-attempt2.log"
+      ]
+    },
+    {
+      "check": "M1 distributed spine, both hosts",
+      "status": "pass",
+      "passed": 10,
+      "skipped": 0,
+      "perHost": true,
+      "detail": "Includes deployed worker execution through reference provider, tenant isolation, event/cost/audit attribution and drain rollback. Not real-model execution.",
+      "logs": [
+        "local-m1-spine-isolated.log",
+        "evidence/vps/m1-spine-tests-attempt2.log"
+      ]
+    },
+    {
+      "check": "Artifact store round-trip, truncated upload denial, stale upload orphan cleanup",
+      "status": "pass",
+      "passed": 3,
+      "skipped": 0,
+      "perHost": true,
+      "logs": [
+        "local-artifact-store-tests.log",
+        "evidence/vps/artifact-store-tests.log"
+      ]
+    },
+    {
+      "check": "Two private VPS control-plane replicas: leases, capacity/rate windows, failover and durable events",
+      "status": "pass",
+      "passed": 9,
+      "skipped": 0,
+      "detail": "Store and control-plane tests. Does not prove full authenticated browser WebSocket delivery or deployment across two failure domains.",
+      "logs": [
+        "evidence/vps/two-replica-tests.log"
+      ]
+    },
+    {
+      "check": "ARM64 control-plane/worker/adapter-manager image build and test-key admission",
+      "status": "pass",
+      "detail": "Development signing authority only; not production supply-chain acceptance."
+    },
+    {
+      "check": "Public HTTPS and authentication",
+      "status": "pass",
+      "detail": "HTTPS health 200; signed-out /api/companies 401; HTTP redirect 308; real user Google sign-in and dummy data persistence."
+    },
+    {
+      "check": "Native local Codex subscription sign-in, onboarding and persisted Commander response",
+      "status": "pass",
+      "detail": "Explicit test company model override required because the default was retired. This is a real model-backed native turn, not a distributed worker task.",
+      "logs": [
+        "evidence/local-subscription-model-override.json",
+        "evidence/local-subscription-followup.json"
+      ],
+      "screenshot": "evidence/local-subscription-commander.jpg"
+    },
+    {
+      "check": "VPS test control plane -> local worker job delegation and return result",
+      "status": "pass",
+      "detail": "Stopped-worker control remained pending with zero leases; the expected local worker then exclusively leased the job, completed a real pinned Node env probe on the local Docker host and returned a successful terminal and unique marker. Ordinary reference-provider task output/usage is scripted. Public UI submission, arbitrary native commands and personal subscription delegation are not tested.",
+      "logs": [
+        "evidence/vps/vps-issued-local-worker-job-cross-execution.json",
+        "evidence/cross-task-local-worker.log"
+      ]
+    },
+    {
+      "check": "Additional offline policy and static tooling checks",
+      "status": "pass after Git prerequisite correction",
+      "passed": 410,
+      "skipped": 0,
+      "detail": "410 unique cases and seven static commands; initial Git-owner prerequisite failure retained. Distinct from the earlier 205-case subset.",
+      "logs": [
+        "evidence/offline-policy/summary.json"
+      ]
+    },
+    {
+      "check": "POSIX image signing/admission pipeline with stubbed Docker",
+      "status": "pass",
+      "passed": 13,
+      "skipped": 0,
+      "detail": "Unchanged 11-file HEAD snapshot on Ubuntu ARM64 Node 24. No real Docker calls; active VPS allowlist unchanged.",
+      "logs": [
+        "evidence/offline-policy/posix-summary.json"
+      ]
+    },
+    {
+      "check": "Shipped-boot shape, decision scanning and cleanup evidence offline regressions",
+      "status": "pass",
+      "passed": 248,
+      "skipped": 0,
+      "detail": "Three unchanged suites, serial Node 24, owned temporary Git/process fixtures; no real Docker/provider/app calls.",
+      "logs": [
+        "evidence/offline-nested/summary.json"
+      ]
+    },
+    {
+      "check": "Actual built-image least-privilege contents and candidate revision labels",
+      "status": "pass",
+      "passed": 9,
+      "skipped": 0,
+      "detail": "Disposable shell inspectors of candidate ARM64 CP/worker/adapter-manager images. No app boot, host mounts or provider keys; image records unchanged.",
+      "logs": [
+        "evidence/image-contents/summary.json",
+        "evidence/image-contents/live-image-contents.log"
+      ]
+    },
+    {
+      "check": "M1 required fault cases and suppressed-injection control (one declared structural case remains pending)",
+      "status": "pass at required-case scope",
+      "passed": 26,
+      "skipped": 0,
+      "detail": "Private M1-D1-SPINE reference-provider fault profile and suppressed-injection control. Not full D1 operation floors, real E2B/LLM fault campaign or public UI execution.",
+      "logs": [
+        "evidence/fault-campaign-summary.json",
+        "evidence/vps/fault-profile-tests.log",
+        "evidence/vps/fault-suppressed-tests.log"
+      ]
+    },
+    {
+      "check": "Linux worker-slot exclusive ownership and restart identity",
+      "status": "pass",
+      "passed": 2,
+      "skipped": 0,
+      "logs": [
+        "evidence/vps/m4-slot-tests.log"
+      ]
+    },
+    {
+      "check": "Staging manifest actual Docker Compose rendering and invariant checks",
+      "status": "pass",
+      "passed": 6,
+      "skipped": 0,
+      "detail": "Rendering only, not running multi-host staging.",
+      "logs": [
+        "evidence/vps/staging-render-tests.log"
+      ]
+    },
+    {
+      "check": "Fresh private base D1 foundation fixture",
+      "status": "pass",
+      "passed": 34,
+      "skipped": 0,
+      "detail": "Includes 100 lease races, network/tenant/stale-fence denials, enrollment/restart, lease faults, telemetry and collected evidence. Initial project-selector/collector prerequisite failures retained.",
+      "logs": [
+        "evidence/vps/foundation-tests-attempt2.log",
+        "evidence/vps/foundation-tests.log"
+      ]
+    },
+    {
+      "check": "Actual CLI SQL/gzip backup and restore with rollback and ACL fallback refusal",
+      "status": "pass",
+      "passed": 1,
+      "skipped": 0,
+      "detail": "Composite 11-case fixture, host Node 22.22.1; not full schema or production RPO/RTO.",
+      "logs": [
+        "evidence/vps/m4-cli-restore-tests-attempt3.log"
+      ]
+    }
+  ],
+  "suiteResults": {
+    "fullNode26": {
+      "status": "fail",
+      "files": {
+        "failed": 36,
+        "passed": 2487,
+        "skipped": 227
+      },
+      "tests": {
+        "failed": 325,
+        "passed": 24012,
+        "skipped": 2062
+      },
+      "uncaughtErrors": 38,
+      "log": "local-full-tests.log",
+      "interpretation": "System Node 26 differs from the Node 24 test lane. Many failures involve unavailable localStorage."
+    },
+    "node24RepeatOfFailedFiles": {
+      "status": "mixed",
+      "files": {
+        "failed": 2,
+        "passed": 34
+      },
+      "tests": {
+        "failed": 2,
+        "passed": 479,
+        "skipped": 15
+      },
+      "log": "local-node24-all-failed-files.log",
+      "residuals": [
+        "playwright-core/package.json resolution fails in browser-runtime parity test",
+        "runtime log-sink observation failed in grouped run but passed alone with Node 24 also on PATH"
+      ],
+      "limitation": "Historical targeted repeat; superseded for full-lane status by fullNode24. Original failures remain retained."
+    },
+    "localM1UnderLoad": {
+      "status": "fail",
+      "passed": 9,
+      "total": 10,
+      "logs": [
+        "local-m1-spine-tests.log",
+        "local-m1-spine-tests-node24.log"
+      ],
+      "interpretation": "Enabled-tenant placement control returned required_target_unavailable during heavy competing suite load. Fixture uses a single liveness stamp and placement freshness is bounded to 120 seconds. Unchanged assertions passed in a fresh three-case comparison and then in the complete isolated run (10/10, ~34 seconds). Load-sensitive fixture/test reliability finding; exact cause is not proven."
+    },
+    "fullNode24": {
+      "capturedAt": "2026-10-15T15:48:15.551Z",
+      "exitCode": 1,
+      "files": {
+        "failed": 5,
+        "passed": 2518,
+        "skipped": 227,
+        "total": 2750,
+        "line": "Test Files  5 failed | 2518 passed | 227 skipped (2750)"
+      },
+      "tests": {
+        "failed": 4,
+        "passed": 24332,
+        "skipped": 2063,
+        "total": 26399,
+        "line": "Tests  4 failed | 24332 passed | 2063 skipped (26399)"
+      },
+      "uncaughtErrors": 1,
+      "duration": "Duration  1461.40s (transform 191.46s, setup 149.20s, collect 4009.71s, tests 1612.44s, environment 1292.96s, prepare 652.76s)",
+      "log": "local-full-tests-node24.log",
+      "failures": [
+        "FAIL  |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 real-createApp() composition — import-constraint (E0-F005)",
+        "FAIL  |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves",
+        "FAIL  |@armyofagents/db| src/__tests__/required-migration-identity.test.ts > required migration identity > uses literal Drizzle journal array order when idx, tag, and when values all disagree",
+        "FAIL  |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > maps one attempt-local typed static context from exact authority symbols with no laundering or injection",
+        "FAIL  |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > calls update with archived status when Archive is confirmed via dialog"
+      ]
+    },
+    "windowsOptInNode24": {
+      "capturedAt": "2026-10-15T16:33:49.768Z",
+      "exitCode": 1,
+      "wrapperExitCode": 1,
+      "nativeExitCode": null,
+      "completion": "All 123 per-file test reports observed; final global failure-detail/count reporting interrupted by Windows PowerShell NativeCommandError.",
+      "countsSource": "Derived by summing the 123 complete per-file Vitest reports; not a captured final global summary.",
+      "originalEncoding": "utf16le",
+      "originalLog": "local-windows-opt-in-node24.log",
+      "log": "local-windows-opt-in-node24-decoded.log",
+      "logStartedAt": "2026-10-15T15:48:29.849Z",
+      "logLastWriteAt": "2026-10-15T16:30:34.837Z",
+      "files": {
+        "passed": 121,
+        "failed": 2,
+        "skipped": 0,
+        "total": 123,
+        "line": "Test Files 121 passed / 2 failed / 0 skipped (123); derived"
+      },
+      "tests": {
+        "total": 1466,
+        "failed": 6,
+        "skipped": 2,
+        "passed": 1458,
+        "line": "Tests 1458 passed / 6 failed / 2 skipped (1466); derived"
+      },
+      "uncaughtErrors": null,
+      "duration": "Final Vitest duration unavailable; see log timestamps.",
+      "failures": [
+        "× distributed-execution non-owner startup gate > checks grant-option ACL tuples independently on every derived relation and non-dropped user column 300003ms",
+        "× distributed-execution non-owner startup gate > keeps aoa_operator outside the drizzle migration schema 553ms",
+        "× distributed-execution non-owner startup gate > proves the module-load sentinel reaches every guarded module while enabled 11646ms",
+        "× distributed-execution non-owner startup gate > observes the child's fallback port without accepting unrelated requested-port health 11272ms",
+        "× distributed-execution non-owner startup gate > threads the identical metrics instance through the real flag-on startup and app composition 13288ms",
+        "× JOB-001 transactional job submission > emits only stable identifier metadata when a submission transaction fails 1025ms"
+      ],
+      "interpretation": "Six failed assertions are observed, so this lane cannot pass. Unknown final uncaught-error count is not zero. Focused direct-Node reproductions provide final failure details separately; do not replace this whole-lane result with them."
+    },
+    "singleFileNode24": {
+      "node": "v24.19.0",
+      "executable": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+      "repo": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+      "cleared": [
+        "AOA_RUN_WIN_INTEGRATION",
+        "AOA_D1_LIVE",
+        "E2B_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "DATABASE_URL",
+        "AOA_HOME",
+        "AOA_CONFIG"
+      ],
+      "concurrency": 1,
+      "retry": "none",
+      "results": [
+        {
+          "file": "packages/browser-runtime/src/__tests__/image-playwright-parity.test.ts",
+          "command": [
+            "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+            "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+            "run",
+            "packages/browser-runtime/src/__tests__/image-playwright-parity.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--poolOptions.forks.maxForks=1",
+            "--poolOptions.forks.minForks=1",
+            "--reporter=verbose"
+          ],
+          "cwd": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+          "startedAt": "2026-10-15T16:07:32.704Z",
+          "endedAt": "2026-10-15T16:07:35.019Z",
+          "exitCode": 1,
+          "signal": null,
+          "error": null,
+          "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\triage-node24\\image-playwright-parity.test.log",
+          "fileSummary": "Test Files  1 failed (1)",
+          "testSummary": "Tests  1 failed | 3 passed (4)",
+          "errorsSummary": null,
+          "duration": "Duration  599ms (transform 40ms, setup 0ms, collect 54ms, tests 14ms, environment 0ms, prepare 163ms)"
+        },
+        {
+          "file": "packages/db/src/__tests__/required-migration-identity.test.ts",
+          "command": [
+            "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+            "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+            "run",
+            "packages/db/src/__tests__/required-migration-identity.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--poolOptions.forks.maxForks=1",
+            "--poolOptions.forks.minForks=1",
+            "--reporter=verbose"
+          ],
+          "cwd": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+          "startedAt": "2026-10-15T16:07:35.020Z",
+          "endedAt": "2026-10-15T16:07:41.685Z",
+          "exitCode": 0,
+          "signal": null,
+          "error": null,
+          "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\triage-node24\\required-migration-identity.test.log",
+          "fileSummary": "Test Files  1 passed (1)",
+          "testSummary": "Tests  3 passed (3)",
+          "errorsSummary": null,
+          "duration": "Duration  5.36s (transform 987ms, setup 0ms, collect 62ms, tests 4.74s, environment 0ms, prepare 140ms)"
+        },
+        {
+          "file": "server/src/__tests__/cloud-plugin-process-composition.test.ts",
+          "command": [
+            "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+            "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+            "run",
+            "server/src/__tests__/cloud-plugin-process-composition.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--poolOptions.forks.maxForks=1",
+            "--poolOptions.forks.minForks=1",
+            "--reporter=verbose"
+          ],
+          "cwd": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+          "startedAt": "2026-10-15T16:07:41.686Z",
+          "endedAt": "2026-10-15T16:08:16.347Z",
+          "exitCode": 1,
+          "signal": null,
+          "error": null,
+          "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\triage-node24\\cloud-plugin-process-composition.test.log",
+          "fileSummary": "Test Files  1 failed (1)",
+          "testSummary": "Tests  6 passed | 1 skipped (7)",
+          "errorsSummary": null,
+          "duration": "Duration  33.16s (transform 9.16s, setup 0ms, collect 2.45s, tests 30.11s, environment 0ms, prepare 183ms)"
+        },
+        {
+          "file": "server/src/__tests__/job-leasing-contract.test.ts",
+          "command": [
+            "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+            "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+            "run",
+            "server/src/__tests__/job-leasing-contract.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--poolOptions.forks.maxForks=1",
+            "--poolOptions.forks.minForks=1",
+            "--reporter=verbose"
+          ],
+          "cwd": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+          "startedAt": "2026-10-15T16:08:16.348Z",
+          "endedAt": "2026-10-15T16:10:11.057Z",
+          "exitCode": 0,
+          "signal": null,
+          "error": null,
+          "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\triage-node24\\job-leasing-contract.test.log",
+          "fileSummary": "Test Files  1 passed (1)",
+          "testSummary": "Tests  20 passed (20)",
+          "errorsSummary": null,
+          "duration": "Duration  113.03s (transform 2.57s, setup 0ms, collect 7.39s, tests 104.82s, environment 0ms, prepare 209ms)"
+        },
+        {
+          "file": "ui/src/__tests__/ProjectDetailWorkspaces.test.tsx",
+          "command": [
+            "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+            "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+            "run",
+            "ui/src/__tests__/ProjectDetailWorkspaces.test.tsx",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--poolOptions.forks.maxForks=1",
+            "--poolOptions.forks.minForks=1",
+            "--reporter=verbose"
+          ],
+          "cwd": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+          "startedAt": "2026-10-15T16:10:11.058Z",
+          "endedAt": "2026-10-15T16:10:21.537Z",
+          "exitCode": 0,
+          "signal": null,
+          "error": null,
+          "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\triage-node24\\ProjectDetailWorkspaces.test.log",
+          "fileSummary": "Test Files  1 passed (1)",
+          "testSummary": "Tests  16 passed (16)",
+          "errorsSummary": null,
+          "duration": "Duration  9.14s (transform 1.12s, setup 213ms, collect 4.29s, tests 2.70s, environment 1.32s, prepare 200ms)"
+        },
+        {
+          "file": "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+          "command": [
+            "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+            "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+            "run",
+            "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--poolOptions.forks.maxForks=1",
+            "--poolOptions.forks.minForks=1",
+            "--reporter=verbose"
+          ],
+          "cwd": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+          "startedAt": "2026-10-15T16:10:21.538Z",
+          "endedAt": "2026-10-15T16:10:30.076Z",
+          "exitCode": 1,
+          "signal": null,
+          "error": null,
+          "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\triage-node24\\server-artifact-export.test.log",
+          "fileSummary": "Test Files  1 failed (1)",
+          "testSummary": "Tests  1 failed | 33 passed (34)",
+          "errorsSummary": null,
+          "duration": "Duration  7.24s (transform 1.07s, setup 0ms, collect 3.40s, tests 3.27s, environment 0ms, prepare 128ms)"
+        }
+      ]
+    },
+    "windowsFocused": [
+      {
+        "startedAt": "2026-10-15T16:32:54.331Z",
+        "finishedAt": "2026-10-15T16:33:34.814Z",
+        "runtime": "v24.19.0",
+        "command": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+          "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+          "run",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--no-file-parallelism",
+          "server/src/__tests__/job-submission.integration.test.ts"
+        ],
+        "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing",
+        "exitCode": 0,
+        "signal": null,
+        "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\windows-triage\\submission-metadata.log",
+        "fileSummary": "Test Files  1 passed (1)",
+        "testSummary": "Tests  42 passed (42)",
+        "errorsSummary": null,
+        "evidenceFile": "evidence/windows-triage/submission-metadata.json"
+      },
+      {
+        "startedAt": "2026-10-15T16:33:34.354Z",
+        "finishedAt": "2026-10-15T16:39:22.347Z",
+        "runtime": "v24.19.0",
+        "command": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+          "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+          "run",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--no-file-parallelism",
+          "server/src/__tests__/distributed-execution-db-startup.integration.test.ts",
+          "-t",
+          "checks grant-option ACL tuples independently|keeps aoa_operator outside|proves the module-load sentinel|observes the.*fallback port|threads the identical metrics instance"
+        ],
+        "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing",
+        "exitCode": 1,
+        "signal": null,
+        "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\windows-triage\\startup-failures.log",
+        "fileSummary": "Test Files  1 failed (1)",
+        "testSummary": "Tests  5 failed | 72 skipped (77)",
+        "errorsSummary": null,
+        "evidenceFile": "evidence/windows-triage/startup-failures.json"
+      }
+    ]
+  },
+  "e2b": {
+    "lifecycle": {
+      "run": "aoa-validation-20ccb3f9-3c7c-4d3d-8418-fc4a2ebd149f",
+      "elapsedMs": 10817,
+      "results": [
+        {
+          "name": "real sandbox creation with 60-second TTL",
+          "status": "pass"
+        },
+        {
+          "name": "staged file, real command mutation, readback, stdout and stderr",
+          "status": "pass"
+        },
+        {
+          "name": "provider key absent from sandbox environment",
+          "status": "pass"
+        },
+        {
+          "name": "positive command timeout",
+          "status": "pass"
+        },
+        {
+          "name": "termination, provider not-found, repeat cleanup",
+          "status": "pass"
+        },
+        {
+          "name": "short TTL expires on real provider",
+          "status": "pass"
+        }
+      ],
+      "cleanup": {
+        "inventoryComplete": true,
+        "matchingResources": 0,
+        "unconfirmedOwnedResources": 0
+      },
+      "scope": "Candidate transport smoke; excludes model execution and full distributed dispatch"
+    },
+    "capabilities": {
+      "run": "aoa-capability-143be12d-cddf-4d85-a72a-02bc5452fe55",
+      "elapsedMs": 6796,
+      "checks": [
+        {
+          "name": "oversize file read refuses at byte cap on real SDK stream",
+          "status": "pass"
+        },
+        {
+          "name": "background process acknowledgement and running observation",
+          "status": "pass"
+        },
+        {
+          "name": "graceful cancel reports unsupported and still-running honestly",
+          "status": "pass"
+        },
+        {
+          "name": "forced kill followed by observed process absence",
+          "status": "pass"
+        },
+        {
+          "name": "invalid handle produces unknown rather than false stopped status",
+          "status": "pass"
+        }
+      ],
+      "cleanup": {
+        "cleanupConfirmed": true,
+        "inventoryComplete": true,
+        "matchingResources": 0
+      },
+      "knownLimitation": "Pinned transport cannot send a graceful per-process cancel or observe a process exit code through list(); forced kill is separate."
+    },
+    "sandboxCount": 3,
+    "modelCalls": 0,
+    "scope": "base template and candidate shipped transport in provider-only image. Not full distributed real-E2B dispatch or an AoA agent CLI template. Final dollar charge was not queried."
+  },
+  "crossHost": {
+    "status": "pass within scope",
+    "directions": [
+      "local worker -> VPS D1 authority",
+      "VPS worker -> local Docker D1 authority"
+    ],
+    "assertions": [
+      "fresh signed heartbeat",
+      "private tunnel interruption causes stale heartbeat and retry",
+      "same worker identity and fresh heartbeat after reconnect",
+      "same identity and renewed heartbeat after container restart"
+    ],
+    "scope": "The original bidirectional phase proved heartbeat/polling/reconnect only. A later separate VPS-issued pre-placed fixture job ran through a local worker and reference provider; see crossHostJobExecution. Neither phase establishes public UI -> local personal Codex execution.",
+    "security": "Loopback SSH forward/reverse forward. Test-only ingress bridge and host allowlist overlay were added, so this is not the original hermetic D1 network topology.",
+    "finalState": "Probe containers and extra replica stopped, tunnel closed, named identity volumes retained. Both apps and normal D1 stacks remain running.",
+    "evidence": [
+      "evidence/cross-vps-to-local-active.json",
+      "evidence/cross-vps-to-local-partition.json",
+      "evidence/cross-vps-to-local-recovered.json",
+      "evidence/cross-vps-to-local-restarted.json",
+      "evidence/vps/cross-local-to-vps-active.json",
+      "evidence/vps/cross-local-to-vps-partition.json",
+      "evidence/vps/cross-local-to-vps-recovered.json",
+      "evidence/vps/cross-local-to-vps-restarted.json"
+    ]
+  },
+  "performance": {
+    "windowsClient": {
+      "capturedAt": "2026-10-15T11:00:09.257Z",
+      "results": [
+        {
+          "endpoint": "http://127.0.0.1:3210/api/health",
+          "requests": 100,
+          "concurrency": 4,
+          "errors": [],
+          "durationMs": 74.26870000000001,
+          "p50Ms": 2.825000000000017,
+          "p95Ms": 4.705999999999989,
+          "maxMs": 5.550600000000003,
+          "scope": "Health endpoint from Windows client; includes network latency; not workload capacity or D5 acceptance"
+        },
+        {
+          "endpoint": "https://testing.armyofagents.org/api/health",
+          "requests": 100,
+          "concurrency": 4,
+          "errors": [],
+          "durationMs": 4379.1283,
+          "p50Ms": 171.4349000000002,
+          "p95Ms": 201.86749999999938,
+          "maxMs": 234.27689999999984,
+          "scope": "Health endpoint from Windows client; includes network latency; not workload capacity or D5 acceptance"
+        }
+      ]
+    },
+    "helsinkiHost": {
+      "capturedAt": "2026-10-15T11:06:15.455Z",
+      "results": [
+        {
+          "endpoint": "http://127.0.0.1:3210/api/health",
+          "client": "Helsinki-VPS-host",
+          "requests": 100,
+          "concurrency": 4,
+          "errors": [],
+          "durationMs": 261.246612,
+          "p50Ms": 8.714511000000016,
+          "p95Ms": 22.674759999999992,
+          "maxMs": 27.136177000000032,
+          "scope": "Health endpoint only; includes client network latency; not workload capacity or D5 acceptance"
+        },
+        {
+          "endpoint": "https://testing.armyofagents.org/api/health",
+          "client": "Helsinki-VPS-host",
+          "requests": 100,
+          "concurrency": 4,
+          "errors": [],
+          "durationMs": 486.9683359999999,
+          "p50Ms": 5.8371810000001005,
+          "p95Ms": 13.476207999999815,
+          "maxMs": 482.25275899999997,
+          "scope": "Health endpoint only; includes client network latency; not workload capacity or D5 acceptance"
+        }
+      ]
+    },
+    "acceptance": "Health smoke only (100 requests per endpoint, concurrency 4). No job throughput, sustained load, saturation, D5 SLO, or two-failure-domain claim."
+  },
+  "findings": [
+    {
+      "id": "TST-001",
+      "priority": "P1",
+      "status": "full supported-runtime lane executed; failures remain",
+      "title": "Full supported-runtime test result is available",
+      "action": "Triage the retained full Node 24 failures and rerun the affected assertions, then the full required lane. Keep skipped/live cases explicit."
+    },
+    {
+      "id": "TST-002",
+      "priority": "P2",
+      "status": "reproduced",
+      "title": "Playwright parity test cannot resolve a transitive dependency",
+      "evidence": "packages/browser-runtime declares playwright but the test directly requires playwright-core/package.json; strict pnpm install reproduces module-not-found on Node 24 and 26.",
+      "action": "Review dependency declaration/module resolution without masking the image/version parity assertion."
+    },
+    {
+      "id": "TST-003",
+      "priority": "P2",
+      "status": "load-sensitive",
+      "title": "Local M1 placement control and runtime log-sink tests are sensitive to test load",
+      "action": "Investigate fixture heartbeat freshness and asynchronous process observation. Isolated reruns pass; do not silently discard the original failures."
+    },
+    {
+      "id": "TST-004",
+      "priority": "P1",
+      "status": "passed with company configuration workaround",
+      "title": "Local subscription authentication and native Commander response validated",
+      "evidence": "App recognized auth.json, verify returned 200/verified, and user_message run completed with model gpt-5.6-luna. AOA_SUBSCRIPTION_OK persisted after reload.",
+      "action": "Retain this test company model override until TST-008 is resolved. No OpenAI API key was needed."
+    },
+    {
+      "id": "TST-005",
+      "priority": "P1",
+      "status": "capability gap / unvalidated",
+      "title": "Public cloud personal-subscription/device execution is not implemented or accepted",
+      "evidence": "Cloud onboarding explicitly defers local CLI Commander; source documents company-key distributed paths separately from the unfinished full device credential broker.",
+      "action": "Implement and validate the supported device-local credential broker path for the PC owner subscription, or separately validate a company-key distributed cohort. Native local Commander success does not establish this cloud-to-personal-device workflow."
+    },
+    {
+      "id": "TST-006",
+      "priority": "P2",
+      "status": "confirmed capability limit",
+      "title": "E2B transport does not support graceful per-process cancellation or exit-code observation through process listing",
+      "action": "Record an explicit capability disposition for workloads that require graceful cancellation/exit codes; forced kill was tested successfully."
+    },
+    {
+      "id": "TST-007",
+      "priority": "P1",
+      "status": "not executed",
+      "title": "Release operational acceptance is incomplete",
+      "action": "Complete the prescribed sustained capacity/churn campaign, failure-domain and recovery timing checks, upgrade/rollback on deployment topology, real provider fault/rotation rehearsals, and release acceptance owner sign-off. A single VPS with local_disk storage is not that topology."
+    },
+    {
+      "id": "TST-008",
+      "priority": "P1",
+      "status": "reproduced; test company workaround applied",
+      "title": "Hardcoded gpt-5.5 default breaks Codex subscription onboarding",
+      "evidence": "After successful login the hello probe returned HTTP 400: gpt-5.5 is not supported with ChatGPT authentication. Official retirement took effect 15 October 2026 at 00:30 IST. Setting test company model to gpt-5.6-luna from the pinned CLI model catalog made the identical probe pass.",
+      "action": "Update default/model-availability handling and review CLI compatibility pins. Validate onboarding, Commander, crew and saved managed configurations against models actually available to that account/client. Product code was not changed.",
+      "source": "https://learn.chatgpt.com/docs/models"
+    },
+    {
+      "id": "TST-009",
+      "priority": "P2",
+      "status": "observed; cause not established",
+      "title": "Native background crew path still needs validation",
+      "evidence": "A sweep.steward background run failed after the successful Commander turn. Local setup logs also warn that the agent JWT signing secret is absent; this warning alone does not prove the failure cause.",
+      "action": "Provision persistent local agent JWT signing configuration and validate crew authentication, available model resolution and actual tool calls before accepting the background crew path."
+    },
+    {
+      "id": "TST-011",
+      "priority": "P2",
+      "status": "composition import-hook timeout reproduced separately; migration, job-contract and UI files passed separately",
+      "title": "Supported-runtime suite has hook, test-timeout and UI-state failures",
+      "evidence": "cloud-plugin-process-composition beforeAll timed out at 30s; required-migration-identity test at 5s; job-leasing-contract static-context assertion at 30s; ProjectDetailWorkspaces Archive action saw a loading skeleton after earlier readiness waits. Full run: five failed files, four failed tests. Root causes are not established by timeout messages alone.",
+      "action": "Investigate each unchanged assertion and repeat in isolation; preserve full-run failures and establish required stability before accepting the lane."
+    },
+    {
+      "id": "TST-012",
+      "priority": "P2",
+      "status": "observed in complete Node 24 lane",
+      "title": "Artifact-export queued-deadline test emits an unhandled rejection",
+      "evidence": "Vitest recorded one unhandled WireProtocolError in adapter-manager server-artifact-export queued request deadline case. The suite assertion counts alone do not capture this error. Source starts both promises then attaches rejection checks sequentially; scheduling is a hypothesis requiring controlled reproduction.",
+      "action": "Reproduce and distinguish promise-observation timing from product deadline/error handling. Keep unhandled errors at zero in the accepted lane."
+    },
+    {
+      "id": "TST-014",
+      "priority": "P2",
+      "status": "five selected failures reproduced together; native final details captured",
+      "title": "Opt-in startup and serving-role validation has failures",
+      "evidence": "Broad lane reported five startup-file failures. Focused unchanged repeat: native exit1, five failed and72 filtered skips,346.78s. ACL sweep again exceeded300s. Operator-schema case expected operator_authority but received app_authority; all three child tests exited at app-authority before their sentinel/port/metrics assertions. The shared ACL mutation loop does not observe test abort and may continue after Vitest times out the outer promise; fixture cascade is strongly supported structurally, but an independent isolation experiment was not run.",
+      "action": "Reproduce the expensive ACL case and verify teardown/state restoration before classifying later failures. Then isolate the operator and native child-server assertions on supported Windows and authoritative Linux CI. Preserve this lane and its skips; no baseline waiver is established."
+    },
+    {
+      "id": "TST-015",
+      "priority": "P2",
+      "status": "observed in broad lane; complete 42-test single-file repeat passed",
+      "title": "Submission-error metadata test captured an empty log delta",
+      "evidence": "JOB-001 metadata test failed at its first assertion: empty captured output did not contain job_submission_internal_error. The later sentinel/SQL/stack absence assertions were not reached; this is not demonstrated secret leakage. Separate direct-Node full-file run passed42/42 and the target passed664ms. Fixed-delay flush/read and swallowed read errors are possible contributors; cause unproven.",
+      "action": "Investigate the log-capture sink/read/flush timing and preserve both attempts. Require reliable positive logging evidence before accepting the negative redaction assertions."
+    },
+    {
+      "id": "TST-016",
+      "priority": "P2",
+      "status": "capture wrapper corrected; original whole-lane final summary unavailable",
+      "title": "Windows PowerShell interrupted final Vitest error reporting",
+      "evidence": "All123 per-file reports are present (1458passed/6failed/2skipped), but PowerShell5 ErrorActionPreference=Stop raised NativeCommandError when Vitest wrote final stderr. Original UTF16LE log retained and decoded copy supplied. Counts are derived from file reports; native final exit/uncaught-error count were not captured. A direct Node child-output wrapper now captures both streams without that conversion.",
+      "action": "Use the corrected capture wrapper for future complete-lane acceptance. Focused reproductions retain full native summaries; no repeat of the entire known-failing broad lane is necessary until fixes or a new acceptance candidate justify it."
+    },
+    {
+      "id": "TST-013",
+      "priority": "P2",
+      "status": "newly observed in separate single-file Node 24 execution",
+      "title": "Artifact-export stalled-upload assertion returns a different error class",
+      "evidence": "server-artifact-export.test.ts:487 expected WireProtocolError but received ResourceNotAvailableError. This file passed 33 tests and failed one. Export and destroy start concurrently; request ordering is plausible but not demonstrated. The separate queued-deadline case passed and emitted no unhandled error in this run.",
+      "action": "Investigate ownership/destroy/export ordering and the intended error contract. Keep this result separate from TST-012 and preserve both full-run and single-file failures."
+    },
+    {
+      "id": "TST-010",
+      "priority": "P1",
+      "status": "existing branch finding; not remeasured by this session",
+      "title": "Full fleet fairness and capacity acceptance remains open",
+      "evidence": "M4 execution ledger retains ten-loop queue-delay failures and real-daemon noisy-work drain-deadline failures after the readiness optimization. Later quiet-tenant ratios improved at bounded scale; full D5 remains unproven.",
+      "action": "Investigate remaining capacity/queue behavior using actual daemon/provider execution and retain fixed arrival ratios, deadlines and original failures. Run the full D5 topology/load campaign before promotion."
+    }
+  ],
+  "protectedCredentials": "Google and E2B environment files are mode 600 on the VPS. No credential values belong in this report or product source.",
+  "screenshots": [
+    "evidence/vps-dummy-task.jpg",
+    "evidence/local-subscription-setup.jpg",
+    "evidence/local-subscription-commander.jpg"
+  ],
+  "subscriptionFollowup": {
+    "capturedAt": "2026-10-15T15:06:31.4188799Z",
+    "subscriptionSignIn": "recognized",
+    "onboarding": "completed",
+    "helloProbe": "passed",
+    "modelOverride": "gpt-5.6-luna",
+    "commanderRun": {
+      "id": "83a369cc-6e56-49ee-93b5-531156aedcd7",
+      "status": "completed",
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "triggerSource": "user_message",
+      "createdAt": "2026-10-15T14:50:56.773Z"
+    },
+    "expectedReply": "AOA_SUBSCRIPTION_OK",
+    "replyObservedAfterReload": true,
+    "credentialMode": "ChatGPT subscription; no API key configured",
+    "defaultModelFinding": {
+      "model": "gpt-5.5",
+      "probeStatus": 400,
+      "message": "The 'gpt-5.5' model is not supported when using Codex with a ChatGPT account.",
+      "officialSource": "https://learn.chatgpt.com/docs/models",
+      "retirementDate": "2026-10-14",
+      "retirementAtIST": "2026-10-15T00:30:00+05:30"
+    },
+    "scope": "Native local Commander response only; not distributed personal subscription execution",
+    "screenshot": "evidence/local-subscription-commander.jpg"
+  },
+  "crossHostJobExecution": {
+    "createdAt": "2026-10-15T15:04:23.688Z",
+    "direction": "VPS-issued job -> local Docker worker and local reference provider",
+    "tenant": {
+      "key": "CrossHost",
+      "organizationId": "9cfa8c26-6e47-4997-8991-42ee02c22e43",
+      "companyId": "28e41573-d492-4129-aa5b-8da09f6e3c49",
+      "agentId": "9d7ada73-5bf1-4deb-842b-acc9b41e3862",
+      "issuePrefix": "XHOST"
+    },
+    "ids": {
+      "jobId": "f6933ee3-d0b8-498f-817b-c35c6737266a",
+      "attemptId": "2f06c54d-a076-406c-999a-0beafb6c79be",
+      "issueId": "cfc810b7-61f5-4ad5-a78f-1cce812d9da8",
+      "runId": "99965429-e66c-4957-81f5-1046a2f723ee",
+      "handleId": "34734b7b-66fa-4a9a-b201-1ad1afa0c724"
+    },
+    "nonce": "cross_34128010fea04f15a96347704018daa7",
+    "targetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+    "expectedWorkerId": "871a3bca-323e-4b90-a14d-9841cf39ee73",
+    "baseline": {
+      "ok": true,
+      "attemptStatus": "pending",
+      "attemptTargetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+      "events": [],
+      "leaseWorkerIds": [],
+      "logMessages": [],
+      "terminal": []
+    },
+    "scope": "Pre-placed fixture job in isolated VPS D1 control plane, not the public Google-authenticated app. Ordinary task output/usage are scripted reference-provider output; env probe runs a real pinned Node child on the local Docker host. No personal Codex credential delegation.",
+    "observedAt": "2026-10-15T15:04:27.754Z",
+    "observation": {
+      "ok": true,
+      "attemptStatus": "succeeded",
+      "attemptTargetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+      "events": [
+        {
+          "eventType": "attempt_started",
+          "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+        },
+        {
+          "eventType": "log",
+          "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+        },
+        {
+          "eventType": "log",
+          "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+        },
+        {
+          "eventType": "usage",
+          "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+        },
+        {
+          "eventType": "terminal",
+          "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+        }
+      ],
+      "leaseWorkerIds": [
+        "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      ],
+      "logMessages": [
+        "dep017.env_probe {\"probe\":\"dep017-env-absence/v1\",\"verdict\":\"absent\",\"clean\":{\"probe\":\"dep017-env-absence/v1\",\"checked\":[\"datastore_credential\",\"secrets_master_key\",\"auth_signing_secret\",\"source_control_token\",\"subscription_login\",\"provider_control_key\",\"object_store_credential\",\"worker_enrollment\",\"oauth_client_secret\",\"connector_token\",\"embeddings_key\",\"legacy_agent_key\",\"host_control_plane_env\",\"model_provider_key_not_allowed\",\"unclassified_credential_shaped\",\"cross_tenant_credential\",\"provider_credential_value_mismatch\",\"unredeemed_provider_credential\"],\"present\":[],\"presentNames\":[],\"allowedPresent\":[\"ANTHROPIC_API_KEY\"],\"allowedMismatch\":[],\"envCount\":1,\"unnamedEnvCount\":0,\"unreportedPresentCount\":0,\"metadata\":{\"attempted\":true,\"target\":\"169.254.169.254\",\"reachable\":false,\"errorCode\":\"ECONNREFUSED\"},\"redeemedNames\":[\"ANTHROPIC_API_KEY\"]},\"plantedControl\":{\"planted\":[{\"name\":\"DATABASE_URL\",\"expectClass\":\"datastore_credential\",\"satisfied\":true},{\"name\":\"OPENAI_API_KEY\",\"expectClass\":\"cross_tenant_credential\",\"satisfied\":true},{\"name\":\"ANTHROPIC_API_KEY\",\"expectClass\":\"provider_credential_value_mismatch\",\"satisfied\":true}],\"detected\":[\"cross_tenant_credential\",\"datastore_credential\",\"provider_credential_value_mismatch\"],\"red\":true}}",
+        "AOA-RUN-OUTPUT-PROBE arm=cross_34128010fea04f15a96347704018daa7 control=cross_34128010fea04f15a96347704018daa7"
+      ],
+      "terminal": [
+        {
+          "status": "succeeded",
+          "exitCode": 0,
+          "errorCode": null,
+          "errorMessage": null
+        }
+      ]
+    },
+    "failures": [],
+    "probeFailures": [],
+    "nonceSeen": true,
+    "passed": true,
+    "evidenceFile": "evidence/vps/vps-issued-local-worker-job-cross-execution.json",
+    "fixtureNotes": [
+      "The original heartbeat fixture could not restart after its 10-minute test enrollment route expired. This failure is retained; a new target and identity were created instead of altering old authority.",
+      "First fresh job succeeded and the real local env probe passed; the optional result-marker probe flag was absent, so its added nonce assertion failed. That evidence is retained.",
+      "Final run enabled the existing AOA_WORKER_RUN_OUTPUT_PROBE=1 test surface and passed the unique-marker assertion as well. No product assertions were removed.",
+      "Artifact export logged producer_failed in the reference-provider run. Cross-host artifact export is not accepted by this check."
+    ]
+  },
+  "offlinePolicy": {
+    "repo": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+    "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "runtime": "v24.19.0",
+    "startedAt": "2026-10-15T16:08:56.464Z",
+    "environment": "Allowlisted OS environment only; all provider keys, DB URLs, AOA runtime variables and opt-in flags excluded; isolated Node path first.",
+    "safetyReview": "Selected source uses read-only committed artifact analysis, in-memory mutation fixtures, mkdtemp fixtures, injected provider fetchFn, and stubbed shell Docker function; no live Docker/provider/DB execution.",
+    "authority": [
+      ".github/workflows/pr.yml policy",
+      ".github/workflows/d1-merge-train.yml static preflight"
+    ],
+    "limitations": "Supplemental offline/keyless checks only; no formal gate closure, live compose, paid provider, or real image contents exercised.",
+    "excluded": [
+      {
+        "path": "docker/images/__tests__/image-pipeline.test.mjs",
+        "status": "unrun",
+        "reason": "Behavioral half requires bash/openssl/base64 and POSIX shim execution; omitted on Windows rather than forcing environment adaptation."
+      },
+      {
+        "path": "scripts/check-m1-shipped-boot-shape.test.mjs",
+        "status": "unrun",
+        "reason": "Contains additional nested shell and disposable git-history executions; bounded lane selected pure/static staging invariants instead."
+      },
+      {
+        "path": "scripts/lib/__tests__/m1-shipped-boot.test.mjs",
+        "status": "unrun",
+        "reason": "Large nested journey subprocess corpus omitted from bounded lane; not needed to execute selected provider/compose decision suites."
+      },
+      {
+        "path": "scripts/lib/__tests__/m1-cleanup-evidence.test.mjs",
+        "status": "unrun",
+        "reason": "Nested cleanup/journey subprocess monkeypatch corpus omitted from bounded lane; pure provider cleanup observer suite selected."
+      },
+      {
+        "path": "tests/d1/* live campaigns; docker/images/__tests__/image-contents.test.mjs",
+        "status": "unrun",
+        "reason": "Require live Docker/images/stack; outside this delegated offline lane."
+      }
+    ],
+    "results": [
+      {
+        "id": "fault-matrix",
+        "kind": "test",
+        "file": "scripts/check-campaign-fault-matrix.test.mjs",
+        "scope": "DEP-018 campaign declaration and synthetic evidence verdicts",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/check-campaign-fault-matrix.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:08:56.466Z",
+        "durationMs": 1733,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 57,
+          "suites": 0,
+          "pass": 57,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "d1-compose",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/d1-compose-invariants.test.mjs",
+        "scope": "DEP-002 topology isolation; includes check-d1-compose and ctl-allowlist cases",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/d1-compose-invariants.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:08:58.204Z",
+        "durationMs": 360,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 62,
+          "suites": 0,
+          "pass": 62,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "image-deps",
+        "kind": "test",
+        "file": "scripts/check-image-deps-stages.test.mjs",
+        "scope": "DEP-001 static split-image dependency closure",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/check-image-deps-stages.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:08:58.565Z",
+        "durationMs": 1241,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 34,
+          "suites": 0,
+          "pass": 34,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "dockerfile-static",
+        "kind": "test",
+        "file": "docker/images/__tests__/dockerfile-static.test.mjs",
+        "scope": "DEP-001 static split-image Dockerfiles and tracked COPY inputs",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "docker/images/__tests__/dockerfile-static.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:08:59.807Z",
+        "durationMs": 383,
+        "exitCode": 1,
+        "signal": null,
+        "error": null,
+        "status": "failed",
+        "counts": {
+          "tests": 28,
+          "suites": 0,
+          "pass": 27,
+          "fail": 1,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "staging-compose",
+        "kind": "test",
+        "file": "scripts/check-staging-manifest.test.mjs",
+        "scope": "DEP-006 staging composition and DEP-015 shipped overlay invariants",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/check-staging-manifest.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:00.191Z",
+        "durationMs": 355,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 66,
+          "suites": 0,
+          "pass": 66,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "desktop-staging-manifest",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/staging-manifest.test.mjs",
+        "scope": "DSK-003 synthetic installer staging manifest",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/staging-manifest.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:00.548Z",
+        "durationMs": 226,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 22,
+          "suites": 4,
+          "pass": 22,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "provider-cleanup",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/m1-provider-cleanup.test.mjs",
+        "scope": "M1 provider cleanup observer decisions using injected mock transport",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/m1-provider-cleanup.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:00.774Z",
+        "durationMs": 604,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 107,
+          "suites": 0,
+          "pass": 107,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "provider-identity",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/m1-provider-identity.test.mjs",
+        "scope": "M1 provider template/build identity decisions using injected mock transport",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/m1-provider-identity.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:01.379Z",
+        "durationMs": 246,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 7,
+          "suites": 0,
+          "pass": 7,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "dispatch-declared",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/d1-dispatch-declared.test.mjs",
+        "scope": "WRK-008 slice 2b dispatch composition declaration",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/d1-dispatch-declared.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:01.626Z",
+        "durationMs": 218,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 5,
+          "suites": 0,
+          "pass": 5,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "boot-provider-free",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/boot-roots-provider-free.test.mjs",
+        "scope": "WRK-008 slice 2b provider-free boot roots",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/boot-roots-provider-free.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:01.845Z",
+        "durationMs": 203,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 5,
+          "suites": 0,
+          "pass": 5,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "boot-browser-spawn-free",
+        "kind": "test",
+        "file": "scripts/lib/__tests__/boot-roots-browser-spawn-free.test.mjs",
+        "scope": "BRW-hostspawn-gate static discovery and synthetic spawn declarations",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "scripts/lib/__tests__/boot-roots-browser-spawn-free.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.049Z",
+        "durationMs": 315,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {
+          "tests": 17,
+          "suites": 0,
+          "pass": 17,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "id": "fault-matrix-real",
+        "kind": "static",
+        "file": "scripts/check-campaign-fault-matrix.mjs",
+        "scope": "DEP-018 committed fault declaration",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-campaign-fault-matrix.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.365Z",
+        "durationMs": 99,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      },
+      {
+        "id": "d1-compose-real",
+        "kind": "static",
+        "file": "scripts/check-d1-compose.mjs",
+        "scope": "DEP-002 committed static topology",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-d1-compose.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.464Z",
+        "durationMs": 90,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      },
+      {
+        "id": "image-deps-real",
+        "kind": "static",
+        "file": "scripts/check-image-deps-stages.mjs",
+        "scope": "DEP-001 committed dependency closure",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-image-deps-stages.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.555Z",
+        "durationMs": 134,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      },
+      {
+        "id": "staging-compose-real",
+        "kind": "static",
+        "file": "scripts/check-staging-manifest.mjs",
+        "scope": "DEP-006 / DEP-015 committed staging composition",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-staging-manifest.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.691Z",
+        "durationMs": 94,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      },
+      {
+        "id": "dispatch-declared-real",
+        "kind": "static",
+        "file": "scripts/check-d1-dispatch-declared.mjs",
+        "scope": "WRK-008 committed dispatch declaration",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-d1-dispatch-declared.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.787Z",
+        "durationMs": 88,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      },
+      {
+        "id": "boot-provider-free-real",
+        "kind": "static",
+        "file": "scripts/check-boot-roots-provider-free.mjs",
+        "scope": "WRK-008 committed boot roots",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-boot-roots-provider-free.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.876Z",
+        "durationMs": 91,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      },
+      {
+        "id": "boot-browser-spawn-free-real",
+        "kind": "static",
+        "file": "scripts/check-boot-roots-browser-spawn-free.mjs",
+        "scope": "BRW-hostspawn-gate committed spawn inventory",
+        "command": [
+          "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+          "scripts/check-boot-roots-browser-spawn-free.mjs"
+        ],
+        "startedAt": "2026-10-15T16:09:02.968Z",
+        "durationMs": 352,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "status": "passed",
+        "counts": {}
+      }
+    ],
+    "trackedStatusUnchanged": null,
+    "finishedAt": "2026-10-15T16:10:49.903Z",
+    "totals": {
+      "commands": 18,
+      "passed": 17,
+      "failed": 1,
+      "tests": 410,
+      "pass": 409,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "finalTrackedStatusClean": true,
+    "metadataCorrection": "Initial before/after probes lacked Git safe-directory configuration and their empty stdout was not valid evidence. Final SHA/status verified read-only with command-scoped safe.directory; checkout tracked status is clean. The first failed test result and logs are retained. Following explicit parent authorization and successful plain Git verification as the checkout owner, only the unchanged dockerfile-static suite was purposefully rerun in owner context and passed.",
+    "failureDetails": [
+      {
+        "id": "dockerfile-static",
+        "case": "every local path the split Dockerfiles COPY is present and NOT gitignored (WRK-017)",
+        "location": "docker/images/__tests__/dockerfile-static.test.mjs:328",
+        "observed": "Git precondition expected stdout 'true' but received ''.",
+        "diagnosis": "Sanitized subprocess environment omitted inherited Git safe-directory configuration; git exit 128 reported dubious ownership (Dell checkout owner, CodexSandboxOffline process user). This is an environment precondition failure, not evidence that COPY inputs are missing.",
+        "action": "First failed log retained. After explicit parent authorization and successful owner-context plain Git check, ONLY unchanged dockerfile-static suite rerun with require_escalated; no global Git config or source change."
+      }
+    ],
+    "setupCorrectionRerun": {
+      "id": "dockerfile-static-owner",
+      "file": "docker/images/__tests__/dockerfile-static.test.mjs",
+      "command": [
+        "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "docker/images/__tests__/dockerfile-static.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:10:47.703Z",
+      "durationMs": 2198,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 28,
+        "suites": 0,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+      "trackedStatusUnchanged": true,
+      "trackedStatusClean": true,
+      "reason": "Explicit parent authorization after diagnosed ownership mismatch and successful plain Git verification with require_escalated; only this unchanged suite rerun under checkout owner identity."
+    },
+    "originalRunTotals": {
+      "commands": 18,
+      "passed": 17,
+      "failed": 1,
+      "tests": 410,
+      "pass": 409,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "effectiveTotalsAfterSetupCorrection": {
+      "commands": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 410,
+      "pass": 410,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "offlinePosix": {
+    "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "startedAt": "2026-10-15T16:18:56Z",
+    "finishedAt": "2026-10-15T16:19:00.341Z",
+    "host": "authorized Ubuntu VPS (Linux arm64)",
+    "runtime": "v24.19.0",
+    "platform": "linux",
+    "arch": "arm64",
+    "suite": "docker/images/__tests__/image-pipeline.test.mjs",
+    "scope": "DEP-014 / DEP-001 Docker-free SBOM-sign-admit pipeline and refusal controls",
+    "authority": ".github/workflows/pr.yml policy image-pipeline command",
+    "command": [
+      "/opt/aoa-testing/toolchain/node-v24.19.0-linux-arm64/bin/node",
+      "--test",
+      "--test-concurrency=1",
+      "--test-reporter=tap",
+      "docker/images/__tests__/image-pipeline.test.mjs"
+    ],
+    "exitCode": 0,
+    "counts": {
+      "tests": 13,
+      "suites": 0,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "fixture": "Disposable git archive of exact HEAD containing only the 11 unchanged checked-in inputs required by this suite. Active checkout has a generated allowlist with 3 entries; it was not used as a fixture or changed.",
+    "provenance": "No fixture Git initialization was needed. AOA_IMAGE_REVISION is set by the original test; provenance sourceUrl uses its existing unknown fallback. Empty temporary HOME, GIT_CONFIG_NOSYSTEM=1 and GIT_CONFIG_GLOBAL=/dev/null prevent user/system Git configuration reads.",
+    "environment": "env -i; isolated Node24 first on PATH; empty temporary HOME and TMPDIR; no provider credentials, database URLs, AOA opt-in flags, BASH_ENV or external image-record overrides inherited.",
+    "safety": "Reviewed original scripts and test. Test prepends its temporary Docker shim (inspect/run only, no delegation) to PATH; outer fallback Docker shim exits 97 if called. syft absent on restricted PATH, ensuring no alternate image scanner. Output/signing key/allowlist/provenance stay in temporary fixtures; real OpenSSL and Node verifier run locally.",
+    "activeAllowlistSha256Before": "44f3fcab844a0ea7952ee65716b56c2768e2a2a306aa5f45d8ede20d754e85df",
+    "activeAllowlistSha256After": "44f3fcab844a0ea7952ee65716b56c2768e2a2a306aa5f45d8ede20d754e85df",
+    "activeAllowlistUnchanged": true,
+    "sourceLog": "/opt/aoa-testing/evidence/offline-posix-image-pipeline.log",
+    "limitations": "Synthetic Docker inventory and test signing root only. Does not build/inspect real images, exercise Docker daemon, use release trust, reach external APIs, or close any formal gate. Separate result; original 410-case totals unchanged."
+  },
+  "offlineNested": {
+    "candidate": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "runtime": "v24.19.0",
+    "scope": "Offline tests only. Owned temporary file/Git fixtures; workflow Docker/sudo shell functions stubbed; teardown subprocesses and provider fetch stubbed; no live apps, Docker, network, providers or credential access. Real checkout is read-only. Assertions unchanged; one attempt per file, sequential.",
+    "safetyNotes": [
+      "Shape candidate-binding fixture initializes and mutates only its owned mkdtemp Git repository, explicitly authorized by parent.",
+      "Global/system Git configuration disabled for fixtures; no repository configuration changed.",
+      "All temp paths redirected beneath this evidence directory."
+    ],
+    "clearedEnvironmentVariableNames": [
+      "GIT_CONFIG_COUNT",
+      "GIT_CONFIG_KEY_0",
+      "GIT_CONFIG_KEY_1",
+      "GIT_CONFIG_VALUE_0",
+      "GIT_CONFIG_VALUE_1",
+      "GIT_PAGER"
+    ],
+    "startedAt": "2026-10-15T16:18:55.260Z",
+    "results": [
+      {
+        "file": "scripts/check-m1-shipped-boot-shape.test.mjs",
+        "sourceSha256": "f45103d6835e3036f3580bde46556feca3b7f20f03cc5f9d53e4243293e53a5d",
+        "command": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "scripts/check-m1-shipped-boot-shape.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:18:55.261Z",
+        "durationMs": 10505.8959,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "counts": {
+          "tests": 67,
+          "suites": 0,
+          "pass": 67,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "log": "check-m1-shipped-boot-shape.log",
+        "failureHeaders": []
+      },
+      {
+        "file": "scripts/lib/__tests__/m1-shipped-boot.test.mjs",
+        "sourceSha256": "bc5f30cbb48fb4c03bfa87e9208ff563faff27b0c013c35a06ed86f83ef74388",
+        "command": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "scripts/lib/__tests__/m1-shipped-boot.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:19:05.772Z",
+        "durationMs": 10055.116999999998,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "counts": {
+          "tests": 116,
+          "suites": 0,
+          "pass": 116,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "log": "m1-shipped-boot.log",
+        "failureHeaders": []
+      },
+      {
+        "file": "scripts/lib/__tests__/m1-cleanup-evidence.test.mjs",
+        "sourceSha256": "e95c6514ea1b9cedb3dbcf06e42fbfb63280ba3ae27dcd3389516fe268bf9b8a",
+        "command": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+          "--test",
+          "--test-concurrency=1",
+          "scripts/lib/__tests__/m1-cleanup-evidence.test.mjs"
+        ],
+        "startedAt": "2026-10-15T16:19:15.829Z",
+        "durationMs": 21771.173300000002,
+        "exitCode": 0,
+        "signal": null,
+        "error": null,
+        "counts": {
+          "tests": 65,
+          "suites": 0,
+          "pass": 65,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "log": "m1-cleanup-evidence.log",
+        "failureHeaders": []
+      }
+    ],
+    "finishedAt": "2026-10-15T16:19:37.600Z",
+    "countParseNote": "Node 24 used its spec reporter. Counts parsed from retained final ℹ summary lines; tests were not rerun.",
+    "totals": {
+      "tests": 248,
+      "pass": 248,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "liveImageContents": {
+    "expectedSha": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "runtime": "v24.19.0",
+    "platform": "linux",
+    "arch": "arm64",
+    "startedAt": "2026-10-15T16:29:36.804Z",
+    "suite": "docker/images/__tests__/image-contents.test.mjs",
+    "scope": "DEP-001 / DEP-014 live built-image least-privilege contents; WRK-009 worker test-double exclusions",
+    "authority": ".github/workflows/d1-merge-train.yml AOA_DEP001_IMAGE_TEST=1 image-contents command",
+    "images": [
+      {
+        "name": "control-plane",
+        "image": "aoa-test/control-plane:13b4e806f31a67c3c172f2216272570203132f8f",
+        "recordedDigest": "sha256:376b07d5552c2bc54f7f46b06a9096030ab37aa3a60324e77900afc6217dd0ca",
+        "imageId": "sha256:376b07d5552c2bc54f7f46b06a9096030ab37aa3a60324e77900afc6217dd0ca",
+        "revision": "13b4e806f31a67c3c172f2216272570203132f8f"
+      },
+      {
+        "name": "worker",
+        "image": "aoa-test/worker:13b4e806f31a67c3c172f2216272570203132f8f",
+        "recordedDigest": "sha256:6781334c7451563906d7c94c1b61417bf37b2479e3e0d990e092f8cdb79a41f6",
+        "imageId": "sha256:6781334c7451563906d7c94c1b61417bf37b2479e3e0d990e092f8cdb79a41f6",
+        "revision": "13b4e806f31a67c3c172f2216272570203132f8f"
+      },
+      {
+        "name": "adapter-manager",
+        "image": "aoa-test/adapter-manager:13b4e806f31a67c3c172f2216272570203132f8f",
+        "recordedDigest": "sha256:5bce08ff1ee9497bb7596d90f49bba577fce7a0a8bf05bcb03db9428e4467a07",
+        "imageId": "sha256:5bce08ff1ee9497bb7596d90f49bba577fce7a0a8bf05bcb03db9428e4467a07",
+        "revision": "13b4e806f31a67c3c172f2216272570203132f8f"
+      }
+    ],
+    "status": "passed",
+    "counts": {
+      "tests": 9,
+      "suites": 0,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "command": [
+      "/opt/aoa-testing/toolchain/node-v24.19.0-linux-arm64/bin/node",
+      "--test",
+      "--test-concurrency=1",
+      "--test-reporter=tap",
+      "docker/images/__tests__/image-contents.test.mjs"
+    ],
+    "sourceLog": "/opt/aoa-testing/evidence/live-image-contents.log",
+    "environment": "env allowlist only: isolated Node24 PATH, empty temporary HOME/DOCKER_CONFIG, LANG; AOA_DEP001_IMAGE_TEST=1 only for test. No paid-provider keys, app variables, host mounts or fixture flags.",
+    "safety": "Reviewed unchanged suite: docker version/inspect plus docker run --rm --entrypoint sh IMAGE -c read-only presence/find/id commands. No host binds, environment injection, image entrypoint/application boot, source changes or data mutation. Image Config.Env values are consumed inside tests and never printed on passing assertions.",
+    "limitations": "Actual candidate images on Linux arm64 only; container shell/filesystem/config assertions, not live provider work, DB/tenant behavior, release admission or formal gate closure.",
+    "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "digestsSha256Before": "6a6e9f7f7487bc54e64b0ddbaf8f8db92465afb35d741619b4b0f5a98894c4ab",
+    "exitCode": 0,
+    "signal": null,
+    "error": null,
+    "durationMs": 14461,
+    "digestsSha256After": "6a6e9f7f7487bc54e64b0ddbaf8f8db92465afb35d741619b4b0f5a98894c4ab",
+    "digestsUnchanged": true,
+    "finishedAt": "2026-10-15T16:29:52.151Z"
+  },
+  "faultCampaign": {
+    "capturedAt": "2026-10-15T16:20:09.230Z",
+    "runtime": "isolated Node 24.19.0 ARM64",
+    "profile": {
+      "exitCode": 0,
+      "verdictExit": 0,
+      "counts": {
+        "total": 26,
+        "passed": 26,
+        "failed": 0,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "startedAt": "2026-10-15T15:59:50.561Z",
+      "finishedAt": "2026-10-15T16:09:46.914Z",
+      "declaredRequiredCases": 30,
+      "pendingCases": [
+        {
+          "caseId": "d1.credential.production_reader_company_predicate",
+          "kind": "structural",
+          "reason": "STRUCTURALLY UNAVAILABLE ON THIS LANE, and ROUTED by E6-D003 (planning session, F2) to the M1a-D2-MECHANISM profile -- it is NOT an oversight and NOT unowned. Measured at source: reaching this reader's decision needs authorizeSecretResolve to ADMIT, which needs a resolvable device_local credential; server/src/services/device-local-broker.ts holds failClosedDeviceLocalBroker and no other implementation in the tree, and the fenced route collapses every outcome to denied/malformed by design (it must not be an oracle). So on D1 an admitted read and a denied one are indistinguishable at every observable surface, and a case built here could not tell its two arms apart. Its sibling d1.tenant.legacy.provider_credentials proves the PREDICATE and the grant on the same non-owner pool, with both controls; this case is the reader's own invocation of it and is never a pass here.",
+          "owner": "M1a-D2-MECHANISM, case d2m.credential.production_reader_company_predicate, per E6-D003"
+        }
+      ],
+      "profileComplete": false,
+      "verdictText": "OK: tests/d1/fault-matrix.json declares 3 gate profile(s) and 83 case(s) (47 required, 36 pending), each with an injection, an observer and an expected classification; every profile carries the F10 tenant matrix (journeys, nine denial surfaces, the\n    control tenant, and the four no-RLS legacy tables with positive + anti-vacuity controls).\nOK: /opt/aoa-testing/evidence/fault-campaign-profile/m1-fault-matrix-evidence.json — profile M1-D1-SPINE: 30/30 required case(s) fired and classified as declared, 1 pending. Profile INCOMPLETE (pending cases remain).",
+      "cases": [
+        {
+          "caseId": "d1.reconcile.worker_startup_lease_probe",
+          "injectionFired": true,
+          "observedClassification": "startup_reconciler_fences_its_own_prior_lease",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.journey.A",
+          "injectionFired": true,
+          "observedClassification": "journey_priced_once_and_audited"
+        },
+        {
+          "caseId": "d1.tenant.journey.B",
+          "injectionFired": true,
+          "observedClassification": "journey_priced_once_and_audited"
+        },
+        {
+          "caseId": "d1.tenant.cross.events",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.read",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.lease",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.cancel",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.secrets",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.outputs",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.staged_inputs",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.legacy.cost_events",
+          "injectionFired": true,
+          "observedClassification": "filtered_by_query_predicate_not_rls",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.legacy.activity_log",
+          "injectionFired": true,
+          "observedClassification": "filtered_by_query_predicate_not_rls",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.legacy.task_outputs",
+          "injectionFired": true,
+          "observedClassification": "filtered_by_query_predicate_not_rls",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.legacy.provider_credentials",
+          "injectionFired": true,
+          "observedClassification": "filtered_by_query_predicate_not_rls",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.cross.cost_rows",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.tenant.control_refused",
+          "injectionFired": true,
+          "observedClassification": "legacy_for_organization_disabled"
+        },
+        {
+          "caseId": "d1.tenant.cross.tool_calls",
+          "injectionFired": true,
+          "observedClassification": "denied_with_same_tenant_positive_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.credential.lease_expired_redemption_refused",
+          "injectionFired": true,
+          "observedClassification": "redemption_refused_after_lease_end_with_live_lease_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.credential.wrong_lease_redemption_refused",
+          "injectionFired": true,
+          "observedClassification": "redemption_refused_on_foreign_lease_with_own_lease_control",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.redaction.planted_canary_scrubbed",
+          "injectionFired": true,
+          "observedClassification": "canary_scrubbed_while_unseeded_twin_leaks",
+          "positiveControlPassed": true
+        },
+        {
+          "caseId": "d1.cancel.unleased_attempt",
+          "injectionFired": true,
+          "observedClassification": "cancelled_directly_without_command"
+        },
+        {
+          "caseId": "d1.cancel.leased_attempt",
+          "injectionFired": true,
+          "observedClassification": "cancel_requested_with_fenced_command"
+        },
+        {
+          "caseId": "d1.provider.execute_deadline_exceeded",
+          "injectionFired": true,
+          "observedClassification": "ingest_classifies_provider_derived_terminal"
+        },
+        {
+          "caseId": "d1.fault.object_store.truncated_upload",
+          "injectionFired": true,
+          "observedClassification": "fenced_commit_refuses_unverifiable_object"
+        },
+        {
+          "caseId": "d1.cleanup.orphan_object_swept",
+          "injectionFired": true,
+          "observedClassification": "uncommitted_object_deleted"
+        },
+        {
+          "caseId": "d1.fault.link_cut.worker_to_control_plane",
+          "injectionFired": true,
+          "observedClassification": "lease_reclaimed_and_late_ack_refused"
+        },
+        {
+          "caseId": "d1.reconcile.expired_lease_reaped",
+          "injectionFired": true,
+          "observedClassification": "single_winner_retry_minted"
+        },
+        {
+          "caseId": "d1.restart.control_plane_process",
+          "injectionFired": true,
+          "observedClassification": "durable_lease_state_survives_restart"
+        },
+        {
+          "caseId": "d1.fault.link_cut.control_plane_to_postgres",
+          "injectionFired": true,
+          "observedClassification": "database_link_severed_and_restored"
+        },
+        {
+          "caseId": "d1.provider.worker_terminal_mapping",
+          "injectionFired": true,
+          "observedClassification": "worker_maps_provider_timeout_to_failed_terminal",
+          "positiveControlPassed": true
+        }
+      ]
+    },
+    "suppressed": {
+      "exitCode": 1,
+      "counts": {
+        "total": 26,
+        "passed": 14,
+        "failed": 12,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "controlPassed": true,
+      "result": "PASS: suppressed injections make the evidence verdict fail as required"
+    },
+    "scope": "Private M1-D1-SPINE reference-provider fault profile and suppressed-injection control. Not full D1 operation floors, real E2B/LLM fault campaign or public UI execution."
+  }
+}

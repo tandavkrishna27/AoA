@@ -1,0 +1,961 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 12.64kB 0.0s done
+#1 DONE 0.1s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 2.8s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.1s done
+#3 DONE 0.1s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 0B / 14.28MB 0.2s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 5.24MB / 14.28MB 0.5s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 7.34MB / 14.28MB 0.6s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 8.39MB / 14.28MB 0.8s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 10.49MB / 14.28MB 0.9s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 11.53MB / 14.28MB 1.1s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 13.63MB / 14.28MB 1.2s
+#3 sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 14.28MB / 14.28MB 1.3s done
+#3 extracting sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62
+#3 extracting sha256:9d2b4f57f9e20f33279375ce25c6ff14f30f64270ed5c7b613b2b30256754f62 0.2s done
+#3 DONE 1.7s
+
+#4 resolve image config for docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#4 DONE 2.3s
+
+#5 [internal] load metadata for docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#5 DONE 2.4s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 1.01kB done
+#6 DONE 0.1s
+
+#7 [base 1/2] FROM docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#7 resolve docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d 0.1s done
+#7 ...
+
+#8 docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#8 resolve docker.io/docker/buildkit-syft-scanner:stable-1 0.4s done
+#8 DONE 0.5s
+
+#7 [base 1/2] FROM docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#7 sha256:9b1e5916e806ef5bb236af370ad581fe663d238f5844c896f0d4d585066f52d7 0B / 447B 0.2s
+#7 sha256:bb32ac071c20af27be109cd610037428cf01353bebab58a1af63b2be22204691 0B / 1.72MB 0.2s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 0B / 50.54MB 0.2s
+#7 sha256:3953cba099bd70283204102191e03e9c2dd98f4817413c564d28582790d8f25e 0B / 3.31kB 0.2s
+#7 sha256:9b1e5916e806ef5bb236af370ad581fe663d238f5844c896f0d4d585066f52d7 447B / 447B 0.3s done
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 0B / 29.78MB 0.2s
+#7 sha256:bb32ac071c20af27be109cd610037428cf01353bebab58a1af63b2be22204691 1.72MB / 1.72MB 0.7s done
+#7 sha256:3953cba099bd70283204102191e03e9c2dd98f4817413c564d28582790d8f25e 3.31kB / 3.31kB 0.7s done
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 2.10MB / 29.78MB 0.8s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 4.19MB / 50.54MB 1.1s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 4.19MB / 29.78MB 0.9s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 8.39MB / 50.54MB 1.4s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 6.29MB / 29.78MB 1.1s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 8.39MB / 29.78MB 1.2s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 12.58MB / 50.54MB 1.7s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 10.49MB / 29.78MB 1.4s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 12.58MB / 29.78MB 1.5s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 15.73MB / 50.54MB 2.0s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 17.83MB / 29.78MB 2.0s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 19.92MB / 50.54MB 2.3s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 19.92MB / 29.78MB 2.1s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 24.12MB / 50.54MB 2.6s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 22.02MB / 29.78MB 2.3s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 24.12MB / 29.78MB 2.4s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 27.26MB / 50.54MB 2.9s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 26.21MB / 29.78MB 2.6s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 28.31MB / 29.78MB 2.7s
+#7 sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 29.78MB / 29.78MB 2.9s done
+#7 extracting sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 33.55MB / 50.54MB 3.3s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 36.70MB / 50.54MB 3.5s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 40.89MB / 50.54MB 3.8s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 45.09MB / 50.54MB 4.1s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 49.28MB / 50.54MB 4.4s
+#7 sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 50.54MB / 50.54MB 4.5s done
+#7 extracting sha256:26c307b5e35a59ce911f5fde5b9458120ec8734e831ea2da5649a9ad14abfd3d 1.6s done
+#7 extracting sha256:3953cba099bd70283204102191e03e9c2dd98f4817413c564d28582790d8f25e 0.0s done
+#7 extracting sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5
+#7 ...
+
+#8 docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#8 sha256:307ce207d6cb61564520be6064a834450b1cc937f720bee712ee09ed9ded309f 49.55MB / 49.55MB 4.5s done
+#8 extracting sha256:307ce207d6cb61564520be6064a834450b1cc937f720bee712ee09ed9ded309f 0.9s done
+#8 DONE 6.5s
+
+#9 [internal] load build context
+#9 transferring context: 42.22MB 6.3s
+#9 ...
+
+#7 [base 1/2] FROM docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#7 extracting sha256:277f601c91adf91e83d785cde33c33e76cad14e47666838b96426b10249862f5 2.0s done
+#7 extracting sha256:bb32ac071c20af27be109cd610037428cf01353bebab58a1af63b2be22204691 0.1s done
+#7 DONE 7.3s
+
+#9 [internal] load build context
+#9 ...
+
+#7 [base 1/2] FROM docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#7 extracting sha256:9b1e5916e806ef5bb236af370ad581fe663d238f5844c896f0d4d585066f52d7 0.0s done
+#7 DONE 7.3s
+
+#9 [internal] load build context
+#9 transferring context: 90.91MB 11.4s
+#9 transferring context: 140.25MB 16.5s
+#9 ...
+
+#10 [base 2/2] RUN apt-get update   && apt-get install -y --no-install-recommends     ca-certificates     curl   && rm -rf /var/lib/apt/lists/*   && corepack enable
+#10 0.340 Get:1 http://deb.debian.org/debian trixie InRelease [140 kB]
+#10 0.370 Get:2 http://deb.debian.org/debian trixie-updates InRelease [47.3 kB]
+#10 0.371 Get:3 http://deb.debian.org/debian-security trixie-security InRelease [43.4 kB]
+#10 0.397 Get:4 http://deb.debian.org/debian trixie/main amd64 Packages [9678 kB]
+#10 ...
+
+#9 [internal] load build context
+#9 transferring context: 190.61MB 21.6s
+#9 transferring context: 238.67MB 26.6s
+#9 transferring context: 283.13MB 31.8s
+#9 transferring context: 302.92MB 33.8s done
+#9 DONE 34.0s
+
+#10 [base 2/2] RUN apt-get update   && apt-get install -y --no-install-recommends     ca-certificates     curl   && rm -rf /var/lib/apt/lists/*   && corepack enable
+#10 90.75 Ign:4 http://deb.debian.org/debian trixie/main amd64 Packages
+#10 90.87 Get:5 http://deb.debian.org/debian trixie-updates/main amd64 Packages [4412 B]
+#10 90.89 Get:6 http://deb.debian.org/debian-security trixie-security/main amd64 Packages [267 kB]
+#10 91.79 Get:4 http://deb.debian.org/debian trixie/main amd64 Packages [9678 kB]
+#10 92.62 Fetched 1825 kB in 1min 32s (19.8 kB/s)
+#10 92.62 Reading package lists...
+#10 93.30 Reading package lists...
+#10 93.93 Building dependency tree...
+#10 94.07 Reading state information...
+#10 94.31 The following additional packages will be installed:
+#10 94.31   libbrotli1 libcom-err2 libcurl4t64 libffi8 libgnutls30t64 libgssapi-krb5-2
+#10 94.31   libidn2-0 libk5crypto3 libkeyutils1 libkrb5-3 libkrb5support0 libldap2
+#10 94.31   libnghttp2-14 libnghttp3-9 libp11-kit0 libpsl5t64 librtmp1 libsasl2-2
+#10 94.31   libsasl2-modules-db libssh2-1t64 libssl3t64 libtasn1-6 libunistring5 openssl
+#10 94.31   openssl-provider-legacy
+#10 94.31 Suggested packages:
+#10 94.31   gnutls-bin krb5-doc krb5-user
+#10 94.31 Recommended packages:
+#10 94.31   bash-completion krb5-locales libldap-common publicsuffix libsasl2-modules
+#10 94.49 The following NEW packages will be installed:
+#10 94.49   ca-certificates curl libbrotli1 libcom-err2 libcurl4t64 libffi8
+#10 94.49   libgnutls30t64 libgssapi-krb5-2 libidn2-0 libk5crypto3 libkeyutils1
+#10 94.49   libkrb5-3 libkrb5support0 libldap2 libnghttp2-14 libnghttp3-9 libp11-kit0
+#10 94.49   libpsl5t64 librtmp1 libsasl2-2 libsasl2-modules-db libssh2-1t64 libtasn1-6
+#10 94.49   libunistring5 openssl
+#10 94.49 The following packages will be upgraded:
+#10 94.49   libssl3t64 openssl-provider-legacy
+#10 94.54 2 upgraded, 25 newly installed, 0 to remove and 22 not upgraded.
+#10 94.54 Need to get 9356 kB of archives.
+#10 94.54 After this operation, 17.8 MB of additional disk space will be used.
+#10 94.54 Get:1 http://deb.debian.org/debian-security trixie-security/main amd64 openssl-provider-legacy amd64 3.5.7-1~deb13u3 [316 kB]
+#10 94.58 Get:2 http://deb.debian.org/debian-security trixie-security/main amd64 libssl3t64 amd64 3.5.7-1~deb13u3 [2458 kB]
+#10 94.86 Get:3 http://deb.debian.org/debian-security trixie-security/main amd64 openssl amd64 3.5.7-1~deb13u3 [1508 kB]
+#10 95.01 Get:4 http://deb.debian.org/debian trixie/main amd64 ca-certificates all 20250419 [162 kB]
+#10 95.02 Get:5 http://deb.debian.org/debian trixie/main amd64 libbrotli1 amd64 1.1.0-2+b7 [307 kB]
+#10 95.03 Get:6 http://deb.debian.org/debian trixie/main amd64 libkrb5support0 amd64 1.21.3-5+deb13u1 [33.1 kB]
+#10 95.03 Get:7 http://deb.debian.org/debian trixie/main amd64 libcom-err2 amd64 1.47.2-3+b12 [25.0 kB]
+#10 95.03 Get:8 http://deb.debian.org/debian trixie/main amd64 libk5crypto3 amd64 1.21.3-5+deb13u1 [81.2 kB]
+#10 95.04 Get:9 http://deb.debian.org/debian trixie/main amd64 libkeyutils1 amd64 1.6.3-6 [9456 B]
+#10 95.04 Get:10 http://deb.debian.org/debian trixie/main amd64 libkrb5-3 amd64 1.21.3-5+deb13u1 [326 kB]
+#10 95.06 Get:11 http://deb.debian.org/debian trixie/main amd64 libgssapi-krb5-2 amd64 1.21.3-5+deb13u1 [138 kB]
+#10 95.08 Get:12 http://deb.debian.org/debian trixie/main amd64 libunistring5 amd64 1.3-2 [477 kB]
+#10 95.14 Get:13 http://deb.debian.org/debian trixie/main amd64 libidn2-0 amd64 2.3.8-2 [109 kB]
+#10 95.16 Get:14 http://deb.debian.org/debian trixie/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg1-9 [19.8 kB]
+#10 95.16 Get:15 http://deb.debian.org/debian trixie/main amd64 libsasl2-2 amd64 2.1.28+dfsg1-9 [57.5 kB]
+#10 95.17 Get:16 http://deb.debian.org/debian trixie/main amd64 libldap2 amd64 2.6.10+dfsg-1 [194 kB]
+#10 95.19 Get:17 http://deb.debian.org/debian trixie/main amd64 libnghttp2-14 amd64 1.64.0-1.1+deb13u1 [76.2 kB]
+#10 95.20 Get:18 http://deb.debian.org/debian trixie/main amd64 libnghttp3-9 amd64 1.8.0-1 [67.7 kB]
+#10 95.21 Get:19 http://deb.debian.org/debian trixie/main amd64 libpsl5t64 amd64 0.21.2-1.1+b1 [57.2 kB]
+#10 95.22 Get:20 http://deb.debian.org/debian trixie/main amd64 libffi8 amd64 3.4.8-2 [24.1 kB]
+#10 95.22 Get:21 http://deb.debian.org/debian trixie/main amd64 libp11-kit0 amd64 0.25.5-3 [425 kB]
+#10 95.27 Get:22 http://deb.debian.org/debian trixie/main amd64 libtasn1-6 amd64 4.20.0-2+deb13u1 [50.1 kB]
+#10 95.28 Get:23 http://deb.debian.org/debian trixie/main amd64 libgnutls30t64 amd64 3.8.9-3+deb13u4 [1469 kB]
+#10 95.45 Get:24 http://deb.debian.org/debian trixie/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b5 [58.8 kB]
+#10 95.46 Get:25 http://deb.debian.org/debian trixie/main amd64 libssh2-1t64 amd64 1.11.1-1+deb13u2 [245 kB]
+#10 95.49 Get:26 http://deb.debian.org/debian-security trixie-security/main amd64 libcurl4t64 amd64 8.14.1-2+deb13u7 [392 kB]
+#10 95.54 Get:27 http://deb.debian.org/debian-security trixie-security/main amd64 curl amd64 8.14.1-2+deb13u7 [270 kB]
+#10 95.71 debconf: unable to initialize frontend: Dialog
+#10 95.71 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#10 95.71 debconf: falling back to frontend: Readline
+#10 95.71 debconf: unable to initialize frontend: Readline
+#10 95.71 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC entries checked: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.40.1 /usr/local/share/perl/5.40.1 /usr/lib/x86_64-linux-gnu/perl5/5.40 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.40 /usr/share/perl/5.40 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 8, <STDIN> line 27.)
+#10 95.71 debconf: falling back to frontend: Teletype
+#10 95.72 debconf: unable to initialize frontend: Teletype
+#10 95.72 debconf: (This frontend requires a controlling tty.)
+#10 95.72 debconf: falling back to frontend: Noninteractive
+#10 96.39 Preconfiguring packages ...
+#10 96.47 Fetched 9356 kB in 1s (8832 kB/s)
+#10 96.50 (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 5021 files and directories currently installed.)
+#10 96.50 Preparing to unpack .../openssl-provider-legacy_3.5.7-1~deb13u3_amd64.deb ...
+#10 96.54 Unpacking openssl-provider-legacy (3.5.7-1~deb13u3) over (3.5.6-1~deb13u2) ...
+#10 96.64 Setting up openssl-provider-legacy (3.5.7-1~deb13u3) ...
+#10 96.73 (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 5021 files and directories currently installed.)
+#10 96.74 Preparing to unpack .../libssl3t64_3.5.7-1~deb13u3_amd64.deb ...
+#10 96.79 Unpacking libssl3t64:amd64 (3.5.7-1~deb13u3) over (3.5.6-1~deb13u2) ...
+#10 97.01 Setting up libssl3t64:amd64 (3.5.7-1~deb13u3) ...
+#10 97.10 Selecting previously unselected package openssl.
+#10 97.10 (Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 5021 files and directories currently installed.)
+#10 97.11 Preparing to unpack .../00-openssl_3.5.7-1~deb13u3_amd64.deb ...
+#10 97.12 Unpacking openssl (3.5.7-1~deb13u3) ...
+#10 97.26 Selecting previously unselected package ca-certificates.
+#10 97.26 Preparing to unpack .../01-ca-certificates_20250419_all.deb ...
+#10 97.27 Unpacking ca-certificates (20250419) ...
+#10 97.39 Selecting previously unselected package libbrotli1:amd64.
+#10 97.39 Preparing to unpack .../02-libbrotli1_1.1.0-2+b7_amd64.deb ...
+#10 97.40 Unpacking libbrotli1:amd64 (1.1.0-2+b7) ...
+#10 97.50 Selecting previously unselected package libkrb5support0:amd64.
+#10 97.50 Preparing to unpack .../03-libkrb5support0_1.21.3-5+deb13u1_amd64.deb ...
+#10 97.51 Unpacking libkrb5support0:amd64 (1.21.3-5+deb13u1) ...
+#10 97.59 Selecting previously unselected package libcom-err2:amd64.
+#10 97.59 Preparing to unpack .../04-libcom-err2_1.47.2-3+b12_amd64.deb ...
+#10 97.61 Unpacking libcom-err2:amd64 (1.47.2-3+b12) ...
+#10 97.69 Selecting previously unselected package libk5crypto3:amd64.
+#10 97.69 Preparing to unpack .../05-libk5crypto3_1.21.3-5+deb13u1_amd64.deb ...
+#10 97.70 Unpacking libk5crypto3:amd64 (1.21.3-5+deb13u1) ...
+#10 97.78 Selecting previously unselected package libkeyutils1:amd64.
+#10 97.78 Preparing to unpack .../06-libkeyutils1_1.6.3-6_amd64.deb ...
+#10 97.80 Unpacking libkeyutils1:amd64 (1.6.3-6) ...
+#10 97.88 Selecting previously unselected package libkrb5-3:amd64.
+#10 97.88 Preparing to unpack .../07-libkrb5-3_1.21.3-5+deb13u1_amd64.deb ...
+#10 97.89 Unpacking libkrb5-3:amd64 (1.21.3-5+deb13u1) ...
+#10 98.00 Selecting previously unselected package libgssapi-krb5-2:amd64.
+#10 98.00 Preparing to unpack .../08-libgssapi-krb5-2_1.21.3-5+deb13u1_amd64.deb ...
+#10 98.01 Unpacking libgssapi-krb5-2:amd64 (1.21.3-5+deb13u1) ...
+#10 98.10 Selecting previously unselected package libunistring5:amd64.
+#10 98.10 Preparing to unpack .../09-libunistring5_1.3-2_amd64.deb ...
+#10 98.11 Unpacking libunistring5:amd64 (1.3-2) ...
+#10 98.21 Selecting previously unselected package libidn2-0:amd64.
+#10 98.21 Preparing to unpack .../10-libidn2-0_2.3.8-2_amd64.deb ...
+#10 98.22 Unpacking libidn2-0:amd64 (2.3.8-2) ...
+#10 98.29 Selecting previously unselected package libsasl2-modules-db:amd64.
+#10 98.29 Preparing to unpack .../11-libsasl2-modules-db_2.1.28+dfsg1-9_amd64.deb ...
+#10 98.30 Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg1-9) ...
+#10 98.37 Selecting previously unselected package libsasl2-2:amd64.
+#10 98.37 Preparing to unpack .../12-libsasl2-2_2.1.28+dfsg1-9_amd64.deb ...
+#10 98.38 Unpacking libsasl2-2:amd64 (2.1.28+dfsg1-9) ...
+#10 98.46 Selecting previously unselected package libldap2:amd64.
+#10 98.46 Preparing to unpack .../13-libldap2_2.6.10+dfsg-1_amd64.deb ...
+#10 98.47 Unpacking libldap2:amd64 (2.6.10+dfsg-1) ...
+#10 98.55 Selecting previously unselected package libnghttp2-14:amd64.
+#10 98.55 Preparing to unpack .../14-libnghttp2-14_1.64.0-1.1+deb13u1_amd64.deb ...
+#10 98.57 Unpacking libnghttp2-14:amd64 (1.64.0-1.1+deb13u1) ...
+#10 98.65 Selecting previously unselected package libnghttp3-9:amd64.
+#10 98.65 Preparing to unpack .../15-libnghttp3-9_1.8.0-1_amd64.deb ...
+#10 98.66 Unpacking libnghttp3-9:amd64 (1.8.0-1) ...
+#10 98.74 Selecting previously unselected package libpsl5t64:amd64.
+#10 98.74 Preparing to unpack .../16-libpsl5t64_0.21.2-1.1+b1_amd64.deb ...
+#10 98.75 Unpacking libpsl5t64:amd64 (0.21.2-1.1+b1) ...
+#10 98.83 Selecting previously unselected package libffi8:amd64.
+#10 98.83 Preparing to unpack .../17-libffi8_3.4.8-2_amd64.deb ...
+#10 98.84 Unpacking libffi8:amd64 (3.4.8-2) ...
+#10 98.92 Selecting previously unselected package libp11-kit0:amd64.
+#10 98.92 Preparing to unpack .../18-libp11-kit0_0.25.5-3_amd64.deb ...
+#10 98.93 Unpacking libp11-kit0:amd64 (0.25.5-3) ...
+#10 99.02 Selecting previously unselected package libtasn1-6:amd64.
+#10 99.02 Preparing to unpack .../19-libtasn1-6_4.20.0-2+deb13u1_amd64.deb ...
+#10 99.03 Unpacking libtasn1-6:amd64 (4.20.0-2+deb13u1) ...
+#10 99.11 Selecting previously unselected package libgnutls30t64:amd64.
+#10 99.11 Preparing to unpack .../20-libgnutls30t64_3.8.9-3+deb13u4_amd64.deb ...
+#10 99.12 Unpacking libgnutls30t64:amd64 (3.8.9-3+deb13u4) ...
+#10 99.24 Selecting previously unselected package librtmp1:amd64.
+#10 99.24 Preparing to unpack .../21-librtmp1_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb ...
+#10 99.25 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#10 99.33 Selecting previously unselected package libssh2-1t64:amd64.
+#10 99.34 Preparing to unpack .../22-libssh2-1t64_1.11.1-1+deb13u2_amd64.deb ...
+#10 99.35 Unpacking libssh2-1t64:amd64 (1.11.1-1+deb13u2) ...
+#10 99.43 Selecting previously unselected package libcurl4t64:amd64.
+#10 99.43 Preparing to unpack .../23-libcurl4t64_8.14.1-2+deb13u7_amd64.deb ...
+#10 99.45 Unpacking libcurl4t64:amd64 (8.14.1-2+deb13u7) ...
+#10 99.54 Selecting previously unselected package curl.
+#10 99.54 Preparing to unpack .../24-curl_8.14.1-2+deb13u7_amd64.deb ...
+#10 99.55 Unpacking curl (8.14.1-2+deb13u7) ...
+#10 99.62 Setting up libkeyutils1:amd64 (1.6.3-6) ...
+#10 99.66 Setting up libbrotli1:amd64 (1.1.0-2+b7) ...
+#10 99.69 Setting up libnghttp2-14:amd64 (1.64.0-1.1+deb13u1) ...
+#10 99.72 Setting up libcom-err2:amd64 (1.47.2-3+b12) ...
+#10 99.76 Setting up libkrb5support0:amd64 (1.21.3-5+deb13u1) ...
+#10 99.79 Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg1-9) ...
+#10 99.82 Setting up libunistring5:amd64 (1.3-2) ...
+#10 99.85 Setting up libk5crypto3:amd64 (1.21.3-5+deb13u1) ...
+#10 99.89 Setting up libsasl2-2:amd64 (2.1.28+dfsg1-9) ...
+#10 99.92 Setting up libnghttp3-9:amd64 (1.8.0-1) ...
+#10 99.95 Setting up libffi8:amd64 (3.4.8-2) ...
+#10 99.99 Setting up libtasn1-6:amd64 (4.20.0-2+deb13u1) ...
+#10 100.0 Setting up libkrb5-3:amd64 (1.21.3-5+deb13u1) ...
+#10 100.1 Setting up libssh2-1t64:amd64 (1.11.1-1+deb13u2) ...
+#10 100.1 Setting up openssl (3.5.7-1~deb13u3) ...
+#10 100.1 Setting up libldap2:amd64 (2.6.10+dfsg-1) ...
+#10 100.2 Setting up libidn2-0:amd64 (2.3.8-2) ...
+#10 100.2 Setting up ca-certificates (20250419) ...
+#10 100.3 debconf: unable to initialize frontend: Dialog
+#10 100.3 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#10 100.3 debconf: falling back to frontend: Readline
+#10 100.3 debconf: unable to initialize frontend: Readline
+#10 100.3 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC entries checked: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.40.1 /usr/local/share/perl/5.40.1 /usr/lib/x86_64-linux-gnu/perl5/5.40 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.40 /usr/share/perl/5.40 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 8.)
+#10 100.3 debconf: falling back to frontend: Teletype
+#10 100.3 debconf: unable to initialize frontend: Teletype
+#10 100.3 debconf: (This frontend requires a controlling tty.)
+#10 100.3 debconf: falling back to frontend: Noninteractive
+#10 100.8 Updating certificates in /etc/ssl/certs...
+#10 101.5 150 added, 0 removed; done.
+#10 101.5 Setting up libp11-kit0:amd64 (0.25.5-3) ...
+#10 101.6 Setting up libgssapi-krb5-2:amd64 (1.21.3-5+deb13u1) ...
+#10 101.6 Setting up libgnutls30t64:amd64 (3.8.9-3+deb13u4) ...
+#10 101.6 Setting up libpsl5t64:amd64 (0.21.2-1.1+b1) ...
+#10 101.7 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#10 101.7 Setting up libcurl4t64:amd64 (8.14.1-2+deb13u7) ...
+#10 101.7 Setting up curl (8.14.1-2+deb13u7) ...
+#10 101.8 Processing triggers for libc-bin (2.41-12+deb13u3) ...
+#10 101.8 Processing triggers for ca-certificates (20250419) ...
+#10 101.8 Updating certificates in /etc/ssl/certs...
+#10 102.4 0 added, 0 removed; done.
+#10 102.4 Running hooks in /etc/ca-certificates/update.d...
+#10 102.4 done.
+#10 DONE 102.5s
+
+#11 [production 1/8] WORKDIR /cp-app
+#11 DONE 0.2s
+
+#12 [deps  1/24] WORKDIR /app
+#12 DONE 0.2s
+
+#13 [deps  2/24] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+#13 DONE 0.2s
+
+#14 [deps  3/24] COPY server/package.json server/
+#14 DONE 0.1s
+
+#15 [deps  4/24] COPY ui/package.json ui/
+#15 DONE 0.1s
+
+#16 [deps  5/24] COPY packages/shared/package.json packages/shared/
+#16 DONE 0.1s
+
+#17 [deps  6/24] COPY packages/browser-runtime/package.json packages/browser-runtime/
+#17 DONE 0.1s
+
+#18 [deps  7/24] COPY packages/db/package.json packages/db/
+#18 DONE 0.1s
+
+#19 [deps  8/24] COPY packages/adapter-utils/package.json packages/adapter-utils/
+#19 DONE 0.1s
+
+#20 [deps  9/24] COPY packages/worker-protocol/package.json packages/worker-protocol/
+#20 DONE 0.1s
+
+#21 [deps 10/24] COPY packages/provider-capability/package.json packages/provider-capability/
+#21 DONE 0.1s
+
+#22 [deps 11/24] COPY packages/plugins/sdk/package.json packages/plugins/sdk/
+#22 DONE 0.1s
+
+#23 [deps 12/24] COPY packages/adapters/acpx-local/package.json packages/adapters/acpx-local/
+#23 DONE 0.1s
+
+#24 [deps 13/24] COPY packages/adapters/claude-local/package.json packages/adapters/claude-local/
+#24 DONE 0.1s
+
+#25 [deps 14/24] COPY packages/adapters/codex-local/package.json packages/adapters/codex-local/
+#25 DONE 0.1s
+
+#26 [deps 15/24] COPY packages/adapters/cursor-cloud/package.json packages/adapters/cursor-cloud/
+#26 DONE 0.1s
+
+#27 [deps 16/24] COPY packages/adapters/cursor-local/package.json packages/adapters/cursor-local/
+#27 DONE 0.1s
+
+#28 [deps 17/24] COPY packages/adapters/gemini-local/package.json packages/adapters/gemini-local/
+#28 DONE 0.1s
+
+#29 [deps 18/24] COPY packages/adapters/grok-local/package.json packages/adapters/grok-local/
+#29 DONE 0.1s
+
+#30 [deps 19/24] COPY packages/adapters/openclaw/package.json packages/adapters/openclaw/
+#30 DONE 0.1s
+
+#31 [deps 20/24] COPY packages/adapters/openclaw-gateway/package.json packages/adapters/openclaw-gateway/
+#31 DONE 0.1s
+
+#32 [deps 21/24] COPY packages/adapters/opencode-local/package.json packages/adapters/opencode-local/
+#32 DONE 0.1s
+
+#33 [deps 22/24] COPY packages/adapters/pi-local/package.json packages/adapters/pi-local/
+#33 DONE 0.1s
+
+#34 [deps 23/24] COPY patches/ patches/
+#34 DONE 0.1s
+
+#35 [deps 24/24] RUN pnpm install --frozen-lockfile --filter "@armyofagents/server..." --filter "@armyofagents/ui..."
+#35 0.347 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-9.15.4.tgz
+#35 2.443 Scope: 20 of 21 workspace projects
+#35 2.460 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#35 2.460 (Use `node --trace-deprecation ...` to show where the warning was created)
+#35 2.563 Lockfile is up to date, resolution step is skipped
+#35 2.664 Progress: resolved 1, reused 0, downloaded 0, added 0
+#35 2.900 .                                        |    +1479 ++++++++++++++++++++++++++++
+#35 3.666 Progress: resolved 1479, reused 0, downloaded 22, added 0
+#35 3.915 
+#35 3.915    ╭───────────────────────────────────────────────────────────────────╮
+#35 3.915    │                                                                   │
+#35 3.915    │                Update available! 9.15.4 → 12.11.2.                │
+#35 3.915    │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.11.2   │
+#35 3.915    │         Run "corepack install -g pnpm@12.11.2" to update.         │
+#35 3.915    │                                                                   │
+#35 3.915    ╰───────────────────────────────────────────────────────────────────╯
+#35 3.915 
+#35 4.664 Progress: resolved 1479, reused 0, downloaded 62, added 62
+#35 5.664 Progress: resolved 1479, reused 0, downloaded 94, added 93
+#35 6.663 Progress: resolved 1479, reused 0, downloaded 136, added 136
+#35 7.664 Progress: resolved 1479, reused 0, downloaded 256, added 256
+#35 8.665 Progress: resolved 1479, reused 0, downloaded 319, added 318
+#35 9.666 Progress: resolved 1479, reused 0, downloaded 382, added 385
+#35 10.67 Progress: resolved 1479, reused 0, downloaded 540, added 543
+#35 11.67 Progress: resolved 1479, reused 0, downloaded 615, added 619
+#35 12.67 Progress: resolved 1479, reused 0, downloaded 705, added 709
+#35 13.67 Progress: resolved 1479, reused 0, downloaded 724, added 727
+#35 14.67 Progress: resolved 1479, reused 0, downloaded 746, added 750
+#35 15.67 Progress: resolved 1479, reused 0, downloaded 767, added 771
+#35 16.67 Progress: resolved 1479, reused 0, downloaded 791, added 795
+#35 17.67 Progress: resolved 1479, reused 0, downloaded 833, added 836
+#35 18.67 Progress: resolved 1479, reused 0, downloaded 855, added 859
+#35 19.67 Progress: resolved 1479, reused 0, downloaded 926, added 927
+#35 20.67 Progress: resolved 1479, reused 0, downloaded 1053, added 1057
+#35 21.67 Progress: resolved 1479, reused 0, downloaded 1134, added 1138
+#35 22.69 Progress: resolved 1479, reused 0, downloaded 1182, added 1185
+#35 23.68 Progress: resolved 1479, reused 0, downloaded 1203, added 1206
+#35 24.68 Progress: resolved 1479, reused 0, downloaded 1252, added 1256
+#35 25.68 Progress: resolved 1479, reused 0, downloaded 1296, added 1299
+#35 26.68 Progress: resolved 1479, reused 0, downloaded 1348, added 1350
+#35 27.68 Progress: resolved 1479, reused 0, downloaded 1397, added 1399
+#35 28.70 Progress: resolved 1479, reused 0, downloaded 1435, added 1438
+#35 29.70 Progress: resolved 1479, reused 0, downloaded 1463, added 1468
+#35 30.70 Progress: resolved 1479, reused 0, downloaded 1467, added 1472
+#35 32.27 Progress: resolved 1479, reused 0, downloaded 1468, added 1472
+#35 33.27 Progress: resolved 1479, reused 0, downloaded 1470, added 1474
+#35 34.27 Progress: resolved 1479, reused 0, downloaded 1471, added 1476
+#35 35.27 Progress: resolved 1479, reused 0, downloaded 1472, added 1477
+#35 35.91 Progress: resolved 1479, reused 0, downloaded 1474, added 1479, done
+#35 43.87 .../@embedded-postgres/linux-x64 postinstall$ node scripts/hydrate-symlinks.js
+#35 43.98 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#35 43.99 .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+#35 44.19 .../@embedded-postgres/linux-x64 postinstall: Done
+#35 44.20 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#35 44.29 .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+#35 46.58 .../es5-ext@0.10.64/node_modules/es5-ext postinstall$  node -e "try{require('./_postinstall')}catch(e){}" || exit 0
+#35 46.71 .../es5-ext@0.10.64/node_modules/es5-ext postinstall: Done
+#35 47.00  WARN  Failed to create bin at /app/server/node_modules/.bin/paperclip-plugin-dev-server. ENOENT: no such file or directory, open '/app/packages/plugins/sdk/dist/dev-cli.js'
+#35 47.84  WARN  Failed to create bin at /app/server/node_modules/.bin/paperclip-plugin-dev-server. ENOENT: no such file or directory, open '/app/server/node_modules/@armyofagents/plugin-sdk/dist/dev-cli.js'
+#35 47.97 Done in 46s
+#35 DONE 48.4s
+
+#36 [build 2/9] COPY --from=deps /app /app
+#36 DONE 13.9s
+
+#37 [build 3/9] COPY . .
+#37 DONE 2.6s
+
+#38 [build 4/9] RUN pnpm install --frozen-lockfile --filter "@armyofagents/server..." --filter "@armyofagents/ui..."
+#38 0.365 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-9.15.4.tgz
+#38 2.074 Scope: 26 of 35 workspace projects
+#38 2.090 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#38 2.090 (Use `node --trace-deprecation ...` to show where the warning was created)
+#38 2.245 Lockfile is up to date, resolution step is skipped
+#38 2.511 
+#38 2.511    ╭───────────────────────────────────────────────────────────────────╮
+#38 2.511    │                                                                   │
+#38 2.511    │                Update available! 9.15.4 → 12.11.2.                │
+#38 2.511    │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.11.2   │
+#38 2.511    │         Run "corepack install -g pnpm@12.11.2" to update.         │
+#38 2.511    │                                                                   │
+#38 2.511    ╰───────────────────────────────────────────────────────────────────╯
+#38 2.511 
+#38 8.376  WARN  Failed to create bin at /app/packages/adapter-manager/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#38 8.379  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#38 8.380  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#38 8.385  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#38 8.386  WARN  Failed to create bin at /app/server/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#38 8.386  WARN  Failed to create bin at /app/server/node_modules/.bin/paperclip-plugin-dev-server. ENOENT: no such file or directory, open '/app/packages/plugins/sdk/dist/dev-cli.js'
+#38 9.004  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-capability/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#38 9.051  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/sandbox-e2b-provider/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#38 9.058  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-wire/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#38 9.064  WARN  Failed to create bin at /app/packages/adapter-manager/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/adapter-manager/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#38 9.087  WARN  Failed to create bin at /app/server/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/server/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#38 9.087  WARN  Failed to create bin at /app/server/node_modules/.bin/paperclip-plugin-dev-server. ENOENT: no such file or directory, open '/app/server/node_modules/@armyofagents/plugin-sdk/dist/dev-cli.js'
+#38 9.202 Done in 7.5s
+#38 DONE 9.4s
+
+#39 [build 5/9] RUN pnpm --filter "@armyofagents/server..." --filter "@armyofagents/ui..." build
+#39 0.704 Scope: 26 of 35 workspace projects
+#39 0.708 packages/worker-protocol build$ tsc
+#39 0.710 packages/shared build$ tsc
+#39 4.402 packages/worker-protocol build: Done
+#39 7.998 packages/shared build: Done
+#39 7.999 packages/worker-daemon build$ tsc
+#39 8.000 packages/sandbox-fake-provider build$ tsc
+#39 8.001 packages/adapter-utils build$ tsc
+#39 8.001 packages/browser-runtime build$ tsc
+#39 11.49 packages/browser-runtime build: Done
+#39 11.49 packages/db build$ tsc && rm -rf dist/migrations && cp -r src/migrations dist/migrations
+#39 11.58 packages/sandbox-fake-provider build: Done
+#39 11.58 packages/plugins/sdk build$ pnpm --filter @armyofagents/shared build && tsc
+#39 12.59 packages/plugins/sdk build: > @armyofagents/shared@0.2.7 build /app/packages/shared
+#39 12.60 packages/plugins/sdk build: > tsc
+#39 15.14 packages/worker-daemon build: Done
+#39 20.46 packages/adapter-utils build: Done
+#39 43.34 packages/plugins/sdk build: Done
+#39 53.32 packages/db build: Done
+#39 53.32 packages/provider-capability build$ tsc
+#39 53.32 packages/sandbox-provider-contract build$ tsc
+#39 53.32 packages/adapters/acpx-local build$ tsc
+#39 53.32 packages/adapters/claude-local build$ tsc && node --input-type=commonjs -e "require('node:fs').cpSync('src/server/hook-forward.mjs','dist/server/hook-forward.mjs')"
+#39 56.08 packages/provider-capability build: Done
+#39 56.08 packages/adapters/codex-local build$ tsc
+#39 56.28 packages/sandbox-provider-contract build: Done
+#39 56.28 packages/adapters/cursor-cloud build$ tsc
+#39 66.81 packages/adapters/acpx-local build: Done
+#39 66.81 packages/adapters/cursor-local build$ tsc
+#39 67.70 packages/adapters/claude-local build: Done
+#39 67.70 packages/adapters/gemini-local build$ tsc
+#39 71.62 packages/adapters/cursor-cloud build: Done
+#39 71.62 packages/adapters/grok-local build$ tsc
+#39 73.48 packages/adapters/codex-local build: Done
+#39 73.48 packages/adapters/openclaw build$ tsc
+#39 84.14 packages/adapters/cursor-local build: Done
+#39 84.14 packages/adapters/openclaw-gateway build$ tsc
+#39 85.94 packages/adapters/gemini-local build: Done
+#39 85.94 packages/adapters/opencode-local build$ tsc
+#39 89.33 packages/adapters/grok-local build: Done
+#39 89.34 packages/adapters/pi-local build$ tsc
+#39 90.82 packages/adapters/openclaw build: Done
+#39 99.77 packages/adapters/openclaw-gateway build: Done
+#39 101.5 packages/adapters/opencode-local build: Done
+#39 103.5 packages/adapters/pi-local build: Done
+#39 103.5 packages/sandbox-e2b-provider build$ tsc
+#39 103.5 ui build$ tsc -b && vite build
+#39 108.2 packages/sandbox-e2b-provider build: Done
+#39 158.9 ui build: vite v6.4.3 building for production...
+#39 159.0 ui build: transforming...
+#39 186.8 ui build: ✓ 6599 modules transformed.
+#39 188.5 ui build: rendering chunks...
+#39 191.0 ui build: [plugin vite:reporter] 
+#39 191.0 ui build: (!) /app/ui/src/pages/AgentDetail.tsx is dynamically imported by /app/ui/src/App.tsx but also statically imported by /app/ui/src/components/agent-detail/AgentDetailContainer.tsx, /app/ui/src/components/agent-detail/RunDetailContainer.tsx, dynamic import will not move module into another chunk.
+#39 191.3 ui build: computing gzip size...
+#39 192.4 ui build: dist/index.html                                           3.88 kB │ gzip:     1.48 kB
+#39 192.4 ui build: dist/assets/pdf.worker.min-qwK7q_zL.mjs               1,046.21 kB
+#39 192.4 ui build: dist/assets/PdfDocumentRenderer-U49Gidf8.css              9.22 kB │ gzip:     2.00 kB
+#39 192.4 ui build: dist/assets/MemoryExplorer-CxEC_eri.css                  33.79 kB │ gzip:     6.01 kB
+#39 192.4 ui build: dist/assets/index-BolRqikd.css                          358.76 kB │ gzip:    54.36 kB
+#39 192.4 ui build: dist/assets/channel-BYb5KuvZ.js                           0.11 kB │ gzip:     0.13 kB
+#39 192.4 ui build: dist/assets/init-Gi6I4Gst.js                              0.15 kB │ gzip:     0.13 kB
+#39 192.4 ui build: dist/assets/chunk-QZHKN3VN-DckEQxlE.js                    0.19 kB │ gzip:     0.16 kB
+#39 192.4 ui build: dist/assets/chunk-55IACEB6-DawUy5eL.js                    0.27 kB │ gzip:     0.23 kB
+#39 192.4 ui build: dist/assets/chunk-4BX2VUAB-BZPHHS4A.js                    0.30 kB │ gzip:     0.20 kB
+#39 192.4 ui build: dist/assets/diff-DbItnlRl.js                              0.31 kB │ gzip:     0.24 kB
+#39 192.4 ui build: dist/assets/chunk-FMBD7UC4-B79_0_2a.js                    0.37 kB │ gzip:     0.27 kB
+#39 192.4 ui build: dist/assets/stateDiagram-v2-BHNVJYJU-Z9Q8L4dD.js          0.42 kB │ gzip:     0.30 kB
+#39 192.4 ui build: dist/assets/funnel-BSv6yiHV.js                            0.43 kB │ gzip:     0.32 kB
+#39 192.4 ui build: dist/assets/classDiagram-4FO5ZUOK-Bgyoqr3d.js             0.50 kB │ gzip:     0.34 kB
+#39 192.4 ui build: dist/assets/classDiagram-v2-Q7XG4LA2-Bgyoqr3d.js          0.50 kB │ gzip:     0.34 kB
+#39 192.4 ui build: dist/assets/chunk-2J33WTMH-BUaJfyvm.js                    0.53 kB │ gzip:     0.37 kB
+#39 192.4 ui build: dist/assets/brainfuck-C4LP7Hcl.js                         0.61 kB │ gzip:     0.33 kB
+#39 192.4 ui build: dist/assets/infoDiagram-5YYISTIA-CyiAy6Rg.js              0.61 kB │ gzip:     0.42 kB
+#39 192.4 ui build: dist/assets/properties-C78fOPTZ.js                        0.67 kB │ gzip:     0.35 kB
+#39 192.4 ui build: dist/assets/cmake-BQqOBYOt.js                             0.78 kB │ gzip:     0.46 kB
+#39 192.4 ui build: dist/assets/asciiarmor-Df11BRmG.js                        0.79 kB │ gzip:     0.41 kB
+#39 192.4 ui build: dist/assets/http-DBlCnlav.js                              0.85 kB │ gzip:     0.41 kB
+#39 192.4 ui build: dist/assets/protobuf-ChK-085T.js                          0.86 kB │ gzip:     0.52 kB
+#39 192.4 ui build: dist/assets/solr-DehyRSwq.js                              0.87 kB │ gzip:     0.46 kB
+#39 192.4 ui build: dist/assets/troff-wAsdV37c.js                             0.96 kB │ gzip:     0.44 kB
+#39 192.4 ui build: dist/assets/spreadsheet-BCZA_wO0.js                       1.14 kB │ gzip:     0.54 kB
+#39 192.4 ui build: dist/assets/toml-Bm5Em-hy.js                              1.14 kB │ gzip:     0.54 kB
+#39 192.4 ui build: dist/assets/ordinal-Cboi1Yqb.js                           1.19 kB │ gzip:     0.57 kB
+#39 192.4 ui build: dist/assets/mbox-CNhZ1qSd.js                              1.40 kB │ gzip:     0.66 kB
+#39 192.4 ui build: dist/assets/sieve-C3Gn_uJK.js                             1.62 kB │ gzip:     0.77 kB
+#39 192.4 ui build: dist/assets/rpm-CTu-6PCP.js                               1.62 kB │ gzip:     0.83 kB
+#39 192.4 ui build: dist/assets/factor-kuTfRLto.js                            1.67 kB │ gzip:     0.61 kB
+#39 192.4 ui build: dist/assets/z80-Hz9HOZM7.js                               1.75 kB │ gzip:     0.81 kB
+#39 192.4 ui build: dist/assets/eiffel-CnydiIhH.js                            1.81 kB │ gzip:     0.92 kB
+#39 192.4 ui build: dist/assets/elm-vLlmbW-K.js                               1.89 kB │ gzip:     0.82 kB
+#39 192.4 ui build: dist/assets/mathematica-DTrFuWx2.js                       1.92 kB │ gzip:     0.82 kB
+#39 192.4 ui build: dist/assets/chunk-ND2GUHAM-Cgmmvb7z.js                    1.92 kB │ gzip:     0.85 kB
+#39 192.4 ui build: dist/assets/dockerfile-BKs6k2Af.js                        1.95 kB │ gzip:     0.67 kB
+#39 192.4 ui build: dist/assets/MemoryIndexBadge-D-eKPbtG.js                  1.96 kB │ gzip:     0.57 kB
+#39 192.4 ui build: dist/assets/turtle-B1tBg_DP.js                            1.98 kB │ gzip:     0.90 kB
+#39 192.4 ui build: dist/assets/ebnf-CDyGwa7X.js                              1.99 kB │ gzip:     0.81 kB
+#39 192.4 ui build: dist/assets/smalltalk-CnHTOXQT.js                         2.01 kB │ gzip:     0.85 kB
+#39 192.4 ui build: dist/assets/dtd-DF_7sFjM.js                               2.06 kB │ gzip:     0.87 kB
+#39 192.4 ui build: dist/assets/mumps-BT43cFF4.js                             2.07 kB │ gzip:     0.98 kB
+#39 192.4 ui build: dist/assets/fcl-Kvtd6kyn.js                               2.08 kB │ gzip:     0.95 kB
+#39 192.4 ui build: dist/assets/ntriples-BfvgReVJ.js                          2.10 kB │ gzip:     0.75 kB
+#39 192.4 ui build: dist/assets/yacas-BJ4BC0dw.js                             2.15 kB │ gzip:     1.09 kB
+#39 192.4 ui build: dist/assets/simple-mode-GW_nhZxv.js                       2.28 kB │ gzip:     1.09 kB
+#39 192.4 ui build: dist/assets/apl-B4CMkyY2.js                               2.30 kB │ gzip:     1.23 kB
+#39 192.4 ui build: dist/assets/pascal--L3eBynH.js                            2.30 kB │ gzip:     1.19 kB
+#39 192.4 ui build: dist/assets/octave-Ck1zUtKM.js                            2.31 kB │ gzip:     1.09 kB
+#39 192.4 ui build: dist/assets/commonlisp-DBKNyK5s.js                        2.32 kB │ gzip:     1.10 kB
+#39 192.4 ui build: dist/assets/tcl-DVfN8rqt.js                               2.36 kB │ gzip:     1.23 kB
+#39 192.4 ui build: dist/assets/index-CJHbKn4M.js                             2.43 kB │ gzip:     1.50 kB
+#39 192.4 ui build: dist/assets/webidl-ZXfAyPTL.js                            2.52 kB │ gzip:     1.26 kB
+#39 192.4 ui build: dist/assets/pig-CevX1Tat.js                               2.53 kB │ gzip:     1.38 kB
+#39 192.4 ui build: dist/assets/puppet-DMA9R1ak.js                            2.54 kB │ gzip:     1.20 kB
+#39 192.4 ui build: dist/assets/forth-Ffai-XNe.js                             2.54 kB │ gzip:     1.33 kB
+#39 192.4 ui build: dist/assets/constant-R5Gq4oH2.js                          2.56 kB │ gzip:     1.08 kB
+#39 192.4 ui build: dist/assets/shell-CjFT_Tl9.js                             2.57 kB │ gzip:     1.21 kB
+#39 192.4 ui build: dist/assets/index-CheKVM9u.js                             2.64 kB │ gzip:     1.51 kB
+#39 192.4 ui build: dist/assets/velocity-D8B20fx6.js                          2.67 kB │ gzip:     1.11 kB
+#39 192.4 ui build: dist/assets/tiddlywiki-DO-Gjzrf.js                        2.78 kB │ gzip:     1.07 kB
+#39 192.4 ui build: dist/assets/modelica-Dc1JOy9r.js                          2.79 kB │ gzip:     1.29 kB
+#39 192.4 ui build: dist/assets/diagram-5GNKFQAL-lCItRIYj.js                  2.79 kB │ gzip:     1.38 kB
+#39 192.4 ui build: dist/assets/oz-BzwKVEFT.js                                2.90 kB │ gzip:     1.28 kB
+#39 192.4 ui build: dist/assets/r-B6wPVr8A.js                                 2.94 kB │ gzip:     1.36 kB
+#39 192.4 ui build: dist/assets/stex-C3f8Ysf7.js                              3.12 kB │ gzip:     1.20 kB
+#39 192.4 ui build: dist/assets/tiki-DGYXhP31.js                              3.25 kB │ gzip:     1.26 kB
+#39 192.4 ui build: dist/assets/vhdl-lSbBsy5d.js                              3.35 kB │ gzip:     1.51 kB
+#39 192.4 ui build: dist/assets/lua-BgMRiT3U.js                               3.40 kB │ gzip:     1.44 kB
+#39 192.4 ui build: dist/assets/index-Bd88A3UT.js                             3.41 kB │ gzip:     1.73 kB
+#39 192.4 ui build: dist/assets/arc-CyFJWmBh.js                               3.42 kB │ gzip:     1.47 kB
+#39 192.4 ui build: dist/assets/mscgen-BA5vi2Kp.js                            3.51 kB │ gzip:     0.98 kB
+#39 192.4 ui build: dist/assets/sparql-DkYu6x3z.js                            3.55 kB │ gzip:     1.63 kB
+#39 192.4 ui build: dist/assets/cypher-C_CwsFkJ.js                            3.56 kB │ gzip:     1.52 kB
+#39 192.4 ui build: dist/assets/NewGoalDialog-Brtxob8V.js                     3.63 kB │ gzip:     1.62 kB
+#39 192.4 ui build: dist/assets/d-pRatUO7H.js                                 3.72 kB │ gzip:     1.68 kB
+#39 192.4 ui build: dist/assets/coffeescript-S37ZYGWr.js                      3.87 kB │ gzip:     1.69 kB
+#39 192.4 ui build: dist/assets/vb-CmGdzxic.js                                3.90 kB │ gzip:     1.79 kB
+#39 192.4 ui build: dist/assets/swift-BzpIVaGY.js                             3.96 kB │ gzip:     1.79 kB
+#39 192.4 ui build: dist/assets/asn1-EdZsLKOL.js                              3.98 kB │ gzip:     1.96 kB
+#39 192.4 ui build: dist/assets/q-pXgVlZs6.js                                 4.03 kB │ gzip:     1.67 kB
+#39 192.4 ui build: dist/assets/ttcn-cfg-B9xdYoR4.js                          4.05 kB │ gzip:     1.71 kB
+#39 192.4 ui build: dist/assets/dylan-DwRh75JA.js                             4.05 kB │ gzip:     1.65 kB
+#39 192.4 ui build: dist/assets/livescript-BwQOo05w.js                        4.09 kB │ gzip:     1.64 kB
+#39 192.4 ui build: dist/assets/groovy-D9Dt4D0W.js                            4.14 kB │ gzip:     1.77 kB
+#39 192.4 ui build: dist/assets/haskell-Cw1EW3IL.js                           4.17 kB │ gzip:     1.89 kB
+#39 192.4 ui build: dist/assets/diagram-LMA3HP47-B1Q_wAqw.js                  4.28 kB │ gzip:     1.87 kB
+#39 192.4 ui build: dist/assets/RoutineTitleWithVariables-B9ujsv0j.js         4.36 kB │ gzip:     1.85 kB
+#39 192.4 ui build: dist/assets/asterisk-B-8jnY81.js                          4.48 kB │ gzip:     1.78 kB
+#39 192.4 ui build: dist/assets/gas-Bneqetm1.js                               4.57 kB │ gzip:     1.28 kB
+#39 192.4 ui build: dist/assets/fortran-DYz_wnZ1.js                           4.65 kB │ gzip:     2.01 kB
+#39 192.4 ui build: dist/assets/defaultLocale-5voVPcsN.js                     4.69 kB │ gzip:     2.18 kB
+#39 192.4 ui build: dist/assets/mllike-CXdrOF99.js                            4.79 kB │ gzip:     1.53 kB
+#39 192.4 ui build: dist/assets/ttcn-CfJYG6tj.js                              4.80 kB │ gzip:     2.13 kB
+#39 192.4 ui build: dist/assets/index-DwAvUU7G.js                             5.07 kB │ gzip:     2.41 kB
+#39 192.4 ui build: dist/assets/RoutineVariablesEditor-CfR4ap3e.js            5.08 kB │ gzip:     1.71 kB
+#39 192.4 ui build: dist/assets/ecl-Cabwm37j.js                               5.13 kB │ gzip:     2.31 kB
+#39 192.4 ui build: dist/assets/crystal-SjHAIU92.js                           5.13 kB │ gzip:     2.07 kB
+#39 192.4 ui build: dist/assets/RoutineRunDialog-8CSJM76_.js                  5.16 kB │ gzip:     2.11 kB
+#39 192.4 ui build: dist/assets/ruby-B2Rjki9n.js                              5.16 kB │ gzip:     2.15 kB
+#39 192.4 ui build: dist/assets/pieDiagram-4H26LBE5-CJUCe618.js               5.35 kB │ gzip:     2.37 kB
+#39 192.4 ui build: dist/assets/julia-DuME0IfC.js                             5.39 kB │ gzip:     2.14 kB
+#39 192.4 ui build: dist/assets/linear-B2hEizDU.js                            5.65 kB │ gzip:     2.30 kB
+#39 192.4 ui build: dist/assets/vbscript-BuJXcnF6.js                          5.82 kB │ gzip:     2.57 kB
+#39 192.4 ui build: dist/assets/mirc-CjQqDB4T.js                              5.92 kB │ gzip:     2.68 kB
+#39 192.4 ui build: dist/assets/Issues-8jUiDOui.js                            5.96 kB │ gzip:     2.47 kB
+#39 192.4 ui build: dist/assets/diagram-2AECGRRQ-NqIo2VMe.js                  6.00 kB │ gzip:     2.53 kB
+#39 192.4 ui build: dist/assets/cobol-CWcv1MsR.js                             6.20 kB │ gzip:     2.96 kB
+#39 192.4 ui build: dist/assets/scheme-C41bIUwD.js                            6.37 kB │ gzip:     2.39 kB
+#39 192.4 ui build: dist/assets/python-BuPzkPfP.js                            6.48 kB │ gzip:     2.73 kB
+#39 192.4 ui build: dist/assets/xquery-DzFWVndE.js                            6.62 kB │ gzip:     2.56 kB
+#39 192.4 ui build: dist/assets/pug-DeIclll2.js                               6.67 kB │ gzip:     1.94 kB
+#39 192.4 ui build: dist/assets/textile-CnDTJFAw.js                           6.80 kB │ gzip:     2.44 kB
+#39 192.4 ui build: dist/assets/nsis-LdVXkNf5.js                              6.81 kB │ gzip:     2.99 kB
+#39 192.4 ui build: dist/assets/NewAgentDialog-_5amtNFX.js                    7.06 kB │ gzip:     2.94 kB
+#39 192.4 ui build: dist/assets/nginx-DdIZxoE0.js                             7.34 kB │ gzip:     2.72 kB
+#39 192.4 ui build: dist/assets/powershell-CFHJl5sT.js                        7.77 kB │ gzip:     3.33 kB
+#39 192.4 ui build: dist/assets/haxe-H-WmDvRZ.js                              7.89 kB │ gzip:     2.95 kB
+#39 192.4 ui build: dist/assets/erlang-BNw1qcRV.js                            8.10 kB │ gzip:     2.89 kB
+#39 192.4 ui build: dist/assets/verilog-C6RDOZhf.js                           8.24 kB │ gzip:     3.52 kB
+#39 192.4 ui build: dist/assets/sas-B4kiWyti.js                               9.33 kB │ gzip:     4.11 kB
+#39 192.4 ui build: dist/assets/perl-CdXCOZ3F.js                              9.75 kB │ gzip:     3.46 kB
+#39 192.4 ui build: dist/assets/zoom-DrNGoej5.js                             10.07 kB │ gzip:     3.69 kB
+#39 192.4 ui build: dist/assets/gherkin-heZmZLOM.js                          10.16 kB │ gzip:     5.09 kB
+#39 192.4 ui build: dist/assets/stateDiagram-AJRCARHV-CvDesHpv.js            10.40 kB │ gzip:     3.63 kB
+#39 192.4 ui build: dist/assets/clojure-BMjYHr_A.js                          10.82 kB │ gzip:     3.99 kB
+#39 192.4 ui build: dist/assets/diagram-KO2AKTUF-iT6nTYuC.js                 10.85 kB │ gzip:     4.18 kB
+#39 192.4 ui build: dist/assets/dagre-BM42HDAG-DMqNCRS6.js                   11.43 kB │ gzip:     4.22 kB
+#39 192.4 ui build: dist/assets/idl-BEugSyMb.js                              11.63 kB │ gzip:     4.52 kB
+#39 192.4 ui build: dist/assets/index-DboxAhVq.js                            12.71 kB │ gzip:     5.60 kB
+#39 192.4 ui build: dist/assets/diagram-OG6HWLK6-DVV_7eXO.js                 13.50 kB │ gzip:     4.84 kB
+#39 192.4 ui build: dist/assets/NewProjectDialog-CXsUUJuf.js                 14.00 kB │ gzip:     4.09 kB
+#39 192.4 ui build: dist/assets/AoaAgentDetail-BPW7y7nD.js                   14.46 kB │ gzip:     4.32 kB
+#39 192.4 ui build: dist/assets/index-BMrq-pjM.js                            14.80 kB │ gzip:     5.98 kB
+#39 192.4 ui build: dist/assets/index-rzPUZbMM.js                            16.32 kB │ gzip:     7.45 kB
+#39 192.4 ui build: dist/assets/javascript-iXu5QeM3.js                       17.08 kB │ gzip:     5.75 kB
+#39 192.4 ui build: dist/assets/ishikawaDiagram-YF4QCWOH-CfXiPAAA.js         17.60 kB │ gzip:     6.69 kB
+#39 192.4 ui build: dist/assets/index-BkQA5Yh0.js                            19.69 kB │ gzip:     9.30 kB
+#39 192.4 ui build: dist/assets/kanban-definition-UN3LZRKU-Dw-v7Yua.js       20.73 kB │ gzip:     7.31 kB
+#39 192.4 ui build: dist/assets/index-Dcsd6qfe.js                            20.94 kB │ gzip:     9.35 kB
+#39 192.4 ui build: dist/assets/clike-B9uivgTg.js                            22.30 kB │ gzip:     7.86 kB
+#39 192.4 ui build: dist/assets/Routines-b2Zw8Fo1.js                         22.88 kB │ gzip:     5.97 kB
+#39 192.4 ui build: dist/assets/index-C6TJPBav.js                            23.07 kB │ gzip:    10.39 kB
+#39 192.4 ui build: dist/assets/mindmap-definition-RKZ34NQL-BtA-HtDv.js      23.40 kB │ gzip:     7.91 kB
+#39 192.4 ui build: dist/assets/sankeyDiagram-5OEKKPKP-BwoUmIzI.js           23.43 kB │ gzip:     8.59 kB
+#39 192.4 ui build: dist/assets/journeyDiagram-JHISSGLW-NafM65Cf.js          23.61 kB │ gzip:     8.36 kB
+#39 192.4 ui build: dist/assets/graph-CAnANduQ.js                            23.95 kB │ gzip:     8.32 kB
+#39 192.4 ui build: dist/assets/IssuesList-DAaPafI-.js                       25.17 kB │ gzip:     6.30 kB
+#39 192.4 ui build: dist/assets/stylus-B533Al4x.js                           25.80 kB │ gzip:     8.60 kB
+#39 192.4 ui build: dist/assets/index-Dc1QLqAM.js                            25.86 kB │ gzip:    11.62 kB
+#39 192.4 ui build: dist/assets/wardleyDiagram-YWT4CUSO-dkL5Sw6x.js          26.13 kB │ gzip:     6.95 kB
+#39 192.4 ui build: dist/assets/index-eYEWvxfX.js                            26.40 kB │ gzip:     8.82 kB
+#39 192.4 ui build: dist/assets/NewIssueDialog-BkJhV4Ro.js                   26.55 kB │ gzip:     7.42 kB
+#39 192.4 ui build: dist/assets/erDiagram-TEJ5UH35-DailsJG7.js               27.01 kB │ gzip:     9.39 kB
+#39 192.4 ui build: dist/assets/css-BnMrqG3P.js                              27.13 kB │ gzip:     8.47 kB
+#39 192.4 ui build: dist/assets/index-o_iLZRqB.js                            28.70 kB │ gzip:    11.66 kB
+#39 192.4 ui build: dist/assets/gitGraphDiagram-PVQCEYII-B_qU5AI1.js         29.97 kB │ gzip:     8.89 kB
+#39 192.4 ui build: dist/assets/index-CjC4TVcX.js                            30.81 kB │ gzip:    12.65 kB
+#39 192.4 ui build: dist/assets/requirementDiagram-4Y6WPE33-BeyO387n.js      31.24 kB │ gzip:     9.83 kB
+#39 192.4 ui build: dist/assets/timeline-definition-PNZ67QCA-DfelKl_g.js     31.39 kB │ gzip:    10.44 kB
+#39 192.4 ui build: dist/assets/index-BImQf9gK.js                            32.33 kB │ gzip:    13.07 kB
+#39 192.4 ui build: dist/assets/quadrantDiagram-W4KKPZXB-Drm28olC.js         34.54 kB │ gzip:    10.15 kB
+#39 192.4 ui build: dist/assets/layout-DGIYPm2g.js                           35.84 kB │ gzip:    12.87 kB
+#39 192.4 ui build: dist/assets/sql-D0XecflT.js                              37.05 kB │ gzip:    10.94 kB
+#39 192.4 ui build: dist/assets/transform-BbtfPqKp.js                        37.23 kB │ gzip:    12.59 kB
+#39 192.4 ui build: dist/assets/chunk-AQP2D5EJ-4p3ofWtw.js                   37.57 kB │ gzip:    12.24 kB
+#39 192.4 ui build: dist/assets/xychartDiagram-2RQKCTM6-N1fAZdW2.js          40.43 kB │ gzip:    11.58 kB
+#39 192.4 ui build: dist/assets/index-CNFG5SWq.js                            40.74 kB │ gzip:    16.75 kB
+#39 192.4 ui build: dist/assets/vennDiagram-CIIHVFJN-7O7nEPl1.js             41.87 kB │ gzip:    15.60 kB
+#39 192.4 ui build: dist/assets/RoutineDetail-DJGNQG2_.js                    42.13 kB │ gzip:    11.55 kB
+#39 192.4 ui build: dist/assets/index-DIkVc9XM.js                            44.18 kB │ gzip:    15.34 kB
+#39 192.4 ui build: dist/assets/ProjectDetail-B5jBA8JH.js                    44.95 kB │ gzip:    11.59 kB
+#39 192.4 ui build: dist/assets/index-CCzXOvGx.js                            45.12 kB │ gzip:    19.16 kB
+#39 192.4 ui build: dist/assets/Skills-C4HRzOBY.js                           45.62 kB │ gzip:    12.23 kB
+#39 192.4 ui build: dist/assets/Memory-DtWmgTqT.js                           45.66 kB │ gzip:    11.07 kB
+#39 192.4 ui build: dist/assets/chunk-727SXJPM-CLuaCYUR.js                   49.10 kB │ gzip:    15.75 kB
+#39 192.4 ui build: dist/assets/GitCommandCentre-COab3wQ_.js                 60.81 kB │ gzip:    17.71 kB
+#39 192.4 ui build: dist/assets/flowDiagram-I6XJVG4X-D_QqNbrG.js             61.22 kB │ gzip:    19.53 kB
+#39 192.4 ui build: dist/assets/ganttDiagram-6RSMTGT7-Mnhd2yUl.js            69.58 kB │ gzip:    23.48 kB
+#39 192.4 ui build: dist/assets/c4Diagram-AAUBKEIU-CwCRD-vR.js               70.01 kB │ gzip:    19.66 kB
+#39 192.4 ui build: dist/assets/index-Q2cUgKRL.js                            70.82 kB │ gzip:    25.85 kB
+#39 192.4 ui build: dist/assets/DesignGuide-BCsRdFcM.js                      72.60 kB │ gzip:    17.16 kB
+#39 192.4 ui build: dist/assets/blockDiagram-GPEHLZMM-DmoNEJi3.js            75.15 kB │ gzip:    21.62 kB
+#39 192.4 ui build: dist/assets/cose-bilkent-S5V4N54A-_EIXDHw4.js            81.76 kB │ gzip:    22.49 kB
+#39 192.4 ui build: dist/assets/index-C52dH_rx.js                            86.65 kB │ gzip:    34.41 kB
+#39 192.4 ui build: dist/assets/sigma.esm-BuQk_0qI.js                        91.60 kB │ gzip:    24.83 kB
+#39 192.4 ui build: dist/assets/index-DGjh2Tfo.js                            97.87 kB │ gzip:    28.46 kB
+#39 192.4 ui build: dist/assets/index-C_lEpp9v.js                           100.57 kB │ gzip:    33.63 kB
+#39 192.4 ui build: dist/assets/sequenceDiagram-3UESZ5HK-Cnhk1Gb1.js        117.36 kB │ gzip:    31.20 kB
+#39 192.4 ui build: dist/assets/WorkspaceView-B69hvZrG.js                   119.35 kB │ gzip:    27.94 kB
+#39 192.4 ui build: dist/assets/architectureDiagram-3BPJPVTR-BwpSSfY0.js    149.80 kB │ gzip:    42.33 kB
+#39 192.4 ui build: dist/assets/katex-C5jXJg4s.js                           261.33 kB │ gzip:    77.57 kB
+#39 192.4 ui build: dist/assets/cytoscape.esm-LDYqcvCF.js                   442.60 kB │ gzip:   141.99 kB
+#39 192.4 ui build: dist/assets/PdfDocumentRenderer-fAFXTa51.js             461.85 kB │ gzip:   136.45 kB
+#39 192.4 ui build: dist/assets/mermaid.core-lQpmyimI.js                    583.50 kB │ gzip:   136.61 kB
+#39 192.4 ui build: dist/assets/wardley-L42UT6IY-DLL6B1az.js                615.46 kB │ gzip:   148.57 kB
+#39 192.5 ui build: dist/assets/MemoryExplorer-BfU6rya7.js                1,096.47 kB │ gzip:   361.20 kB
+#39 192.5 ui build: dist/assets/index-DoIQilWv.js                         4,413.99 kB │ gzip: 1,241.46 kB
+#39 192.5 ui build: ✓ built in 33.45s
+#39 192.5 ui build: (!) Some chunks are larger than 3000 kB after minification. Consider:
+#39 192.5 ui build: - Using dynamic import() to code-split the application
+#39 192.5 ui build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+#39 192.5 ui build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#39 193.1 ui build: Done
+#39 193.1 packages/provider-wire build$ tsc
+#39 194.6 packages/provider-wire build: Done
+#39 194.6 packages/adapter-manager build$ tsc
+#39 197.5 packages/adapter-manager build: Done
+#39 197.5 server build$ tsc && node --input-type=commonjs -e "require('node:fs').cpSync('src/onboarding-assets','dist/onboarding-assets',{recursive:true})"
+#39 254.0 server build: Done
+#39 DONE 254.0s
+
+#40 [build 6/9] RUN test -f server/dist/index.js || (echo "ERROR: server build output missing" && exit 1)
+#40 DONE 0.4s
+
+#41 [build 7/9] RUN pnpm --filter @armyofagents/server deploy --prod /cp-app
+#41 2.750 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#41 2.750 (Use `node --trace-deprecation ...` to show where the warning was created)
+#41 2.823 Packages are copied from the content-addressable store to the virtual store.
+#41 2.823   Content-addressable store is at: /root/.local/share/pnpm/store/v3
+#41 2.823   Virtual store is at:             ../cp-app/node_modules/.pnpm
+#41 2.906 Progress: resolved 1, reused 0, downloaded 0, added 0
+#41 3.909 Progress: resolved 20, reused 12, downloaded 0, added 0
+#41 4.919 Progress: resolved 34, reused 20, downloaded 14, added 0
+#41 5.414 server                                   |  WARN  deprecated @types/diff@8.0.0
+#41 5.861 server                                   |  WARN  deprecated eslint@9.39.5
+#41 5.914 Progress: resolved 74, reused 20, downloaded 54, added 0
+#41 6.915 Progress: resolved 80, reused 20, downloaded 60, added 0
+#41 7.916 Progress: resolved 103, reused 20, downloaded 78, added 0
+#41 8.917 Progress: resolved 143, reused 20, downloaded 118, added 0
+#41 9.918 Progress: resolved 218, reused 20, downloaded 193, added 0
+#41 10.92 Progress: resolved 372, reused 20, downloaded 347, added 0
+#41 11.92 Progress: resolved 449, reused 20, downloaded 427, added 0
+#41 12.92 Progress: resolved 513, reused 21, downloaded 463, added 0
+#41 13.92 Progress: resolved 539, reused 21, downloaded 473, added 0
+#41 14.92 Progress: resolved 589, reused 22, downloaded 481, added 0
+#41 15.92 Progress: resolved 622, reused 22, downloaded 490, added 0
+#41 16.92 Progress: resolved 646, reused 22, downloaded 496, added 0
+#41 17.92 Progress: resolved 664, reused 22, downloaded 512, added 0
+#41 18.92 Progress: resolved 687, reused 22, downloaded 538, added 0
+#41 19.92 Progress: resolved 719, reused 22, downloaded 575, added 0
+#41 20.92 Progress: resolved 843, reused 22, downloaded 701, added 0
+#41 21.93 Progress: resolved 911, reused 23, downloaded 771, added 0
+#41 22.92 Progress: resolved 995, reused 23, downloaded 855, added 0
+#41 23.95 Progress: resolved 1004, reused 23, downloaded 860, added 0
+#41 24.95 Progress: resolved 1021, reused 23, downloaded 868, added 0
+#41 25.95 Progress: resolved 1024, reused 23, downloaded 873, added 0
+#41 26.74  WARN  18 deprecated subdependencies found: @esbuild-kit/core-utils@3.3.2, @esbuild-kit/esm-loader@2.6.5, @smithy/core@3.24.1, @xmldom/xmldom@0.8.13, @zed-industries/codex-acp-darwin-arm64@0.12.0, @zed-industries/codex-acp-darwin-x64@0.12.0, @zed-industries/codex-acp-linux-arm64@0.12.0, @zed-industries/codex-acp-linux-x64@0.12.0, @zed-industries/codex-acp-win32-arm64@0.12.0, @zed-industries/codex-acp-win32-x64@0.12.0, @zed-industries/codex-acp@0.12.0, fstream@1.0.12, glob@11.1.0, glob@7.2.3, inflight@1.0.6, lodash.isequal@4.5.0, rimraf@2.7.1, uuid@8.3.2
+#41 26.80 .                                        | +687 ++++++++++++++++++++++++++++++++
+#41 26.95 Progress: resolved 1026, reused 23, downloaded 877, added 0
+#41 27.95 Progress: resolved 1026, reused 23, downloaded 877, added 42
+#41 28.95 Progress: resolved 1026, reused 23, downloaded 877, added 48
+#41 29.95 Progress: resolved 1026, reused 23, downloaded 877, added 345
+#41 30.95 Progress: resolved 1026, reused 23, downloaded 878, added 681
+#41 32.19 Progress: resolved 1026, reused 23, downloaded 879, added 681
+#41 33.19 Progress: resolved 1026, reused 23, downloaded 880, added 684
+#41 34.19 Progress: resolved 1026, reused 23, downloaded 880, added 685
+#41 40.33 Progress: resolved 1026, reused 23, downloaded 880, added 686
+#41 45.02 Progress: resolved 1026, reused 23, downloaded 880, added 687
+#41 45.02 Progress: resolved 1026, reused 23, downloaded 880, added 687, done
+#41 47.84 .../@embedded-postgres/linux-x64 postinstall$ node scripts/hydrate-symlinks.js
+#41 47.91 .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+#41 47.91 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#41 48.04 .../@embedded-postgres/linux-x64 postinstall: Done
+#41 48.04 .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+#41 48.11 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#41 55.22  WARN  Failed to create bin at /app/cp-app/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/cp-app/node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti-cli.mjs'
+#41 55.22  WARN  Failed to create bin at /app/cp-app/node_modules/.bin/acorn. ENOENT: no such file or directory, open '/cp-app/node_modules/.pnpm/acorn@8.16.0/node_modules/acorn/bin/acorn'
+#41 55.22  WARN  Failed to create bin at /app/cp-app/node_modules/.bin/drizzle-kit. ENOENT: no such file or directory, open '/cp-app/node_modules/.pnpm/drizzle-kit@0.31.10/node_modules/drizzle-kit/bin.cjs'
+#41 55.88  WARN  Issues with peer dependencies found
+#41 55.88 server
+#41 55.88 ├─┬ better-call 1.3.5
+#41 55.88 │ └── ✕ unmet peer zod@^4.0.0: found 3.25.76
+#41 55.88 └─┬ @armyofagents/adapter-acpx-local 0.2.7
+#41 55.88   └─┬ @agentclientprotocol/claude-agent-acp 0.31.4
+#41 55.88     └─┬ @anthropic-ai/claude-agent-sdk 0.2.121
+#41 55.88       └── ✕ unmet peer zod@^4.0.0: found 3.25.76
+#41 55.88 
+#41 DONE 57.4s
+
+#42 [build 8/9] RUN node docker/apply-workspace-publish-config.mjs /cp-app/node_modules
+#42 1.189 applied publishConfig: @armyofagents/adapter-acpx-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-acpx-local@file+packages+adapters+acpx-local/node_modules/@armyofagents/adapter-acpx-local/package.json)
+#42 1.193 applied publishConfig: @armyofagents/adapter-claude-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-claude-local@file+packages+adapters+claude-local/node_modules/@armyofagents/adapter-claude-local/package.json)
+#42 1.199 applied publishConfig: @armyofagents/adapter-codex-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-codex-local@file+packages+adapters+codex-local/node_modules/@armyofagents/adapter-codex-local/package.json)
+#42 1.201 applied publishConfig: @armyofagents/adapter-cursor-cloud (/cp-app/node_modules/.pnpm/@armyofagents+adapter-cursor-cloud@file+packages+adapters+cursor-cloud/node_modules/@armyofagents/adapter-cursor-cloud/package.json)
+#42 1.204 applied publishConfig: @armyofagents/adapter-cursor-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-cursor-local@file+packages+adapters+cursor-local/node_modules/@armyofagents/adapter-cursor-local/package.json)
+#42 1.208 applied publishConfig: @armyofagents/adapter-gemini-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-gemini-local@file+packages+adapters+gemini-local/node_modules/@armyofagents/adapter-gemini-local/package.json)
+#42 1.210 applied publishConfig: @armyofagents/adapter-grok-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-grok-local@file+packages+adapters+grok-local/node_modules/@armyofagents/adapter-grok-local/package.json)
+#42 1.213 applied publishConfig: @armyofagents/adapter-openclaw-gateway (/cp-app/node_modules/.pnpm/@armyofagents+adapter-openclaw-gateway@file+packages+adapters+openclaw-gateway/node_modules/@armyofagents/adapter-openclaw-gateway/package.json)
+#42 1.216 applied publishConfig: @armyofagents/adapter-openclaw (/cp-app/node_modules/.pnpm/@armyofagents+adapter-openclaw@file+packages+adapters+openclaw/node_modules/@armyofagents/adapter-openclaw/package.json)
+#42 1.220 applied publishConfig: @armyofagents/adapter-opencode-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-opencode-local@file+packages+adapters+opencode-local/node_modules/@armyofagents/adapter-opencode-local/package.json)
+#42 1.222 applied publishConfig: @armyofagents/adapter-pi-local (/cp-app/node_modules/.pnpm/@armyofagents+adapter-pi-local@file+packages+adapters+pi-local/node_modules/@armyofagents/adapter-pi-local/package.json)
+#42 1.225 applied publishConfig: @armyofagents/adapter-utils (/cp-app/node_modules/.pnpm/@armyofagents+adapter-utils@file+packages+adapter-utils/node_modules/@armyofagents/adapter-utils/package.json)
+#42 1.236 applied publishConfig: @armyofagents/db (/cp-app/node_modules/.pnpm/@armyofagents+db@file+packages+db_@electric-sql+pglite@0.3.15_@opentelemetry+api@1.9.1_kysely@0.29.3_pg@8.18.0/node_modules/@armyofagents/db/package.json)
+#42 1.240 applied publishConfig: @armyofagents/plugin-sdk (/cp-app/node_modules/.pnpm/@armyofagents+plugin-sdk@file+packages+plugins+sdk_react@19.2.4/node_modules/@armyofagents/plugin-sdk/package.json)
+#42 1.242 applied publishConfig: @armyofagents/provider-capability (/cp-app/node_modules/.pnpm/@armyofagents+provider-capability@file+packages+provider-capability/node_modules/@armyofagents/provider-capability/package.json)
+#42 1.248 applied publishConfig: @armyofagents/shared (/cp-app/node_modules/.pnpm/@armyofagents+shared@file+packages+shared/node_modules/@armyofagents/shared/package.json)
+#42 1.604 apply-workspace-publish-config: promoted publishConfig on 16 @armyofagents package manifest(s)
+#42 DONE 1.7s
+
+#43 [build 9/9] RUN test -f /cp-app/dist/index.js || (echo "ERROR: control-plane deploy output missing" && exit 1)
+#43 DONE 0.5s
+
+#44 [production 2/8] COPY --chown=node:node --from=build /cp-app /cp-app
+#44 DONE 8.8s
+
+#45 [production 3/8] COPY --chown=node:node --from=build /app/ui/dist /cp-app/ui-dist
+#45 DONE 0.6s
+
+#46 [production 4/8] COPY --chown=node:node docker/control-plane/entrypoint.sh /usr/local/bin/control-plane-entrypoint.sh
+#46 DONE 0.2s
+
+#47 [production 5/8] COPY --chown=node:node docker/control-plane/migrate-entrypoint.sh /usr/local/bin/migrate-entrypoint.sh
+#47 DONE 0.2s
+
+#48 [production 6/8] COPY --chown=node:node docker/control-plane/provision-d1-serving-roles.mjs /cp-app/provision-d1-serving-roles.mjs
+#48 DONE 0.2s
+
+#49 [production 7/8] COPY --chown=node:node docker/control-plane/seed-d1-worker-enrolment.mjs /cp-app/seed-d1-worker-enrolment.mjs
+#49 DONE 0.2s
+
+#50 [production 8/8] RUN sed -i 's/\r$//' /usr/local/bin/control-plane-entrypoint.sh /usr/local/bin/migrate-entrypoint.sh   && chmod +x /usr/local/bin/control-plane-entrypoint.sh /usr/local/bin/migrate-entrypoint.sh   && mkdir -p /aoa   && chown node:node /aoa
+#50 DONE 0.3s
+
+#51 [linux/amd64] generating sbom using docker.io/docker/buildkit-syft-scanner:stable-1
+#51 0.328 time="2026-10-15T10:25:56Z" level=info msg="starting syft scanner for buildkit v1.12.0"
+#51 DONE 9.5s
+
+#52 exporting to image
+#52 exporting layers
+#52 exporting layers 45.1s done
+#52 exporting manifest sha256:08aca8a116ad5386616d61aeaa24027d1c78e113bae07a1e9ad57ec553bbd009 0.0s done
+#52 exporting config sha256:5ff9822b077b04407b9702889f1d063b80bedc78f19895ed89af0c78c29d5469 0.0s done
+#52 exporting attestation manifest sha256:e0068ad2e1b7f87b1f019d69ecac4116b61f69a054ae22d4e87c688b480aab77
+#52 exporting attestation manifest sha256:e0068ad2e1b7f87b1f019d69ecac4116b61f69a054ae22d4e87c688b480aab77 0.1s done
+#52 exporting manifest list sha256:6433835c2622776a785a3aba7bbcffd022fdd90399abff72574bfec4cae0cf12 0.0s done
+#52 naming to docker.io/aoa-test/control-plane:13b4e806f
+#52 naming to docker.io/aoa-test/control-plane:13b4e806f done
+#52 unpacking to docker.io/aoa-test/control-plane:13b4e806f
+#52 unpacking to docker.io/aoa-test/control-plane:13b4e806f 37.3s done
+#52 DONE 93.4s
+
+#53 resolving provenance for metadata file
+#53 DONE 0.1s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/kce0ufh54e1e8q74kglgz07jq

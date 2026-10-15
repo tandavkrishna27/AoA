@@ -1,0 +1,67 @@
+{
+  "scope": "Six separately executed single-file runs, once each, sequentially, with one Vitest worker. Concurrent parent PostgreSQL lane remained active, so these are not machine-wide idle-isolation runs.",
+  "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "node": "v24.19.0",
+  "configuration": "Default test assertions and timeouts retained. No automatic retries, dependencies, application configuration, fixture configuration, or product/test source changes.",
+  "environment": "Node 24 directory prepended to child PATH. AOA_RUN_WIN_INTEGRATION, AOA_D1_LIVE, E2B_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, DATABASE_URL, AOA_HOME, AOA_CONFIG removed from child environment.",
+  "commandsAndLogs": "isolated-summary.json contains complete argv arrays, cwd, UTC timestamps, exit codes, file/test counts, durations, and absolute log paths for each run.",
+  "sandboxStartupAttempts": "All six initial sandbox attempts exited 1 before test collection because esbuild could not read the existing repository config (Access is denied). These are infrastructure startup failures, not assertion attempts. Preserved separately in sandbox-startup-*.log and sandbox-startup-isolated-summary.json. Actual assertion runs used approved escalation.",
+  "singleFileTotals": { "filesPassed": 3, "filesFailed": 3, "testsPassed": 81, "testsFailed": 2, "testsSkipped": 1, "testsTotal": 84, "unhandledErrorsReported": 0 },
+  "results": [
+    {
+      "file": "packages/browser-runtime/src/__tests__/image-playwright-parity.test.ts",
+      "exitCode": 1,
+      "tests": { "passed": 3, "failed": 1, "skipped": 0 },
+      "classification": "Original failure reproduced",
+      "demonstrated": "createRequire(import.meta.url) in test:40-41 cannot resolve playwright-core/package.json. Browser-runtime declares playwright as a devDependency, not playwright-core. Resolution probe confirms playwright 1.59.1 resolves, and its own require resolves transitive playwright-core 1.59.1 in pnpm's package store, but direct require from the test yields MODULE_NOT_FOUND.",
+      "rootCause": "Direct transitive dependency lookup is not exposed from this package in the installed pnpm layout. No version mismatch was demonstrated.",
+      "additionalEvidence": "resolution-evidence.json"
+    },
+    {
+      "file": "packages/db/src/__tests__/required-migration-identity.test.ts",
+      "exitCode": 0,
+      "tests": { "passed": 3, "failed": 0, "skipped": 0 },
+      "classification": "Original full-run 5000ms timeout did not reproduce",
+      "demonstrated": "First test took 4121ms; subsequent tests took 315ms and 305ms. First test resets modules then dynamically imports client.ts, which statically imports Drizzle, postgres, and the full schema.",
+      "hypothesis": "Cold import/transform cost and execution load can consume the 5-second budget; import cost has not been instrumented and machine-wide contention is not proven as root cause.",
+      "limitation": "Single-file pass does not erase original 5018ms timeout."
+    },
+    {
+      "file": "server/src/__tests__/cloud-plugin-process-composition.test.ts",
+      "exitCode": 1,
+      "tests": { "passed": 6, "failed": 0, "skipped": 1 },
+      "classification": "Original suite-level failure reproduced",
+      "demonstrated": "beforeAll at 170 did not finish await import('../app.js') within 30000ms. Runtime worker-denial/positive-control tests passed. Missing cloud-composition-does-not-exist.cjs child error is the intentional positive control, not this failure.",
+      "unresolved": "The timeout alone does not distinguish a slow import graph from an ESM-cycle stall. Test comments describe an existing Drizzle require(esm) cycle, but no such cycle error was produced by this timed-out hook."
+    },
+    {
+      "file": "server/src/__tests__/job-leasing-contract.test.ts",
+      "exitCode": 0,
+      "tests": { "passed": 20, "failed": 0, "skipped": 0 },
+      "classification": "Original full-run 30000ms timeout did not reproduce",
+      "demonstrated": "Previously failing static-context test took 18248ms, versus 31501ms in original run. Authority-writer inventory took 56496ms, versus 102451ms originally. Source implements synchronous TypeScript AST parsing/walks over adversarial fixtures and production code. Vitest duration 113.03s.",
+      "hypothesis": "Expensive synchronous analysis is sensitive to execution conditions. Exact source of original slowdown has not been measured.",
+      "limitation": "Single-file pass does not erase original failure."
+    },
+    {
+      "file": "ui/src/__tests__/ProjectDetailWorkspaces.test.tsx",
+      "exitCode": 0,
+      "tests": { "passed": 16, "failed": 0, "skipped": 0 },
+      "classification": "Original UI failure did not reproduce",
+      "demonstrated": "Archive test passed 125ms. Original full-run log shows the synchronous getByTestId immediately before click could not find archive-workspace-ws-1 and the DOM contained loading skeletons. Test waits for both archive buttons before that synchronous re-query.",
+      "hypothesis": "A render/loading-state transition between awaited readiness and synchronous re-query is consistent with the original evidence; the trigger and underlying React/query scheduling cause remain unproven.",
+      "limitation": "Single-file pass does not erase original failure."
+    },
+    {
+      "file": "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+      "exitCode": 1,
+      "tests": { "passed": 33, "failed": 1, "skipped": 0 },
+      "classification": "Original queued unhandled rejection did not reproduce; a different assertion failed",
+      "demonstrated": "STALLED upload test at 487 expected WireProtocolError but received ResourceNotAvailableError, 27ms. It starts export and destroy concurrently at 485-486. Queued deadline test passed 410ms. No unhandled rejection or PromiseRejectionHandledWarning appeared in this single-file log.",
+      "newFailureHypothesis": "Concurrent destroy may acquire the sandbox operation path before export inspection, causing resource-unavailable refusal; request arrival/lock order was not instrumented, so this remains a hypothesis.",
+      "originalUnhandledEvidence": "Original full-run log reports WireProtocolError for queued test and PromiseRejectionHandledWarning. Test creates both first and queued promises at 692-700, awaits first's rejection at 701, then attaches queued's rejection assertion at 704. Source therefore leaves queued temporarily without a rejection handler; a queued response arriving first can produce the observed late-handler symptom. Timing order was not demonstrated in the single-file run.",
+      "limitation": "The newly observed assertion failure is separate from the original full-run unhandled error. Neither was fixed or retried."
+    }
+  ],
+  "verification": "git status --short and git diff --stat were empty after the six runs, and git rev-parse HEAD remained the requested pinned SHA. No full suite, typecheck, or build was rerun because this task was limited to six targeted reproductions."
+}

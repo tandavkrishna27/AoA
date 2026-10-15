@@ -1,0 +1,20 @@
+[
+  {
+    "base": "http://127.0.0.1:3210",
+    "httpStatus": 200,
+    "status": "ok",
+    "deploymentMode": "local_trusted",
+    "authReady": true,
+    "revision": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "capturedAt": "2026-10-15T16:39:24.339Z"
+  },
+  {
+    "base": "https://testing.armyofagents.org",
+    "httpStatus": 200,
+    "status": "ok",
+    "deploymentMode": "cloud_auth",
+    "authReady": true,
+    "revision": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "capturedAt": "2026-10-15T16:39:25.028Z"
+  }
+]

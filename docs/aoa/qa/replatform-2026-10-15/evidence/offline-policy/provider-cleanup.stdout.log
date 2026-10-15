@@ -1,0 +1,652 @@
+TAP version 13
+# Subtest: running GET is positive presence, never cleanup success
+ok 1 - running GET is positive presence, never cleanup success
+  ---
+  duration_ms: 57.2729
+  type: 'test'
+  ...
+# Subtest: paused GET is positive presence, never cleanup success
+ok 2 - paused GET is positive presence, never cleanup success
+  ---
+  duration_ms: 1.3705
+  type: 'test'
+  ...
+# Subtest: 404 plus complete empty list remains unknown: inaccessible or still killing is possible
+ok 3 - 404 plus complete empty list remains unknown: inaccessible or still killing is possible
+  ---
+  duration_ms: 1.9608
+  type: 'test'
+  ...
+# Subtest: paused presence on a later page overrides GET 404, including an empty first page
+ok 4 - paused presence on a later page overrides GET 404, including an empty first page
+  ---
+  duration_ms: 2.7917
+  type: 'test'
+  ...
+# Subtest: GET HTTP 400 never trusts a JSON code404 as absence
+ok 5 - GET HTTP 400 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 1.9139
+  type: 'test'
+  ...
+# Subtest: GET HTTP 401 never trusts a JSON code404 as absence
+ok 6 - GET HTTP 401 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 1.0559
+  type: 'test'
+  ...
+# Subtest: GET HTTP 403 never trusts a JSON code404 as absence
+ok 7 - GET HTTP 403 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 1.1913
+  type: 'test'
+  ...
+# Subtest: GET HTTP 404 never trusts a JSON code404 as absence
+ok 8 - GET HTTP 404 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 1.1016
+  type: 'test'
+  ...
+# Subtest: GET HTTP 429 never trusts a JSON code404 as absence
+ok 9 - GET HTTP 429 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 1.064
+  type: 'test'
+  ...
+# Subtest: GET HTTP 500 never trusts a JSON code404 as absence
+ok 10 - GET HTTP 500 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 2.8389
+  type: 'test'
+  ...
+# Subtest: GET HTTP 503 never trusts a JSON code404 as absence
+ok 11 - GET HTTP 503 never trusts a JSON code404 as absence
+  ---
+  duration_ms: 0.5468
+  type: 'test'
+  ...
+# Subtest: null GET response cannot establish presence or absence
+ok 12 - null GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.5989
+  type: 'test'
+  ...
+# Subtest: empty object GET response cannot establish presence or absence
+ok 13 - empty object GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.7838
+  type: 'test'
+  ...
+# Subtest: wrong ID GET response cannot establish presence or absence
+ok 14 - wrong ID GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.7528
+  type: 'test'
+  ...
+# Subtest: unknown state GET response cannot establish presence or absence
+ok 15 - unknown state GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.8985
+  type: 'test'
+  ...
+# Subtest: empty successful body GET response cannot establish presence or absence
+ok 16 - empty successful body GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.9387
+  type: 'test'
+  ...
+# Subtest: 204 GET response cannot establish presence or absence
+ok 17 - 204 GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.7364
+  type: 'test'
+  ...
+# Subtest: malformed JSON GET response cannot establish presence or absence
+ok 18 - malformed JSON GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.8687
+  type: 'test'
+  ...
+# Subtest: HTML success GET response cannot establish presence or absence
+ok 19 - HTML success GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.5613
+  type: 'test'
+  ...
+# Subtest: redirect GET response cannot establish presence or absence
+ok 20 - redirect GET response cannot establish presence or absence
+  ---
+  duration_ms: 0.4158
+  type: 'test'
+  ...
+# Subtest: null list page is incomplete, not an empty inventory
+ok 21 - null list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.749
+  type: 'test'
+  ...
+# Subtest: object list page is incomplete, not an empty inventory
+ok 22 - object list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.5699
+  type: 'test'
+  ...
+# Subtest: invalid item list page is incomplete, not an empty inventory
+ok 23 - invalid item list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.4749
+  type: 'test'
+  ...
+# Subtest: unknown state list page is incomplete, not an empty inventory
+ok 24 - unknown state list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.5021
+  type: 'test'
+  ...
+# Subtest: oversized page list page is incomplete, not an empty inventory
+ok 25 - oversized page list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.7824
+  type: 'test'
+  ...
+# Subtest: 401 list page is incomplete, not an empty inventory
+ok 26 - 401 list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.4304
+  type: 'test'
+  ...
+# Subtest: 403 list page is incomplete, not an empty inventory
+ok 27 - 403 list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.3597
+  type: 'test'
+  ...
+# Subtest: 404 list page is incomplete, not an empty inventory
+ok 28 - 404 list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.3556
+  type: 'test'
+  ...
+# Subtest: 429 list page is incomplete, not an empty inventory
+ok 29 - 429 list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.3534
+  type: 'test'
+  ...
+# Subtest: 503 list page is incomplete, not an empty inventory
+ok 30 - 503 list page is incomplete, not an empty inventory
+  ---
+  duration_ms: 0.3564
+  type: 'test'
+  ...
+# Subtest: later-page failure retains already observed presence but not list completeness
+ok 31 - later-page failure retains already observed presence but not list completeness
+  ---
+  duration_ms: 0.7873
+  type: 'test'
+  ...
+# Subtest: repeating pagination token stops without treating the partial list as complete
+ok 32 - repeating pagination token stops without treating the partial list as complete
+  ---
+  duration_ms: 0.9399
+  type: 'test'
+  ...
+# Subtest: pagination has a finite page cap even with unique tokens
+ok 33 - pagination has a finite page cap even with unique tokens
+  ---
+  duration_ms: 4.6377
+  type: 'test'
+  ...
+# Subtest: an oversized response body is cancelled without serializing it
+ok 34 - an oversized response body is cancelled without serializing it
+  ---
+  duration_ms: 1.6032
+  type: 'test'
+  ...
+# Subtest: shared deadline bounds a hanging fetch and starts no later requests
+ok 35 - shared deadline bounds a hanging fetch and starts no later requests
+  ---
+  duration_ms: 34.0764
+  type: 'test'
+  ...
+# Subtest: shared deadline bounds a hanging body and starts no later requests
+ok 36 - shared deadline bounds a hanging body and starts no later requests
+  ---
+  duration_ms: 38.924
+  type: 'test'
+  ...
+# Subtest: network exceptions are closed diagnostics, never credential-bearing error text
+ok 37 - network exceptions are closed diagnostics, never credential-bearing error text
+  ---
+  duration_ms: 0.9921
+  type: 'test'
+  ...
+# Subtest: invalid input {"apiKey":""} makes zero requests and never passes
+ok 38 - invalid input {"apiKey":""} makes zero requests and never passes
+  ---
+  duration_ms: 0.2561
+  type: 'test'
+  ...
+# Subtest: invalid input {"apiKey":"bad\\nkey"} makes zero requests and never passes
+ok 39 - invalid input {"apiKey":"bad\\nkey"} makes zero requests and never passes
+  ---
+  duration_ms: 0.1175
+  type: 'test'
+  ...
+# Subtest: invalid input {"sandboxIds":[]} makes zero requests and never passes
+ok 40 - invalid input {"sandboxIds":[]} makes zero requests and never passes
+  ---
+  duration_ms: 0.1163
+  type: 'test'
+  ...
+# Subtest: invalid input {"sandboxIds":null} makes zero requests and never passes
+ok 41 - invalid input {"sandboxIds":null} makes zero requests and never passes
+  ---
+  duration_ms: 0.1041
+  type: 'test'
+  ...
+# Subtest: invalid input {"sandboxIds":["../escape"]} makes zero requests and never passes
+ok 42 - invalid input {"sandboxIds":["../escape"]} makes zero requests and never passes
+  ---
+  duration_ms: 0.1115
+  type: 'test'
+  ...
+# Subtest: invalid input {"sandboxIds":["secret?token=value"]} makes zero requests and never passes
+ok 43 - invalid input {"sandboxIds":["secret?token=value"]} makes zero requests and never passes
+  ---
+  duration_ms: 0.1031
+  type: 'test'
+  ...
+# Subtest: invalid input {"sandboxIds":["id0","id1","id2","id3","id4","id5","id6","id7","id8","id9","id10","id11","id12","id13","id14","id15","id16","id17","id18","id19","id20","id21","id22","id23","id24","id25","id26","id27","id28","id29","id30","id31","id32","id33","id34","id35","id36","id37","id38","id39","id40","id41","id42","id43","id44","id45","id46","id47","id48","id49","id50","id51","id52","id53","id54","id55","id56","id57","id58","id59","id60","id61","id62","id63","id64","id65","id66","id67","id68","id69","id70","id71","id72","id73","id74","id75","id76","id77","id78","id79","id80","id81","id82","id83","id84","id85","id86","id87","id88","id89","id90","id91","id92","id93","id94","id95","id96","id97","id98","id99","id100"]} makes zero requests and never passes
+ok 44 - invalid input {"sandboxIds":["id0","id1","id2","id3","id4","id5","id6","id7","id8","id9","id10","id11","id12","id13","id14","id15","id16","id17","id18","id19","id20","id21","id22","id23","id24","id25","id26","id27","id28","id29","id30","id31","id32","id33","id34","id35","id36","id37","id38","id39","id40","id41","id42","id43","id44","id45","id46","id47","id48","id49","id50","id51","id52","id53","id54","id55","id56","id57","id58","id59","id60","id61","id62","id63","id64","id65","id66","id67","id68","id69","id70","id71","id72","id73","id74","id75","id76","id77","id78","id79","id80","id81","id82","id83","id84","id85","id86","id87","id88","id89","id90","id91","id92","id93","id94","id95","id96","id97","id98","id99","id100"]} makes zero requests and never passes
+  ---
+  duration_ms: 0.1461
+  type: 'test'
+  ...
+# Subtest: invalid input {"deadlineMs":0} makes zero requests and never passes
+ok 45 - invalid input {"deadlineMs":0} makes zero requests and never passes
+  ---
+  duration_ms: 0.0877
+  type: 'test'
+  ...
+# Subtest: invalid input {"deadlineMs":null} makes zero requests and never passes
+ok 46 - invalid input {"deadlineMs":null} makes zero requests and never passes
+  ---
+  duration_ms: 0.1145
+  type: 'test'
+  ...
+# Subtest: invalid input {"deadlineMs":180001} makes zero requests and never passes
+ok 47 - invalid input {"deadlineMs":180001} makes zero requests and never passes
+  ---
+  duration_ms: 0.0999
+  type: 'test'
+  ...
+# Subtest: duplicate expected IDs are observed once, and input is not mutated
+ok 48 - duplicate expected IDs are observed once, and input is not mutated
+  ---
+  duration_ms: 0.8117
+  type: 'test'
+  ...
+# Subtest: elapsed wall time is enforced even before the event-loop timer can run
+ok 49 - elapsed wall time is enforced even before the event-loop timer can run
+  ---
+  duration_ms: 8.9539
+  type: 'test'
+  ...
+# Subtest: malformed pagination token (2049 chars) is not complete or emitted
+ok 50 - malformed pagination token (2049 chars) is not complete or emitted
+  ---
+  duration_ms: 1.222
+  type: 'test'
+  ...
+# Subtest: malformed pagination token (14 chars) is not complete or emitted
+ok 51 - malformed pagination token (14 chars) is not complete or emitted
+  ---
+  duration_ms: 0.754
+  type: 'test'
+  ...
+# Subtest: credential-bearing metadata and network fields are never copied into presence evidence
+ok 52 - credential-bearing metadata and network fields are never copied into presence evidence
+  ---
+  duration_ms: 1.3082
+  type: 'test'
+  ...
+# Subtest: logical deletion passes with authenticated created/killed pair and a later exhausted list
+ok 53 - logical deletion passes with authenticated created/killed pair and a later exhausted list
+  ---
+  duration_ms: 4.4827
+  type: 'test'
+  ...
+# Subtest: optional independently recorded team and execution pins match without requiring a policy approval
+ok 54 - optional independently recorded team and execution pins match without requiring a policy approval
+  ---
+  duration_ms: 1.3376
+  type: 'test'
+  ...
+# Subtest: pending killing refuses logical deletion despite 404 and empty list
+ok 55 - pending killing refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.5175
+  type: 'test'
+  ...
+# Subtest: empty wrong-account history refuses logical deletion despite 404 and empty list
+ok 56 - empty wrong-account history refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.3062
+  type: 'test'
+  ...
+# Subtest: killed without creation refuses logical deletion despite 404 and empty list
+ok 57 - killed without creation refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 2.1303
+  type: 'test'
+  ...
+# Subtest: different teams refuses logical deletion despite 404 and empty list
+ok 58 - different teams refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.201
+  type: 'test'
+  ...
+# Subtest: different executions refuses logical deletion despite 404 and empty list
+ok 59 - different executions refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 0.9707
+  type: 'test'
+  ...
+# Subtest: different sandbox refuses logical deletion despite 404 and empty list
+ok 60 - different sandbox refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 0.9342
+  type: 'test'
+  ...
+# Subtest: different build refuses logical deletion despite 404 and empty list
+ok 61 - different build refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.2934
+  type: 'test'
+  ...
+# Subtest: old creation refuses logical deletion despite 404 and empty list
+ok 62 - old creation refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 2.4917
+  type: 'test'
+  ...
+# Subtest: late kill refuses logical deletion despite 404 and empty list
+ok 63 - late kill refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 3.1495
+  type: 'test'
+  ...
+# Subtest: future timestamp refuses logical deletion despite 404 and empty list
+ok 64 - future timestamp refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 3.5094
+  type: 'test'
+  ...
+# Subtest: reversed lifecycle refuses logical deletion despite 404 and empty list
+ok 65 - reversed lifecycle refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.0238
+  type: 'test'
+  ...
+# Subtest: tied lifecycle refuses logical deletion despite 404 and empty list
+ok 66 - tied lifecycle refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.0299
+  type: 'test'
+  ...
+# Subtest: later resume refuses logical deletion despite 404 and empty list
+ok 67 - later resume refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.1405
+  type: 'test'
+  ...
+# Subtest: later pause refuses logical deletion despite 404 and empty list
+ok 68 - later pause refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 0.9689
+  type: 'test'
+  ...
+# Subtest: old execution killed after new execution started refuses logical deletion despite 404 and empty list
+ok 69 - old execution killed after new execution started refuses logical deletion despite 404 and empty list
+  ---
+  duration_ms: 1.4415
+  type: 'test'
+  ...
+# Subtest: independent identity mismatch {"teamId":"other-team"} refuses a well-formed pair
+ok 70 - independent identity mismatch {"teamId":"other-team"} refuses a well-formed pair
+  ---
+  duration_ms: 1.2833
+  type: 'test'
+  ...
+# Subtest: independent identity mismatch {"executionId":"other-execution"} refuses a well-formed pair
+ok 71 - independent identity mismatch {"executionId":"other-execution"} refuses a well-formed pair
+  ---
+  duration_ms: 1.1078
+  type: 'test'
+  ...
+# Subtest: running listed after killed event still fails
+ok 72 - running listed after killed event still fails
+  ---
+  duration_ms: 3.4989
+  type: 'test'
+  ...
+# Subtest: paused listed after killed event still fails
+ok 73 - paused listed after killed event still fails
+  ---
+  duration_ms: 1.0486
+  type: 'test'
+  ...
+# Subtest: event HTTP 401 is unknown despite exhausted empty inventory
+ok 74 - event HTTP 401 is unknown despite exhausted empty inventory
+  ---
+  duration_ms: 1.2684
+  type: 'test'
+  ...
+# Subtest: event HTTP 403 is unknown despite exhausted empty inventory
+ok 75 - event HTTP 403 is unknown despite exhausted empty inventory
+  ---
+  duration_ms: 1.0484
+  type: 'test'
+  ...
+# Subtest: event HTTP 404 is unknown despite exhausted empty inventory
+ok 76 - event HTTP 404 is unknown despite exhausted empty inventory
+  ---
+  duration_ms: 1.2136
+  type: 'test'
+  ...
+# Subtest: event HTTP 429 is unknown despite exhausted empty inventory
+ok 77 - event HTTP 429 is unknown despite exhausted empty inventory
+  ---
+  duration_ms: 0.6425
+  type: 'test'
+  ...
+# Subtest: event HTTP 500 is unknown despite exhausted empty inventory
+ok 78 - event HTTP 500 is unknown despite exhausted empty inventory
+  ---
+  duration_ms: 0.6365
+  type: 'test'
+  ...
+# Subtest: event HTTP 503 is unknown despite exhausted empty inventory
+ok 79 - event HTTP 503 is unknown despite exhausted empty inventory
+  ---
+  duration_ms: 0.5616
+  type: 'test'
+  ...
+# Subtest: malformed event history null cannot pass
+ok 80 - malformed event history null cannot pass
+  ---
+  duration_ms: 0.6487
+  type: 'test'
+  ...
+# Subtest: malformed event history {} cannot pass
+ok 81 - malformed event history {} cannot pass
+  ---
+  duration_ms: 0.4863
+  type: 'test'
+  ...
+# Subtest: malformed event history [{}] cannot pass
+ok 82 - malformed event history [{}] cannot pass
+  ---
+  duration_ms: 0.4957
+  type: 'test'
+  ...
+# Subtest: malformed event history [{"id":"killed-event","version":"v2","type":"sandbox.lifecycle.killed","timestamp":"bad","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}},{"id":"created-event","version":"v2","type":"sandbox.lifecycle.created","timestamp":"2020-01-01T00:00:01Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}}] cannot pass
+ok 83 - malformed event history [{"id":"killed-event","version":"v2","type":"sandbox.lifecycle.killed","timestamp":"bad","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}},{"id":"created-event","version":"v2","type":"sandbox.lifecycle.created","timestamp":"2020-01-01T00:00:01Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}}] cannot pass
+  ---
+  duration_ms: 0.8456
+  type: 'test'
+  ...
+# Subtest: malformed event history [{"id":"killed-event","version":"v2","type":"sandbox.lifecycle.killed","timestamp":"2020-01-01T00:01:00Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}},{"id":"created-event","version":"v2","type":"sandbox.lifecycle.created","timestamp":"2020-01-01T00:00:01Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}}] cannot pass
+ok 84 - malformed event history [{"id":"killed-event","version":"v2","type":"sandbox.lifecycle.killed","timestamp":"2020-01-01T00:01:00Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}},{"id":"created-event","version":"v2","type":"sandbox.lifecycle.created","timestamp":"2020-01-01T00:00:01Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}}] cannot pass
+  ---
+  duration_ms: 0.8544
+  type: 'test'
+  ...
+# Subtest: malformed event history [{"id":"killed-event","version":"v99","type":"sandbox.lifecycle.killed","timestamp":"2020-01-01T00:01:00Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}},{"id":"created-event","version":"v2","type":"sandbox.lifecycle.created","timestamp":"2020-01-01T00:00:01Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}}] cannot pass
+ok 85 - malformed event history [{"id":"killed-event","version":"v99","type":"sandbox.lifecycle.killed","timestamp":"2020-01-01T00:01:00Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}},{"id":"created-event","version":"v2","type":"sandbox.lifecycle.created","timestamp":"2020-01-01T00:00:01Z","sandboxId":"owned-one","sandboxTeamId":"team-one","sandboxExecutionId":"execution-one","sandboxTemplateId":"template-one","sandboxBuildId":"build-one","eventData":{"private":"inert-offline-key"}}] cannot pass
+  ---
+  duration_ms: 0.7453
+  type: 'test'
+  ...
+# Subtest: event pagination exhausts offsets before the subsequent sandbox list
+ok 86 - event pagination exhausts offsets before the subsequent sandbox list
+  ---
+  duration_ms: 2.8488
+  type: 'test'
+  ...
+# Subtest: a complete pair on a full event page cannot hide a failing continuation
+ok 87 - a complete pair on a full event page cannot hide a failing continuation
+  ---
+  duration_ms: 1.5857
+  type: 'test'
+  ...
+# Subtest: event pages containing no new IDs stop as incomplete
+ok 88 - event pages containing no new IDs stop as incomplete
+  ---
+  duration_ms: 3.5759
+  type: 'test'
+  ...
+# Subtest: event pagination has a finite per-resource page cap
+ok 89 - event pagination has a finite per-resource page cap
+  ---
+  duration_ms: 25.8589
+  type: 'test'
+  ...
+# Subtest: event pagination rejects inconsistent duplicate IDs
+ok 90 - event pagination rejects inconsistent duplicate IDs
+  ---
+  duration_ms: 1.0251
+  type: 'test'
+  ...
+# Subtest: an identical duplicated event is harmless
+ok 91 - an identical duplicated event is harmless
+  ---
+  duration_ms: 1.0569
+  type: 'test'
+  ...
+# Subtest: good terminal evidence cannot hide failed or truncated final inventory
+ok 92 - good terminal evidence cannot hide failed or truncated final inventory
+  ---
+  duration_ms: 1.0577
+  type: 'test'
+  ...
+# Subtest: a deadline while reading events remains unknown and prevents a list request
+ok 93 - a deadline while reading events remains unknown and prevents a list request
+  ---
+  duration_ms: 39.853
+  type: 'test'
+  ...
+# Subtest: missing expected lifecycle window keeps identity unavailable, not an inferred success
+ok 94 - missing expected lifecycle window keeps identity unavailable, not an inferred success
+  ---
+  duration_ms: 0.9504
+  type: 'test'
+  ...
+# Subtest: invalid or conflicting resources refuse before network: []
+ok 95 - invalid or conflicting resources refuse before network: []
+  ---
+  duration_ms: 0.1931
+  type: 'test'
+  ...
+# Subtest: invalid or conflicting resources refuse before network: [{"sandboxId":"owned-one","notBefore":"bad","notAfter":"bad"}]
+ok 96 - invalid or conflicting resources refuse before network: [{"sandboxId":"owned-one","notBefore":"bad","notAfter":"bad"}]
+  ---
+  duration_ms: 0.0762
+  type: 'test'
+  ...
+# Subtest: invalid or conflicting resources refuse before network: [{"sandboxId":"owned-one","notBefore":"2020-01-01T00:00:00Z","notAfter":"2020-01-01T00:03:00Z","teamId":""}]
+ok 97 - invalid or conflicting resources refuse before network: [{"sandboxId":"owned-one","notBefore":"2020-01-01T00:00:00Z","notAfter":"2020-01-01T00:03:00Z","teamId":""}]
+  ---
+  duration_ms: 0.0649
+  type: 'test'
+  ...
+# Subtest: invalid or conflicting resources refuse before network: [{"sandboxId":"owned-one","notBefore":"2020-01-01T00:00:00Z","notAfter":"2020-01-01T00:03:00Z"},{"sandboxId":"owned-one","notBefore":"2020-01-01T00:00:00Z","notAfter":"2020-01-01T00:03:00Z","executionId":"conflict"}]
+ok 98 - invalid or conflicting resources refuse before network: [{"sandboxId":"owned-one","notBefore":"2020-01-01T00:00:00Z","notAfter":"2020-01-01T00:03:00Z"},{"sandboxId":"owned-one","notBefore":"2020-01-01T00:00:00Z","notAfter":"2020-01-01T00:03:00Z","executionId":"conflict"}]
+  ---
+  duration_ms: 0.0738
+  type: 'test'
+  ...
+# Subtest: all expected resources must have terminal evidence
+ok 99 - all expected resources must have terminal evidence
+  ---
+  duration_ms: 1.0469
+  type: 'test'
+  ...
+# Subtest: all resources can pass using the same authenticated team context
+ok 100 - all resources can pass using the same authenticated team context
+  ---
+  duration_ms: 1.0964
+  type: 'test'
+  ...
+# Subtest: contradictory team identities under one credential cannot certify multiple resources
+ok 101 - contradictory team identities under one credential cannot certify multiple resources
+  ---
+  duration_ms: 1.9548
+  type: 'test'
+  ...
+# Subtest: a final response crossing the shared deadline cannot produce success
+ok 102 - a final response crossing the shared deadline cannot produce success
+  ---
+  duration_ms: 61.336
+  type: 'test'
+  ...
+# Subtest: matching optional sandboxIds remain compatible with resource bindings
+ok 103 - matching optional sandboxIds remain compatible with resource bindings
+  ---
+  duration_ms: 0.8279
+  type: 'test'
+  ...
+# Subtest: contradictory optional sandboxIds do not silently replace the resource inventory
+ok 104 - contradictory optional sandboxIds do not silently replace the resource inventory
+  ---
+  duration_ms: 0.153
+  type: 'test'
+  ...
+# Subtest: valid terminal pair cannot hide malformed or failed GET 200
+ok 105 - valid terminal pair cannot hide malformed or failed GET 200
+  ---
+  duration_ms: 0.7074
+  type: 'test'
+  ...
+# Subtest: valid terminal pair cannot hide malformed or failed GET 401
+ok 106 - valid terminal pair cannot hide malformed or failed GET 401
+  ---
+  duration_ms: 0.8426
+  type: 'test'
+  ...
+# Subtest: valid terminal pair cannot hide malformed or failed GET 500
+ok 107 - valid terminal pair cannot hide malformed or failed GET 500
+  ---
+  duration_ms: 0.8387
+  type: 'test'
+  ...
+1..107
+# tests 107
+# suites 0
+# pass 107
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 522.3907

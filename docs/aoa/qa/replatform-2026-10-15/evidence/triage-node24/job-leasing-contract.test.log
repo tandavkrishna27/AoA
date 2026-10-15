@@ -1,0 +1,29 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > verifies the session and Ed25519 proof without opening a database transaction 10ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > binds proof to method/path/body/correlation and denies a copied bearer token 3ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > rejects the platform-scoped physical session before any tenant lookup 1ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > uses only descriptor-allowed frozen poll errors with redacted detail 2ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > keeps worker routes behind the default-off distributed execution composition 0ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > binds the shared-platform enrollment guard to the exact outer production declaration 17ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > discovers every exempt repository delegate call site and its promise observation 4ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > requires the tenant placement-profile delegate to follow its awaited row lock and scope denial 5ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > requires the placement decision writer's exact one-shot null predicate 8ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > binds the combined platform-authority guard to the protected transaction and target 6ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > inventories interpolated tagged-SQL certificate mutations by their real target 2ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > enforces an exhaustive authority-writer allowlist and target-worker-exclusive lock order 56496ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > maps one attempt-local typed static context from exact authority symbols with no laundering or injection 18248ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > selects one database-native global head with an exact static-certificate anti-join 241ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > keeps protected candidate facts immutable and certificate writers certificate-only 29758ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 final-review repository and telemetry contracts > defines bounded tuple-exact cleanup with left-join drift retention and three statement gates 9ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 final-review repository and telemetry contracts > returns certificate telemetry from the claim SQL instead of inferring it from candidate length 2ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 final-review repository and telemetry contracts > locks non-platform target before worker and touches liveness only after authority revalidation 1ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 final-review repository and telemetry contracts > requires the real-PG lock-order overlap to enter through the public poll service 2ms
+ ✓ |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 final-review repository and telemetry contracts > threads one optional closed metrics instance through leasing, scheduler, and outbox 1ms
+
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Start at  21:38:17
+   Duration  113.03s (transform 2.57s, setup 0ms, collect 7.39s, tests 104.82s, environment 0ms, prepare 209ms)
+

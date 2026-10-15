@@ -1,0 +1,17 @@
+{
+  "id": "dispatch-declared-real",
+  "kind": "static",
+  "file": "scripts/check-d1-dispatch-declared.mjs",
+  "scope": "WRK-008 committed dispatch declaration",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "scripts/check-d1-dispatch-declared.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:02.787Z",
+  "durationMs": 88,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {}
+}

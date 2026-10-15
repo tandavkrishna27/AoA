@@ -1,0 +1,212 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth > every sink (and the bare form) fails closed on cloud_auth 4ms
+ ✓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth > the REAL worker manager denies startWorker before any fork (zero child process) on cloud_auth 2ms
+ ✓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth > a direct worker handle denies before fork (worker-fork sink) on cloud_auth 2ms
+ ✓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth > the parent worker-child marker AOA_PLUGIN_WORKER_PROCESS=1 does NOT unblock the fork on cloud_auth 1ms
+ ✓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth > stripHostedPluginWorkerMarker() removes a spoofed marker from the hosted parent (cloud only) 0ms
+ ✓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth > self-hosted positive (local_trusted): the worker path is live — a real fork IS attempted 84ms
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "worker-manager"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 1
+    [35mblockedActivationSourceCount[39m: 1
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "worker-fork"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 2
+    [35mblockedActivationSourceCount[39m: 2
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "lifecycle"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 3
+    [35mblockedActivationSourceCount[39m: 3
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "loader"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 4
+    [35mblockedActivationSourceCount[39m: 4
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "loader-import"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 5
+    [35mblockedActivationSourceCount[39m: 5
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "ui-static"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 6
+    [35mblockedActivationSourceCount[39m: 6
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mcompanyId[39m: "company-a"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "worker-manager"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 7
+    [35mblockedActivationSourceCount[39m: 7
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mcompanyId[39m: "company-a"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "worker-fork"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 8
+    [35mblockedActivationSourceCount[39m: 8
+[16:07:45] [33mWARN[39m: [36mblocked cloud plugin execution[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.cloud_blocked"
+    [35mpluginId[39m: "p1"
+    [35mcompanyId[39m: "company-a"
+    [35mactivationSource[39m: "boot"
+    [35msink[39m: "worker-manager"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+    [35mblockedActivationCount[39m: 9
+    [35mblockedActivationSourceCount[39m: 9
+[16:07:45] [33mWARN[39m: [36mstripped spoofed plugin worker-child marker from the hosted parent[39m
+    [35mservice[39m: "cloud-plugin-execution"
+    [35mevent[39m: "plugin.worker.parent_marker_stripped"
+    [35menvVar[39m: "AOA_PLUGIN_WORKER_PROCESS"
+    [35mreasonCode[39m: "PLUGIN_WORKER_BLOCKED_IN_CLOUD"
+[16:07:45] [32mINFO[39m: [36mstarting plugin worker[39m
+    [35mservice[39m: "plugin-worker-manager"
+    [35mpluginId[39m: "p1"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr] node:internal/modules/cjs/loader:1520[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]   throw err;[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]   ^[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr] [39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr] Error: Cannot find module 'C:\Users\Dell\Desktop\aoa\replatform-testing\cloud-composition-does-not-exist.cjs'[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at Module._resolveFilename (node:internal/modules/cjs/loader:1517:15)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1122:12)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at Module._load (node:internal/modules/cjs/loader:1294:5)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]     at node:internal/main/run_main_module:33:47 {[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]   code: 'MODULE_NOT_FOUND',[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr]   requireStack: [][39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr] }[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr] [39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [33mWARN[39m: [36m[plugin stderr] Node.js v24.19.0[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mstream[39m: "stderr"
+[16:07:45] [31mERROR[39m: [36mworker process crashed[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mcode[39m: 1
+    [35msignal[39m: null
+    [35mconsecutiveCrashes[39m: 1
+    [35mtotalCrashes[39m: 1
+[16:07:45] [31mERROR[39m: [36mmax consecutive crashes reached, not restarting[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    [35mconsecutiveCrashes[39m: 1
+    [35mmaxCrashes[39m: 10
+[16:07:45] [31mERROR[39m: [36mworker initialize failed[39m
+    [35mservice[39m: "plugin-worker"
+    [35mpluginId[39m: "p1"
+    err: "Worker process exited (code=1, signal=null)\n\nWorker stderr:\nnode:internal/modules/cjs/loader:1520\n  throw err;\n  ^\n\nError: Cannot find module 'C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\cloud-composition-does-not-exist.cjs'\n    at Module._resolveFilename (node:internal/modules/cjs/loader:1517:15)\n    at wrapResolveFilename (node:internal/modules/cjs/loader:1071:27)\n    at defaultResolveImplForCJSLoading (node:internal/modules/cjs/loader:1095:10)\n    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1122:12)\n    at Module._load (node:internal/modules/cjs/loader:1294:5)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  code: 'MODULE_NOT_FOUND',\n  requireStack: []\n}\n\nNode.js v24.19.0"
+ ↓ |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 real-createApp() composition — import-constraint (E0-F005) > documents that the real app is not importable under vitest (drizzle require(esm) cycle)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 real-createApp() composition — import-constraint (E0-F005)
+Error: Hook timed out in 30000ms.
+If this is a long-running hook, pass a timeout value as the last argument or configure it globally with "hookTimeout".
+ ❯ src/__tests__/cloud-plugin-process-composition.test.ts:170:3
+    168|   let importError: unknown = null;
+    169| 
+    170|   beforeAll(async () => {
+       |   ^
+    171|     try {
+    172|       appModule = await import("../app.js");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 passed | 1 skipped (7)
+   Start at  21:37:42
+   Duration  33.16s (transform 9.16s, setup 0ms, collect 2.45s, tests 30.11s, environment 0ms, prepare 183ms)
+

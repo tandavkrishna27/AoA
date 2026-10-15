@@ -1,0 +1,997 @@
+{
+  "profile": "m1-spine",
+  "ticket": "DEP-016",
+  "usageMode": "canned",
+  "startedAt": "2026-10-15T11:12:02.012Z",
+  "finishedAt": "2026-10-15T11:12:35.608Z",
+  "tenants": {
+    "enabled": [
+      {
+        "key": "A",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a"
+      },
+      {
+        "key": "B",
+        "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+        "companyId": "0d016b01-0000-4000-8000-00000000000b"
+      }
+    ],
+    "control": {
+      "key": "C",
+      "organizationId": "0d016c00-0000-4000-8000-00000000000c",
+      "companyId": "0d016c01-0000-4000-8000-00000000000c"
+    }
+  },
+  "executor": "worker",
+  "replicas": {
+    "control-plane": {
+      "deploymentMode": "authenticated",
+      "deploymentEnabled": true,
+      "rolloutSha256": "02cebb95542abbd49ff4b646d8ee1dc730ce584e49d6287c08b04f1160a9012f",
+      "rolloutRaw": "{\"organizations\":{\"0d016a00-0000-4000-8000-00000000000a\":{\"mode\":\"canary\",\"workloads\":[\"batch\"]},\"0d016b00-0000-4000-8000-00000000000b\":{\"mode\":\"canary\",\"workloads\":[\"batch\"]}}}",
+      "resolved": {
+        "0d016a00-0000-4000-8000-00000000000a": "canary",
+        "0d016b00-0000-4000-8000-00000000000b": "canary",
+        "0d016c00-0000-4000-8000-00000000000c": "off"
+      },
+      "crewRaw": null,
+      "crewEnabled": false,
+      "toolSurfaceRaw": null,
+      "toolSurfaceArmed": false,
+      "organizationToolSurface": {
+        "0d016a00-0000-4000-8000-00000000000a": false,
+        "0d016b00-0000-4000-8000-00000000000b": false,
+        "0d016c00-0000-4000-8000-00000000000c": false
+      },
+      "excludedFlags": {
+        "AOA_DISTRIBUTED_PUBLIC_SERVICE_INGRESS_ENABLED": null,
+        "AOA_DISTRIBUTED_CLOUD_PLUGIN_EXECUTION_ENABLED": null,
+        "AOA_ALLOW_UNSANDBOXED_MULTITENANT": null,
+        "AOA_0188_CUTOVER_OPT_IN": null
+      },
+      "freezeExclusions": {
+        "categories": {
+          "workload": {
+            "mechanism": "rollout_allowlist",
+            "state": "batch/task_run only"
+          },
+          "desktop": {
+            "mechanism": "service_absence",
+            "state": "absent",
+            "services": []
+          },
+          "mobility": {
+            "mechanism": "route_absence",
+            "state": "absent",
+            "routes": []
+          },
+          "cutover": {
+            "mechanism": "canary_rollout_and_real_opt_in",
+            "state": "off"
+          },
+          "ha": {
+            "mechanism": "topology_observation",
+            "state": "not_claimed",
+            "runningControlPlanes": 1
+          },
+          "beta": {
+            "mechanism": "deployment_mode",
+            "state": "authenticated"
+          },
+          "crew": {
+            "mechanism": "AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED",
+            "state": null
+          },
+          "tool": {
+            "mechanism": "AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED",
+            "state": "off",
+            "raw": null
+          }
+        },
+        "actualFlags": {
+          "AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED": null,
+          "AOA_DISTRIBUTED_PUBLIC_SERVICE_INGRESS_ENABLED": null,
+          "AOA_DISTRIBUTED_CLOUD_PLUGIN_EXECUTION_ENABLED": null,
+          "AOA_ALLOW_UNSANDBOXED_MULTITENANT": null,
+          "AOA_0188_CUTOVER_OPT_IN": null,
+          "AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED": null
+        },
+        "sha256": "e083efc3b3d86fec3877422faa208a14eb9a7e94c88d3f2d1161e8bbe0d7ce3b"
+      }
+    }
+  },
+  "enabled": {
+    "A": {
+      "jobId": "430dbbff-7a10-40bf-9a48-90275c689d40",
+      "attemptId": "eb5226f4-f32b-4e77-90d1-c9a7b1497ca2",
+      "workerId": "ac30b121-8da0-4986-9639-b592f1b4017f",
+      "targetId": "da93201a-cece-4b11-8fac-eb97a98b959c",
+      "leaseId": "f51a6395-0db1-42da-aac2-bf7a994e1b58",
+      "providerUsage": {
+        "inputTokens": 120000,
+        "outputTokens": 30000,
+        "cachedInputTokens": 0,
+        "runtimeMillis": 4200
+      },
+      "attemptStatus": "succeeded",
+      "events": [
+        {
+          "eventId": "89b8f51d-4324-4dba-a742-79db33cc42ed",
+          "eventType": "attempt_started",
+          "sequence": 1,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a"
+        },
+        {
+          "eventId": "1b3a13bb-bf61-4084-8328-aea9500dadb4",
+          "eventType": "usage",
+          "sequence": 2,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a"
+        },
+        {
+          "eventId": "a67f79f0-5ab9-4477-87d5-2a127cad4f9f",
+          "eventType": "terminal",
+          "sequence": 3,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a"
+        }
+      ],
+      "usageEvents": [
+        {
+          "eventId": "1b3a13bb-bf61-4084-8328-aea9500dadb4",
+          "sequence": 2,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "payload": {
+            "inputTokens": 120000,
+            "outputTokens": 30000,
+            "runtimeMillis": 4200,
+            "cachedInputTokens": 0
+          }
+        }
+      ],
+      "costRows": [
+        {
+          "id": "dbd254d6-f4f2-44c5-b755-d71865402f46",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "agentId": "0d016a02-0000-4000-8000-00000000000a",
+          "provider": "claude_local",
+          "model": "claude-sonnet-4-6",
+          "inputTokens": 120000,
+          "outputTokens": 30000,
+          "cachedInputTokens": 0,
+          "costCents": 81,
+          "sourceIdempotencyKey": "cost:0d016a01-0000-4000-8000-00000000000a:1b3a13bb-bf61-4084-8328-aea9500dadb4",
+          "rateId": "claude-sonnet-4-6",
+          "rateVersion": 1
+        }
+      ],
+      "receipts": [
+        {
+          "projectionKind": "activity_audit",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "activity:0d016a01-0000-4000-8000-00000000000a:89b8f51d-4324-4dba-a742-79db33cc42ed",
+          "aggregateKind": "activity_log",
+          "targetAggregateId": "60583770-9c6f-44c9-94ff-39965626603f"
+        },
+        {
+          "projectionKind": "activity_audit",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "activity:0d016a01-0000-4000-8000-00000000000a:a67f79f0-5ab9-4477-87d5-2a127cad4f9f",
+          "aggregateKind": "activity_log",
+          "targetAggregateId": "a075ef7b-d3a2-4e68-8bff-9f5bd109370d"
+        },
+        {
+          "projectionKind": "attempt_started",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "89b8f51d-4324-4dba-a742-79db33cc42ed",
+          "aggregateKind": null,
+          "targetAggregateId": "eb5226f4-f32b-4e77-90d1-c9a7b1497ca2"
+        },
+        {
+          "projectionKind": "attempt_terminal",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "a67f79f0-5ab9-4477-87d5-2a127cad4f9f",
+          "aggregateKind": null,
+          "targetAggregateId": "eb5226f4-f32b-4e77-90d1-c9a7b1497ca2"
+        },
+        {
+          "projectionKind": "authoritative_cost",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "cost:0d016a01-0000-4000-8000-00000000000a:1b3a13bb-bf61-4084-8328-aea9500dadb4",
+          "aggregateKind": "cost_events",
+          "targetAggregateId": "dbd254d6-f4f2-44c5-b755-d71865402f46"
+        }
+      ],
+      "activity": [
+        {
+          "id": "60583770-9c6f-44c9-94ff-39965626603f",
+          "action": "job.attempt_started",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "organizationId": null,
+          "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "actorType": "system",
+          "actorId": "worker:ac30b121-8da0-4986-9639-b592f1b4017f",
+          "entityType": "job",
+          "entityId": "430dbbff-7a10-40bf-9a48-90275c689d40"
+        },
+        {
+          "id": "a075ef7b-d3a2-4e68-8bff-9f5bd109370d",
+          "action": "job.attempt_terminal",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "organizationId": null,
+          "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "actorType": "system",
+          "actorId": "worker:ac30b121-8da0-4986-9639-b592f1b4017f",
+          "entityType": "job",
+          "entityId": "430dbbff-7a10-40bf-9a48-90275c689d40"
+        }
+      ],
+      "criterion5EnvProbe": {
+        "observed": false,
+        "reason": "the m1-spine lane runs the reference provider, which executes no command, and its workers do not dispatch; criterion 5 is observed in the DEP-015 shipped-boot lane only",
+        "logMessages": 0
+      }
+    },
+    "B": {
+      "jobId": "1190f206-f9b5-42ea-9a77-cb4c76f96cc5",
+      "attemptId": "a1e2301c-4561-410e-87ee-a0c5ecc7ea3d",
+      "workerId": "d1cc70b4-7e20-4c97-988d-c862938f2fbf",
+      "targetId": "cfc7affa-9245-4245-babe-fbed51a61635",
+      "leaseId": "94da133d-17aa-49a3-8c02-44db25d73f51",
+      "providerUsage": {
+        "inputTokens": 120000,
+        "outputTokens": 30000,
+        "cachedInputTokens": 0,
+        "runtimeMillis": 4200
+      },
+      "attemptStatus": "succeeded",
+      "events": [
+        {
+          "eventId": "01641c70-a8e9-4adb-8c15-e4f081ef9b4d",
+          "eventType": "attempt_started",
+          "sequence": 1,
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b"
+        },
+        {
+          "eventId": "83c73abd-fb86-460a-95a8-98077b120402",
+          "eventType": "usage",
+          "sequence": 2,
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b"
+        },
+        {
+          "eventId": "f6f577a6-18fe-4805-984f-236d11131ffb",
+          "eventType": "terminal",
+          "sequence": 3,
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b"
+        }
+      ],
+      "usageEvents": [
+        {
+          "eventId": "83c73abd-fb86-460a-95a8-98077b120402",
+          "sequence": 2,
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "payload": {
+            "inputTokens": 120000,
+            "outputTokens": 30000,
+            "runtimeMillis": 4200,
+            "cachedInputTokens": 0
+          }
+        }
+      ],
+      "costRows": [
+        {
+          "id": "944b7e65-e0f2-45a0-b089-de3cb5adc86d",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "agentId": "0d016b02-0000-4000-8000-00000000000b",
+          "provider": "claude_local",
+          "model": "claude-sonnet-4-6",
+          "inputTokens": 120000,
+          "outputTokens": 30000,
+          "cachedInputTokens": 0,
+          "costCents": 81,
+          "sourceIdempotencyKey": "cost:0d016b01-0000-4000-8000-00000000000b:83c73abd-fb86-460a-95a8-98077b120402",
+          "rateId": "claude-sonnet-4-6",
+          "rateVersion": 1
+        }
+      ],
+      "receipts": [
+        {
+          "projectionKind": "activity_audit",
+          "status": "applied",
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "sourceIdentity": "activity:0d016b01-0000-4000-8000-00000000000b:01641c70-a8e9-4adb-8c15-e4f081ef9b4d",
+          "aggregateKind": "activity_log",
+          "targetAggregateId": "b3afdbd5-d939-45fa-af51-b4ff45eee5b6"
+        },
+        {
+          "projectionKind": "activity_audit",
+          "status": "applied",
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "sourceIdentity": "activity:0d016b01-0000-4000-8000-00000000000b:f6f577a6-18fe-4805-984f-236d11131ffb",
+          "aggregateKind": "activity_log",
+          "targetAggregateId": "bb1ee380-aae2-4c8d-b12c-b653e4e568d4"
+        },
+        {
+          "projectionKind": "attempt_started",
+          "status": "applied",
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "sourceIdentity": "01641c70-a8e9-4adb-8c15-e4f081ef9b4d",
+          "aggregateKind": null,
+          "targetAggregateId": "a1e2301c-4561-410e-87ee-a0c5ecc7ea3d"
+        },
+        {
+          "projectionKind": "attempt_terminal",
+          "status": "applied",
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "sourceIdentity": "f6f577a6-18fe-4805-984f-236d11131ffb",
+          "aggregateKind": null,
+          "targetAggregateId": "a1e2301c-4561-410e-87ee-a0c5ecc7ea3d"
+        },
+        {
+          "projectionKind": "authoritative_cost",
+          "status": "applied",
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "sourceIdentity": "cost:0d016b01-0000-4000-8000-00000000000b:83c73abd-fb86-460a-95a8-98077b120402",
+          "aggregateKind": "cost_events",
+          "targetAggregateId": "944b7e65-e0f2-45a0-b089-de3cb5adc86d"
+        }
+      ],
+      "activity": [
+        {
+          "id": "b3afdbd5-d939-45fa-af51-b4ff45eee5b6",
+          "action": "job.attempt_started",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "organizationId": null,
+          "detailsOrganizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "actorType": "system",
+          "actorId": "worker:d1cc70b4-7e20-4c97-988d-c862938f2fbf",
+          "entityType": "job",
+          "entityId": "1190f206-f9b5-42ea-9a77-cb4c76f96cc5"
+        },
+        {
+          "id": "bb1ee380-aae2-4c8d-b12c-b653e4e568d4",
+          "action": "job.attempt_terminal",
+          "companyId": "0d016b01-0000-4000-8000-00000000000b",
+          "organizationId": null,
+          "detailsOrganizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "actorType": "system",
+          "actorId": "worker:d1cc70b4-7e20-4c97-988d-c862938f2fbf",
+          "entityType": "job",
+          "entityId": "1190f206-f9b5-42ea-9a77-cb4c76f96cc5"
+        }
+      ],
+      "criterion5EnvProbe": {
+        "observed": false,
+        "reason": "harness-driven: the DEP-017 probe runs inside a sandbox, and M1-D1-SPINE has ONE deployed worker, which drives the first enabled tenant",
+        "logMessages": 0
+      }
+    }
+  },
+  "workerDriven": {
+    "executor": "worker",
+    "deployedWorkerId": "0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae",
+    "deployedTargetId": "33333333-3333-4333-8333-333333333333",
+    "deployedWorkerCount": 1,
+    "jobId": "a9365a74-098a-4ed1-a7cf-70d64ceb4225",
+    "attemptId": "94ace012-fe2b-4a2c-b3db-1c5b499b1d72",
+    "attemptStatus": "succeeded",
+    "events": [
+      {
+        "eventType": "attempt_started",
+        "workerId": "0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae"
+      },
+      {
+        "eventType": "log",
+        "workerId": "0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae"
+      },
+      {
+        "eventType": "usage",
+        "workerId": "0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae"
+      },
+      {
+        "eventType": "terminal",
+        "workerId": "0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae"
+      }
+    ],
+    "leaseWorkerIds": [
+      "0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae"
+    ],
+    "terminal": [
+      {
+        "status": "succeeded",
+        "exitCode": 0,
+        "errorCode": null,
+        "errorMessage": null
+      }
+    ],
+    "logMessages": 1,
+    "usageEvents": [
+      {
+        "eventId": "cdd404d0-5bbe-4954-9b2b-8ea568b6fe5e",
+        "sequence": 3,
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "payload": {
+          "inputTokens": 120000,
+          "outputTokens": 30000,
+          "runtimeMillis": 3,
+          "cachedInputTokens": 0
+        }
+      }
+    ],
+    "costRows": [
+      {
+        "id": "928bfc5a-32a6-4678-8ff9-04351c401f00",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "agentId": "0d016a02-0000-4000-8000-00000000000a",
+        "provider": "claude_local",
+        "model": "claude-sonnet-4-6",
+        "inputTokens": 120000,
+        "outputTokens": 30000,
+        "cachedInputTokens": 0,
+        "costCents": 81,
+        "sourceIdempotencyKey": "cost:0d016a01-0000-4000-8000-00000000000a:cdd404d0-5bbe-4954-9b2b-8ea568b6fe5e",
+        "rateId": "claude-sonnet-4-6",
+        "rateVersion": 1
+      }
+    ],
+    "receipts": [
+      {
+        "projectionKind": "activity_audit",
+        "status": "applied",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "sourceIdentity": "activity:0d016a01-0000-4000-8000-00000000000a:48d6d99b-cbf5-40a5-a2de-53fdd1c68a2f",
+        "aggregateKind": "activity_log",
+        "targetAggregateId": "fe18cae1-f0e8-48eb-beba-561f49f38cdb"
+      },
+      {
+        "projectionKind": "activity_audit",
+        "status": "applied",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "sourceIdentity": "activity:0d016a01-0000-4000-8000-00000000000a:fb0cb2fd-fd1a-4c0e-b66e-68a5c0aedaa6",
+        "aggregateKind": "activity_log",
+        "targetAggregateId": "b1860431-5aa3-4684-8b30-d80a732d3f56"
+      },
+      {
+        "projectionKind": "attempt_started",
+        "status": "applied",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "sourceIdentity": "fb0cb2fd-fd1a-4c0e-b66e-68a5c0aedaa6",
+        "aggregateKind": null,
+        "targetAggregateId": "94ace012-fe2b-4a2c-b3db-1c5b499b1d72"
+      },
+      {
+        "projectionKind": "attempt_terminal",
+        "status": "applied",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "sourceIdentity": "48d6d99b-cbf5-40a5-a2de-53fdd1c68a2f",
+        "aggregateKind": null,
+        "targetAggregateId": "94ace012-fe2b-4a2c-b3db-1c5b499b1d72"
+      },
+      {
+        "projectionKind": "authoritative_cost",
+        "status": "applied",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "sourceIdentity": "cost:0d016a01-0000-4000-8000-00000000000a:cdd404d0-5bbe-4954-9b2b-8ea568b6fe5e",
+        "aggregateKind": "cost_events",
+        "targetAggregateId": "928bfc5a-32a6-4678-8ff9-04351c401f00"
+      }
+    ],
+    "activity": [
+      {
+        "id": "b1860431-5aa3-4684-8b30-d80a732d3f56",
+        "action": "job.attempt_started",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "actorType": "system",
+        "actorId": "worker:0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae",
+        "entityType": "job",
+        "entityId": "a9365a74-098a-4ed1-a7cf-70d64ceb4225"
+      },
+      {
+        "id": "fe18cae1-f0e8-48eb-beba-561f49f38cdb",
+        "action": "job.attempt_terminal",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "actorType": "system",
+        "actorId": "worker:0ff4c31c-e0eb-45fc-b7c1-6411dd65c3ae",
+        "entityType": "job",
+        "entityId": "a9365a74-098a-4ed1-a7cf-70d64ceb4225"
+      }
+    ],
+    "criterion5EnvProbe": {
+      "observed": true,
+      "scope": "stage_in_env_only",
+      "logMessages": 1
+    }
+  },
+  "workerDrivenIsolation": {
+    "ok": true,
+    "targetOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+    "foreignAttemptsOnDeployedTarget": 0,
+    "ownAttemptsOnDeployedTarget": 3,
+    "otherTenantAttemptsAnywhere": 8
+  },
+  "control": {
+    "placements": [
+      {
+        "replica": "control-plane",
+        "jobId": "857396cd-de72-4e90-9c79-edb67db785da",
+        "disposition": "legacy",
+        "owner": "legacy",
+        "targetId": null,
+        "targetClass": null,
+        "targetScope": null,
+        "targetGeneration": null,
+        "profileHash": null,
+        "providerConstraintHash": null,
+        "fallbackDisposition": "not_applicable",
+        "reasonCode": "organization_disabled",
+        "mode": "legacy",
+        "leaseEligible": false,
+        "inputDigest": "c7ae207c727f8a6b3dd503ba13407000653801b62154fc5015ea58769c32d0a5",
+        "policyDigest": "c7ae207c727f8a6b3dd503ba13407000653801b62154fc5015ea58769c32d0a5"
+      }
+    ],
+    "positiveControlPlacement": {
+      "replica": "control-plane",
+      "tenant": "A",
+      "jobId": "d729a587-6600-4c65-8443-3f1e457c74bf",
+      "disposition": "selected",
+      "owner": "organization_dedicated",
+      "targetId": "da93201a-cece-4b11-8fac-eb97a98b959c",
+      "targetClass": "organization_dedicated",
+      "targetScope": "organization",
+      "targetGeneration": 1,
+      "profileHash": "eb18a2af6023fbaecebe8cee7722de1019c1bfce65ecf87dc45802911f579657",
+      "providerConstraintHash": "6806f456d41a7608b6cef8db6115d2c1e7f53781ffbcecceaf0031df12823e2f",
+      "fallbackDisposition": "primary",
+      "reasonCode": "target_selected",
+      "mode": "active",
+      "leaseEligible": true,
+      "inputDigest": "ad662c7119afc4cebe1f19627dce7200656dbe9a3c8758595533ef0b228dc1b8",
+      "policyDigest": "ad662c7119afc4cebe1f19627dce7200656dbe9a3c8758595533ef0b228dc1b8"
+    },
+    "jobIds": [
+      "857396cd-de72-4e90-9c79-edb67db785da"
+    ],
+    "pollOutcome": "no_work",
+    "counts": {
+      "ok": true,
+      "jobEvents": 0,
+      "costRows": 0,
+      "receipts": 0,
+      "leases": 0,
+      "attempts": [
+        {
+          "jobId": "857396cd-de72-4e90-9c79-edb67db785da",
+          "status": "pending",
+          "disposition": "legacy",
+          "leaseEligible": false,
+          "reasonCode": "organization_disabled",
+          "mode": "legacy"
+        }
+      ]
+    }
+  },
+  "verdicts": {
+    "replicas": [],
+    "A:criterion5": [],
+    "A": [],
+    "B:criterion5": [],
+    "B": [],
+    "workerDriven": [],
+    "workerDrivenCost": [],
+    "criterion5": [],
+    "workerDrivenControl": [
+      {
+        "code": "worker_driven:events_not_deployed_worker",
+        "message": "[m1-spine:worker-driven] 3 accepted event(s) were produced by a worker that is NOT the deployed one (attempt_started:ac30b121-8da0-4986-9639-b592f1b4017f, usage:ac30b121-8da0-4986-9639-b592f1b4017f, terminal:ac30b121-8da0-4986-9639-b592f1b4017f)"
+      },
+      {
+        "code": "worker_driven:lease_not_deployed_worker",
+        "message": "[m1-spine:worker-driven] the attempt was leased by ac30b121-8da0-4986-9639-b592f1b4017f, not only by the deployed worker"
+      },
+      {
+        "code": "worker_driven:target_mismatch",
+        "message": "[m1-spine:worker-driven] the attempt is placed on da93201a-cece-4b11-8fac-eb97a98b959c, not on the deployed worker's target 33333333-3333-4333-8333-333333333333"
+      }
+    ],
+    "criterion5Others": [],
+    "isolation": [],
+    "control": [],
+    "rollbackRehearsal": []
+  },
+  "isolation": {
+    "victim": "A",
+    "attacker": "B",
+    "jobId": "251b1d3e-dd9e-4d78-9b66-d7cc2272cd40",
+    "hostileEventUpload": {
+      "status": 401,
+      "ackStatus": null,
+      "code": "unauthorized"
+    },
+    "ownEventUpload": {
+      "status": 200,
+      "ackStatus": "accepted",
+      "code": null
+    },
+    "hostileAck": {
+      "status": 409,
+      "outcome": null,
+      "code": "stale_fence"
+    },
+    "foreignScopeEventCount": 0,
+    "ownScopeEventCount": 1,
+    "costRowsBeforeHostile": 1,
+    "costRowsAfterHostile": 1,
+    "usageEventsBeforeHostile": 1,
+    "usageEventsAfterHostile": 1,
+    "hostileUploadBody": {
+      "protocolVersion": 1,
+      "code": "unauthorized",
+      "correlationId": "a6f1c577-5b1b-4df2-a748-f7cefa7984e0",
+      "message": "Worker control request denied",
+      "retryAfterMs": null,
+      "serverTime": "2026-10-15T11:12:21.746Z",
+      "redaction": "secret",
+      "detail": {}
+    },
+    "hostileAckBody": {
+      "protocolVersion": 1,
+      "code": "stale_fence",
+      "correlationId": "310dae56-9296-4ab8-b381-13ddbb155568",
+      "message": "Worker control request denied",
+      "retryAfterMs": null,
+      "serverTime": "2026-10-15T11:12:22.092Z",
+      "redaction": "secret",
+      "detail": {}
+    },
+    "costRowsAfter": [
+      {
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "agentId": "0d016a02-0000-4000-8000-00000000000a",
+        "costCents": 2
+      }
+    ]
+  },
+  "rollbackRehearsal": {
+    "operator": "m1-spine-3919bb1a",
+    "exitCode": 0,
+    "reportLines": [
+      {
+        "organization": {
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 4,
+          "failedJobIds": []
+        }
+      },
+      {
+        "organization": {
+          "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 1,
+          "failedJobIds": []
+        }
+      },
+      {
+        "organization": {
+          "organizationId": "0d016c00-0000-4000-8000-00000000000c",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 2,
+          "failedJobIds": []
+        }
+      },
+      {
+        "organization": {
+          "organizationId": "1869ff2f-bdd1-46be-8aeb-f78e0c7113e8",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 1,
+          "failedJobIds": []
+        }
+      },
+      {
+        "organization": {
+          "organizationId": "2ef10f91-ec28-4958-891f-98950d93fb56",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 1,
+          "failedJobIds": []
+        }
+      },
+      {
+        "organization": {
+          "organizationId": "71bdfe70-505d-44b5-81a5-f3932b180204",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 1,
+          "failedJobIds": []
+        }
+      },
+      {
+        "organization": {
+          "organizationId": "d7fc09eb-5064-4cb4-be4f-3a7427327ea6",
+          "skipped": false,
+          "reason": null,
+          "cancelled": 0,
+          "failedJobIds": []
+        }
+      },
+      {
+        "summary": {
+          "reason": "distributed_execution_rollback",
+          "actorId": "operator-cli:m1-spine-3919bb1a",
+          "organizationsScanned": 7,
+          "cancelled": 10,
+          "skippedCount": 0,
+          "skippedOrganizations": [],
+          "failedCancellations": []
+        }
+      }
+    ],
+    "stderr": "",
+    "drainable": [
+      {
+        "tenantKey": "A",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "jobId": "84b44626-ce99-4e77-a4b0-b15dbcd0ecc6",
+        "attemptId": "24846f67-0a56-4d00-b7c7-10263f4bff95"
+      },
+      {
+        "tenantKey": "B",
+        "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+        "companyId": "0d016b01-0000-4000-8000-00000000000b",
+        "jobId": "f7bc5cfe-6835-4922-a227-2ee1b86aae22",
+        "attemptId": "a19de370-2e1a-435c-8d0e-5884019746a2"
+      }
+    ],
+    "preDrainCandidates": [
+      {
+        "jobId": "5688f5c0-a5e4-4333-9f08-67f5b6694ee4",
+        "attemptId": "918935bb-eebf-4917-abf1-f3d669555df1",
+        "organizationId": "0d016c00-0000-4000-8000-00000000000c",
+        "companyId": "0d016c01-0000-4000-8000-00000000000c",
+        "status": "pending",
+        "disposition": "legacy",
+        "activeLeases": 0,
+        "activeLeaseId": null
+      },
+      {
+        "jobId": "2f809f7b-726b-459e-a7ab-e79d264a9d88",
+        "attemptId": "35fed52e-88b2-4993-a433-9b0a6d367b7a",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "status": "pending",
+        "disposition": "selected",
+        "activeLeases": 0,
+        "activeLeaseId": null
+      },
+      {
+        "jobId": "251b1d3e-dd9e-4d78-9b66-d7cc2272cd40",
+        "attemptId": "f4c949f8-c77c-4c2b-82fc-88831b74530e",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "status": "leased",
+        "disposition": "selected",
+        "activeLeases": 1,
+        "activeLeaseId": "350fe968-dc96-477e-8d57-5436fb10d984"
+      },
+      {
+        "jobId": "857396cd-de72-4e90-9c79-edb67db785da",
+        "attemptId": "1988c0cb-9dd2-4d58-8e44-d1cc0b7ec9f9",
+        "organizationId": "0d016c00-0000-4000-8000-00000000000c",
+        "companyId": "0d016c01-0000-4000-8000-00000000000c",
+        "status": "pending",
+        "disposition": "legacy",
+        "activeLeases": 0,
+        "activeLeaseId": null
+      },
+      {
+        "jobId": "d729a587-6600-4c65-8443-3f1e457c74bf",
+        "attemptId": "728c6bbc-2aaa-4632-b7d7-cd7db35a8465",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "status": "pending",
+        "disposition": "selected",
+        "activeLeases": 0,
+        "activeLeaseId": null
+      },
+      {
+        "jobId": "84b44626-ce99-4e77-a4b0-b15dbcd0ecc6",
+        "attemptId": "24846f67-0a56-4d00-b7c7-10263f4bff95",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "status": "pending",
+        "disposition": "selected",
+        "activeLeases": 0,
+        "activeLeaseId": null
+      },
+      {
+        "jobId": "f7bc5cfe-6835-4922-a227-2ee1b86aae22",
+        "attemptId": "a19de370-2e1a-435c-8d0e-5884019746a2",
+        "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+        "companyId": "0d016b01-0000-4000-8000-00000000000b",
+        "status": "pending",
+        "disposition": "selected",
+        "activeLeases": 0,
+        "activeLeaseId": null
+      }
+    ],
+    "terminalJobIds": [
+      "430dbbff-7a10-40bf-9a48-90275c689d40",
+      "1190f206-f9b5-42ea-9a77-cb4c76f96cc5"
+    ],
+    "audit": [
+      {
+        "action": "job.drain.requested",
+        "entityId": "251b1d3e-dd9e-4d78-9b66-d7cc2272cd40",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      },
+      {
+        "action": "job.drain.requested",
+        "entityId": "2f809f7b-726b-459e-a7ab-e79d264a9d88",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      },
+      {
+        "action": "job.drain.requested",
+        "entityId": "84b44626-ce99-4e77-a4b0-b15dbcd0ecc6",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      },
+      {
+        "action": "job.drain.requested",
+        "entityId": "d729a587-6600-4c65-8443-3f1e457c74bf",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      },
+      {
+        "action": "job.drain.requested",
+        "entityId": "f7bc5cfe-6835-4922-a227-2ee1b86aae22",
+        "companyId": "0d016b01-0000-4000-8000-00000000000b",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016b00-0000-4000-8000-00000000000b",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      },
+      {
+        "action": "job.drain.requested",
+        "entityId": "5688f5c0-a5e4-4333-9f08-67f5b6694ee4",
+        "companyId": "0d016c01-0000-4000-8000-00000000000c",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016c00-0000-4000-8000-00000000000c",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      },
+      {
+        "action": "job.drain.requested",
+        "entityId": "857396cd-de72-4e90-9c79-edb67db785da",
+        "companyId": "0d016c01-0000-4000-8000-00000000000c",
+        "organizationId": null,
+        "detailsOrganizationId": "0d016c00-0000-4000-8000-00000000000c",
+        "detailsReason": "distributed_execution_rollback",
+        "actorType": "system",
+        "actorId": "operator-cli:m1-spine-3919bb1a"
+      }
+    ],
+    "attempts": [
+      {
+        "attemptId": "a1e2301c-4561-410e-87ee-a0c5ecc7ea3d",
+        "jobId": "1190f206-f9b5-42ea-9a77-cb4c76f96cc5",
+        "attemptNumber": 1,
+        "status": "succeeded"
+      },
+      {
+        "attemptId": "f4c949f8-c77c-4c2b-82fc-88831b74530e",
+        "jobId": "251b1d3e-dd9e-4d78-9b66-d7cc2272cd40",
+        "attemptNumber": 1,
+        "status": "cancel_requested"
+      },
+      {
+        "attemptId": "35fed52e-88b2-4993-a433-9b0a6d367b7a",
+        "jobId": "2f809f7b-726b-459e-a7ab-e79d264a9d88",
+        "attemptNumber": 1,
+        "status": "cancelled"
+      },
+      {
+        "attemptId": "eb5226f4-f32b-4e77-90d1-c9a7b1497ca2",
+        "jobId": "430dbbff-7a10-40bf-9a48-90275c689d40",
+        "attemptNumber": 1,
+        "status": "succeeded"
+      },
+      {
+        "attemptId": "918935bb-eebf-4917-abf1-f3d669555df1",
+        "jobId": "5688f5c0-a5e4-4333-9f08-67f5b6694ee4",
+        "attemptNumber": 1,
+        "status": "cancelled"
+      },
+      {
+        "attemptId": "24846f67-0a56-4d00-b7c7-10263f4bff95",
+        "jobId": "84b44626-ce99-4e77-a4b0-b15dbcd0ecc6",
+        "attemptNumber": 1,
+        "status": "cancelled"
+      },
+      {
+        "attemptId": "1988c0cb-9dd2-4d58-8e44-d1cc0b7ec9f9",
+        "jobId": "857396cd-de72-4e90-9c79-edb67db785da",
+        "attemptNumber": 1,
+        "status": "cancelled"
+      },
+      {
+        "attemptId": "728c6bbc-2aaa-4632-b7d7-cd7db35a8465",
+        "jobId": "d729a587-6600-4c65-8443-3f1e457c74bf",
+        "attemptNumber": 1,
+        "status": "cancelled"
+      },
+      {
+        "attemptId": "a19de370-2e1a-435c-8d0e-5884019746a2",
+        "jobId": "f7bc5cfe-6835-4922-a227-2ee1b86aae22",
+        "attemptNumber": 1,
+        "status": "cancelled"
+      }
+    ],
+    "commands": [
+      {
+        "jobId": "251b1d3e-dd9e-4d78-9b66-d7cc2272cd40",
+        "attemptId": "f4c949f8-c77c-4c2b-82fc-88831b74530e",
+        "leaseId": "350fe968-dc96-477e-8d57-5436fb10d984",
+        "commandKind": "cancel",
+        "reason": "distributed_execution_rollback"
+      }
+    ]
+  }
+}

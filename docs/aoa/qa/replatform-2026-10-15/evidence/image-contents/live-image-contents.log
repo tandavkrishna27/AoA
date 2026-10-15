@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: control-plane: no docker binary, no worker daemon, no agent CLIs, non-root
+ok 1 - control-plane: no docker binary, no worker daemon, no agent CLIs, non-root
+  ---
+  duration_ms: 1787.914773
+  type: 'test'
+  ...
+# Subtest: control-plane: carries the OCI revision label from digests.env
+ok 2 - control-plane: carries the OCI revision label from digests.env
+  ---
+  duration_ms: 77.914189
+  type: 'test'
+  ...
+# Subtest: worker: no server/db/ui, ships the daemon binary, non-root
+ok 3 - worker: no server/db/ui, ships the daemon binary, non-root
+  ---
+  duration_ms: 5033.143337
+  type: 'test'
+  ...
+# Subtest: worker: no provider credential baked into the image config
+ok 4 - worker: no provider credential baked into the image config
+  ---
+  duration_ms: 77.97987
+  type: 'test'
+  ...
+# Subtest: adapter-manager: no provider credential baked into the image config
+ok 5 - adapter-manager: no provider credential baked into the image config
+  ---
+  duration_ms: 500.013407
+  type: 'test'
+  ...
+# Subtest: adapter-manager: no server/db/ui, no database client, no docker, no agent CLIs, non-root
+ok 6 - adapter-manager: no server/db/ui, no database client, no docker, no agent CLIs, non-root
+  ---
+  duration_ms: 5713.211045
+  type: 'test'
+  ...
+# Subtest: adapter-manager: ships its bin and the provider (e2b) SDK it hosts
+ok 7 - adapter-manager: ships its bin and the provider (e2b) SDK it hosts
+  ---
+  duration_ms: 868.81648
+  type: 'test'
+  ...
+# Subtest: adapter-manager: carries the OCI revision label from digests.env
+ok 8 - adapter-manager: carries the OCI revision label from digests.env
+  ---
+  duration_ms: 79.243474
+  type: 'test'
+  ...
+# Subtest: worker: carries the OCI revision label from digests.env
+ok 9 - worker: carries the OCI revision label from digests.env
+  ---
+  duration_ms: 87.786703
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14396.734945

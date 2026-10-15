@@ -1,0 +1,8 @@
+{
+  "direction": "local-to-vps",
+  "organizationId": "9cfa8c26-6e47-4997-8991-42ee02c22e43",
+  "companyId": "28e41573-d492-4129-aa5b-8da09f6e3c49",
+  "targetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+  "createdAt": "2026-10-15T15:00:36.164Z",
+  "scope": "Fresh worker enrollment, durable identity, heartbeat, partition and reconnect; dispatch disabled"
+}

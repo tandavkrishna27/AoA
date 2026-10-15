@@ -1,0 +1,35 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > the Dockerfile pins an exact Playwright version 2ms
+ × |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves 10ms
+   → Cannot find module 'playwright-core/package.json'
+Require stack:
+- C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts
+ ✓ |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > the image installs a browser, not just the module 0ms
+ ✓ |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > the image ASSERTS chromium at build time, the way it already does for the CLIs 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves
+Error: Cannot find module 'playwright-core/package.json'
+Require stack:
+- C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts
+ ❯ src/__tests__/image-playwright-parity.test.ts:41:23
+     39|   it("that pin equals the version this repo actually resolves", () => {
+     40|     const require_ = createRequire(import.meta.url);
+     41|     const resolved = (require_("playwright-core/package.json") as { ve…
+       |                       ^
+     42|     expect(imagePin()).toBe(resolved);
+     43|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { code: 'MODULE_NOT_FOUND', requireStack: [ 'C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts' ] }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  21:37:34
+   Duration  599ms (transform 40ms, setup 0ms, collect 54ms, tests 14ms, environment 0ms, prepare 163ms)
+

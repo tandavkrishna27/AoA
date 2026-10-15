@@ -1,0 +1,214 @@
+TAP version 13
+# Subtest: worker-b persisted a DeviceIdentityRecord + receipt to its own volume
+ok 1 - worker-b persisted a DeviceIdentityRecord + receipt to its own volume
+  ---
+  duration_ms: 251.046465
+  type: 'test'
+  ...
+# Subtest: worker-a (mounted_secret control) persisted NOTHING
+ok 2 - worker-a (mounted_secret control) persisted NOTHING
+  ---
+  duration_ms: 234.767009
+  type: 'test'
+  ...
+# Subtest: the assertion above is non-vacuous — worker-a IS up and its /worker IS readable
+ok 3 - the assertion above is non-vacuous — worker-a IS up and its /worker IS readable
+  ---
+  duration_ms: 219.027715
+  type: 'test'
+  ...
+# Subtest: the control plane holds exactly ONE enrolled worker row for the target
+ok 4 - the control plane holds exactly ONE enrolled worker row for the target
+  ---
+  duration_ms: 577.007309
+  type: 'test'
+  ...
+# Subtest: the single-use enrolment code was consumed exactly once
+ok 5 - the single-use enrolment code was consumed exactly once
+  ---
+  duration_ms: 323.294514
+  type: 'test'
+  ...
+# Subtest: restarting worker-b does NOT enrol again (the steady-state short-circuit)
+ok 6 - restarting worker-b does NOT enrol again (the steady-state short-circuit)
+  ---
+  duration_ms: 2597.364472
+  type: 'test'
+  ...
+# Subtest: E6F-01 lease races: 100 submit->placement->lease->ACK races across >=2 profiles, one winner each
+ok 7 - E6F-01 lease races: 100 submit->placement->lease->ACK races across >=2 profiles, one winner each
+  ---
+  duration_ms: 13048.904628
+  type: 'test'
+  ...
+# Subtest: E6F-03 networked smoke: enroll -> poll -> lease -> ack -> fake-execute
+ok 8 - E6F-03 networked smoke: enroll -> poll -> lease -> ack -> fake-execute
+  ---
+  duration_ms: 3979.063612
+  type: 'test'
+  ...
+# Subtest: E6F-04 available-path tenancy: zero cross-Organization reads/existence disclosures (enroll/poll/lease)
+ok 9 - E6F-04 available-path tenancy: zero cross-Organization reads/existence disclosures (enroll/poll/lease)
+  ---
+  duration_ms: 7610.349541
+  type: 'test'
+  ...
+# Subtest: E6F-08 metadata: worker-a cannot reach the cloud IMDS endpoint 169.254.169.254 (internal nets, no off-stack route)
+ok 10 - E6F-08 metadata: worker-a cannot reach the cloud IMDS endpoint 169.254.169.254 (internal nets, no off-stack route)
+  ---
+  duration_ms: 304.953495
+  type: 'test'
+  ...
+# Subtest: E6F-08 metadata: worker-a cannot reach the ECS task metadata endpoint 169.254.170.2
+ok 11 - E6F-08 metadata: worker-a cannot reach the ECS task metadata endpoint 169.254.170.2
+  ---
+  duration_ms: 199.840052
+  type: 'test'
+  ...
+# Subtest: E6F-08 external: worker-a cannot reach an arbitrary public address (8.8.8.8:53)
+ok 12 - E6F-08 external: worker-a cannot reach an arbitrary public address (8.8.8.8:53)
+  ---
+  duration_ms: 203.249543
+  type: 'test'
+  ...
+# Subtest: E6F-08 private-net: worker-a cannot reach an arbitrary off-stack private address (10.0.0.1:22)
+ok 13 - E6F-08 private-net: worker-a cannot reach an arbitrary off-stack private address (10.0.0.1:22)
+  ---
+  duration_ms: 269.045692
+  type: 'test'
+  ...
+# Subtest: E6F-08 control-plane-internals / cross-job: worker-a cannot reach the data tier postgres:5432 directly (not on data-net)
+ok 14 - E6F-08 control-plane-internals / cross-job: worker-a cannot reach the data tier postgres:5432 directly (not on data-net)
+  ---
+  duration_ms: 286.686192
+  type: 'test'
+  ...
+# Subtest: E6F-08 provider-socket: the fake-provider container cannot reach the data tier postgres:5432 directly
+ok 15 - E6F-08 provider-socket: the fake-provider container cannot reach the data tier postgres:5432 directly
+  ---
+  duration_ms: 220.990004
+  type: 'test'
+  ...
+# Subtest: E6F-08 metadata: the fake-provider container cannot reach the cloud IMDS endpoint either
+ok 16 - E6F-08 metadata: the fake-provider container cannot reach the cloud IMDS endpoint either
+  ---
+  duration_ms: 319.700786
+  type: 'test'
+  ...
+# Subtest: E6F-08 POSITIVE CONTROL: worker-a CAN reach the declared provider API (fake-provider:8080) — the denials are real segmentation
+ok 17 - E6F-08 POSITIVE CONTROL: worker-a CAN reach the declared provider API (fake-provider:8080) — the denials are real segmentation
+  ---
+  duration_ms: 266.457083
+  type: 'test'
+  ...
+# Subtest: E6F-08 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) stale-fence non-disclosure: a stale fence on a real lease is denied IDENTICALLY to a nonexistent lease
+ok 18 - E6F-08 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) stale-fence non-disclosure: a stale fence on a real lease is denied IDENTICALLY to a nonexistent lease
+  ---
+  duration_ms: 3448.741816
+  type: 'test'
+  ...
+# Subtest: E6F-09 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) case 1 — pre-ACK disconnect: lease → cut worker-to-control-plane → back-date ack_deadline → reap → reclaimed, late ack refused
+ok 19 - E6F-09 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) case 1 — pre-ACK disconnect: lease → cut worker-to-control-plane → back-date ack_deadline → reap → reclaimed, late ack refused
+  ---
+  duration_ms: 5501.312922
+  type: 'test'
+  ...
+# Subtest: E6F-09 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) case 2 — lost completion ACK: a terminal event uploaded twice (same eventId + stable idempotencyKey) yields the identical ack and no duplicate row
+ok 20 - E6F-09 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) case 2 — lost completion ACK: a terminal event uploaded twice (same eventId + stable idempotencyKey) yields the identical ack and no duplicate row
+  ---
+  duration_ms: 4832.295725
+  type: 'test'
+  ...
+# Subtest: E6F-09 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) case 3 — expired lease: ack → stop renewing → back-date expires_at → reap → single-winner retry, late event refused stale_fence
+ok 21 - E6F-09 CONTROL-PLANE gate (harness-driven; no worker daemon, no device) case 3 — expired lease: ack → stop renewing → back-date expires_at → reap → single-winner retry, late event refused stale_fence
+  ---
+  duration_ms: 5643.919695
+  type: 'test'
+  ...
+# Subtest: E6F-10 telemetry contract: durable trace + tenant scoping + retained evidence
+ok 22 - E6F-10 telemetry contract: durable trace + tenant scoping + retained evidence
+  ---
+  duration_ms: 9262.120978
+  type: 'test'
+  ...
+# Subtest: the deliberate fixture genuinely fails (turns the merge-train red)
+ok 23 - the deliberate fixture genuinely fails (turns the merge-train red)
+  ---
+  duration_ms: 3.676413
+  type: 'test'
+  ...
+# Subtest: on that failure, the evidence bundle is ASSEMBLED with all four sections
+ok 24 - on that failure, the evidence bundle is ASSEMBLED with all four sections
+  ---
+  duration_ms: 4.577096
+  type: 'test'
+  ...
+# Subtest: every retained section carries real evidence (present:true + checksum)
+ok 25 - every retained section carries real evidence (present:true + checksum)
+  ---
+  duration_ms: 1.391844
+  type: 'test'
+  ...
+# Subtest: LIVE: a real D1 stack failure retains the evidence bundle
+ok 26 - LIVE: a real D1 stack failure retains the evidence bundle
+  ---
+  duration_ms: 27.490535
+  type: 'test'
+  ...
+# Subtest: an allowlisted peer scripts a golden fixture on the fake control endpoint
+ok 27 - an allowlisted peer scripts a golden fixture on the fake control endpoint
+  ---
+  duration_ms: 864.862114
+  type: 'test'
+  ...
+# Subtest: driving the declared API records a deterministic invocation ledger
+ok 28 - driving the declared API records a deterministic invocation ledger
+  ---
+  duration_ms: 1417.102985
+  type: 'test'
+  ...
+# Subtest: LOAD-BEARING: worker-a cannot reach postgres:5432 (not on data-net)
+ok 29 - LOAD-BEARING: worker-a cannot reach postgres:5432 (not on data-net)
+  ---
+  duration_ms: 596.293704
+  type: 'test'
+  ...
+# Subtest: worker-b cannot reach postgres:5432 (not on data-net)
+ok 30 - worker-b cannot reach postgres:5432 (not on data-net)
+  ---
+  duration_ms: 341.0503
+  type: 'test'
+  ...
+# Subtest: bridge honesty: worker-a reaches toxiproxy:15432 (TCP, by design) but CANNOT authenticate to postgres (no aoa_app creds)
+ok 31 - bridge honesty: worker-a reaches toxiproxy:15432 (TCP, by design) but CANNOT authenticate to postgres (no aoa_app creds)
+  ---
+  duration_ms: 387.740062
+  type: 'test'
+  ...
+# Subtest: positive control: worker-a CAN reach the fake-provider declared API (:8080)
+ok 32 - positive control: worker-a CAN reach the fake-provider declared API (:8080)
+  ---
+  duration_ms: 306.036899
+  type: 'test'
+  ...
+# Subtest: control-plane is REFUSED the fake control endpoint (:8081 peer allowlist)
+ok 33 - control-plane is REFUSED the fake control endpoint (:8081 peer allowlist)
+  ---
+  duration_ms: 369.86952
+  type: 'test'
+  ...
+# Subtest: positive control: control-plane CAN reach the fake declared API (:8080)
+ok 34 - positive control: control-plane CAN reach the fake declared API (:8080)
+  ---
+  duration_ms: 334.839439
+  type: 'test'
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 67790.833149

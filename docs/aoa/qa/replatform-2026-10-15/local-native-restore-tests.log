@@ -1,0 +1,28 @@
+✖ native full-schema restore rejects stale fence authority (56399.5163ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 56633.0732
+
+✖ failing tests:
+
+test at tests\d1\m4-native-fence-restore.test.mjs:12:1
+✖ native full-schema restore rejects stale fence authority (56399.5163ms)
+  AssertionError [ERR_ASSERTION]: Selected native restore case must execute; a skip is not evidence
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/tests/d1/m4-native-fence-restore.test.mjs:68:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

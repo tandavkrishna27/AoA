@@ -1,0 +1,38 @@
+{
+  "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "startedAt": "2026-10-15T16:18:56Z",
+  "finishedAt": "2026-10-15T16:19:00.341Z",
+  "host": "authorized Ubuntu VPS (Linux arm64)",
+  "runtime": "v24.19.0",
+  "platform": "linux",
+  "arch": "arm64",
+  "suite": "docker/images/__tests__/image-pipeline.test.mjs",
+  "scope": "DEP-014 / DEP-001 Docker-free SBOM-sign-admit pipeline and refusal controls",
+  "authority": ".github/workflows/pr.yml policy image-pipeline command",
+  "command": [
+    "/opt/aoa-testing/toolchain/node-v24.19.0-linux-arm64/bin/node",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "docker/images/__tests__/image-pipeline.test.mjs"
+  ],
+  "exitCode": 0,
+  "counts": {
+    "tests": 13,
+    "suites": 0,
+    "pass": 13,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "fixture": "Disposable git archive of exact HEAD containing only the 11 unchanged checked-in inputs required by this suite. Active checkout has a generated allowlist with 3 entries; it was not used as a fixture or changed.",
+  "provenance": "No fixture Git initialization was needed. AOA_IMAGE_REVISION is set by the original test; provenance sourceUrl uses its existing unknown fallback. Empty temporary HOME, GIT_CONFIG_NOSYSTEM=1 and GIT_CONFIG_GLOBAL=/dev/null prevent user/system Git configuration reads.",
+  "environment": "env -i; isolated Node24 first on PATH; empty temporary HOME and TMPDIR; no provider credentials, database URLs, AOA opt-in flags, BASH_ENV or external image-record overrides inherited.",
+  "safety": "Reviewed original scripts and test. Test prepends its temporary Docker shim (inspect/run only, no delegation) to PATH; outer fallback Docker shim exits 97 if called. syft absent on restricted PATH, ensuring no alternate image scanner. Output/signing key/allowlist/provenance stay in temporary fixtures; real OpenSSL and Node verifier run locally.",
+  "activeAllowlistSha256Before": "44f3fcab844a0ea7952ee65716b56c2768e2a2a306aa5f45d8ede20d754e85df",
+  "activeAllowlistSha256After": "44f3fcab844a0ea7952ee65716b56c2768e2a2a306aa5f45d8ede20d754e85df",
+  "activeAllowlistUnchanged": true,
+  "sourceLog": "/opt/aoa-testing/evidence/offline-posix-image-pipeline.log",
+  "limitations": "Synthetic Docker inventory and test signing root only. Does not build/inspect real images, exercise Docker daemon, use release trust, reach external APIs, or close any formal gate. Separate result; original 410-case totals unchanged."
+}

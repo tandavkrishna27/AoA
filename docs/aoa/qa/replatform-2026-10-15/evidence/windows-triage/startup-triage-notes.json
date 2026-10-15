@@ -1,0 +1,60 @@
+{
+  "candidate": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "runtime": "v24.19.0",
+  "scope": "One executable targeted attempt covering five previously failing startup cases; unchanged assertions and timeouts, one Vitest worker, AOA_RUN_WIN_INTEGRATION=1. The preceding sandbox attempt failed configuration loading before tests; its log and JSON are retained separately. No further test rounds.",
+  "evidence": {
+    "executionSummary": "startup-failures.json",
+    "completeStdoutAndStderr": "startup-failures.log",
+    "pretestSandboxFailure": ["startup-failures-sandbox.json", "startup-failures-sandbox.log"]
+  },
+  "result": {
+    "exitCode": 1,
+    "filesFailed": 1,
+    "testsPassed": 0,
+    "testsFailed": 5,
+    "testsFilteredOut": 72,
+    "totalCollectedTests": 77,
+    "vitestDurationSeconds": 346.78,
+    "hookFailureReported": false,
+    "vitestUnhandledErrorBlockReported": false,
+    "note": "The 72 skipped cases were excluded by the requested name filter, not executed integration coverage. No global Windows-lane pass is claimed."
+  },
+  "failures": [
+    {
+      "test": "checks grant-option ACL tuples independently on every derived relation and non-dropped user column",
+      "source": "server/src/__tests__/distributed-execution-db-startup.integration.test.ts:5254",
+      "observed": "Test timed out in 300000ms, reproducing the original full-lane timeout.",
+      "classification": "Demonstrated timeout/test reliability failure; no accepted invalid ACL was demonstrated."
+    },
+    {
+      "test": "keeps aoa_operator outside the drizzle migration schema",
+      "source": "server/src/__tests__/distributed-execution-db-startup.integration.test.ts:5415",
+      "expected": "distributed_execution_operator_authority",
+      "actual": "distributed_execution_app_authority",
+      "classification": "Wrong-phase rejection after the timed-out ACL sweep; shared-fixture interference strongly supported. Independent operator-authority defect not established."
+    },
+    {
+      "tests": [
+        "proves the module-load sentinel reaches every guarded module while enabled",
+        "observes the child's fallback port without accepting unrelated requested-port health",
+        "threads the identical metrics instance through the real flag-on startup and app composition"
+      ],
+      "sources": [
+        "server/src/__tests__/distributed-execution-db-startup.integration.test.ts:5448",
+        "server/src/__tests__/distributed-execution-db-startup.integration.test.ts:5515",
+        "server/src/__tests__/distributed-execution-db-startup.integration.test.ts:5536"
+      ],
+      "actual": "Each child exited with distributed_execution_app_authority from server/src/db/distributed-execution-databases.ts:1760 before the intended positive startup journey.",
+      "classification": "Reproduced positive-startup failures under the same potentially contaminated fixture. These results do not independently prove sentinel wiring, fallback-port selection, or metrics identity defects."
+    }
+  ],
+  "sourceAnalysis": {
+    "sharedFixture": "One beforeAll creates the embedded cluster/admin pool at startup test lines 163-236. afterAll closes it at 238-244; there is no per-test fresh database/reset.",
+    "mutationLifetime": "The exhaustive ACL sweep at lines 5254-5359 changes relation and column GRANT OPTION state and restores it in each iteration's finally. Its async callback has no test-context signal or cancellation check. Timeout does not await its complete loop before later tests reuse the database.",
+    "runnerSemantics": "Installed @vitest/runner 3.2.6 dist/chunk-hooks.js:1852-1922 rejects the outer promise on timeout and aborts context. It does not terminate the underlying async callback; this callback does not consume that context signal.",
+    "rejectionOrder": "Production startup checks app authority before operator authority, server/src/db/distributed-execution-databases.ts:1750-1782. An outstanding app ACL mutation therefore masks an operator-specific injected violation and prevents positive startup checks.",
+    "confidence": "Fixture cascade is strongly supported by the timeout, shared mutable ACL loop, lack of cancellation, wrong-phase rejection, and continuing app-authority logs during subsequent tests. The specific remaining ACL tuple was not queried; no isolated run excluding the sweep was authorized or performed, so independent product causes are not conclusively ruled out.",
+    "additionalDiagnostic": "Embedded PostgreSQL emitted a missing shared-memory-segment FATAL near shutdown at 16:39:22 UTC. Vitest reported neither a hook failure nor an unhandled-error block; no independent causal finding is inferred from this shutdown line."
+  },
+  "followUpOnly": "Make the ACL fixture cancellation-safe and ensure complete restoration/settlement before later cases, retaining full assertion coverage. Establish each positive startup journey on uncontaminated fixture state before assigning independent product defects. No source/setup changes, timeout increases, assertion relaxations or additional test rounds were made."
+}

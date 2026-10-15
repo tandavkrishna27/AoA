@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-10-15T15:06:31.4188799Z",
+  "subscriptionSignIn": "recognized",
+  "onboarding": "completed",
+  "helloProbe": "passed",
+  "modelOverride": "gpt-5.6-luna",
+  "commanderRun": {
+    "id": "83a369cc-6e56-49ee-93b5-531156aedcd7",
+    "status": "completed",
+    "provider": "openai",
+    "model": "gpt-5.6-luna",
+    "triggerSource": "user_message",
+    "createdAt": "2026-10-15T14:50:56.773Z"
+  },
+  "expectedReply": "AOA_SUBSCRIPTION_OK",
+  "replyObservedAfterReload": true,
+  "credentialMode": "ChatGPT subscription; no API key configured",
+  "defaultModelFinding": {
+    "model": "gpt-5.5",
+    "probeStatus": 400,
+    "message": "The 'gpt-5.5' model is not supported when using Codex with a ChatGPT account.",
+    "officialSource": "https://learn.chatgpt.com/docs/models",
+    "retirementDate": "2026-10-14"
+  },
+  "scope": "Native local Commander response only; not distributed personal subscription execution",
+  "screenshot": "evidence/local-subscription-commander.jpg"
+}

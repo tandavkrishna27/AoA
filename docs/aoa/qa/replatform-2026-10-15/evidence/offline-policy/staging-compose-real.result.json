@@ -1,0 +1,17 @@
+{
+  "id": "staging-compose-real",
+  "kind": "static",
+  "file": "scripts/check-staging-manifest.mjs",
+  "scope": "DEP-006 / DEP-015 committed staging composition",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "scripts/check-staging-manifest.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:02.691Z",
+  "durationMs": 94,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {}
+}

@@ -1,0 +1,193 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ❯ |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts (4 tests | 1 failed) 22ms
+   ✓ BRW-003b — image Playwright pin vs resolved Playwright > the Dockerfile pins an exact Playwright version 3ms
+   × BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves 15ms
+     → Cannot find module 'playwright-core/package.json'
+Require stack:
+- C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts
+   ✓ BRW-003b — image Playwright pin vs resolved Playwright > the image installs a browser, not just the module 1ms
+   ✓ BRW-003b — image Playwright pin vs resolved Playwright > the image ASSERTS chromium at build time, the way it already does for the CLIs 1ms
+stderr | src/__tests__/WorkspaceView.test.tsx > WorkspaceView — three-panel layout > shows a workspace error fallback when a panel render fails
+Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) {
+  [stack]: [Getter/Setter],
+  [message]: 'Synthetic workspace timeline render failure'
+}
+
+The above error occurred in the <WorkspaceTimeline> component.
+
+React will try to recreate this component tree from scratch using the error boundary you provided, WorkspaceErrorBoundary.
+
+Workspace render error Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) 
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:5:25)
+    at div (<anonymous>)
+    at Panel (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:100:13)
+    at div (<anonymous>)
+    at Group (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:92:13)
+    at div (<anonymous>)
+    at WorkspaceErrorBoundary (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceErrorBoundary.tsx:7:1)
+    at div (<anonymous>)
+    at WorkspaceLayout (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceLayout.tsx:36:3)
+    at WorkspaceView (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\pages\WorkspaceView.tsx:15:62)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Outlet (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7027:26)
+    at div (<anonymous>)
+    at LayoutStub (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:340:36)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Routes (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7097:3)
+    at Router (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7036:13)
+    at MemoryRouter (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6952:3)
+    at QueryClientProvider (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/@tanstack+react-query@5.90.21_react@19.2.4/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js:20:3)
+Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) {
+  [stack]: [Getter/Setter],
+  [message]: 'Synthetic workspace timeline render failure'
+}
+
+The above error occurred in the <WorkspaceTimeline> component.
+
+React will try to recreate this component tree from scratch using the error boundary you provided, WorkspaceErrorBoundary.
+
+Workspace render error Error: Synthetic workspace timeline render failure
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:20:13)
+    at Object.react_stack_bottom_frame (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:25904:20)
+    at renderWithHooks (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:7662:22)
+    at updateFunctionComponent (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:10166:19)
+    at beginWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:11778:18)
+    at runWithFiberInDEV (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:874:13)
+    at performUnitOfWork (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17641:22)
+    at workLoopSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17469:41)
+    at renderRootSync (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:17450:11)
+    at performWorkOnRoot (C:\Users\Dell\Desktop\aoa\replatform-testing\node_modules\.pnpm\react-dom@19.2.4_react@19.2.4\node_modules\react-dom\cjs\react-dom-client.development.js:16583:35) 
+    at WorkspaceTimeline (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:5:25)
+    at div (<anonymous>)
+    at Panel (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:100:13)
+    at div (<anonymous>)
+    at Group (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:92:13)
+    at div (<anonymous>)
+    at WorkspaceErrorBoundary (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceErrorBoundary.tsx:7:1)
+    at div (<anonymous>)
+    at WorkspaceLayout (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\components\workspace\WorkspaceLayout.tsx:36:3)
+    at WorkspaceView (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\pages\WorkspaceView.tsx:15:62)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Outlet (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7027:26)
+    at div (<anonymous>)
+    at LayoutStub (C:\Users\Dell\Desktop\aoa\replatform-testing\ui\src\__tests__\WorkspaceView.test.tsx:340:36)
+    at RenderedRoute (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6218:26)
+    at Routes (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7097:3)
+    at Router (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:7036:13)
+    at MemoryRouter (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/react-router@7.18.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/react-router/dist/development/chunk-4ZMWKKQ3.mjs:6952:3)
+    at QueryClientProvider (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/node_modules/.pnpm/@tanstack+react-query@5.90.21_react@19.2.4/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js:20:3)
+
+ ✓ |@armyofagents/ui| src/__tests__/WorkspaceRightPanel.test.tsx (17 tests) 6945ms
+   ✓ WorkspaceRightPanel cockpit contract > renders the software cockpit sections in the final order  725ms
+   ✓ WorkspaceRightPanel cockpit contract > replaces static card subtitles with live summaries and hides empty summaries  327ms
+   ✓ WorkspaceRightPanel cockpit contract > renders the cockpit header with ticket identifier, actions, and collapse  954ms
+   ✓ WorkspaceRightPanel cockpit contract > keeps workspace actions reachable from the collapsed cockpit rail  347ms
+   ✓ WorkspaceRightPanel cockpit contract > applies containment classes to every cockpit section  313ms
+   ✓ WorkspaceRightPanel cockpit contract > keeps collapsed cockpit rows status-only with actions hidden  324ms
+   ✓ WorkspaceRightPanel cockpit contract > shows Wake agent only after Process is expanded and never shows pause or cancel controls  637ms
+   ✓ WorkspaceRightPanel cockpit contract > wakes the assigned agent with the current issue payload  476ms
+   ✓ WorkspaceRightPanel cockpit contract > renders services under Services and git under Git  321ms
+   ✓ WorkspaceRightPanel cockpit contract > opens captured pending detected outputs from the sidebar artifacts section  798ms
+   ✓ WorkspaceRightPanel cockpit contract > dismisses pending detected outputs from the sidebar artifact actions menu  707ms
+ ✓ |@armyofagents/ui| src/__tests__/GitPanel.test.tsx (36 tests) 10068ms
+   ✓ GitPanel > offers manual GitHub PR refresh from Git actions  918ms
+   ✓ GitPanel > keeps manual GitHub PR refresh available after a sync failure  423ms
+   ✓ GitPanel > copy button copies branch name to clipboard  487ms
+   ✓ GitPanel > falls back when clipboard write fails and confirms branch copy  373ms
+   ✓ GitPanel > clicking Create PR opens the dialog  422ms
+   ✓ GitPanel > asks for confirmation before committing when a run is active  1246ms
+   ✓ GitPanel > asks for confirmation before pushing when a run is active, cancel prevents push, and continue performs it  1183ms
+   ✓ GitPanel > PR action buttons > calls mergePr with rebase method from the merge dropdown  481ms
+   ✓ GitPanel > PR action buttons > calls closePr on Close PR click  431ms
+   ✓ GitPanel > review fixes — silent background sync, request review, draft, terminal polling > requests a review with the entered reviewers and toasts on success  876ms
+   ✓ GitPanel > review fixes — silent background sync, request review, draft, terminal polling > disables merge and labels the button 'Draft' for a draft PR  323ms
+ ✓ |@armyofagents/ui| src/__tests__/WorkspaceView.test.tsx (23 tests) 8795ms
+   ✓ WorkspaceView — route and page renders > renders the workspace layout when data loads  801ms
+   ✓ WorkspaceView — three-panel layout > opens a browser preview tab from a running workspace service  591ms
+   ✓ WorkspaceView — three-panel layout > uses the center header control to show and hide the preview panel without clearing tabs  604ms
+   ✓ WorkspaceView — three-panel layout > uses a consistent 42px chrome height across workspace panel headers  446ms
+   ✓ WorkspaceView — three-panel layout > opens an artifact preview tab from the artifacts section  602ms
+   ✓ WorkspaceView — three-panel layout > renders timeline in center panel and right panel sections  307ms
+   ✓ WorkspaceView — left panel task navigator > shows group labels for non-empty groups  316ms
+   ✓ WorkspaceView — left panel task navigator > shows Completed group collapsed by default (with a done workspace task)  315ms
+   ✓ WorkspaceView — left panel task navigator > highlights the selected task  370ms
+   ✓ WorkspaceView — left panel task navigator > clicking a task updates selected task  915ms
+   ✓ WorkspaceView — left panel task navigator > navigates to a task's workspace when selecting a task from another workspace  589ms
+   ✓ WorkspaceView — left panel task navigator > honors the selected issue query param on workspace load  306ms
+   ✓ WorkspaceView — left panel task navigator > filters tasks by search input  361ms
+   ✓ WorkspaceView — navigation > centers icons in the collapsed left task rail  416ms
+ ✓ |@armyofagents/ui| src/__tests__/InboxHub.test.tsx (41 tests | 2 skipped) 10705ms
+   ✓ InboxHub page > renders the hub at the canonical /inbox route  417ms
+   ✓ InboxHub page > writes canonical /inbox paths when lanes and items are selected  416ms
+   ✓ InboxHub page > answers runtime permission prompts from the hub viewer  409ms
+   ✓ InboxHub page > submits runtime work-question answers from the hub viewer  801ms
+   ✓ InboxHub page > disables runtime decision actions after the prompt expires  306ms
+   ✓ InboxHub page > marks an unread row read only once even if it is clicked repeatedly  338ms
+   ✓ InboxHub page > viewer can mark a selected read item unread  310ms
+   ✓ InboxHub page > viewer can dismiss and snooze the selected item  424ms
+   ✓ InboxHub page > targets the selected hub row when multiple rows map to the same entity tab  458ms
+   ✓ InboxHub page > viewer can undo personal dismiss and snooze actions  617ms
+   ✓ InboxHub page > viewer resolves an item and can undo the server-backed action  412ms
+   ✓ InboxHub page > keeps server undo reachable after the resolved item leaves the active list  535ms
+   ✓ InboxHub page > viewer shows claim and release actions for board-pool items  367ms
+   ✓ InboxHub page > history controls request resolved and archived items inside the active lane  309ms
+   ✓ InboxHub page > bulk dismisses selected open items as personal state  323ms
+   ✓ InboxHub page > shows a compact bulk result summary when one selected item fails  329ms
+   ✓ InboxHub page > passes search text to the list query  397ms
+   ✓ InboxHub page > restores a hidden dismissed row via Undismiss from the revealed list  454ms
+   ✓ InboxHub page > caches a list item's tab so it survives a refetch that drops the row  493ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves
+Error: Cannot find module 'playwright-core/package.json'
+Require stack:
+- C:\Users\Dell\Desktop\aoa\replatform-testing\packages\browser-runtime\src\__tests__\image-playwright-parity.test.ts
+ ❯ src/__tests__/image-playwright-parity.test.ts:41:23
+     39|   it("that pin equals the version this repo actually resolves", () => {
+     40|     const require_ = createRequire(import.meta.url);
+     41|     const resolved = (require_("playwright-core/package.json") as { ve…
+       |                       ^
+     42|     expect(imagePin()).toBe(resolved);
+     43|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  1 failed | 118 passed | 2 skipped (121)
+   Start at  16:21:42
+   Duration  33.54s (transform 10.80s, setup 1.47s, collect 34.61s, tests 36.53s, environment 13.00s, prepare 1.66s)
+

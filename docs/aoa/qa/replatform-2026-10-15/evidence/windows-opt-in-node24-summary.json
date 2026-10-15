@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-10-15T16:33:49.768Z",
+  "exitCode": 1,
+  "wrapperExitCode": 1,
+  "nativeExitCode": null,
+  "completion": "All 123 per-file test reports observed; final global failure-detail/count reporting interrupted by Windows PowerShell NativeCommandError.",
+  "countsSource": "Derived by summing the 123 complete per-file Vitest reports; not a captured final global summary.",
+  "originalEncoding": "utf16le",
+  "originalLog": "local-windows-opt-in-node24.log",
+  "log": "local-windows-opt-in-node24-decoded.log",
+  "logStartedAt": "2026-10-15T15:48:29.849Z",
+  "logLastWriteAt": "2026-10-15T16:30:34.837Z",
+  "files": {
+    "passed": 121,
+    "failed": 2,
+    "skipped": 0,
+    "total": 123,
+    "line": "Test Files 121 passed / 2 failed / 0 skipped (123); derived"
+  },
+  "tests": {
+    "total": 1466,
+    "failed": 6,
+    "skipped": 2,
+    "passed": 1458,
+    "line": "Tests 1458 passed / 6 failed / 2 skipped (1466); derived"
+  },
+  "uncaughtErrors": null,
+  "duration": "Final Vitest duration unavailable; see log timestamps.",
+  "failures": [
+    "× distributed-execution non-owner startup gate > checks grant-option ACL tuples independently on every derived relation and non-dropped user column 300003ms",
+    "× distributed-execution non-owner startup gate > keeps aoa_operator outside the drizzle migration schema 553ms",
+    "× distributed-execution non-owner startup gate > proves the module-load sentinel reaches every guarded module while enabled 11646ms",
+    "× distributed-execution non-owner startup gate > observes the child's fallback port without accepting unrelated requested-port health 11272ms",
+    "× distributed-execution non-owner startup gate > threads the identical metrics instance through the real flag-on startup and app composition 13288ms",
+    "× JOB-001 transactional job submission > emits only stable identifier metadata when a submission transaction fails 1025ms"
+  ],
+  "interpretation": "Six failed assertions are observed, so this lane cannot pass. Unknown final uncaught-error count is not zero. Focused direct-Node reproductions provide final failure details separately; do not replace this whole-lane result with them."
+}

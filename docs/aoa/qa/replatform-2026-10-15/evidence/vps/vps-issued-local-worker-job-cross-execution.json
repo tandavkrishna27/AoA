@@ -1,0 +1,78 @@
+{
+  "createdAt": "2026-10-15T15:04:23.688Z",
+  "direction": "VPS-issued job -> local Docker worker and local reference provider",
+  "tenant": {
+    "key": "CrossHost",
+    "organizationId": "9cfa8c26-6e47-4997-8991-42ee02c22e43",
+    "companyId": "28e41573-d492-4129-aa5b-8da09f6e3c49",
+    "agentId": "9d7ada73-5bf1-4deb-842b-acc9b41e3862",
+    "issuePrefix": "XHOST"
+  },
+  "ids": {
+    "jobId": "f6933ee3-d0b8-498f-817b-c35c6737266a",
+    "attemptId": "2f06c54d-a076-406c-999a-0beafb6c79be",
+    "issueId": "cfc810b7-61f5-4ad5-a78f-1cce812d9da8",
+    "runId": "99965429-e66c-4957-81f5-1046a2f723ee",
+    "handleId": "34734b7b-66fa-4a9a-b201-1ad1afa0c724"
+  },
+  "nonce": "cross_34128010fea04f15a96347704018daa7",
+  "targetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+  "expectedWorkerId": "871a3bca-323e-4b90-a14d-9841cf39ee73",
+  "baseline": {
+    "ok": true,
+    "attemptStatus": "pending",
+    "attemptTargetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+    "events": [],
+    "leaseWorkerIds": [],
+    "logMessages": [],
+    "terminal": []
+  },
+  "scope": "Pre-placed fixture job in isolated VPS D1 control plane, not the public Google-authenticated app. Ordinary task output/usage are scripted reference-provider output; env probe runs a real pinned Node child on the local Docker host. No personal Codex credential delegation.",
+  "observedAt": "2026-10-15T15:04:27.754Z",
+  "observation": {
+    "ok": true,
+    "attemptStatus": "succeeded",
+    "attemptTargetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+    "events": [
+      {
+        "eventType": "attempt_started",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "log",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "log",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "usage",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "terminal",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      }
+    ],
+    "leaseWorkerIds": [
+      "871a3bca-323e-4b90-a14d-9841cf39ee73"
+    ],
+    "logMessages": [
+      "dep017.env_probe {\"probe\":\"dep017-env-absence/v1\",\"verdict\":\"absent\",\"clean\":{\"probe\":\"dep017-env-absence/v1\",\"checked\":[\"datastore_credential\",\"secrets_master_key\",\"auth_signing_secret\",\"source_control_token\",\"subscription_login\",\"provider_control_key\",\"object_store_credential\",\"worker_enrollment\",\"oauth_client_secret\",\"connector_token\",\"embeddings_key\",\"legacy_agent_key\",\"host_control_plane_env\",\"model_provider_key_not_allowed\",\"unclassified_credential_shaped\",\"cross_tenant_credential\",\"provider_credential_value_mismatch\",\"unredeemed_provider_credential\"],\"present\":[],\"presentNames\":[],\"allowedPresent\":[\"ANTHROPIC_API_KEY\"],\"allowedMismatch\":[],\"envCount\":1,\"unnamedEnvCount\":0,\"unreportedPresentCount\":0,\"metadata\":{\"attempted\":true,\"target\":\"169.254.169.254\",\"reachable\":false,\"errorCode\":\"ECONNREFUSED\"},\"redeemedNames\":[\"ANTHROPIC_API_KEY\"]},\"plantedControl\":{\"planted\":[{\"name\":\"DATABASE_URL\",\"expectClass\":\"datastore_credential\",\"satisfied\":true},{\"name\":\"OPENAI_API_KEY\",\"expectClass\":\"cross_tenant_credential\",\"satisfied\":true},{\"name\":\"ANTHROPIC_API_KEY\",\"expectClass\":\"provider_credential_value_mismatch\",\"satisfied\":true}],\"detected\":[\"cross_tenant_credential\",\"datastore_credential\",\"provider_credential_value_mismatch\"],\"red\":true}}",
+      "AOA-RUN-OUTPUT-PROBE arm=cross_34128010fea04f15a96347704018daa7 control=cross_34128010fea04f15a96347704018daa7"
+    ],
+    "terminal": [
+      {
+        "status": "succeeded",
+        "exitCode": 0,
+        "errorCode": null,
+        "errorMessage": null
+      }
+    ]
+  },
+  "failures": [],
+  "probeFailures": [],
+  "nonceSeen": true,
+  "passed": true
+}

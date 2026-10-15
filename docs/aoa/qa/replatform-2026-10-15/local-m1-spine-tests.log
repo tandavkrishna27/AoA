@@ -1,0 +1,49 @@
+✔ m1-spine: every control-plane replica carries the F10 tenant set, and the crew switch is off (8148.3588ms)
+✔ m1-spine: tenant A — a handed-off attempt through the REAL ingest is priced once and audited (34789.0026ms)
+✔ m1-spine: tenant B — a handed-off attempt through the REAL ingest is priced once and audited (28462.2402ms)
+✔ m1-spine: the DEPLOYED worker performs tenant A's journey — lease, execute, events, terminal (20779.0585ms)
+✔ m1-spine: ★ the worker-driven verdict REDS on tenant A's HARNESS-driven attempt (the control) (7144.8235ms)
+✔ m1-spine: criterion 5 is observed for the worker-driven tenant and RECORDED unobserved for the others (3539.6323ms)
+✔ m1-spine: the deployed worker is offered no work for tenant B or the control tenant (7702.1919ms)
+✔ m1-spine: tenant B cannot write to, acknowledge or read tenant A's attempt (41300.9165ms)
+✖ m1-spine: the control tenant is refused distributed execution on every replica and stays legacy (43558.9333ms)
+✔ m1-spine: the MIG-009 drain CLI rolls back live distributed work, per tenant and attributed (40597.0001ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 236333.496
+
+✖ failing tests:
+
+test at tests\d1\m1-spine.test.mjs:767:1
+✖ m1-spine: the control tenant is refused distributed execution on every replica and stays legacy (43558.9333ms)
+  AssertionError [ERR_ASSERTION]: control tenant violations:
+    - control:positive_control_not_selected: control tenant C: the same placement service on an ENABLED tenant returned {"replica":"control-plane","tenant":"A","jobId":"fff00561-18ec-44a5-b7a3-223d08fcea7f","disposition":"queued","owner":null,"targetId":null,"targetClass":null,"targetScope":null,"targetGeneration":null,"profileHash":null,"providerConstraintHash":null,"fallbackDisposition":"forbidden","reasonCode":"required_target_unavailable","mode":"active","leaseEligible":false,"inputDigest":"2a5f76786db9cdd29717b90573470e0e59b5292fa261a179d283959aeb026367","policyDigest":"2a5f76786db9cdd29717b90573470e0e59b5292fa261a179d283959aeb026367"} — it must SELECT a lease-eligible target (disposition "selected", mode "active", leaseEligible true), or the refusal is not shown to be the rollout's
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'control:positive_control_not_selected',
+  +     message: `control tenant C: the same placement service on an ENABLED tenant returned {"replica":"control-plane","tenant":"A","jobId":"fff00561-18ec-44a5-b7a3-223d08fcea7f","disposition":"queued","owner":null,"targetId":null,"targetClass":null,"targetScope":null,"targetGeneration":null,"profileHash":null,"providerConstraintHash":null,"fallbackDisposition":"forbidden","reasonCode":"required_target_unavailable","mode":"active","leaseEligible":false,"inputDigest":"2a5f76786db9cdd29717b90573470e0e59b5292fa261a179d283959aeb026367","policyDigest":"2a5f76786db9cdd29717b90573470e0e59b5292fa261a179d283959aeb026367"} — it must SELECT a lease-eligible target (disposition "selected", mode "active", leaseEligible true), or the refusal is not shown to be the rollout's`
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/tests/d1/m1-spine.test.mjs:828:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'control:positive_control_not_selected', message: `control tenant C: the same placement service on an ENABLED tenant returned {"replica":"control-plane","tenant":"A","jobId":"fff00561-18ec-44a5-b7a3-223d08fcea7f","disposition":"queued","owner":null,"targetId":null,"targetClass":null,"targetScope":null,"targetGeneration":null,"profileHash":null,"providerConstraintHash":null,"fallbackDisposition":"forbidden","reasonCode":"required_target_unavailable","mode":"active","leaseEligible":false,"inputDigest":"2a5f76786db9cdd29717b90573470e0e59b5292fa261a179d283959aeb026367","policyDigest":"2a5f76786db9cdd29717b90573470e0e59b5292fa261a179d283959aeb026367"} — it must SELECT a lease-eligible target (disposition "selected", mode "active", leaseEligible true), or the refusal is not shown to be the rollout's` } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

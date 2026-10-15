@@ -1,0 +1,17 @@
+{
+  "id": "boot-provider-free-real",
+  "kind": "static",
+  "file": "scripts/check-boot-roots-provider-free.mjs",
+  "scope": "WRK-008 committed boot roots",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "scripts/check-boot-roots-provider-free.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:02.876Z",
+  "durationMs": 91,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {}
+}

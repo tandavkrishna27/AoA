@@ -1,0 +1,18 @@
+✔ m1-spine: every control-plane replica carries the F10 tenant set, and the crew switch is off (862.1837ms)
+✔ m1-spine: tenant A — a handed-off attempt through the REAL ingest is priced once and audited (4048.3543ms)
+✔ m1-spine: tenant B — a handed-off attempt through the REAL ingest is priced once and audited (3981.3499ms)
+✔ m1-spine: the DEPLOYED worker performs tenant A's journey — lease, execute, events, terminal (6049.9688ms)
+✔ m1-spine: ★ the worker-driven verdict REDS on tenant A's HARNESS-driven attempt (the control) (565.2221ms)
+✔ m1-spine: criterion 5 is observed for the worker-driven tenant and RECORDED unobserved for the others (288.9738ms)
+✔ m1-spine: the deployed worker is offered no work for tenant B or the control tenant (537.7908ms)
+✔ m1-spine: tenant B cannot write to, acknowledge or read tenant A's attempt (4630.2175ms)
+✔ m1-spine: the control tenant is refused distributed execution on every replica and stays legacy (6637.8307ms)
+✔ m1-spine: the MIG-009 drain CLI rolls back live distributed work, per tenant and attributed (5986.0017ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33692.7163

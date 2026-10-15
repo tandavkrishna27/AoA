@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: build.sh builds all three split images from their own Dockerfiles
+ok 1 - build.sh builds all three split images from their own Dockerfiles
+  ---
+  duration_ms: 4.059494
+  type: 'test'
+  ...
+# Subtest: d1-merge-train builds, SBOMs, signs, admits and inspects the images on every run
+ok 2 - d1-merge-train builds, SBOMs, signs, admits and inspects the images on every run
+  ---
+  duration_ms: 2.508129
+  type: 'test'
+  ...
+# Subtest: DEP-014 boots nothing: no adapter-manager service in D1, no provider credential in the lane
+ok 3 - DEP-014 boots nothing: no adapter-manager service in D1, no provider credential in the lane
+  ---
+  duration_ms: 2.586569
+  type: 'test'
+  ...
+# Subtest: CONTROL: the keyless assertion still reds for a provider credential, under any name
+ok 4 - CONTROL: the keyless assertion still reds for a provider credential, under any name
+  ---
+  duration_ms: 2.042727
+  type: 'test'
+  ...
+# Subtest: sbom.sh emits an SBOM for each of the three images, bound to its digest
+ok 5 - sbom.sh emits an SBOM for each of the three images, bound to its digest
+  ---
+  duration_ms: 133.440821
+  type: 'test'
+  ...
+# Subtest: sign.sh records one signed admission entry + provenance per image
+ok 6 - sign.sh records one signed admission entry + provenance per image
+  ---
+  duration_ms: 554.573475
+  type: 'test'
+  ...
+# Subtest: admit.sh admits all three signed images
+ok 7 - admit.sh admits all three signed images
+  ---
+  duration_ms: 514.257775
+  type: 'test'
+  ...
+# Subtest: CONTROL: an adapter-manager with no admission entry is refused (the pre-DEP-014 state)
+ok 8 - CONTROL: an adapter-manager with no admission entry is refused (the pre-DEP-014 state)
+  ---
+  duration_ms: 408.768851
+  type: 'test'
+  ...
+# Subtest: CONTROL: a tampered/retagged adapter-manager (live digest != recorded) is refused
+ok 9 - CONTROL: a tampered/retagged adapter-manager (live digest != recorded) is refused
+  ---
+  duration_ms: 384.886169
+  type: 'test'
+  ...
+# Subtest: CONTROL: a recorded digest that is not the signed one is refused
+ok 10 - CONTROL: a recorded digest that is not the signed one is refused
+  ---
+  duration_ms: 424.344585
+  type: 'test'
+  ...
+# Subtest: CONTROL: a corrupted adapter-manager signature is refused by the verifier
+ok 11 - CONTROL: a corrupted adapter-manager signature is refused by the verifier
+  ---
+  duration_ms: 478.086371
+  type: 'test'
+  ...
+# Subtest: CONTROL: an unsigned adapter-manager entry is refused by the verifier
+ok 12 - CONTROL: an unsigned adapter-manager entry is refused by the verifier
+  ---
+  duration_ms: 499.213724
+  type: 'test'
+  ...
+# Subtest: CONTROL: a mismatched adapter-manager source revision is refused by the verifier
+ok 13 - CONTROL: a mismatched adapter-manager source revision is refused by the verifier
+  ---
+  duration_ms: 524.609691
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4079.068723

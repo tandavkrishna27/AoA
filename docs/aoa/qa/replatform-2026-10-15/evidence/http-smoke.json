@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-10-15T11:00:09.257Z",
+  "results": [
+    {
+      "endpoint": "http://127.0.0.1:3210/api/health",
+      "requests": 100,
+      "concurrency": 4,
+      "errors": [],
+      "durationMs": 74.26870000000001,
+      "p50Ms": 2.825000000000017,
+      "p95Ms": 4.705999999999989,
+      "maxMs": 5.550600000000003,
+      "scope": "Health endpoint from Windows client; includes network latency; not workload capacity or D5 acceptance"
+    },
+    {
+      "endpoint": "https://testing.armyofagents.org/api/health",
+      "requests": 100,
+      "concurrency": 4,
+      "errors": [],
+      "durationMs": 4379.1283,
+      "p50Ms": 171.4349000000002,
+      "p95Ms": 201.86749999999938,
+      "maxMs": 234.27689999999984,
+      "scope": "Health endpoint from Windows client; includes network latency; not workload capacity or D5 acceptance"
+    }
+  ]
+}

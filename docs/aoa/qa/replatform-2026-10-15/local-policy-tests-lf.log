@@ -1,0 +1,384 @@
+gate-clause-wiring: OK (29 wired clause(s), 5 declared dormant, 2 provider-capability claim(s) matched to source)
+  DORMANT, on the record: E3-15-budget, E3-5-product-approval, E5-3-patch-quarantine, E5-6-denied-egress, E5-result-commit-worker
+▶ countProductionCallers — a sentence is not a call site
+  ✔ ★ THE MUTATION — a symbol whose ONLY reference is a string literal counts ZERO (6.5906ms)
+  ✔ ★ POSITIVE CONTROL — a symbol with a REAL call keeps its count (4.9787ms)
+  ✔ ★ THE MUTATION, second case — its OWN error-message strings no longer inflate it (5.0333ms)
+  ✔ ★ POSITIVE CONTROL — a real call inside a template interpolation still counts (5.0801ms)
+  ✔ an import specifier is still blanked — string stripping runs AFTER, never before (4.7039ms)
+  ✔ test paths are still excluded (5.0527ms)
+✔ countProductionCallers — a sentence is not a call site (34.7039ms)
+▶ stripStringLiterals — bounded mis-detection
+  ✔ drops quoted contents but keeps the delimiters (0.5863ms)
+  ✔ keeps template interpolations verbatim and drops the literal text (0.3261ms)
+  ✔ ★ an unterminated quote is abandoned at the newline, never at EOF (0.5516ms)
+  ✔ preserves newlines inside a multi-line template so line structure survives (0.3824ms)
+✔ stripStringLiterals — bounded mis-detection (2.6504ms)
+✔ load measurements count failed attempts, exclude late completions and use nearest-rank p95 (3.7751ms)
+✔ load request cohort excludes drain starts but retains slow in-window failures (0.2533ms)
+✔ quiet fairness fails on starvation, missing baseline, or excessive delay without aggregate masking (1.2957ms)
+✔ local load source rejects unbounded duration and duplicate tenant identities before Docker use (2.5644ms)
+✔ spine topology observation honors the same isolated stack binding as its HTTP clients (0.7864ms)
+✔ DEFAULT: with no override the binding is byte-for-byte the D1 lane's own argv (102.8879ms)
+✔ OVERRIDE: the shipped-boot lane's project, two files and HTTP service all take effect (87.3873ms)
+✔ PARTIAL override: a project with no file list still addresses the default file (91.0585ms)
+✔ an env file with no project or file override still reaches the default file (91.0167ms)
+✔ BLANK and whitespace-only values are treated as absent, not as an empty file argument (78.9093ms)
+✔ the harness has NO remaining hardcoded compose-file argv (1.5387ms)
+✔ runLeaseRace: a transient ACK retries the same operation with fresh signed proof (13.7729ms)
+✔ runLeaseRace: ACK backpressure exhausts a bounded number of attempts (3.2434ms)
+✔ runLeaseRace: ACK never sleeps past its offered deadline or sends an expired retry (1.772ms)
+✔ runLeaseRace: unauthorized, stale fence and unknown failures are never retried (6.6078ms)
+✔ runLeaseRace: throttled ACK retries and a zero hint cannot spin without waiting (2.2665ms)
+✔ runLeaseRace: an absent or expired ACK deadline sends no request (3.8373ms)
+✔ runLeaseRace: malformed retry hints never trigger another ACK (8.1911ms)
+✔ runReplicaRace: a transient ACK retries the same operation with fresh signed proof (3.398ms)
+✔ runReplicaRace: ACK backpressure exhausts a bounded number of attempts (2.5549ms)
+✔ runReplicaRace: ACK never sleeps past its offered deadline or sends an expired retry (1.4616ms)
+✔ runReplicaRace: unauthorized, stale fence and unknown failures are never retried (3.6481ms)
+✔ runReplicaRace: throttled ACK retries and a zero hint cannot spin without waiting (1.5804ms)
+✔ runReplicaRace: an absent or expired ACK deadline sends no request (2.9712ms)
+✔ runReplicaRace: malformed retry hints never trigger another ACK (6.7879ms)
+✔ ★ claiming wired with ZERO callers FAILS — the whole point (2.9548ms)
+✔ wired with a real caller passes (0.3101ms)
+✔ ★ unwired is ALLOWED but must say why, and is REPORTED on a green run (0.3338ms)
+✔ ★ an unwired clause that GAINED a caller is surfaced, not silently tolerated (0.2735ms)
+✔ a symbol nobody measured fails rather than being assumed wired (0.2639ms)
+✔ a declaration with no symbol, or a bad status, is malformed (0.3753ms)
+✔ malformed input fails closed rather than reporting OK (0.2658ms)
+✔ ★ POSITIVE CONTROL — a fully-wired manifest is green and counts correctly (0.2398ms)
+✔ ★ expectedReferences allows a KNOWN-unreachable reference, and still catches a new one (0.3863ms)
+✔ the register as corrected matches source and passes (0.972ms)
+✔ ★ THE MUTATION — a stale claim about ONE provider FAILS, and the other provider's claim stays GREEN (0.373ms)
+✔ ★ the PROSE is checked too — a correct structured claim beside a stale sentence still FAILS (1.1555ms)
+✔ prose asserting a value NO claim declares is caught in the other direction (0.2514ms)
+✔ ★ prose that names a watched property with NO claim at all is refused — the front-door loophole (0.2269ms)
+✔ a clause that says nothing about a watched property is untouched (0.1904ms)
+✔ a file that declares the property nowhere, or declares it twice, is REFUSED rather than guessed (0.2893ms)
+✔ a malformed claim is reported and does not silently pass as a checked one (0.2615ms)
+✔ malformed input is refused, not assumed clean (0.1745ms)
+✔ ★ the shipped register declares E5-2's artifactExportMode claims for BOTH providers (1.3805ms)
+✔ admits a signed, allowlisted control-plane digest with matching provenance (16.0953ms)
+✔ admits the worker image on its own allowlist entry (1.0781ms)
+✔ rejects an UNSIGNED digest (fail-closed) (0.6892ms)
+✔ rejects an empty-string signature (fail-closed) (0.5006ms)
+✔ rejects a TAMPERED digest that is no longer on the allowlist (0.8473ms)
+✔ rejects an allowlisted digest whose signature was minted for a DIFFERENT digest (1.0744ms)
+✔ rejects a signature by an UNTRUSTED key (forged, not the trust root) (1.5655ms)
+✔ rejects a WRONG-provenance digest (source revision mismatch vs allowlist) (1.1765ms)
+✔ rejects MISSING provenance (no source revision at all) (1.3707ms)
+✔ rejects a validly-signed digest that is NOT on the allowlist (admit-only-allowlisted) (1.0766ms)
+✔ rejects a malformed digest (not sha256:<64hex>) (0.9921ms)
+✔ signature is load-bearing: valid bundle admits, same bundle without/with-forged signature is rejected (2.7725ms)
+✔ fail-closed on garbage input: null (0.3397ms)
+✔ fail-closed on garbage input: undefined (0.1578ms)
+✔ fail-closed on garbage input: empty object (0.0829ms)
+✔ fail-closed on garbage input: number (0.1924ms)
+✔ fail-closed on garbage input: string (0.0763ms)
+✔ fail-closed on garbage input: missing allowlist (0.091ms)
+✔ fail-closed on garbage input: missing trustRoot (0.0803ms)
+✔ fail-closed on garbage input: allowlist not array (0.0708ms)
+✔ a corrupt PEM trust root is a rejection, not a crash (1.5053ms)
+✔ canonicalSigningPayload is deterministic and binds digest + revision (0.2685ms)
+✔ the tenant set is three DISTINCT Organizations: two enabled, one control (F10) (7.3336ms)
+✖ the committed m1-spine override has zero violations (anchor) (6.351ms)
+✔ an override that sets the rollout on only ONE replica is refused (1.0407ms)
+✖ BOTH assignments under ONE replica is refused — the count is per block (Codex P2) (1.5015ms)
+✖ an override that arms the crew switch is refused (0.8526ms)
+✖ an override that keeps worker-a in the default profile is refused (one-worker topology) (0.829ms)
+✔ a replica with the declared tenant set and the crew switch off has zero violations (anchor) (0.7152ms)
+✔ a replica whose rollout differs from the declared value is refused (0.2491ms)
+✔ a replica on which the CONTROL tenant resolves to anything but off is refused (0.2556ms)
+✔ a replica on which an ENABLED tenant resolves to off is refused (0.3268ms)
+✔ a replica with the crew switch ON, or set to an unparseable value, is refused (0.3344ms)
+✔ a replica with the TOOL SURFACE armed, unparseable, or opted in per-Organization is refused (M1a freeze) (0.2353ms)
+✔ a replica with the deployment flag off is refused (the profile would run nothing distributed) (0.1758ms)
+✔ D1 emits every locked freeze category and refuses a real excluded switch (1.3708ms)
+✔ a well-formed enabled-tenant observation has zero violations (anchor) (1.7402ms)
+✔ NO cost row (the usage-suppressed positive control's state) is a cost violation carrying the marker (0.3341ms)
+✔ the expected charge is DERIVED, and equals 81 cents for the canned units at rate version 1 (0.1961ms)
+✔ a POSITIVE charge of the wrong AMOUNT is refused (Codex) (0.7971ms)
+✔ units that are not the canned ones are refused, so the amount expectation cannot detach (0.3632ms)
+✔ a ZERO-cost row is refused (0.276ms)
+✔ TWO cost rows for one attempt are refused (exactly one) (0.2019ms)
+✔ a cost row attributed to ANOTHER tenant's Company is refused (F10 attribution) (0.1718ms)
+✔ a pending, duplicated or foreign authoritative_cost receipt is refused (0.4707ms)
+✔ an authoritative_cost receipt bound to a DIFFERENT event, or the wrong aggregate, is refused (Codex P2) (0.2988ms)
+✔ a missing, duplicated or foreign audit row is refused (JOB-017 named set) (0.3032ms)
+✔ a DUPLICATE accepted usage event is refused — exactly one, never >= 1 (0.225ms)
+✔ ZERO accepted usage events is refused, and distinctly from a duplicate (0.18ms)
+✔ a usage event of ANOTHER Organization never counts toward this tenant's one (F10) (0.1594ms)
+✔ stored usage units that differ from the ones the provider reported are refused (0.2252ms)
+✔ a cost row whose tokens or key are not the accepted usage event's is refused (0.3464ms)
+✔ a POSITIVE charge priced from another model, provider or rate version is refused (Codex P2) (0.3619ms)
+✔ a cost row rolled up to ANOTHER agent of the same Company is refused (Codex P2) (0.1923ms)
+✔ an audit row naming a DIFFERENT worker, or a non-system actor, is refused (Codex P2) (0.2216ms)
+✔ activity_audit receipts keyed to the WRONG events, or the wrong aggregate, are refused (Codex P2) (0.2274ms)
+✔ a receipt whose TARGET is an unrelated row is refused (Codex P2) (0.2428ms)
+✔ SWAPPED audit receipt targets are refused — set equality would have passed them (Codex) (0.2416ms)
+✔ an audit row recording ANOTHER Organization is refused, even with the right Company (Codex P2) (0.195ms)
+✔ a ledger without exactly one attempt_started and one terminal is refused, not skipped (Codex P2) (0.3109ms)
+✔ a journey the ingest did not fully accept is refused before cost is judged (0.126ms)
+✔ a denied hostile pair with its same-tenant control has zero violations (anchor) (0.309ms)
+✔ a foreign worker whose event upload is ACCEPTED is refused (0.16ms)
+✔ a denial whose SAME-TENANT control also failed proves nothing and is refused (0.1866ms)
+✔ a hostile request that merely FAILED is not a denial (Codex P2) (0.2418ms)
+✔ a foreign worker acknowledging another tenant's lease is refused (0.1713ms)
+✔ a foreign tenant scope that can READ the victim's events is refused, and an empty own-scope read voids it (0.1893ms)
+✔ hostile traffic that changed the victim's cost rows or usage events is refused (0.1659ms)
+✔ recording criterion 5 as unobserved, with no probe summary on the attempt, has zero violations (anchor) (0.2141ms)
+✔ a probe summary on the attempt while the record says unobserved is refused (the tripwire) (0.1381ms)
+✔ CLAIMING criterion 5 without a summary is refused (0.1198ms)
+✔ a refused control tenant has zero violations (anchor) (0.5486ms)
+✔ a control tenant placed distributed on ANY replica is refused (0.1385ms)
+✔ a control tenant refused for the WRONG reason is refused (it must be the rollout) (0.1135ms)
+✔ a positive control that is legacy, queued, failed or not lease-eligible is refused (Codex P1) (0.3095ms)
+✔ a positive-control placement that ERRORED is not a decision, and voids the refusal (0.1545ms)
+✔ a control tenant whose STORED placement is leasable, or wrongly reasoned, is refused (Codex P2) (0.2586ms)
+✔ a control tenant that was offered work, or that has events, cost or receipts, is refused (0.3646ms)
+✔ a control observation missing the RUNNING control plane's placement is refused (0.2231ms)
+✔ a clean, attributed, selective drain has zero violations (anchor) (1.6751ms)
+✔ a drain CLI that did not exit 0 is refused (0.3361ms)
+✔ a drained job with no audit row, or two, is refused (the audit is the rehearsal's evidence) (0.6604ms)
+✔ a drain audit row naming another tenant, or a different operator, is refused (0.2838ms)
+✔ a drain whose audit row exists but whose attempt did NOT move is refused (Codex P1) (0.1826ms)
+✔ a drain that moved an already-terminal attempt is refused (0.1854ms)
+✔ the two branches differ, and each is pinned: unleased -> cancelled, leased -> cancel_requested + a cancel command (0.863ms)
+✔ a LEASED attempt the drain left running is refused, even when the seeded pair moved (Codex P1) (0.3018ms)
+✔ a census attempt with no drain audit row, or one naming another tenant, is refused (0.4034ms)
+✔ a SIBLING attempt of the same job left running is refused — state is keyed per attempt (Codex P1) (0.3501ms)
+✔ a drain audit row that records no reason, or another one, is refused (Codex P2) (0.4084ms)
+✔ a NON-system actor on a census candidate's audit row is refused (Codex P2) (0.2267ms)
+✔ a drain that also cancelled an already-terminal attempt is refused (it must be selective) (0.1851ms)
+✔ keyed shape: exactly one accepted usage event whose numbers are the run's stored usage passes (0.1737ms)
+✔ POSITIVE CONTROL (keyed): a DUPLICATE or replayed usage event for the attempt is refused (0.2214ms)
+✔ keyed shape: ZERO accepted usage events is refused, distinctly from a duplicate (0.1433ms)
+✔ keyed shape (F10): a SECOND Organization's usage never counts toward the first tenant's one (0.2145ms)
+✔ keyed shape: stored usage that is not the accepted event's numbers is refused (0.2509ms)
+✔ keyed shape: an event with NO runtimeMillis leaves the wall-clock duration alone (the projector's fallback) (0.1333ms)
+✔ keyed shape: an accepted usage event with NO stored usage_json is refused (0.103ms)
+✔ the spine and the keyed lane share ONE implementation — neither re-implements the rule (1.1138ms)
+✔ worker-driven: the ZERO-VIOLATION anchor — a real green run passes (0.6051ms)
+✔ worker-driven: every violation carries the marker, so the lane's control can grep its arm (0.1712ms)
+✔ worker-driven: ★ an event produced by ANOTHER worker reds — the not-the-executor case (0.2309ms)
+✔ worker-driven: ★★★ a WHOLLY harness-driven attempt reds on both the events and the lease (0.2796ms)
+✔ worker-driven: a lease taken by a second worker reds even when the events look right (0.129ms)
+✔ worker-driven: no lease at all reds (0.1067ms)
+✔ worker-driven: no events at all reds, and names the missing ones (0.1142ms)
+✔ worker-driven: a missing terminal reds (a run that never durably ended is not a journey) (0.1721ms)
+✔ worker-driven: ★ a MISSING usage event does NOT red — that is the cost verdict's job (0.148ms)
+✔ worker-driven: an attempt placed on ANOTHER target reds (0.1043ms)
+✔ worker-driven: a non-succeeded attempt reds (0.1102ms)
+✔ worker-driven: NO deployed worker id is a violation, never a vacuous pass (0.1013ms)
+✔ worker-driven: an unknown executor mode is refused (0.1001ms)
+✔ worker-driven: the HARNESS control passes when the attempt really was harness-driven (0.1173ms)
+✔ worker-driven: ★ the HARNESS control REDS if the attempt was in fact worker-driven (0.1073ms)
+✔ env probe: a clean summary passes, and it is the SHARED verdict that judges it (0.5135ms)
+✔ env probe: ★ NO summary reds — a probe that did not run must never read as a pass (0.1372ms)
+✔ env probe: a summary reporting a PRESENT credential class reds (0.1748ms)
+✔ env probe: ★ a BLIND probe reds — the planted control must have turned red (0.3683ms)
+✔ env probe: an unreadable summary reds (0.2989ms)
+✖ override: the COMMITTED file has zero violations (the anchor) (1.3617ms)
+✔ override: ★ dropping dispatch from the deployed worker reds (1.0622ms)
+✔ override: ★ dropping the DEP-017 probe reds (acceptance item 6 cannot be dropped quietly) (1.0648ms)
+✔ override: ★ dropping the DEP-023 run-output probe reds (the E5 clause-5 streams cannot be dropped quietly) (0.7189ms)
+✔ override: dropping the event outbox reds (0.7616ms)
+✔ override: leaving the worker on a boot root that injects NO provider reds (1.8136ms)
+✖ override: ★ arming dispatch on a SECOND service reds — M1-D1-SPINE is ONE deployed worker (8.3119ms)
+✔ override: ★★★ arming the wire WITHOUT the control-plane public key reds (an ungated provider) (1.2312ms)
+✔ override: not arming the wire at all reds (1.0356ms)
+✔ override: ★ a worker pointed at a port the provider does not serve reds (0.9375ms)
+✔ override: ★ dropping the capability MINT key reds (every run would die no_run_capability) (1.2383ms)
+✔ override: ★ a seed that authorizes a DIFFERENT ticket than the worker presents reds (0.6256ms)
+✔ override: ★★★ committed key material reds, in both shapes (1.5367ms)
+✔ override: the DEP-016 clauses still hold (this ticket extends them, it does not fork them) (1.2007ms)
+✔ override: ★★★ mounting the runtime-keys DIRECTORY reds — the provider must not hold the private key (1.0148ms)
+✔ override: ★ the PRIVATE half bound into the reference provider reds (0.8259ms)
+✔ override: the PUBLIC half bound into the control plane reds too (the boundary is two-sided) (1.6728ms)
+✖ override: a key mounted into ANY other service reds (1.6666ms)
+✔ usage: the WORKER-DRIVEN arm pins the three token counts and lets the duration be measured (0.352ms)
+✔ usage: ★ the worker-driven arm still reds when a TOKEN count drifts from the canned units (0.2318ms)
+✔ usage: ★ a missing or negative measured duration reds — the observer must have measured one (0.3127ms)
+✔ usage: WITHOUT the arm the duration is still pinned (the harness path is unchanged) (0.2231ms)
+✔ worker marker: it is DISTINCT from the cost and usage markers, in both directions (0.2139ms)
+✔ worker marker: a worker-driven observation carries it on every COST and USAGE violation (0.5313ms)
+✔ worker marker: ★ an AUDIT-only worker failure does NOT mint it (Codex P2, PR #580) (0.4153ms)
+✔ worker marker: ★ the HARNESS path CANNOT produce it, however broken the attempt is (0.493ms)
+✔ worker marker: a MALFORMED declaration fails closed — it reds, and without the marker (0.4912ms)
+✔ worker marker: the PROFILE declares it exactly once, inside the EXECUTOR === "worker" block (0.9178ms)
+✔ worker marker: the d1 lane's usage-suppressed control greps BOTH literals (0.6937ms)
+✔ D1 host jobs install the lockfile-pinned AST compiler before their Node preflights (1.2384ms)
+✔ the fault-matrix job reserves time for action post-step cleanup (0.6893ms)
+ℹ tests 205
+ℹ suites 2
+ℹ pass 198
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 36222.5234
+
+✖ failing tests:
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:72:1
+✖ the committed m1-spine override has zero violations (anchor) (6.351ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'override:worker_a_not_excluded',
+  +     message: 'worker-a must be moved out of the default profile (one-worker topology)'
+  +   },
+  +   {
+  +     code: 'override:second_replica_not_excluded',
+  +     message: 'control-plane-b must be moved out of the default profile — M1-D1-SPINE is ONE control plane'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:74:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'override:worker_a_not_excluded', message: 'worker-a must be moved out of the default profile (one-worker topology)' }, { code: 'override:second_replica_not_excluded', message: 'control-plane-b must be moved out of the default profile — M1-D1-SPINE is ONE control plane' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:84:1
+✖ BOTH assignments under ONE replica is refused — the count is per block (Codex P2) (1.5015ms)
+  AssertionError [ERR_ASSERTION]: the fixture keeps two assignments
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:90:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:94:1
+✖ an override that arms the crew switch is refused (0.8526ms)
+  AssertionError [ERR_ASSERTION]: fixture must actually inject the flag
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:97:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '# =============================================================================\r\n# DEP-016 + DEP-019 — the `m1-spine` campaign profile\'s topology, as a compose OVERRIDE.\r\n#\r\n#   docker compose -f docker-compose.d1.yml -f docker/d1/m1-spine.override.yml up -d --wait\r\n#\r\n# It changes the base D1 stack and touches nothing else, so the existing two-worker merge train\r\n# (`bounded` / `foundation`, which never passes this file) is unchanged:\r\n#\r\n#   1. ONE worker AND ONE control plane. `worker-a` and `control-plane-b` are moved into a profile\r\n#      that nothing enables, so only `worker-b` and the single `control-plane` run — the topology\r\n#      `M1-D1-SPINE` names: "one control-plane instance, one separately deployed worker"\r\n#      (`docs/replatform/epic-regrooming/scope-triage.md`, Codex P1 on PR #566). A second replica\r\n#      would let HA behaviour affect evidence presented as single-control-plane. `test-runner`\'s\r\n#      dependency list is replaced (`!override`) because a dependency on a service outside the\r\n#      active profiles is a compose error.\r\n#      ★ The S0-8 amendment — the rollout policy identical on BOTH replica blocks — is a CONFIG\r\n#      claim and is unchanged: this file still carries it for `control-plane-b`, and the static\r\n#      check still holds both blocks to the same byte-for-byte value, so the two agree the moment a\r\n#      second replica is brought up.\r\n#   2. The F10 TENANT SET, on EVERY control-plane replica, identically. Two Organizations are\r\n#      `canary` (CLI-006: placement presents canary as `active`, so their attempts are\r\n#      lease-eligible); the CONTROL Organization is absent, which the rollout source reads as\r\n#      disabled. The value is the one `M1_SPINE_ROLLOUT_ENV_VALUE` in\r\n#      `scripts/lib/m1-spine-assertions.mjs` builds — `evaluateSpineOverrideText` (pr.yml) holds\r\n#      this file to it, and the live profile re-reads it from each replica\'s environment.\r\n#   3. NOTHING about the crew switch. `AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED` is deployment-wide\r\n#      with no per-Organization dimension, so arming it would arm crew for every enabled tenant at\r\n#      once. The base file does not set it and neither does this one; the live profile asserts it\r\n#      is unset or false on every replica (M1 plan §6, S0-8).\r\n#\r\n# ── DEP-019: the journey is WORKER-DRIVEN, and that is four more changes ──────\r\n#\r\n#   4. THE ONE DEPLOYED WORKER DISPATCHES. `worker-b` enters the networked container boot root\r\n#      (`/worker-net-app/dist/bin/networked-host.js`, DEP-011 Slice 2b-ii), with\r\n#      `AOA_WORKER_DISPATCH_ENABLED=1`, a durable event outbox and the DEP-017 env probe armed.\r\n#      ★ SCOPED TO THIS FILE, exactly as DEP-015 scoped `checkDispatchDefaultOff` to its own\r\n#      overlay. `docker-compose.d1.yml` and `scripts/d1-dispatch-expectation.json` are UNCHANGED,\r\n#      so `check-d1-dispatch-declared` still holds BOTH base workers to ABSENT and still reds if\r\n#      anyone sets the flag there. That guard parses only the base file, so the override\'s posture\r\n#      would otherwise be covered by nothing — `evaluateSpineOverrideText` holds it instead, in\r\n#      both directions.\r\n#   5. ITS TARGET IS TENANT A\'S. `worker-b` presents a committed, organization-scoped profile bound\r\n#      to the first enabled spine Organization, and `migrate` seeds THAT profile\'s target and\r\n#      authorizes THAT ticket — one artifact read twice, the WRK-017 shape, with the spine\'s own\r\n#      pair of files. The worker gets its OWN state volume so a device identity minted on the\r\n#      two-worker train can never be presented here.\r\n#      ★ ONE deployed worker means ONE worker-driven tenant. Tenant B\'s journey stays\r\n#      harness-driven and every one of its F10 properties is still asserted; the deployed worker\r\n#      being offered NO work for B or for the control tenant is itself a cross-tenant case, with\r\n#      A\'s own offer as its positive control. Recorded in DEP-019-result.md.\r\n#   6. THE REFERENCE PROVIDER SERVES THE GATED WIRE. `fake-provider` opens a third port speaking\r\n#      the adapter-manager\'s `POST /op/<op>`, over the fake\'s per-op `SandboxProvider`. The\r\n#      shipped `bin/adapter-manager.ts` is untouched and stays `e2b`-only.\r\n#   7. THE CONTROL PLANE MINTS THE RUN CAPABILITY. Without\r\n#      `AOA_CONTROL_PLANE_SIGNING_KEY_FILE` the mint is inert, no `ownedLabelsCapability` rides the\r\n#      secret-resolve reply, and every networked run terminates `no_run_capability` before create.\r\n#      ★ THE KEYPAIR IS GENERATED BY THE JOB, NEVER COMMITTED. `docker/d1/runtime-keys/` is\r\n#      git-ignored and created per run; neither half is printed, and a missing or non-ed25519 key\r\n#      is a refusal to boot on both sides — never an ungated provider wire.\r\n#      ★ THE KEY BOUNDARY, now held by a check. The private half is bound as an individual FILE into\r\n#      the control plane ONLY, and the PUBLIC half as an individual FILE into the reference provider\r\n#      ONLY; `evaluateSpineOverrideText` reds on a DIRECTORY mount of `runtime-keys` into any\r\n#      service. History, because this record must not read as though it was always so: until\r\n#      2026-09-23 both services mounted the whole directory, so the provider — the container that\r\n#      also hosts the child-process probe path — did receive the private capability-minting key,\r\n#      while this block claimed it received only the public half. Codex raised it (P1, PR #572); the\r\n#      false claim was corrected first and the binds were fixed under the planning session\'s ruling.\r\n#      ★ The evidence bundle is NOT scanned for these two values before upload — stated because this\r\n#      block previously claimed it was. `collect-d1-evidence` gathers container logs, job events and\r\n#      a SCHEMA-ONLY `pg_dump`, so neither value is captured today, but that is a property of what\r\n#      the services happen to log rather than a control. Tracked in `DEP-019-result.md` §13.5.\r\n#\r\n# ONE-LINE JSON, single-quoted, on purpose: the static check compares it byte-for-byte.\r\n# =============================================================================\r\n\r\nservices:\r\n  migrate:\r\n    # DEP-019 — seed the SPINE worker\'s target and authorize the SPINE ticket. The base file\'s\r\n    # pair belongs to the two-worker train; the mount source here must equal the one `worker-b`\r\n    # presents below, or the seed authorizes a code nothing presents.\r\n    environment:\r\n      AOA_D1_SEED_WORKER_PROFILE_FILE: "/seed-worker.profile.json"\r\n      AOA_D1_SEED_ENROLMENT_TICKET_FILE: "/seed-enrolment-ticket"\r\n    volumes:\r\n      - "./docker/d1/m1-spine-worker.profile.json:/seed-worker.profile.json:ro"\r\n      - "./docker/d1/m1-spine-worker.enrollment-ticket:/seed-enrolment-ticket:ro"\r\n\r\n  control-plane:\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n      # DEP-019 — the OwnedLabelsCapability mint. Generated per run into a git-ignored directory.\r\n      AOA_CONTROL_PLANE_SIGNING_KEY_FILE: "/keys/control-plane-signing-key.pem"\r\n      # DEP-019 — the secrets master key, GENERATED PER RUN and required (`:?`), never committed\r\n      # and never defaulted. The journey\'s job carries one `env` / `sandbox_local_only` secret\r\n      # handle, because the OwnedLabelsCapability only rides a RESOLVED handle\'s reply; resolving\r\n      # it needs the Company secret store, and the store\'s key must be the same one the seed and\r\n      # the server use. Without `:?` a missing value would silently mint a fresh key inside the\r\n      # container and the seeded secret would decrypt nowhere.\r\n      AOA_SECRETS_MASTER_KEY: "${AOA_D1_SPINE_SECRETS_MASTER_KEY:?the lane generates the per-run secrets master key}"\r\n    volumes:\r\n      # The PRIVATE half, and ONLY here. An individual FILE bind, never the directory (Codex P1).\r\n      - "./docker/d1/runtime-keys/control-plane-signing-key.pem:/keys/control-plane-signing-key.pem:ro"\r\n\r\n  control-plane-b:\r\n    profiles: ["m1-spine-excluded"]\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n\r\n  worker-a:\r\n    profiles: ["m1-spine-excluded"]\r\n\r\n  fake-provider:\r\n    environment:\r\n      # DEP-019 — the GATED provider wire. Arming the port without the PUBLIC key is a refusal to\r\n      # boot (fake-provider-entry.mjs), because `createProviderServer` leaves create + execute on\r\n      # raw, ungated handlers when its key is undefined.\r\n      AOA_FAKE_PROVIDER_WIRE_PORT: "8082"\r\n      AOA_FAKE_PROVIDER_CONTROL_PLANE_PUBLIC_KEY_FILE: "/keys/control-plane-public-key.pem"\r\n    volumes:\r\n      - "./tests/fixtures/distributed-execution:/fixtures:ro"\r\n      # The PUBLIC half, and ONLY the public half. An individual FILE bind: mounting the DIRECTORY\r\n      # handed this container the private capability-minting key as well, which matters more than\r\n      # usual because this is also the container that hosts the child-process probe execution path\r\n      # (Codex P1, PR #572). `evaluateSpineOverrideText` now reds on a directory mount of\r\n      # `runtime-keys` into any service, so the boundary is held by a check and not by this comment.\r\n      - "./docker/d1/runtime-keys/control-plane-public-key.pem:/keys/control-plane-public-key.pem:ro"\r\n\r\n  worker-b:\r\n    # DEP-019 — the NETWORKED container boot root. The base image CMD (`worker-daemon.js`) injects\r\n    # no provider and is inert `no_provider`; the base compose\'s `container-host.js` override is\r\n    # the custody path without one. This bin wraps that same custody path and adds the per-run\r\n    # `makeRunProvider` factory over `AOA_WORKER_PROVIDER_URL`.\r\n    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]\r\n    environ'... 1815 more characters,
+    expected: '# =============================================================================\r\n# DEP-016 + DEP-019 — the `m1-spine` campaign profile\'s topology, as a compose OVERRIDE.\r\n#\r\n#   docker compose -f docker-compose.d1.yml -f docker/d1/m1-spine.override.yml up -d --wait\r\n#\r\n# It changes the base D1 stack and touches nothing else, so the existing two-worker merge train\r\n# (`bounded` / `foundation`, which never passes this file) is unchanged:\r\n#\r\n#   1. ONE worker AND ONE control plane. `worker-a` and `control-plane-b` are moved into a profile\r\n#      that nothing enables, so only `worker-b` and the single `control-plane` run — the topology\r\n#      `M1-D1-SPINE` names: "one control-plane instance, one separately deployed worker"\r\n#      (`docs/replatform/epic-regrooming/scope-triage.md`, Codex P1 on PR #566). A second replica\r\n#      would let HA behaviour affect evidence presented as single-control-plane. `test-runner`\'s\r\n#      dependency list is replaced (`!override`) because a dependency on a service outside the\r\n#      active profiles is a compose error.\r\n#      ★ The S0-8 amendment — the rollout policy identical on BOTH replica blocks — is a CONFIG\r\n#      claim and is unchanged: this file still carries it for `control-plane-b`, and the static\r\n#      check still holds both blocks to the same byte-for-byte value, so the two agree the moment a\r\n#      second replica is brought up.\r\n#   2. The F10 TENANT SET, on EVERY control-plane replica, identically. Two Organizations are\r\n#      `canary` (CLI-006: placement presents canary as `active`, so their attempts are\r\n#      lease-eligible); the CONTROL Organization is absent, which the rollout source reads as\r\n#      disabled. The value is the one `M1_SPINE_ROLLOUT_ENV_VALUE` in\r\n#      `scripts/lib/m1-spine-assertions.mjs` builds — `evaluateSpineOverrideText` (pr.yml) holds\r\n#      this file to it, and the live profile re-reads it from each replica\'s environment.\r\n#   3. NOTHING about the crew switch. `AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED` is deployment-wide\r\n#      with no per-Organization dimension, so arming it would arm crew for every enabled tenant at\r\n#      once. The base file does not set it and neither does this one; the live profile asserts it\r\n#      is unset or false on every replica (M1 plan §6, S0-8).\r\n#\r\n# ── DEP-019: the journey is WORKER-DRIVEN, and that is four more changes ──────\r\n#\r\n#   4. THE ONE DEPLOYED WORKER DISPATCHES. `worker-b` enters the networked container boot root\r\n#      (`/worker-net-app/dist/bin/networked-host.js`, DEP-011 Slice 2b-ii), with\r\n#      `AOA_WORKER_DISPATCH_ENABLED=1`, a durable event outbox and the DEP-017 env probe armed.\r\n#      ★ SCOPED TO THIS FILE, exactly as DEP-015 scoped `checkDispatchDefaultOff` to its own\r\n#      overlay. `docker-compose.d1.yml` and `scripts/d1-dispatch-expectation.json` are UNCHANGED,\r\n#      so `check-d1-dispatch-declared` still holds BOTH base workers to ABSENT and still reds if\r\n#      anyone sets the flag there. That guard parses only the base file, so the override\'s posture\r\n#      would otherwise be covered by nothing — `evaluateSpineOverrideText` holds it instead, in\r\n#      both directions.\r\n#   5. ITS TARGET IS TENANT A\'S. `worker-b` presents a committed, organization-scoped profile bound\r\n#      to the first enabled spine Organization, and `migrate` seeds THAT profile\'s target and\r\n#      authorizes THAT ticket — one artifact read twice, the WRK-017 shape, with the spine\'s own\r\n#      pair of files. The worker gets its OWN state volume so a device identity minted on the\r\n#      two-worker train can never be presented here.\r\n#      ★ ONE deployed worker means ONE worker-driven tenant. Tenant B\'s journey stays\r\n#      harness-driven and every one of its F10 properties is still asserted; the deployed worker\r\n#      being offered NO work for B or for the control tenant is itself a cross-tenant case, with\r\n#      A\'s own offer as its positive control. Recorded in DEP-019-result.md.\r\n#   6. THE REFERENCE PROVIDER SERVES THE GATED WIRE. `fake-provider` opens a third port speaking\r\n#      the adapter-manager\'s `POST /op/<op>`, over the fake\'s per-op `SandboxProvider`. The\r\n#      shipped `bin/adapter-manager.ts` is untouched and stays `e2b`-only.\r\n#   7. THE CONTROL PLANE MINTS THE RUN CAPABILITY. Without\r\n#      `AOA_CONTROL_PLANE_SIGNING_KEY_FILE` the mint is inert, no `ownedLabelsCapability` rides the\r\n#      secret-resolve reply, and every networked run terminates `no_run_capability` before create.\r\n#      ★ THE KEYPAIR IS GENERATED BY THE JOB, NEVER COMMITTED. `docker/d1/runtime-keys/` is\r\n#      git-ignored and created per run; neither half is printed, and a missing or non-ed25519 key\r\n#      is a refusal to boot on both sides — never an ungated provider wire.\r\n#      ★ THE KEY BOUNDARY, now held by a check. The private half is bound as an individual FILE into\r\n#      the control plane ONLY, and the PUBLIC half as an individual FILE into the reference provider\r\n#      ONLY; `evaluateSpineOverrideText` reds on a DIRECTORY mount of `runtime-keys` into any\r\n#      service. History, because this record must not read as though it was always so: until\r\n#      2026-09-23 both services mounted the whole directory, so the provider — the container that\r\n#      also hosts the child-process probe path — did receive the private capability-minting key,\r\n#      while this block claimed it received only the public half. Codex raised it (P1, PR #572); the\r\n#      false claim was corrected first and the binds were fixed under the planning session\'s ruling.\r\n#      ★ The evidence bundle is NOT scanned for these two values before upload — stated because this\r\n#      block previously claimed it was. `collect-d1-evidence` gathers container logs, job events and\r\n#      a SCHEMA-ONLY `pg_dump`, so neither value is captured today, but that is a property of what\r\n#      the services happen to log rather than a control. Tracked in `DEP-019-result.md` §13.5.\r\n#\r\n# ONE-LINE JSON, single-quoted, on purpose: the static check compares it byte-for-byte.\r\n# =============================================================================\r\n\r\nservices:\r\n  migrate:\r\n    # DEP-019 — seed the SPINE worker\'s target and authorize the SPINE ticket. The base file\'s\r\n    # pair belongs to the two-worker train; the mount source here must equal the one `worker-b`\r\n    # presents below, or the seed authorizes a code nothing presents.\r\n    environment:\r\n      AOA_D1_SEED_WORKER_PROFILE_FILE: "/seed-worker.profile.json"\r\n      AOA_D1_SEED_ENROLMENT_TICKET_FILE: "/seed-enrolment-ticket"\r\n    volumes:\r\n      - "./docker/d1/m1-spine-worker.profile.json:/seed-worker.profile.json:ro"\r\n      - "./docker/d1/m1-spine-worker.enrollment-ticket:/seed-enrolment-ticket:ro"\r\n\r\n  control-plane:\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n      # DEP-019 — the OwnedLabelsCapability mint. Generated per run into a git-ignored directory.\r\n      AOA_CONTROL_PLANE_SIGNING_KEY_FILE: "/keys/control-plane-signing-key.pem"\r\n      # DEP-019 — the secrets master key, GENERATED PER RUN and required (`:?`), never committed\r\n      # and never defaulted. The journey\'s job carries one `env` / `sandbox_local_only` secret\r\n      # handle, because the OwnedLabelsCapability only rides a RESOLVED handle\'s reply; resolving\r\n      # it needs the Company secret store, and the store\'s key must be the same one the seed and\r\n      # the server use. Without `:?` a missing value would silently mint a fresh key inside the\r\n      # container and the seeded secret would decrypt nowhere.\r\n      AOA_SECRETS_MASTER_KEY: "${AOA_D1_SPINE_SECRETS_MASTER_KEY:?the lane generates the per-run secrets master key}"\r\n    volumes:\r\n      # The PRIVATE half, and ONLY here. An individual FILE bind, never the directory (Codex P1).\r\n      - "./docker/d1/runtime-keys/control-plane-signing-key.pem:/keys/control-plane-signing-key.pem:ro"\r\n\r\n  control-plane-b:\r\n    profiles: ["m1-spine-excluded"]\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n\r\n  worker-a:\r\n    profiles: ["m1-spine-excluded"]\r\n\r\n  fake-provider:\r\n    environment:\r\n      # DEP-019 — the GATED provider wire. Arming the port without the PUBLIC key is a refusal to\r\n      # boot (fake-provider-entry.mjs), because `createProviderServer` leaves create + execute on\r\n      # raw, ungated handlers when its key is undefined.\r\n      AOA_FAKE_PROVIDER_WIRE_PORT: "8082"\r\n      AOA_FAKE_PROVIDER_CONTROL_PLANE_PUBLIC_KEY_FILE: "/keys/control-plane-public-key.pem"\r\n    volumes:\r\n      - "./tests/fixtures/distributed-execution:/fixtures:ro"\r\n      # The PUBLIC half, and ONLY the public half. An individual FILE bind: mounting the DIRECTORY\r\n      # handed this container the private capability-minting key as well, which matters more than\r\n      # usual because this is also the container that hosts the child-process probe execution path\r\n      # (Codex P1, PR #572). `evaluateSpineOverrideText` now reds on a directory mount of\r\n      # `runtime-keys` into any service, so the boundary is held by a check and not by this comment.\r\n      - "./docker/d1/runtime-keys/control-plane-public-key.pem:/keys/control-plane-public-key.pem:ro"\r\n\r\n  worker-b:\r\n    # DEP-019 — the NETWORKED container boot root. The base image CMD (`worker-daemon.js`) injects\r\n    # no provider and is inert `no_provider`; the base compose\'s `container-host.js` override is\r\n    # the custody path without one. This bin wraps that same custody path and adds the per-run\r\n    # `makeRunProvider` factory over `AOA_WORKER_PROVIDER_URL`.\r\n    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]\r\n    environ'... 1815 more characters,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:101:1
+✖ an override that keeps worker-a in the default profile is refused (one-worker topology) (0.829ms)
+  AssertionError [ERR_ASSERTION]: fixture must actually remove the profile
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:104:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '# =============================================================================\r\n# DEP-016 + DEP-019 — the `m1-spine` campaign profile\'s topology, as a compose OVERRIDE.\r\n#\r\n#   docker compose -f docker-compose.d1.yml -f docker/d1/m1-spine.override.yml up -d --wait\r\n#\r\n# It changes the base D1 stack and touches nothing else, so the existing two-worker merge train\r\n# (`bounded` / `foundation`, which never passes this file) is unchanged:\r\n#\r\n#   1. ONE worker AND ONE control plane. `worker-a` and `control-plane-b` are moved into a profile\r\n#      that nothing enables, so only `worker-b` and the single `control-plane` run — the topology\r\n#      `M1-D1-SPINE` names: "one control-plane instance, one separately deployed worker"\r\n#      (`docs/replatform/epic-regrooming/scope-triage.md`, Codex P1 on PR #566). A second replica\r\n#      would let HA behaviour affect evidence presented as single-control-plane. `test-runner`\'s\r\n#      dependency list is replaced (`!override`) because a dependency on a service outside the\r\n#      active profiles is a compose error.\r\n#      ★ The S0-8 amendment — the rollout policy identical on BOTH replica blocks — is a CONFIG\r\n#      claim and is unchanged: this file still carries it for `control-plane-b`, and the static\r\n#      check still holds both blocks to the same byte-for-byte value, so the two agree the moment a\r\n#      second replica is brought up.\r\n#   2. The F10 TENANT SET, on EVERY control-plane replica, identically. Two Organizations are\r\n#      `canary` (CLI-006: placement presents canary as `active`, so their attempts are\r\n#      lease-eligible); the CONTROL Organization is absent, which the rollout source reads as\r\n#      disabled. The value is the one `M1_SPINE_ROLLOUT_ENV_VALUE` in\r\n#      `scripts/lib/m1-spine-assertions.mjs` builds — `evaluateSpineOverrideText` (pr.yml) holds\r\n#      this file to it, and the live profile re-reads it from each replica\'s environment.\r\n#   3. NOTHING about the crew switch. `AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED` is deployment-wide\r\n#      with no per-Organization dimension, so arming it would arm crew for every enabled tenant at\r\n#      once. The base file does not set it and neither does this one; the live profile asserts it\r\n#      is unset or false on every replica (M1 plan §6, S0-8).\r\n#\r\n# ── DEP-019: the journey is WORKER-DRIVEN, and that is four more changes ──────\r\n#\r\n#   4. THE ONE DEPLOYED WORKER DISPATCHES. `worker-b` enters the networked container boot root\r\n#      (`/worker-net-app/dist/bin/networked-host.js`, DEP-011 Slice 2b-ii), with\r\n#      `AOA_WORKER_DISPATCH_ENABLED=1`, a durable event outbox and the DEP-017 env probe armed.\r\n#      ★ SCOPED TO THIS FILE, exactly as DEP-015 scoped `checkDispatchDefaultOff` to its own\r\n#      overlay. `docker-compose.d1.yml` and `scripts/d1-dispatch-expectation.json` are UNCHANGED,\r\n#      so `check-d1-dispatch-declared` still holds BOTH base workers to ABSENT and still reds if\r\n#      anyone sets the flag there. That guard parses only the base file, so the override\'s posture\r\n#      would otherwise be covered by nothing — `evaluateSpineOverrideText` holds it instead, in\r\n#      both directions.\r\n#   5. ITS TARGET IS TENANT A\'S. `worker-b` presents a committed, organization-scoped profile bound\r\n#      to the first enabled spine Organization, and `migrate` seeds THAT profile\'s target and\r\n#      authorizes THAT ticket — one artifact read twice, the WRK-017 shape, with the spine\'s own\r\n#      pair of files. The worker gets its OWN state volume so a device identity minted on the\r\n#      two-worker train can never be presented here.\r\n#      ★ ONE deployed worker means ONE worker-driven tenant. Tenant B\'s journey stays\r\n#      harness-driven and every one of its F10 properties is still asserted; the deployed worker\r\n#      being offered NO work for B or for the control tenant is itself a cross-tenant case, with\r\n#      A\'s own offer as its positive control. Recorded in DEP-019-result.md.\r\n#   6. THE REFERENCE PROVIDER SERVES THE GATED WIRE. `fake-provider` opens a third port speaking\r\n#      the adapter-manager\'s `POST /op/<op>`, over the fake\'s per-op `SandboxProvider`. The\r\n#      shipped `bin/adapter-manager.ts` is untouched and stays `e2b`-only.\r\n#   7. THE CONTROL PLANE MINTS THE RUN CAPABILITY. Without\r\n#      `AOA_CONTROL_PLANE_SIGNING_KEY_FILE` the mint is inert, no `ownedLabelsCapability` rides the\r\n#      secret-resolve reply, and every networked run terminates `no_run_capability` before create.\r\n#      ★ THE KEYPAIR IS GENERATED BY THE JOB, NEVER COMMITTED. `docker/d1/runtime-keys/` is\r\n#      git-ignored and created per run; neither half is printed, and a missing or non-ed25519 key\r\n#      is a refusal to boot on both sides — never an ungated provider wire.\r\n#      ★ THE KEY BOUNDARY, now held by a check. The private half is bound as an individual FILE into\r\n#      the control plane ONLY, and the PUBLIC half as an individual FILE into the reference provider\r\n#      ONLY; `evaluateSpineOverrideText` reds on a DIRECTORY mount of `runtime-keys` into any\r\n#      service. History, because this record must not read as though it was always so: until\r\n#      2026-09-23 both services mounted the whole directory, so the provider — the container that\r\n#      also hosts the child-process probe path — did receive the private capability-minting key,\r\n#      while this block claimed it received only the public half. Codex raised it (P1, PR #572); the\r\n#      false claim was corrected first and the binds were fixed under the planning session\'s ruling.\r\n#      ★ The evidence bundle is NOT scanned for these two values before upload — stated because this\r\n#      block previously claimed it was. `collect-d1-evidence` gathers container logs, job events and\r\n#      a SCHEMA-ONLY `pg_dump`, so neither value is captured today, but that is a property of what\r\n#      the services happen to log rather than a control. Tracked in `DEP-019-result.md` §13.5.\r\n#\r\n# ONE-LINE JSON, single-quoted, on purpose: the static check compares it byte-for-byte.\r\n# =============================================================================\r\n\r\nservices:\r\n  migrate:\r\n    # DEP-019 — seed the SPINE worker\'s target and authorize the SPINE ticket. The base file\'s\r\n    # pair belongs to the two-worker train; the mount source here must equal the one `worker-b`\r\n    # presents below, or the seed authorizes a code nothing presents.\r\n    environment:\r\n      AOA_D1_SEED_WORKER_PROFILE_FILE: "/seed-worker.profile.json"\r\n      AOA_D1_SEED_ENROLMENT_TICKET_FILE: "/seed-enrolment-ticket"\r\n    volumes:\r\n      - "./docker/d1/m1-spine-worker.profile.json:/seed-worker.profile.json:ro"\r\n      - "./docker/d1/m1-spine-worker.enrollment-ticket:/seed-enrolment-ticket:ro"\r\n\r\n  control-plane:\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n      # DEP-019 — the OwnedLabelsCapability mint. Generated per run into a git-ignored directory.\r\n      AOA_CONTROL_PLANE_SIGNING_KEY_FILE: "/keys/control-plane-signing-key.pem"\r\n      # DEP-019 — the secrets master key, GENERATED PER RUN and required (`:?`), never committed\r\n      # and never defaulted. The journey\'s job carries one `env` / `sandbox_local_only` secret\r\n      # handle, because the OwnedLabelsCapability only rides a RESOLVED handle\'s reply; resolving\r\n      # it needs the Company secret store, and the store\'s key must be the same one the seed and\r\n      # the server use. Without `:?` a missing value would silently mint a fresh key inside the\r\n      # container and the seeded secret would decrypt nowhere.\r\n      AOA_SECRETS_MASTER_KEY: "${AOA_D1_SPINE_SECRETS_MASTER_KEY:?the lane generates the per-run secrets master key}"\r\n    volumes:\r\n      # The PRIVATE half, and ONLY here. An individual FILE bind, never the directory (Codex P1).\r\n      - "./docker/d1/runtime-keys/control-plane-signing-key.pem:/keys/control-plane-signing-key.pem:ro"\r\n\r\n  control-plane-b:\r\n    profiles: ["m1-spine-excluded"]\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n\r\n  worker-a:\r\n    profiles: ["m1-spine-excluded"]\r\n\r\n  fake-provider:\r\n    environment:\r\n      # DEP-019 — the GATED provider wire. Arming the port without the PUBLIC key is a refusal to\r\n      # boot (fake-provider-entry.mjs), because `createProviderServer` leaves create + execute on\r\n      # raw, ungated handlers when its key is undefined.\r\n      AOA_FAKE_PROVIDER_WIRE_PORT: "8082"\r\n      AOA_FAKE_PROVIDER_CONTROL_PLANE_PUBLIC_KEY_FILE: "/keys/control-plane-public-key.pem"\r\n    volumes:\r\n      - "./tests/fixtures/distributed-execution:/fixtures:ro"\r\n      # The PUBLIC half, and ONLY the public half. An individual FILE bind: mounting the DIRECTORY\r\n      # handed this container the private capability-minting key as well, which matters more than\r\n      # usual because this is also the container that hosts the child-process probe execution path\r\n      # (Codex P1, PR #572). `evaluateSpineOverrideText` now reds on a directory mount of\r\n      # `runtime-keys` into any service, so the boundary is held by a check and not by this comment.\r\n      - "./docker/d1/runtime-keys/control-plane-public-key.pem:/keys/control-plane-public-key.pem:ro"\r\n\r\n  worker-b:\r\n    # DEP-019 — the NETWORKED container boot root. The base image CMD (`worker-daemon.js`) injects\r\n    # no provider and is inert `no_provider`; the base compose\'s `container-host.js` override is\r\n    # the custody path without one. This bin wraps that same custody path and adds the per-run\r\n    # `makeRunProvider` factory over `AOA_WORKER_PROVIDER_URL`.\r\n    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]\r\n    environ'... 1815 more characters,
+    expected: '# =============================================================================\r\n# DEP-016 + DEP-019 — the `m1-spine` campaign profile\'s topology, as a compose OVERRIDE.\r\n#\r\n#   docker compose -f docker-compose.d1.yml -f docker/d1/m1-spine.override.yml up -d --wait\r\n#\r\n# It changes the base D1 stack and touches nothing else, so the existing two-worker merge train\r\n# (`bounded` / `foundation`, which never passes this file) is unchanged:\r\n#\r\n#   1. ONE worker AND ONE control plane. `worker-a` and `control-plane-b` are moved into a profile\r\n#      that nothing enables, so only `worker-b` and the single `control-plane` run — the topology\r\n#      `M1-D1-SPINE` names: "one control-plane instance, one separately deployed worker"\r\n#      (`docs/replatform/epic-regrooming/scope-triage.md`, Codex P1 on PR #566). A second replica\r\n#      would let HA behaviour affect evidence presented as single-control-plane. `test-runner`\'s\r\n#      dependency list is replaced (`!override`) because a dependency on a service outside the\r\n#      active profiles is a compose error.\r\n#      ★ The S0-8 amendment — the rollout policy identical on BOTH replica blocks — is a CONFIG\r\n#      claim and is unchanged: this file still carries it for `control-plane-b`, and the static\r\n#      check still holds both blocks to the same byte-for-byte value, so the two agree the moment a\r\n#      second replica is brought up.\r\n#   2. The F10 TENANT SET, on EVERY control-plane replica, identically. Two Organizations are\r\n#      `canary` (CLI-006: placement presents canary as `active`, so their attempts are\r\n#      lease-eligible); the CONTROL Organization is absent, which the rollout source reads as\r\n#      disabled. The value is the one `M1_SPINE_ROLLOUT_ENV_VALUE` in\r\n#      `scripts/lib/m1-spine-assertions.mjs` builds — `evaluateSpineOverrideText` (pr.yml) holds\r\n#      this file to it, and the live profile re-reads it from each replica\'s environment.\r\n#   3. NOTHING about the crew switch. `AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED` is deployment-wide\r\n#      with no per-Organization dimension, so arming it would arm crew for every enabled tenant at\r\n#      once. The base file does not set it and neither does this one; the live profile asserts it\r\n#      is unset or false on every replica (M1 plan §6, S0-8).\r\n#\r\n# ── DEP-019: the journey is WORKER-DRIVEN, and that is four more changes ──────\r\n#\r\n#   4. THE ONE DEPLOYED WORKER DISPATCHES. `worker-b` enters the networked container boot root\r\n#      (`/worker-net-app/dist/bin/networked-host.js`, DEP-011 Slice 2b-ii), with\r\n#      `AOA_WORKER_DISPATCH_ENABLED=1`, a durable event outbox and the DEP-017 env probe armed.\r\n#      ★ SCOPED TO THIS FILE, exactly as DEP-015 scoped `checkDispatchDefaultOff` to its own\r\n#      overlay. `docker-compose.d1.yml` and `scripts/d1-dispatch-expectation.json` are UNCHANGED,\r\n#      so `check-d1-dispatch-declared` still holds BOTH base workers to ABSENT and still reds if\r\n#      anyone sets the flag there. That guard parses only the base file, so the override\'s posture\r\n#      would otherwise be covered by nothing — `evaluateSpineOverrideText` holds it instead, in\r\n#      both directions.\r\n#   5. ITS TARGET IS TENANT A\'S. `worker-b` presents a committed, organization-scoped profile bound\r\n#      to the first enabled spine Organization, and `migrate` seeds THAT profile\'s target and\r\n#      authorizes THAT ticket — one artifact read twice, the WRK-017 shape, with the spine\'s own\r\n#      pair of files. The worker gets its OWN state volume so a device identity minted on the\r\n#      two-worker train can never be presented here.\r\n#      ★ ONE deployed worker means ONE worker-driven tenant. Tenant B\'s journey stays\r\n#      harness-driven and every one of its F10 properties is still asserted; the deployed worker\r\n#      being offered NO work for B or for the control tenant is itself a cross-tenant case, with\r\n#      A\'s own offer as its positive control. Recorded in DEP-019-result.md.\r\n#   6. THE REFERENCE PROVIDER SERVES THE GATED WIRE. `fake-provider` opens a third port speaking\r\n#      the adapter-manager\'s `POST /op/<op>`, over the fake\'s per-op `SandboxProvider`. The\r\n#      shipped `bin/adapter-manager.ts` is untouched and stays `e2b`-only.\r\n#   7. THE CONTROL PLANE MINTS THE RUN CAPABILITY. Without\r\n#      `AOA_CONTROL_PLANE_SIGNING_KEY_FILE` the mint is inert, no `ownedLabelsCapability` rides the\r\n#      secret-resolve reply, and every networked run terminates `no_run_capability` before create.\r\n#      ★ THE KEYPAIR IS GENERATED BY THE JOB, NEVER COMMITTED. `docker/d1/runtime-keys/` is\r\n#      git-ignored and created per run; neither half is printed, and a missing or non-ed25519 key\r\n#      is a refusal to boot on both sides — never an ungated provider wire.\r\n#      ★ THE KEY BOUNDARY, now held by a check. The private half is bound as an individual FILE into\r\n#      the control plane ONLY, and the PUBLIC half as an individual FILE into the reference provider\r\n#      ONLY; `evaluateSpineOverrideText` reds on a DIRECTORY mount of `runtime-keys` into any\r\n#      service. History, because this record must not read as though it was always so: until\r\n#      2026-09-23 both services mounted the whole directory, so the provider — the container that\r\n#      also hosts the child-process probe path — did receive the private capability-minting key,\r\n#      while this block claimed it received only the public half. Codex raised it (P1, PR #572); the\r\n#      false claim was corrected first and the binds were fixed under the planning session\'s ruling.\r\n#      ★ The evidence bundle is NOT scanned for these two values before upload — stated because this\r\n#      block previously claimed it was. `collect-d1-evidence` gathers container logs, job events and\r\n#      a SCHEMA-ONLY `pg_dump`, so neither value is captured today, but that is a property of what\r\n#      the services happen to log rather than a control. Tracked in `DEP-019-result.md` §13.5.\r\n#\r\n# ONE-LINE JSON, single-quoted, on purpose: the static check compares it byte-for-byte.\r\n# =============================================================================\r\n\r\nservices:\r\n  migrate:\r\n    # DEP-019 — seed the SPINE worker\'s target and authorize the SPINE ticket. The base file\'s\r\n    # pair belongs to the two-worker train; the mount source here must equal the one `worker-b`\r\n    # presents below, or the seed authorizes a code nothing presents.\r\n    environment:\r\n      AOA_D1_SEED_WORKER_PROFILE_FILE: "/seed-worker.profile.json"\r\n      AOA_D1_SEED_ENROLMENT_TICKET_FILE: "/seed-enrolment-ticket"\r\n    volumes:\r\n      - "./docker/d1/m1-spine-worker.profile.json:/seed-worker.profile.json:ro"\r\n      - "./docker/d1/m1-spine-worker.enrollment-ticket:/seed-enrolment-ticket:ro"\r\n\r\n  control-plane:\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n      # DEP-019 — the OwnedLabelsCapability mint. Generated per run into a git-ignored directory.\r\n      AOA_CONTROL_PLANE_SIGNING_KEY_FILE: "/keys/control-plane-signing-key.pem"\r\n      # DEP-019 — the secrets master key, GENERATED PER RUN and required (`:?`), never committed\r\n      # and never defaulted. The journey\'s job carries one `env` / `sandbox_local_only` secret\r\n      # handle, because the OwnedLabelsCapability only rides a RESOLVED handle\'s reply; resolving\r\n      # it needs the Company secret store, and the store\'s key must be the same one the seed and\r\n      # the server use. Without `:?` a missing value would silently mint a fresh key inside the\r\n      # container and the seeded secret would decrypt nowhere.\r\n      AOA_SECRETS_MASTER_KEY: "${AOA_D1_SPINE_SECRETS_MASTER_KEY:?the lane generates the per-run secrets master key}"\r\n    volumes:\r\n      # The PRIVATE half, and ONLY here. An individual FILE bind, never the directory (Codex P1).\r\n      - "./docker/d1/runtime-keys/control-plane-signing-key.pem:/keys/control-plane-signing-key.pem:ro"\r\n\r\n  control-plane-b:\r\n    profiles: ["m1-spine-excluded"]\r\n    environment:\r\n      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: \'{"organizations":{"0d016a00-0000-4000-8000-00000000000a":{"mode":"canary","workloads":["batch"]},"0d016b00-0000-4000-8000-00000000000b":{"mode":"canary","workloads":["batch"]}}}\'\r\n\r\n  worker-a:\r\n    profiles: ["m1-spine-excluded"]\r\n\r\n  fake-provider:\r\n    environment:\r\n      # DEP-019 — the GATED provider wire. Arming the port without the PUBLIC key is a refusal to\r\n      # boot (fake-provider-entry.mjs), because `createProviderServer` leaves create + execute on\r\n      # raw, ungated handlers when its key is undefined.\r\n      AOA_FAKE_PROVIDER_WIRE_PORT: "8082"\r\n      AOA_FAKE_PROVIDER_CONTROL_PLANE_PUBLIC_KEY_FILE: "/keys/control-plane-public-key.pem"\r\n    volumes:\r\n      - "./tests/fixtures/distributed-execution:/fixtures:ro"\r\n      # The PUBLIC half, and ONLY the public half. An individual FILE bind: mounting the DIRECTORY\r\n      # handed this container the private capability-minting key as well, which matters more than\r\n      # usual because this is also the container that hosts the child-process probe execution path\r\n      # (Codex P1, PR #572). `evaluateSpineOverrideText` now reds on a directory mount of\r\n      # `runtime-keys` into any service, so the boundary is held by a check and not by this comment.\r\n      - "./docker/d1/runtime-keys/control-plane-public-key.pem:/keys/control-plane-public-key.pem:ro"\r\n\r\n  worker-b:\r\n    # DEP-019 — the NETWORKED container boot root. The base image CMD (`worker-daemon.js`) injects\r\n    # no provider and is inert `no_provider`; the base compose\'s `container-host.js` override is\r\n    # the custody path without one. This bin wraps that same custody path and adds the per-run\r\n    # `makeRunProvider` factory over `AOA_WORKER_PROVIDER_URL`.\r\n    command: ["node", "/worker-net-app/dist/bin/networked-host.js"]\r\n    environ'... 1815 more characters,
+    operator: 'notStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:1099:1
+✖ override: the COMMITTED file has zero violations (the anchor) (1.3617ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'override:worker_a_not_excluded',
+  +     message: 'worker-a must be moved out of the default profile (one-worker topology)'
+  +   },
+  +   {
+  +     code: 'override:second_replica_not_excluded',
+  +     message: 'control-plane-b must be moved out of the default profile — M1-D1-SPINE is ONE control plane'
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:1100:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'override:worker_a_not_excluded', message: 'worker-a must be moved out of the default profile (one-worker topology)' }, { code: 'override:second_replica_not_excluded', message: 'control-plane-b must be moved out of the default profile — M1-D1-SPINE is ONE control plane' } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:1133:1
+✖ override: ★ arming dispatch on a SECOND service reds — M1-D1-SPINE is ONE deployed worker (8.3119ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(codes(evaluateSpineOverrideText(broken)).includes("override:dispatch_armed_beyond_the_deployed_worker"))
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:1138:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts\lib\__tests__\m1-spine-assertions.test.mjs:1213:1
+✖ override: a key mounted into ANY other service reds (1.6666ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(codes(evaluateSpineOverrideText(broken)).includes("override:key_mounted_into_unexpected_service"))
+  
+      at TestContext.<anonymous> (file:///C:/Users/Dell/Desktop/aoa/replatform-testing/scripts/lib/__tests__/m1-spine-assertions.test.mjs:1219:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

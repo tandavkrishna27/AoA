@@ -1,0 +1,27 @@
+{
+  "httpStatus": 200,
+  "outcome": "verified",
+  "checks": [
+    {
+      "code": "codex_cwd_valid",
+      "level": "info",
+      "message": "Working directory is valid: C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\server"
+    },
+    {
+      "code": "codex_command_resolvable",
+      "level": "info",
+      "message": "Command is executable: codex"
+    },
+    {
+      "code": "codex_auth_json_present",
+      "level": "info",
+      "message": "Codex auth.json is available for local authentication."
+    },
+    {
+      "code": "codex_hello_probe_passed",
+      "level": "info",
+      "message": "Codex hello probe succeeded.",
+      "detail": "hello"
+    }
+  ]
+}

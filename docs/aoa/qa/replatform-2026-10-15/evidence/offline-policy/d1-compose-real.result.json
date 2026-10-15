@@ -1,0 +1,17 @@
+{
+  "id": "d1-compose-real",
+  "kind": "static",
+  "file": "scripts/check-d1-compose.mjs",
+  "scope": "DEP-002 committed static topology",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "scripts/check-d1-compose.mjs"
+  ],
+  "startedAt": "2026-10-15T16:09:02.464Z",
+  "durationMs": 90,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {}
+}

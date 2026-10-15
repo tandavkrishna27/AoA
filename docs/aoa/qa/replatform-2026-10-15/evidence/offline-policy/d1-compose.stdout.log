@@ -1,0 +1,382 @@
+TAP version 13
+# Subtest: parseCtlAllow trims, drops empties, and detects the '*' sentinel
+ok 1 - parseCtlAllow trims, drops empties, and detects the '*' sentinel
+  ---
+  duration_ms: 4.4631
+  type: 'test'
+  ...
+# Subtest: FAIL-CLOSED: an EMPTY allowlist denies every peer (=> 403)
+ok 2 - FAIL-CLOSED: an EMPTY allowlist denies every peer (=> 403)
+  ---
+  duration_ms: 0.3018
+  type: 'test'
+  ...
+# Subtest: FAIL-CLOSED: an UNSET allowlist denies every peer (=> 403)
+ok 3 - FAIL-CLOSED: an UNSET allowlist denies every peer (=> 403)
+  ---
+  duration_ms: 0.232
+  type: 'test'
+  ...
+# Subtest: the explicit '*' sentinel opens the endpoint to ALL peers
+ok 4 - the explicit '*' sentinel opens the endpoint to ALL peers
+  ---
+  duration_ms: 0.2474
+  type: 'test'
+  ...
+# Subtest: an explicit peer list admits resolved peers and 403s the rest
+ok 5 - an explicit peer list admits resolved peers and 403s the rest
+  ---
+  duration_ms: 0.3948
+  type: 'test'
+  ...
+# Subtest: a non-Set / missing allowedIps with an explicit list denies (=> 403)
+ok 6 - a non-Set / missing allowedIps with an explicit list denies (=> 403)
+  ---
+  duration_ms: 0.2988
+  type: 'test'
+  ...
+# Subtest: real compose defaults to the transferred MinIO package with the proven digest
+ok 7 - real compose defaults to the transferred MinIO package with the proven digest
+  ---
+  duration_ms: 6.5857
+  type: 'test'
+  ...
+# Subtest: real docker-compose.d1.yml parses and satisfies every DEP-002 invariant
+ok 8 - real docker-compose.d1.yml parses and satisfies every DEP-002 invariant
+  ---
+  duration_ms: 9.4824
+  type: 'test'
+  ...
+# Subtest: real compose parses to exactly the 10 matrix services with exact network sets
+ok 9 - real compose parses to exactly the 10 matrix services with exact network sets
+  ---
+  duration_ms: 2.9636
+  type: 'test'
+  ...
+# Subtest: real compose: neither worker is attached to data-net
+ok 10 - real compose: neither worker is attached to data-net
+  ---
+  duration_ms: 1.7993
+  type: 'test'
+  ...
+# Subtest: real toxiproxy.json declares the three in-path proxies
+ok 11 - real toxiproxy.json declares the three in-path proxies
+  ---
+  duration_ms: 0.5287
+  type: 'test'
+  ...
+# Subtest: hand-built valid compose passes with zero violations
+ok 12 - hand-built valid compose passes with zero violations
+  ---
+  duration_ms: 0.9789
+  type: 'test'
+  ...
+# Subtest: REJECT: a worker attached to data-net (load-bearing isolation invariant)
+ok 13 - REJECT: a worker attached to data-net (load-bearing isolation invariant)
+  ---
+  duration_ms: 1.0914
+  type: 'test'
+  ...
+# Subtest: REJECT: control-plane in the fake-provider control-endpoint allowlist (FIX A boundary)
+ok 14 - REJECT: control-plane in the fake-provider control-endpoint allowlist (FIX A boundary)
+  ---
+  duration_ms: 0.6166
+  type: 'test'
+  ...
+# Subtest: REJECT: an empty/unset fake-provider control-endpoint allowlist (FIX A non-empty)
+ok 15 - REJECT: an empty/unset fake-provider control-endpoint allowlist (FIX A non-empty)
+  ---
+  duration_ms: 0.6579
+  type: 'test'
+  ...
+# Subtest: REJECT: a worker carrying a PostgreSQL credential (FIX C credential boundary)
+ok 16 - REJECT: a worker carrying a PostgreSQL credential (FIX C credential boundary)
+  ---
+  duration_ms: 1.0323
+  type: 'test'
+  ...
+# Subtest: REJECT: two services sharing a read-write volume
+ok 17 - REJECT: two services sharing a read-write volume
+  ---
+  duration_ms: 0.9467
+  type: 'test'
+  ...
+# Subtest: REJECT: a long-running service missing a healthcheck
+ok 18 - REJECT: a long-running service missing a healthcheck
+  ---
+  duration_ms: 0.8091
+  type: 'test'
+  ...
+# Subtest: REJECT: control-plane<->postgres not routed through toxiproxy
+ok 19 - REJECT: control-plane<->postgres not routed through toxiproxy
+  ---
+  duration_ms: 0.6621
+  type: 'test'
+  ...
+# Subtest: REJECT: the two workers registering identical target profiles
+ok 20 - REJECT: the two workers registering identical target profiles
+  ---
+  duration_ms: 0.6805
+  type: 'test'
+  ...
+# Subtest: REJECT: an unexpected extra service
+ok 21 - REJECT: an unexpected extra service
+  ---
+  duration_ms: 0.647
+  type: 'test'
+  ...
+# Subtest: REJECT: an isolation network not declared internal
+ok 22 - REJECT: an isolation network not declared internal
+  ---
+  duration_ms: 0.4313
+  type: 'test'
+  ...
+# Subtest: REJECT: short-form (list) depends_on
+ok 23 - REJECT: short-form (list) depends_on
+  ---
+  duration_ms: 0.4391
+  type: 'test'
+  ...
+# Subtest: REJECT: control-plane not gated on migrate completion
+ok 24 - REJECT: control-plane not gated on migrate completion
+  ---
+  duration_ms: 0.4556
+  type: 'test'
+  ...
+# Subtest: REJECT: depending on the one-shot migrate job with service_healthy
+ok 25 - REJECT: depending on the one-shot migrate job with service_healthy
+  ---
+  duration_ms: 0.7397
+  type: 'test'
+  ...
+# Subtest: REJECT: a hardcoded (non-injected) control-plane image digest
+ok 26 - REJECT: a hardcoded (non-injected) control-plane image digest
+  ---
+  duration_ms: 1.8933
+  type: 'test'
+  ...
+# Subtest: REJECT: control-plane missing provider-ctl-net (wrong network set)
+ok 27 - REJECT: control-plane missing provider-ctl-net (wrong network set)
+  ---
+  duration_ms: 0.9223
+  type: 'test'
+  ...
+# Subtest: REJECT: a non-https control-plane presign endpoint (DAT-002 https grant constraint)
+ok 28 - REJECT: a non-https control-plane presign endpoint (DAT-002 https grant constraint)
+  ---
+  duration_ms: 1.0393
+  type: 'test'
+  ...
+# Subtest: REJECT: control-plane missing the s3 storage provider (DAT-002 live tier)
+ok 29 - REJECT: control-plane missing the s3 storage provider (DAT-002 live tier)
+  ---
+  duration_ms: 0.6605
+  type: 'test'
+  ...
+# Subtest: REJECT: control-plane object storage without path-style (SigV4 host match)
+ok 30 - REJECT: control-plane object storage without path-style (SigV4 host match)
+  ---
+  duration_ms: 0.4978
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b with a wrong network set
+ok 31 - REJECT (DEP-009): control-plane-b with a wrong network set
+  ---
+  duration_ms: 0.5115
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b not gated on migrate completion
+ok 32 - REJECT (DEP-009): control-plane-b not gated on migrate completion
+  ---
+  duration_ms: 0.5111
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b sharing control-plane's read-write state volume
+ok 33 - REJECT (DEP-009): control-plane-b sharing control-plane's read-write state volume
+  ---
+  duration_ms: 0.4683
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b<->postgres not routed through toxiproxy
+ok 34 - REJECT (DEP-009): control-plane-b<->postgres not routed through toxiproxy
+  ---
+  duration_ms: 0.6055
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): a hardcoded (non-injected) control-plane-b image digest
+ok 35 - REJECT (DEP-009): a hardcoded (non-injected) control-plane-b image digest
+  ---
+  duration_ms: 0.5451
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b missing the https presign endpoint
+ok 36 - REJECT (DEP-009): control-plane-b missing the https presign endpoint
+  ---
+  duration_ms: 0.7036
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b in the fake-provider control-endpoint allowlist
+ok 37 - REJECT (DEP-009): control-plane-b in the fake-provider control-endpoint allowlist
+  ---
+  duration_ms: 0.6412
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b with a DIVERGENT worker-session signing key
+ok 38 - REJECT (DEP-009): control-plane-b with a DIVERGENT worker-session signing key
+  ---
+  duration_ms: 0.661
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): control-plane-b with a DIVERGENT distributed-execution flag
+ok 39 - REJECT (DEP-009): control-plane-b with a DIVERGENT distributed-execution flag
+  ---
+  duration_ms: 0.5483
+  type: 'test'
+  ...
+# Subtest: REJECT (Blocker B): a D1 worker whose command enters the networked-host bin
+ok 40 - REJECT (Blocker B): a D1 worker whose command enters the networked-host bin
+  ---
+  duration_ms: 0.4673
+  type: 'test'
+  ...
+# Subtest: REJECT (Blocker B): a D1 worker whose ENTRYPOINT enters the networked-host bin
+ok 41 - REJECT (Blocker B): a D1 worker whose ENTRYPOINT enters the networked-host bin
+  ---
+  duration_ms: 0.4419
+  type: 'test'
+  ...
+# Subtest: the shipped D1 compose does NOT enter the networked-host bin (anti-vacuity)
+ok 42 - the shipped D1 compose does NOT enter the networked-host bin (anti-vacuity)
+  ---
+  duration_ms: 0.3358
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): a control-plane replica missing the shared session signing key
+ok 43 - REJECT (DEP-009): a control-plane replica missing the shared session signing key
+  ---
+  duration_ms: 0.3797
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-009): a lone control-plane with no replica (missing control-plane-b)
+ok 44 - REJECT (DEP-009): a lone control-plane with no replica (missing control-plane-b)
+  ---
+  duration_ms: 0.3554
+  type: 'test'
+  ...
+# Subtest: real toxiproxy.json declares the per-replica worker-to-control-plane-b proxy
+ok 45 - real toxiproxy.json declares the per-replica worker-to-control-plane-b proxy
+  ---
+  duration_ms: 0.3735
+  type: 'test'
+  ...
+# Subtest: REJECT: toxiproxy config with a wrong upstream
+ok 46 - REJECT: toxiproxy config with a wrong upstream
+  ---
+  duration_ms: 0.3188
+  type: 'test'
+  ...
+# Subtest: yaml-lite parses nested mappings, block/flow sequences, and quoted scalars
+ok 47 - yaml-lite parses nested mappings, block/flow sequences, and quoted scalars
+  ---
+  duration_ms: 0.2551
+  type: 'test'
+  ...
+# Subtest: yaml-lite strips comments but preserves '\#' inside quotes
+ok 48 - yaml-lite strips comments but preserves '\#' inside quotes
+  ---
+  duration_ms: 0.2747
+  type: 'test'
+  ...
+# Subtest: hand-built ENROLLING compose passes with zero violations (anti-vacuity)
+ok 49 - hand-built ENROLLING compose passes with zero violations (anti-vacuity)
+  ---
+  duration_ms: 0.557
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): file_record custody without the container-host command
+ok 50 - REJECT (WRK-017): file_record custody without the container-host command
+  ---
+  duration_ms: 0.4589
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): the container-host command with mounted_secret custody
+ok 51 - REJECT (WRK-017): the container-host command with mounted_secret custody
+  ---
+  duration_ms: 1.3859
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): the container-host command with NO custody mode declared at all
+ok 52 - REJECT (WRK-017): the container-host command with NO custody mode declared at all
+  ---
+  duration_ms: 0.7738
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): an enrolling worker whose ticket path has nothing mounted at it
+ok 53 - REJECT (WRK-017): an enrolling worker whose ticket path has nothing mounted at it
+  ---
+  duration_ms: 0.7503
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): an enrolling worker whose ticket mount is read-WRITE
+ok 54 - REJECT (WRK-017): an enrolling worker whose ticket mount is read-WRITE
+  ---
+  duration_ms: 0.6458
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): an enrolling worker with no AOA_WORKER_ENROLLMENT_CODE_FILE
+ok 55 - REJECT (WRK-017): an enrolling worker with no AOA_WORKER_ENROLLMENT_CODE_FILE
+  ---
+  duration_ms: 0.5827
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): an enrolling worker whose state dir is a BIND, not a named volume
+ok 56 - REJECT (WRK-017): an enrolling worker whose state dir is a BIND, not a named volume
+  ---
+  duration_ms: 0.6551
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): an enrolling worker whose state dir points nowhere
+ok 57 - REJECT (WRK-017): an enrolling worker whose state dir points nowhere
+  ---
+  duration_ms: 0.5838
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): a worker enrols but migrate does not seed its authority
+ok 58 - REJECT (WRK-017): a worker enrols but migrate does not seed its authority
+  ---
+  duration_ms: 0.4835
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): migrate seeds a DIFFERENT ticket than the worker presents
+ok 59 - REJECT (WRK-017): migrate seeds a DIFFERENT ticket than the worker presents
+  ---
+  duration_ms: 0.6114
+  type: 'test'
+  ...
+# Subtest: REJECT (WRK-017): migrate seeds while NO worker enrols (a seed nothing presents)
+ok 60 - REJECT (WRK-017): migrate seeds while NO worker enrols (a seed nothing presents)
+  ---
+  duration_ms: 0.4025
+  type: 'test'
+  ...
+# Subtest: the real D1 compose declares EXACTLY one enrolling worker and one control
+ok 61 - the real D1 compose declares EXACTLY one enrolling worker and one control
+  ---
+  duration_ms: 2.2504
+  type: 'test'
+  ...
+# Subtest: evaluateComposeInvariants flags an empty compose
+ok 62 - evaluateComposeInvariants flags an empty compose
+  ---
+  duration_ms: 0.1319
+  type: 'test'
+  ...
+1..62
+# tests 62
+# suites 0
+# pass 62
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 246.5276

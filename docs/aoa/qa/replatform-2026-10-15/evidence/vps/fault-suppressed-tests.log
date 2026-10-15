@@ -1,0 +1,431 @@
+✔ fault-matrix: an early hard restart fences its own live persisted lease and resumes polling (140539.554315ms)
+✔ fault-matrix: tenant A — the journey is priced once and audited (F10 per-tenant correctness) (4917.930821ms)
+✔ fault-matrix: tenant B — the journey is priced once and audited (F10 per-tenant correctness) (4770.19047ms)
+✔ fault-matrix: cross-tenant events + read — denied, with a same-tenant positive control (8373.913709ms)
+✔ fault-matrix: cross-tenant lease renew — denied, with a same-tenant positive control (957.691307ms)
+✔ fault-matrix: cross-tenant cancel — denied, with a same-tenant positive control (7542.53256ms)
+✔ fault-matrix: cross-tenant secrets — denied at the fence and invisible under RLS, with controls (1853.366599ms)
+✔ fault-matrix: cross-tenant staged inputs + outputs — denied, with same-tenant positive controls (3984.625677ms)
+✔ fault-matrix: the four legacy no-RLS tables are filtered by the query predicate, with positive and anti-vacuity controls (2624.702662ms)
+✔ fault-matrix: the control tenant is refused distributed execution and stays legacy (8666.03184ms)
+✔ fault-matrix: cross-tenant tool calls — denied by the per-Organization tool-surface gate, with an admit control (2724.920608ms)
+✖ fault-matrix: redemption AFTER the lease ends is refused — with a live-lease same-tenant control (9883.121082ms)
+✖ fault-matrix: redemption on a DIFFERENT lease is refused — with an own-lease same-tenant control (11891.840177ms)
+✔ fault-matrix: a planted credential canary is SCRUBBED from both streams, and the scrubber's own marker is observed there (14594.858749ms)
+✖ fault-matrix: cancelling an UNLEASED attempt cancels it directly (2186.496389ms)
+✖ fault-matrix: cancelling a LEASED attempt requests cancellation and fences a cancel command (3204.013182ms)
+✖ fault-matrix: a provider execute that exceeds its deadline lands as a classified FAILED terminal (9260.840653ms)
+✖ fault-matrix: a truncating toxic on worker-to-minio makes the fenced commit refuse an unverifiable object (4962.191852ms)
+✖ fault-matrix: a fence lost mid-flight makes the commit refuse and the orphan object is swept (27788.185619ms)
+✖ fault-matrix: cutting worker-to-control-plane severs real worker traffic, the lease is reclaimed, and the late ack is refused (4091.928328ms)
+✖ fault-matrix: an expired lease is reaped into a single-winner retry (19726.067065ms)
+✖ fault-matrix: restarting the control plane leaves the durable lease state intact (3687.782892ms)
+✖ fault-matrix: cutting control-plane-to-postgres severs the stack's own database link, and it recovers (2420.689597ms)
+✔ fault-matrix: the DEPLOYED worker maps a provider deadline overrun to its own classified FAILED terminal (13446.105942ms)
+✔ fault-matrix: an expired enrollment code and route refuse restart with 401 and idle (111313.797553ms)
+✖ fault-matrix: every DECLARED case fired its injection and was classified as declared (6.890144ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 14
+ℹ fail 12
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 425611.146253
+
+✖ failing tests:
+
+test at tests/d1/m1-fault-matrix.test.mjs:1258:1
+✖ fault-matrix: redemption AFTER the lease ends is refused — with a live-lease same-tenant control (9883.121082ms)
+  AssertionError [ERR_ASSERTION]: after the lease ended the redemption must be refused at the FENCE (not the catch-all): {"status":200,"outcome":"resolved","code":null,"reason":null}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1341:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1344:1
+✖ fault-matrix: redemption on a DIFFERENT lease is refused — with an own-lease same-tenant control (11891.840177ms)
+  AssertionError [ERR_ASSERTION]: a redemption on another attempt's lease must be REFUSED: {"status":200,"outcome":"resolved","code":null,"reason":null}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1399:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1566:1
+✖ fault-matrix: cancelling an UNLEASED attempt cancels it directly (2186.496389ms)
+  AssertionError [ERR_ASSERTION]: an UNLEASED attempt is cancelled outright: [{"attemptId":"67a19546-522b-4f63-9d6d-b118fa6f173a","jobId":"61478527-417e-4c53-acf5-8dc6ae006e14","attemptNumber":1,"status":"pending"}]
+  + actual - expected
+  
+  + 'pending'
+  - 'cancelled'
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1596:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'pending',
+    expected: 'cancelled',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1600:1
+✖ fault-matrix: cancelling a LEASED attempt requests cancellation and fences a cancel command (3204.013182ms)
+  AssertionError [ERR_ASSERTION]: a LEASED attempt goes to cancel_requested: [{"attemptId":"12c17876-5587-495c-89e5-9b3d75010d5f","jobId":"3d7b36f1-6abb-4ff6-a5e4-b670b4fa6f18","attemptNumber":1,"status":"leased"}]
+  + actual - expected
+  
+  + 'leased'
+  - 'cancel_requested'
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1626:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'leased',
+    expected: 'cancel_requested',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1673:1
+✖ fault-matrix: a provider execute that exceeds its deadline lands as a classified FAILED terminal (9260.840653ms)
+  AssertionError [ERR_ASSERTION]: the provider must report timedOut — the injection: {"kind":"executed","terminalState":"succeeded","faultInjected":false,"timedOut":false,"usage":{"inputTokens":120000,"outputTokens":30000,"cachedInputTokens":0,"runtimeMillis":4200}}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1703:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1713:1
+✖ fault-matrix: a truncating toxic on worker-to-minio makes the fenced commit refuse an unverifiable object (4962.191852ms)
+  AssertionError [ERR_ASSERTION]: the truncating toxic must block the PUT — the injection: {"threw":false,"status":200,"sha256Hex":"9fb64f08eeee002d8c094b7d01d9bf25e42a11da3b47003c7f2a4c93933fb7f2","sha256B64":"n7ZPCO7uAC2MCUt9Adm/JeQqEdo7RwA8fypMk5M/t/I=","sizeBytes":4096,"body":""}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1782:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1789:1
+✖ fault-matrix: a fence lost mid-flight makes the commit refuse and the orphan object is swept (27788.185619ms)
+  AssertionError [ERR_ASSERTION]: the commit under a stale fence must be DENIED stale_fence at the auth layer: {"protocolVersion":1,"correlationId":"a1054d69-ba4b-483e-a474-4c3aa1878d29","serverTime":"2026-10-15T16:15:16.409Z","outcome":"committed","artifactId":"6d370c1b-5fcc-4e27-b937-b21f86caf0ad","versionNumber":1,"committedAt":"2026-10-15T16:15:16.435Z"}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1855:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1861:1
+✖ fault-matrix: cutting worker-to-control-plane severs real worker traffic, the lease is reclaimed, and the late ack is refused (4091.928328ms)
+  AssertionError [ERR_ASSERTION]: a REAL worker request through the proxied path must succeed before the cut, FAIL during it, and succeed after the restore: before=200 during=null after=undefined
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:1968:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:1986:1
+✖ fault-matrix: an expired lease is reaped into a single-winner retry (19726.067065ms)
+  AssertionError [ERR_ASSERTION]: the deadline row must be moved — the injection: {"ok":true,"updated":0}
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:2011:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:2017:1
+✖ fault-matrix: restarting the control plane leaves the durable lease state intact (3687.782892ms)
+  AssertionError [ERR_ASSERTION]: the control plane must actually have restarted — the injection: before=2026-10-15T16:10:21.227752414Z after=2026-10-15T16:10:21.227752414Z
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:2068:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:2077:1
+✖ fault-matrix: cutting control-plane-to-postgres severs the stack's own database link, and it recovers (2420.689597ms)
+  AssertionError [ERR_ASSERTION]: the database link must be OBSERVED severed and restored: cut=null restore={"connected":true}
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:2183:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/d1/m1-fault-matrix.test.mjs:2621:1
+✖ fault-matrix: every DECLARED case fired its injection and was classified as declared (6.890144ms)
+  AssertionError [ERR_ASSERTION]: fault-matrix evidence violations:
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.fault.link_cut.worker_to_control_plane: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.fault.link_cut.control_plane_to_postgres: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.fault.object_store.truncated_upload: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.fault.object_store.truncated_upload: observed "committed", declared "fenced_commit_refuses_unverifiable_object"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.restart.control_plane_process: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.reconcile.expired_lease_reaped: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.reconcile.expired_lease_reaped: observed "not_converged", declared "single_winner_retry_minted"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.reconcile.worker_startup_lease_probe: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.reconcile.worker_startup_lease_probe: observed "restart_injection_suppressed", declared "startup_reconciler_fences_its_own_prior_lease"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.cancel.leased_attempt: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.cancel.leased_attempt: observed "attempt_leased_command_bound_false", declared "cancel_requested_with_fenced_command"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.cancel.unleased_attempt: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.cancel.unleased_attempt: observed "attempt_pending_with_0_command(s)", declared "cancelled_directly_without_command"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.provider.execute_deadline_exceeded: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.provider.execute_deadline_exceeded: observed "failed_arm_succeeded_control_arm_succeeded", declared "ingest_classifies_provider_derived_terminal"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.provider.worker_terminal_mapping: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.provider.worker_terminal_mapping: observed "injected_succeeded_null_control_succeeded_null", declared "worker_maps_provider_timeout_to_failed_terminal"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.cleanup.orphan_object_swept: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.cleanup.orphan_object_swept: observed "object_retained", declared "uncommitted_object_deleted"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.credential.lease_expired_redemption_refused: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.credential.lease_expired_redemption_refused: observed "not_refused", declared "redemption_refused_after_lease_end_with_live_lease_control"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.credential.wrong_lease_redemption_refused: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.credential.wrong_lease_redemption_refused: observed "not_refused", declared "redemption_refused_on_foreign_lease_with_own_lease_control"
+    - evidence:injection_did_not_fire: [fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass
+    - evidence:classification_mismatch: [fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: observed "no_scrubber_marker_observed", declared "canary_scrubbed_while_unseeded_twin_leaks"
+    - evidence:redaction_marker_not_observed: [fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: scrubberMarkerObservedOnStream.events=false -- the scrubber's own replacement marker was NOT observed on the events stream, so that stream's clean arm is not shown to be its work (a probe that cannot go red is not a probe)
+    - evidence:redaction_marker_not_observed: [fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: scrubberMarkerObservedOnStream.logs=false -- the scrubber's own replacement marker was NOT observed on the logs stream, so that stream's clean arm is not shown to be its work (a probe that cannot go red is not a probe)
+  {"profile":"M1-D1-SPINE","declared":31,"required":30,"pending":1,"fired":16,"complete":false}
+  + actual - expected
+  
+  + [
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.fault.link_cut.worker_to_control_plane: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.fault.link_cut.control_plane_to_postgres: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.fault.object_store.truncated_upload: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.fault.object_store.truncated_upload: observed "committed", declared "fenced_commit_refuses_unverifiable_object"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.restart.control_plane_process: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.reconcile.expired_lease_reaped: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.reconcile.expired_lease_reaped: observed "not_converged", declared "single_winner_retry_minted"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.reconcile.worker_startup_lease_probe: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.reconcile.worker_startup_lease_probe: observed "restart_injection_suppressed", declared "startup_reconciler_fences_its_own_prior_lease"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.cancel.leased_attempt: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.cancel.leased_attempt: observed "attempt_leased_command_bound_false", declared "cancel_requested_with_fenced_command"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.cancel.unleased_attempt: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.cancel.unleased_attempt: observed "attempt_pending_with_0_command(s)", declared "cancelled_directly_without_command"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.provider.execute_deadline_exceeded: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.provider.execute_deadline_exceeded: observed "failed_arm_succeeded_control_arm_succeeded", declared "ingest_classifies_provider_derived_terminal"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.provider.worker_terminal_mapping: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.provider.worker_terminal_mapping: observed "injected_succeeded_null_control_succeeded_null", declared "worker_maps_provider_timeout_to_failed_terminal"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.cleanup.orphan_object_swept: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.cleanup.orphan_object_swept: observed "object_retained", declared "uncommitted_object_deleted"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.credential.lease_expired_redemption_refused: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.credential.lease_expired_redemption_refused: observed "not_refused", declared "redemption_refused_after_lease_end_with_live_lease_control"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.credential.wrong_lease_redemption_refused: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.credential.wrong_lease_redemption_refused: observed "not_refused", declared "redemption_refused_on_foreign_lease_with_own_lease_control"'
+  +   },
+  +   {
+  +     code: 'evidence:injection_did_not_fire',
+  +     message: '[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass'
+  +   },
+  +   {
+  +     code: 'evidence:classification_mismatch',
+  +     message: '[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: observed "no_scrubber_marker_observed", declared "canary_scrubbed_while_unseeded_twin_leaks"'
+  +   },
+  +   {
+  +     code: 'evidence:redaction_marker_not_observed',
+  +     message: "[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: scrubberMarkerObservedOnStream.events=false -- the scrubber's own replacement marker was NOT observed on the events stream, so that stream's clean arm is not shown to be its work (a probe that cannot go red is not a probe)"
+  +   },
+  +   {
+  +     code: 'evidence:redaction_marker_not_observed',
+  +     message: "[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: scrubberMarkerObservedOnStream.logs=false -- the scrubber's own replacement marker was NOT observed on the logs stream, so that stream's clean arm is not shown to be its work (a probe that cannot go red is not a probe)"
+  +   }
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m1-fault-matrix.test.mjs:2628:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.fault.link_cut.worker_to_control_plane: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.fault.link_cut.control_plane_to_postgres: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.fault.object_store.truncated_upload: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.fault.object_store.truncated_upload: observed "committed", declared "fenced_commit_refuses_unverifiable_object"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.restart.control_plane_process: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.reconcile.expired_lease_reaped: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.reconcile.expired_lease_reaped: observed "not_converged", declared "single_winner_retry_minted"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.reconcile.worker_startup_lease_probe: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.reconcile.worker_startup_lease_probe: observed "restart_injection_suppressed", declared "startup_reconciler_fences_its_own_prior_lease"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.cancel.leased_attempt: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.cancel.leased_attempt: observed "attempt_leased_command_bound_false", declared "cancel_requested_with_fenced_command"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.cancel.unleased_attempt: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.cancel.unleased_attempt: observed "attempt_pending_with_0_command(s)", declared "cancelled_directly_without_command"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.provider.execute_deadline_exceeded: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.provider.execute_deadline_exceeded: observed "failed_arm_succeeded_control_arm_succeeded", declared "ingest_classifies_provider_derived_terminal"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.provider.worker_terminal_mapping: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.provider.worker_terminal_mapping: observed "injected_succeeded_null_control_succeeded_null", declared "worker_maps_provider_timeout_to_failed_terminal"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.cleanup.orphan_object_swept: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.cleanup.orphan_object_swept: observed "object_retained", declared "uncommitted_object_deleted"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.credential.lease_expired_redemption_refused: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.credential.lease_expired_redemption_refused: observed "not_refused", declared "redemption_refused_after_lease_end_with_live_lease_control"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.credential.wrong_lease_redemption_refused: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.credential.wrong_lease_redemption_refused: observed "not_refused", declared "redemption_refused_on_foreign_lease_with_own_lease_control"' }, { code: 'evidence:injection_did_not_fire', message: '[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: the bundle records injectionFired=false — a declared case whose injection did not fire is a failure, not a pass' }, { code: 'evidence:classification_mismatch', message: '[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: observed "no_scrubber_marker_observed", declared "canary_scrubbed_while_unseeded_twin_leaks"' }, { code: 'evidence:redaction_marker_not_observed', message: "[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: scrubberMarkerObservedOnStream.events=false -- the scrubber's own replacement marker was NOT observed on the events stream, so that stream's clean arm is not shown to be its work (a probe that cannot go red is not a probe)" }, { code: 'evidence:redaction_marker_not_observed', message: "[fault-matrix:evidence] case d1.redaction.planted_canary_scrubbed: scrubberMarkerObservedOnStream.logs=false -- the scrubber's own replacement marker was NOT observed on the logs stream, so that stream's clean arm is not shown to be its work (a probe that cannot go red is not a probe)" } ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

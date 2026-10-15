@@ -1,0 +1,2 @@
+OK: tests/d1/fault-matrix.json declares 3 gate profile(s) and 83 case(s) (47 required, 36 pending), each with an injection, an observer and an expected classification; every profile carries the F10 tenant matrix (journeys, nine denial surfaces, the
+    control tenant, and the four no-RLS legacy tables with positive + anti-vacuity controls).

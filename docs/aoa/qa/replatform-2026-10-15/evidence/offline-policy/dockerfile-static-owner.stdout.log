@@ -1,0 +1,178 @@
+TAP version 13
+# Subtest: control-plane: base image is pinned by digest (@sha256:)
+ok 1 - control-plane: base image is pinned by digest (@sha256:)
+  ---
+  duration_ms: 1.5333
+  type: 'test'
+  ...
+# Subtest: control-plane: runs as a non-root USER
+ok 2 - control-plane: runs as a non-root USER
+  ---
+  duration_ms: 0.2361
+  type: 'test'
+  ...
+# Subtest: control-plane: read-only-root posture (rootfs label + writable VOLUME)
+ok 3 - control-plane: read-only-root posture (rootfs label + writable VOLUME)
+  ---
+  duration_ms: 0.2131
+  type: 'test'
+  ...
+# Subtest: control-plane: declares a HEALTHCHECK
+ok 4 - control-plane: declares a HEALTHCHECK
+  ---
+  duration_ms: 0.1833
+  type: 'test'
+  ...
+# Subtest: control-plane: carries the OCI source-revision label
+ok 5 - control-plane: carries the OCI source-revision label
+  ---
+  duration_ms: 1.0156
+  type: 'test'
+  ...
+# Subtest: worker: base image is pinned by digest (@sha256:)
+ok 6 - worker: base image is pinned by digest (@sha256:)
+  ---
+  duration_ms: 0.1309
+  type: 'test'
+  ...
+# Subtest: worker: runs as a non-root USER
+ok 7 - worker: runs as a non-root USER
+  ---
+  duration_ms: 0.1192
+  type: 'test'
+  ...
+# Subtest: worker: read-only-root posture (rootfs label + writable VOLUME)
+ok 8 - worker: read-only-root posture (rootfs label + writable VOLUME)
+  ---
+  duration_ms: 0.1058
+  type: 'test'
+  ...
+# Subtest: worker: declares a HEALTHCHECK
+ok 9 - worker: declares a HEALTHCHECK
+  ---
+  duration_ms: 0.1459
+  type: 'test'
+  ...
+# Subtest: worker: carries the OCI source-revision label
+ok 10 - worker: carries the OCI source-revision label
+  ---
+  duration_ms: 0.2261
+  type: 'test'
+  ...
+# Subtest: control-plane: builds the server AND the UI (full closure)
+ok 11 - control-plane: builds the server AND the UI (full closure)
+  ---
+  duration_ms: 0.2835
+  type: 'test'
+  ...
+# Subtest: control-plane: HEALTHCHECK targets /api/health
+ok 12 - control-plane: HEALTHCHECK targets /api/health
+  ---
+  duration_ms: 0.1555
+  type: 'test'
+  ...
+# Subtest: control-plane: contains NO docker-cli
+ok 13 - control-plane: contains NO docker-cli
+  ---
+  duration_ms: 0.1396
+  type: 'test'
+  ...
+# Subtest: control-plane: installs NO agent CLIs
+ok 14 - control-plane: installs NO agent CLIs
+  ---
+  duration_ms: 0.1434
+  type: 'test'
+  ...
+# Subtest: control-plane: does NOT include the worker daemon
+ok 15 - control-plane: does NOT include the worker daemon
+  ---
+  duration_ms: 0.0891
+  type: 'test'
+  ...
+# Subtest: control-plane: production stage does NOT copy the whole /app build tree (non-vacuous)
+ok 16 - control-plane: production stage does NOT copy the whole /app build tree (non-vacuous)
+  ---
+  duration_ms: 0.8766
+  type: 'test'
+  ...
+# Subtest: control-plane: production stage ships ONLY the pruned deploy closure + UI assets
+ok 17 - control-plane: production stage ships ONLY the pruned deploy closure + UI assets
+  ---
+  duration_ms: 0.2355
+  type: 'test'
+  ...
+# Subtest: worker: runs the worker daemon binary
+ok 18 - worker: runs the worker daemon binary
+  ---
+  duration_ms: 0.091
+  type: 'test'
+  ...
+# Subtest: worker: build AND deploy stages assert the container-host bin (WRK-017)
+ok 19 - worker: build AND deploy stages assert the container-host bin (WRK-017)
+  ---
+  duration_ms: 0.0926
+  type: 'test'
+  ...
+# Subtest: control-plane: ships the D1 enrolment seed under /cp-app (WRK-017)
+ok 20 - control-plane: ships the D1 enrolment seed under /cp-app (WRK-017)
+  ---
+  duration_ms: 0.12
+  type: 'test'
+  ...
+# Subtest: worker: loopback-only /healthz health surface
+ok 21 - worker: loopback-only /healthz health surface
+  ---
+  duration_ms: 0.0765
+  type: 'test'
+  ...
+# Subtest: worker: contains NO server/db/ui/drizzle/adapter-utils/shared
+ok 22 - worker: contains NO server/db/ui/drizzle/adapter-utils/shared
+  ---
+  duration_ms: 0.1093
+  type: 'test'
+  ...
+# Subtest: worker: installs NO agent CLIs or docker-cli
+ok 23 - worker: installs NO agent CLIs or docker-cli
+  ---
+  duration_ms: 0.0956
+  type: 'test'
+  ...
+# Subtest: control-plane entrypoint: no runtime usermod/groupmod/gosu/chown
+ok 24 - control-plane entrypoint: no runtime usermod/groupmod/gosu/chown
+  ---
+  duration_ms: 0.0896
+  type: 'test'
+  ...
+# Subtest: control-plane entrypoint: execs the passed command
+ok 25 - control-plane entrypoint: execs the passed command
+  ---
+  duration_ms: 0.1047
+  type: 'test'
+  ...
+# Subtest: worker entrypoint: no runtime usermod/groupmod/gosu/chown
+ok 26 - worker entrypoint: no runtime usermod/groupmod/gosu/chown
+  ---
+  duration_ms: 0.0613
+  type: 'test'
+  ...
+# Subtest: worker entrypoint: execs the passed command
+ok 27 - worker entrypoint: execs the passed command
+  ---
+  duration_ms: 0.046
+  type: 'test'
+  ...
+# Subtest: every local path the split Dockerfiles COPY is present and NOT gitignored (WRK-017)
+ok 28 - every local path the split Dockerfiles COPY is present and NOT gitignored (WRK-017)
+  ---
+  duration_ms: 1916.4021
+  type: 'test'
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2048.8896

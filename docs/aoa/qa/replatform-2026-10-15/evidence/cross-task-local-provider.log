@@ -1,0 +1,17 @@
+fake-provider declared API on 0.0.0.0:8080
+fake-provider control endpoint on 0.0.0.0:8081 (allow: <none> (fail-closed: deny all))
+fake-provider GATED provider wire on 0.0.0.0:8082 (1 pinned probe-script digest + a pinned probe argv shape; ownership gate ON)
+adapter-manager provider operation failed {
+  op: 'other',
+  errorClass: 'other',
+  cause: 'unclassified',
+  code: null,
+  httpStatus: null
+}
+adapter-manager provider operation failed {
+  op: 'other',
+  errorClass: 'other',
+  cause: 'unclassified',
+  code: null,
+  httpStatus: null
+}

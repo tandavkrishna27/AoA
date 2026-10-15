@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: actual CLI restores automatic COPY backups as SQL and gzip without PostgreSQL tools
+not ok 1 - actual CLI restores automatic COPY backups as SQL and gzip without PostgreSQL tools
+  ---
+  duration_ms: 11976.325961
+  type: 'test'
+  location: '/opt/aoa-testing/source/tests/d1/m4-cli-restore.test.mjs:8:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    CLI db:backup unexpected status 1: node:internal/modules/cjs/loader:1386
+      throw err;
+      ^
+    
+    Error: Cannot find module '/opt/aoa-testing/source/cli/node_modules/tsx/dist/cli.mjs'
+        at Module._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+        at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+        at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+        at Module._load (node:internal/modules/cjs/loader:1192:37)
+        at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+        at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+        at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+        at node:internal/main/run_main_module:36:49 {
+      code: 'MODULE_NOT_FOUND',
+      requireStack: []
+    }
+    
+    Node.js v22.22.1
+    
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Module._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    Module._load (node:internal/modules/cjs/loader:1192:37)
+    TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    node:internal/main/run_main_module:36:49 {
+    cli (file:///opt/aoa-testing/source/tests/d1/m4-cli-restore.test.mjs:30:337)
+    TestContext.<anonymous> (file:///opt/aoa-testing/source/tests/d1/m4-cli-restore.test.mjs:31:2)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12296.639509

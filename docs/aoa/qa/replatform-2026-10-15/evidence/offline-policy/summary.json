@@ -1,0 +1,546 @@
+{
+  "repo": "C:/Users/Dell/Desktop/aoa/replatform-testing",
+  "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "runtime": "v24.19.0",
+  "startedAt": "2026-10-15T16:08:56.464Z",
+  "environment": "Allowlisted OS environment only; all provider keys, DB URLs, AOA runtime variables and opt-in flags excluded; isolated Node path first.",
+  "safetyReview": "Selected source uses read-only committed artifact analysis, in-memory mutation fixtures, mkdtemp fixtures, injected provider fetchFn, and stubbed shell Docker function; no live Docker/provider/DB execution.",
+  "authority": [
+    ".github/workflows/pr.yml policy",
+    ".github/workflows/d1-merge-train.yml static preflight"
+  ],
+  "limitations": "Supplemental offline/keyless checks only; no formal gate closure, live compose, paid provider, or real image contents exercised.",
+  "excluded": [
+    {
+      "path": "docker/images/__tests__/image-pipeline.test.mjs",
+      "status": "unrun",
+      "reason": "Behavioral half requires bash/openssl/base64 and POSIX shim execution; omitted on Windows rather than forcing environment adaptation."
+    },
+    {
+      "path": "scripts/check-m1-shipped-boot-shape.test.mjs",
+      "status": "unrun",
+      "reason": "Contains additional nested shell and disposable git-history executions; bounded lane selected pure/static staging invariants instead."
+    },
+    {
+      "path": "scripts/lib/__tests__/m1-shipped-boot.test.mjs",
+      "status": "unrun",
+      "reason": "Large nested journey subprocess corpus omitted from bounded lane; not needed to execute selected provider/compose decision suites."
+    },
+    {
+      "path": "scripts/lib/__tests__/m1-cleanup-evidence.test.mjs",
+      "status": "unrun",
+      "reason": "Nested cleanup/journey subprocess monkeypatch corpus omitted from bounded lane; pure provider cleanup observer suite selected."
+    },
+    {
+      "path": "tests/d1/* live campaigns; docker/images/__tests__/image-contents.test.mjs",
+      "status": "unrun",
+      "reason": "Require live Docker/images/stack; outside this delegated offline lane."
+    }
+  ],
+  "results": [
+    {
+      "id": "fault-matrix",
+      "kind": "test",
+      "file": "scripts/check-campaign-fault-matrix.test.mjs",
+      "scope": "DEP-018 campaign declaration and synthetic evidence verdicts",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/check-campaign-fault-matrix.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:08:56.466Z",
+      "durationMs": 1733,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 57,
+        "suites": 0,
+        "pass": 57,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "d1-compose",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/d1-compose-invariants.test.mjs",
+      "scope": "DEP-002 topology isolation; includes check-d1-compose and ctl-allowlist cases",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/d1-compose-invariants.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:08:58.204Z",
+      "durationMs": 360,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 62,
+        "suites": 0,
+        "pass": 62,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "image-deps",
+      "kind": "test",
+      "file": "scripts/check-image-deps-stages.test.mjs",
+      "scope": "DEP-001 static split-image dependency closure",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/check-image-deps-stages.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:08:58.565Z",
+      "durationMs": 1241,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 34,
+        "suites": 0,
+        "pass": 34,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "dockerfile-static",
+      "kind": "test",
+      "file": "docker/images/__tests__/dockerfile-static.test.mjs",
+      "scope": "DEP-001 static split-image Dockerfiles and tracked COPY inputs",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "docker/images/__tests__/dockerfile-static.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:08:59.807Z",
+      "durationMs": 383,
+      "exitCode": 1,
+      "signal": null,
+      "error": null,
+      "status": "failed",
+      "counts": {
+        "tests": 28,
+        "suites": 0,
+        "pass": 27,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "staging-compose",
+      "kind": "test",
+      "file": "scripts/check-staging-manifest.test.mjs",
+      "scope": "DEP-006 staging composition and DEP-015 shipped overlay invariants",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/check-staging-manifest.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:00.191Z",
+      "durationMs": 355,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 66,
+        "suites": 0,
+        "pass": 66,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "desktop-staging-manifest",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/staging-manifest.test.mjs",
+      "scope": "DSK-003 synthetic installer staging manifest",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/staging-manifest.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:00.548Z",
+      "durationMs": 226,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 22,
+        "suites": 4,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "provider-cleanup",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/m1-provider-cleanup.test.mjs",
+      "scope": "M1 provider cleanup observer decisions using injected mock transport",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/m1-provider-cleanup.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:00.774Z",
+      "durationMs": 604,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 107,
+        "suites": 0,
+        "pass": 107,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "provider-identity",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/m1-provider-identity.test.mjs",
+      "scope": "M1 provider template/build identity decisions using injected mock transport",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/m1-provider-identity.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:01.379Z",
+      "durationMs": 246,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "dispatch-declared",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/d1-dispatch-declared.test.mjs",
+      "scope": "WRK-008 slice 2b dispatch composition declaration",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/d1-dispatch-declared.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:01.626Z",
+      "durationMs": 218,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "boot-provider-free",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/boot-roots-provider-free.test.mjs",
+      "scope": "WRK-008 slice 2b provider-free boot roots",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/boot-roots-provider-free.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:01.845Z",
+      "durationMs": 203,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 5,
+        "suites": 0,
+        "pass": 5,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "boot-browser-spawn-free",
+      "kind": "test",
+      "file": "scripts/lib/__tests__/boot-roots-browser-spawn-free.test.mjs",
+      "scope": "BRW-hostspawn-gate static discovery and synthetic spawn declarations",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "scripts/lib/__tests__/boot-roots-browser-spawn-free.test.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.049Z",
+      "durationMs": 315,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {
+        "tests": 17,
+        "suites": 0,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "id": "fault-matrix-real",
+      "kind": "static",
+      "file": "scripts/check-campaign-fault-matrix.mjs",
+      "scope": "DEP-018 committed fault declaration",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-campaign-fault-matrix.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.365Z",
+      "durationMs": 99,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    },
+    {
+      "id": "d1-compose-real",
+      "kind": "static",
+      "file": "scripts/check-d1-compose.mjs",
+      "scope": "DEP-002 committed static topology",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-d1-compose.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.464Z",
+      "durationMs": 90,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    },
+    {
+      "id": "image-deps-real",
+      "kind": "static",
+      "file": "scripts/check-image-deps-stages.mjs",
+      "scope": "DEP-001 committed dependency closure",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-image-deps-stages.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.555Z",
+      "durationMs": 134,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    },
+    {
+      "id": "staging-compose-real",
+      "kind": "static",
+      "file": "scripts/check-staging-manifest.mjs",
+      "scope": "DEP-006 / DEP-015 committed staging composition",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-staging-manifest.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.691Z",
+      "durationMs": 94,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    },
+    {
+      "id": "dispatch-declared-real",
+      "kind": "static",
+      "file": "scripts/check-d1-dispatch-declared.mjs",
+      "scope": "WRK-008 committed dispatch declaration",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-d1-dispatch-declared.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.787Z",
+      "durationMs": 88,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    },
+    {
+      "id": "boot-provider-free-real",
+      "kind": "static",
+      "file": "scripts/check-boot-roots-provider-free.mjs",
+      "scope": "WRK-008 committed boot roots",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-boot-roots-provider-free.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.876Z",
+      "durationMs": 91,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    },
+    {
+      "id": "boot-browser-spawn-free-real",
+      "kind": "static",
+      "file": "scripts/check-boot-roots-browser-spawn-free.mjs",
+      "scope": "BRW-hostspawn-gate committed spawn inventory",
+      "command": [
+        "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+        "scripts/check-boot-roots-browser-spawn-free.mjs"
+      ],
+      "startedAt": "2026-10-15T16:09:02.968Z",
+      "durationMs": 352,
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "status": "passed",
+      "counts": {}
+    }
+  ],
+  "trackedStatusUnchanged": null,
+  "finishedAt": "2026-10-15T16:10:49.903Z",
+  "totals": {
+    "commands": 18,
+    "passed": 17,
+    "failed": 1,
+    "tests": 410,
+    "pass": 409,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "finalTrackedStatusClean": true,
+  "metadataCorrection": "Initial before/after probes lacked Git safe-directory configuration and their empty stdout was not valid evidence. Final SHA/status verified read-only with command-scoped safe.directory; checkout tracked status is clean. The first failed test result and logs are retained. Following explicit parent authorization and successful plain Git verification as the checkout owner, only the unchanged dockerfile-static suite was purposefully rerun in owner context and passed.",
+  "failureDetails": [
+    {
+      "id": "dockerfile-static",
+      "case": "every local path the split Dockerfiles COPY is present and NOT gitignored (WRK-017)",
+      "location": "docker/images/__tests__/dockerfile-static.test.mjs:328",
+      "observed": "Git precondition expected stdout 'true' but received ''.",
+      "diagnosis": "Sanitized subprocess environment omitted inherited Git safe-directory configuration; git exit 128 reported dubious ownership (Dell checkout owner, CodexSandboxOffline process user). This is an environment precondition failure, not evidence that COPY inputs are missing.",
+      "action": "First failed log retained. After explicit parent authorization and successful owner-context plain Git check, ONLY unchanged dockerfile-static suite rerun with require_escalated; no global Git config or source change."
+    }
+  ],
+  "setupCorrectionRerun": {
+    "id": "dockerfile-static-owner",
+    "file": "docker/images/__tests__/dockerfile-static.test.mjs",
+    "command": [
+      "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+      "--test",
+      "--test-concurrency=1",
+      "--test-reporter=tap",
+      "docker/images/__tests__/dockerfile-static.test.mjs"
+    ],
+    "startedAt": "2026-10-15T16:10:47.703Z",
+    "durationMs": 2198,
+    "exitCode": 0,
+    "signal": null,
+    "error": null,
+    "status": "passed",
+    "counts": {
+      "tests": 28,
+      "suites": 0,
+      "pass": 28,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+    "trackedStatusUnchanged": true,
+    "trackedStatusClean": true,
+    "reason": "Explicit parent authorization after diagnosed ownership mismatch and successful plain Git verification with require_escalated; only this unchanged suite rerun under checkout owner identity."
+  },
+  "originalRunTotals": {
+    "commands": 18,
+    "passed": 17,
+    "failed": 1,
+    "tests": 410,
+    "pass": 409,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "effectiveTotalsAfterSetupCorrection": {
+    "commands": 18,
+    "passed": 18,
+    "failed": 0,
+    "tests": 410,
+    "pass": 410,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

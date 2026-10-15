@@ -1,0 +1,11 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |@armyofagents/server| src/__tests__/workspace-runtime.test.ts (53 tests | 52 skipped) 1009ms
+   ✓ ensureRuntimeServicesForRun > observes a rejecting runtime log sink without escaping the service lifecycle  1007ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 52 skipped (53)
+   Start at  16:29:53
+   Duration  5.57s (transform 2.05s, setup 0ms, collect 4.11s, tests 1.01s, environment 0ms, prepare 127ms)
+

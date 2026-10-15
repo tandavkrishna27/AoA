@@ -1,0 +1,71 @@
+{
+  "createdAt": "2026-10-15T14:58:08.010Z",
+  "direction": "VPS-issued job -> local Docker worker and local reference provider",
+  "tenant": {
+    "key": "CrossHost",
+    "organizationId": "7bae8bf0-14ab-49e5-bf28-6aec4e2c442f",
+    "companyId": "51d8fa51-04ea-4804-a2dd-938db1506ecd",
+    "agentId": "f03e2903-9ba2-47a2-bde2-a73e85534bd9",
+    "issuePrefix": "XHOST"
+  },
+  "ids": {
+    "jobId": "7e477698-28a8-4bf1-876a-e7a1856bb89c",
+    "attemptId": "c2b6a912-2eaf-45a4-a156-864c8e5be0c0",
+    "issueId": "5dc54c74-7d29-410b-8fca-0783ce993a4a",
+    "runId": "542619a3-bd08-4b27-8cb3-fda974d89ccb",
+    "handleId": "0d156a65-43bb-412f-8725-c6de0637df1c"
+  },
+  "nonce": "cross_836f49e867ae434d87b1aaae8512123b",
+  "targetId": "80704335-c523-4ddc-ae09-7da50d89bfd8",
+  "expectedWorkerId": "f02a166a-8cae-45ff-b799-639e8fadbbd0",
+  "baseline": {
+    "ok": true,
+    "attemptStatus": "pending",
+    "attemptTargetId": "80704335-c523-4ddc-ae09-7da50d89bfd8",
+    "events": [],
+    "leaseWorkerIds": [],
+    "logMessages": [],
+    "terminal": []
+  },
+  "scope": "Pre-placed fixture job in isolated VPS D1 control plane, not the public Google-authenticated app. Ordinary task output/usage are scripted reference-provider output; env probe runs a real pinned Node child on the local Docker host. No personal Codex credential delegation.",
+  "observedAt": "2026-10-15T14:59:20.253Z",
+  "observation": {
+    "ok": true,
+    "attemptStatus": "pending",
+    "attemptTargetId": "80704335-c523-4ddc-ae09-7da50d89bfd8",
+    "events": [],
+    "leaseWorkerIds": [],
+    "logMessages": [],
+    "terminal": []
+  },
+  "failures": [
+    {
+      "code": "worker_driven:no_events",
+      "message": "[m1-spine:worker-driven] the attempt carries no accepted events at all"
+    },
+    {
+      "code": "worker_driven:missing_event",
+      "message": "[m1-spine:worker-driven] the attempt has no accepted attempt_started event"
+    },
+    {
+      "code": "worker_driven:missing_event",
+      "message": "[m1-spine:worker-driven] the attempt has no accepted terminal event"
+    },
+    {
+      "code": "worker_driven:no_lease",
+      "message": "[m1-spine:worker-driven] no lease was ever taken on this attempt"
+    },
+    {
+      "code": "worker_driven:attempt_not_succeeded",
+      "message": "[m1-spine:worker-driven] the attempt is \"pending\"; a worker-driven journey must reach a durable succeeded terminal"
+    }
+  ],
+  "probeFailures": [
+    {
+      "code": "criterion5:env_probe",
+      "message": "[m1-spine:worker-driven] no DEP-017 env-probe summary on this attempt (the probe did not run; AOA_WORKER_ENV_PROBE unset, or an older worker)"
+    }
+  ],
+  "nonceSeen": false,
+  "passed": false
+}

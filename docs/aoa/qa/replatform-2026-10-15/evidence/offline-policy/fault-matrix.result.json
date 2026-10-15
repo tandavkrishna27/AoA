@@ -1,0 +1,28 @@
+{
+  "id": "fault-matrix",
+  "kind": "test",
+  "file": "scripts/check-campaign-fault-matrix.test.mjs",
+  "scope": "DEP-018 campaign declaration and synthetic evidence verdicts",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "scripts/check-campaign-fault-matrix.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:08:56.466Z",
+  "durationMs": 1733,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {
+    "tests": 57,
+    "suites": 0,
+    "pass": 57,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

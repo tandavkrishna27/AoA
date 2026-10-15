@@ -1,0 +1,23 @@
+{
+  "startedAt": "2026-10-15T16:33:34.354Z",
+  "finishedAt": "2026-10-15T16:39:22.347Z",
+  "runtime": "v24.19.0",
+  "command": [
+    "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\toolchain\\node-v24.19.0-win-x64\\node.exe",
+    "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "--maxWorkers=1",
+    "--minWorkers=1",
+    "--no-file-parallelism",
+    "server/src/__tests__/distributed-execution-db-startup.integration.test.ts",
+    "-t",
+    "checks grant-option ACL tuples independently|keeps aoa_operator outside|proves the module-load sentinel|observes the.*fallback port|threads the identical metrics instance"
+  ],
+  "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\replatform-testing",
+  "exitCode": 1,
+  "signal": null,
+  "log": "C:\\Users\\Dell\\Desktop\\aoa\\testing-ops\\evidence\\windows-triage\\startup-failures.log",
+  "fileSummary": "Test Files  1 failed (1)",
+  "testSummary": "Tests  5 failed | 72 skipped (77)",
+  "errorsSummary": null
+}

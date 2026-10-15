@@ -1,0 +1,73 @@
+{
+  "createdAt": "2026-10-15T15:01:13.002Z",
+  "direction": "VPS-issued job -> local Docker worker and local reference provider",
+  "tenant": {
+    "key": "CrossHost",
+    "organizationId": "9cfa8c26-6e47-4997-8991-42ee02c22e43",
+    "companyId": "28e41573-d492-4129-aa5b-8da09f6e3c49",
+    "agentId": "f621fca7-3e40-46c9-89c9-3b1a81ad9566",
+    "issuePrefix": "XHOST"
+  },
+  "ids": {
+    "jobId": "6b5f3b50-0265-4f5a-916e-908649c15f92",
+    "attemptId": "8829802e-e8f7-4d8d-bc0c-1a6fea71b1a3",
+    "issueId": "faec7010-6ace-4b57-bdcb-6b5cbea589b6",
+    "runId": "a363ccdc-3100-42dd-b539-e7eabb944589",
+    "handleId": "747b9565-61a1-4e9b-9979-4c1a7adc3706"
+  },
+  "nonce": "cross_69d4ac7ada21482a8f2462b3b6b79f13",
+  "targetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+  "expectedWorkerId": "871a3bca-323e-4b90-a14d-9841cf39ee73",
+  "baseline": {
+    "ok": true,
+    "attemptStatus": "pending",
+    "attemptTargetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+    "events": [],
+    "leaseWorkerIds": [],
+    "logMessages": [],
+    "terminal": []
+  },
+  "scope": "Pre-placed fixture job in isolated VPS D1 control plane, not the public Google-authenticated app. Ordinary task output/usage are scripted reference-provider output; env probe runs a real pinned Node child on the local Docker host. No personal Codex credential delegation.",
+  "observedAt": "2026-10-15T15:01:17.075Z",
+  "observation": {
+    "ok": true,
+    "attemptStatus": "succeeded",
+    "attemptTargetId": "2fabfe04-3f1e-43dc-ad75-347a31c9bb71",
+    "events": [
+      {
+        "eventType": "attempt_started",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "log",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "usage",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      },
+      {
+        "eventType": "terminal",
+        "workerId": "871a3bca-323e-4b90-a14d-9841cf39ee73"
+      }
+    ],
+    "leaseWorkerIds": [
+      "871a3bca-323e-4b90-a14d-9841cf39ee73"
+    ],
+    "logMessages": [
+      "dep017.env_probe {\"probe\":\"dep017-env-absence/v1\",\"verdict\":\"absent\",\"clean\":{\"probe\":\"dep017-env-absence/v1\",\"checked\":[\"datastore_credential\",\"secrets_master_key\",\"auth_signing_secret\",\"source_control_token\",\"subscription_login\",\"provider_control_key\",\"object_store_credential\",\"worker_enrollment\",\"oauth_client_secret\",\"connector_token\",\"embeddings_key\",\"legacy_agent_key\",\"host_control_plane_env\",\"model_provider_key_not_allowed\",\"unclassified_credential_shaped\",\"cross_tenant_credential\",\"provider_credential_value_mismatch\",\"unredeemed_provider_credential\"],\"present\":[],\"presentNames\":[],\"allowedPresent\":[\"ANTHROPIC_API_KEY\"],\"allowedMismatch\":[],\"envCount\":1,\"unnamedEnvCount\":0,\"unreportedPresentCount\":0,\"metadata\":{\"attempted\":true,\"target\":\"169.254.169.254\",\"reachable\":false,\"errorCode\":\"ECONNREFUSED\"},\"redeemedNames\":[\"ANTHROPIC_API_KEY\"]},\"plantedControl\":{\"planted\":[{\"name\":\"DATABASE_URL\",\"expectClass\":\"datastore_credential\",\"satisfied\":true},{\"name\":\"OPENAI_API_KEY\",\"expectClass\":\"cross_tenant_credential\",\"satisfied\":true},{\"name\":\"ANTHROPIC_API_KEY\",\"expectClass\":\"provider_credential_value_mismatch\",\"satisfied\":true}],\"detected\":[\"cross_tenant_credential\",\"datastore_credential\",\"provider_credential_value_mismatch\"],\"red\":true}}"
+    ],
+    "terminal": [
+      {
+        "status": "succeeded",
+        "exitCode": 0,
+        "errorCode": null,
+        "errorMessage": null
+      }
+    ]
+  },
+  "failures": [],
+  "probeFailures": [],
+  "nonceSeen": false,
+  "passed": false
+}

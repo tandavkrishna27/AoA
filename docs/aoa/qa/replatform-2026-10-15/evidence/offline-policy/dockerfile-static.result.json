@@ -1,0 +1,28 @@
+{
+  "id": "dockerfile-static",
+  "kind": "test",
+  "file": "docker/images/__tests__/dockerfile-static.test.mjs",
+  "scope": "DEP-001 static split-image Dockerfiles and tracked COPY inputs",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "docker/images/__tests__/dockerfile-static.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:08:59.807Z",
+  "durationMs": 383,
+  "exitCode": 1,
+  "signal": null,
+  "error": null,
+  "status": "failed",
+  "counts": {
+    "tests": 28,
+    "suites": 0,
+    "pass": 27,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

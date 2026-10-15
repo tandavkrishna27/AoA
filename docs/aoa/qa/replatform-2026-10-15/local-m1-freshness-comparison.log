@@ -1,0 +1,11 @@
+✔ m1-spine: every control-plane replica carries the F10 tenant set, and the crew switch is off (917.3991ms)
+✔ m1-spine: tenant A — a handed-off attempt through the REAL ingest is priced once and audited (4132.4672ms)
+✔ m1-spine: the control tenant is refused distributed execution on every replica and stays legacy (6394.4315ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11555.4166

@@ -1,0 +1,12 @@
+
+ RUN  v3.2.6 C:/Users/Dell/Desktop/aoa/replatform-testing
+
+ ✓ |@armyofagents/db| src/__tests__/required-migration-identity.test.ts > required migration identity > uses literal Drizzle journal array order when idx, tag, and when values all disagree 4121ms
+ ✓ |@armyofagents/db| src/__tests__/required-migration-identity.test.ts > required migration identity > preserves duplicate migration-path rejection 315ms
+ ✓ |@armyofagents/db| src/__tests__/required-migration-identity.test.ts > required migration identity > preserves duplicate byte-hash rejection across distinct paths 305ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  21:37:36
+   Duration  5.36s (transform 987ms, setup 0ms, collect 62ms, tests 4.74s, environment 0ms, prepare 140ms)
+

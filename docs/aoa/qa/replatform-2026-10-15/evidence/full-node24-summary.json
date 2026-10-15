@@ -1,0 +1,28 @@
+{
+  "capturedAt": "2026-10-15T15:48:15.551Z",
+  "exitCode": 1,
+  "files": {
+    "failed": 5,
+    "passed": 2518,
+    "skipped": 227,
+    "total": 2750,
+    "line": "Test Files  5 failed | 2518 passed | 227 skipped (2750)"
+  },
+  "tests": {
+    "failed": 4,
+    "passed": 24332,
+    "skipped": 2063,
+    "total": 26399,
+    "line": "Tests  4 failed | 24332 passed | 2063 skipped (26399)"
+  },
+  "uncaughtErrors": 1,
+  "duration": "Duration  1461.40s (transform 191.46s, setup 149.20s, collect 4009.71s, tests 1612.44s, environment 1292.96s, prepare 652.76s)",
+  "log": "local-full-tests-node24.log",
+  "failures": [
+    "FAIL  |@armyofagents/server| src/__tests__/cloud-plugin-process-composition.test.ts > FND-006 real-createApp() composition — import-constraint (E0-F005)",
+    "FAIL  |@armyofagents/browser-runtime| src/__tests__/image-playwright-parity.test.ts > BRW-003b — image Playwright pin vs resolved Playwright > that pin equals the version this repo actually resolves",
+    "FAIL  |@armyofagents/db| src/__tests__/required-migration-identity.test.ts > required migration identity > uses literal Drizzle journal array order when idx, tag, and when values all disagree",
+    "FAIL  |@armyofagents/server| src/__tests__/job-leasing-contract.test.ts > JOB-003 frozen worker-operation HTTP contract > maps one attempt-local typed static context from exact authority symbols with no laundering or injection",
+    "FAIL  |@armyofagents/ui| src/__tests__/ProjectDetailWorkspaces.test.tsx > ProjectDetail — Workspaces tab > calls update with archived status when Archive is confirmed via dialog"
+  ]
+}

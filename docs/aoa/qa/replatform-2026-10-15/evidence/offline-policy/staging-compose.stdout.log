@@ -1,0 +1,406 @@
+TAP version 13
+# Subtest: real docker-compose.staging.yml parses and satisfies every DEP-006 invariant
+ok 1 - real docker-compose.staging.yml parses and satisfies every DEP-006 invariant
+  ---
+  duration_ms: 10.0966
+  type: 'test'
+  ...
+# Subtest: real staging compose parses to exactly the DEP-006 service set
+ok 2 - real staging compose parses to exactly the DEP-006 service set
+  ---
+  duration_ms: 1.9558
+  type: 'test'
+  ...
+# Subtest: hand-built valid staging compose passes with zero violations
+ok 3 - hand-built valid staging compose passes with zero violations
+  ---
+  duration_ms: 1.5238
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.1): a control-plane not gated on migrate completion
+ok 4 - REJECT (§2.1): a control-plane not gated on migrate completion
+  ---
+  duration_ms: 1.0406
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.1): a worker gating on migrate with service_healthy (wrong condition)
+ok 5 - REJECT (§2.1): a worker gating on migrate with service_healthy (wrong condition)
+  ---
+  duration_ms: 0.67
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.2): a control-plane missing the rolling-update policy
+ok 6 - REJECT (§2.2): a control-plane missing the rolling-update policy
+  ---
+  duration_ms: 0.7312
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.2): a worker rollout with unbounded parallelism (breaks N/N-1)
+ok 7 - REJECT (§2.2): a worker rollout with unbounded parallelism (breaks N/N-1)
+  ---
+  duration_ms: 0.5249
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.3): a worker missing stop_grace_period
+ok 8 - REJECT (§2.3): a worker missing stop_grace_period
+  ---
+  duration_ms: 0.4654
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.3): a worker missing the documented drain hook
+ok 9 - REJECT (§2.3): a worker missing the documented drain hook
+  ---
+  duration_ms: 0.5102
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.4): a process-local admission env/flag on any service
+ok 10 - REJECT (§2.4): a process-local admission env/flag on any service
+  ---
+  duration_ms: 0.7146
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.4): a control-plane with distributed execution disabled (shared limiter unwired)
+ok 11 - REJECT (§2.4): a control-plane with distributed execution disabled (shared limiter unwired)
+  ---
+  duration_ms: 0.5135
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): E2B_API_KEY on the control-plane (must be absent)
+ok 12 - REJECT (§2.5): E2B_API_KEY on the control-plane (must be absent)
+  ---
+  duration_ms: 0.4781
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): E2B_API_KEY on a worker (must be absent)
+ok 13 - REJECT (§2.5): E2B_API_KEY on a worker (must be absent)
+  ---
+  duration_ms: 0.4663
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): a baked (literal) E2B_API_KEY on the adapter-manager (not rotatable)
+ok 14 - REJECT (§2.5): a baked (literal) E2B_API_KEY on the adapter-manager (not rotatable)
+  ---
+  duration_ms: 0.5395
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): a `${VAR:-baked-literal}` default E2B_API_KEY (resolves to a baked key)
+ok 15 - REJECT (§2.5): a `${VAR:-baked-literal}` default E2B_API_KEY (resolves to a baked key)
+  ---
+  duration_ms: 0.4982
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): E2B_API_KEY smuggled onto a worker via env_file (opaque channel)
+ok 16 - REJECT (§2.5): E2B_API_KEY smuggled onto a worker via env_file (opaque channel)
+  ---
+  duration_ms: 0.8983
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): a provider-control secret mounted onto a worker (secrets channel)
+ok 17 - REJECT (§2.5): a provider-control secret mounted onto a worker (secrets channel)
+  ---
+  duration_ms: 0.4499
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): the provider-control credential named in a worker command (inline injection)
+ok 18 - REJECT (§2.5): the provider-control credential named in a worker command (inline injection)
+  ---
+  duration_ms: 0.4248
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.5): the control-plane attached to provider-ctl-net (provider-control leak)
+ok 19 - REJECT (§2.5): the control-plane attached to provider-ctl-net (provider-control leak)
+  ---
+  duration_ms: 0.4234
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-010): AOA_WORKER_DISPATCH_ENABLED on a worker's environment
+ok 20 - REJECT (DEP-010): AOA_WORKER_DISPATCH_ENABLED on a worker's environment
+  ---
+  duration_ms: 0.4492
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-010): AOA_WORKER_DISPATCH_ENABLED in a worker's command (inline)
+ok 21 - REJECT (DEP-010): AOA_WORKER_DISPATCH_ENABLED in a worker's command (inline)
+  ---
+  duration_ms: 0.4332
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-010): AOA_WORKER_SANDBOX_PROVIDER on a worker's environment
+ok 22 - REJECT (DEP-010): AOA_WORKER_SANDBOX_PROVIDER on a worker's environment
+  ---
+  duration_ms: 0.3725
+  type: 'test'
+  ...
+# Subtest: REJECT (DEP-010): AOA_WORKER_SANDBOX_PROVIDER in a worker's entrypoint (inline)
+ok 23 - REJECT (DEP-010): AOA_WORKER_SANDBOX_PROVIDER in a worker's entrypoint (inline)
+  ---
+  duration_ms: 0.3999
+  type: 'test'
+  ...
+# Subtest: REJECT (Blocker B): AOA_WORKER_PROVIDER_URL on a worker's environment
+ok 24 - REJECT (Blocker B): AOA_WORKER_PROVIDER_URL on a worker's environment
+  ---
+  duration_ms: 0.4256
+  type: 'test'
+  ...
+# Subtest: REJECT (Blocker B): AOA_WORKER_PROVIDER_URL in a worker's command (inline)
+ok 25 - REJECT (Blocker B): AOA_WORKER_PROVIDER_URL in a worker's command (inline)
+  ---
+  duration_ms: 0.398
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.6): an undocumented render env key
+ok 26 - REJECT (§2.6): an undocumented render env key
+  ---
+  duration_ms: 0.4558
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.7): a worker with no autoscaling max (unbounded replica count)
+ok 27 - REJECT (§2.7): a worker with no autoscaling max (unbounded replica count)
+  ---
+  duration_ms: 0.5278
+  type: 'test'
+  ...
+# Subtest: REJECT (§2.7): a worker with min > max autoscaling bounds
+ok 28 - REJECT (§2.7): a worker with min > max autoscaling bounds
+  ---
+  duration_ms: 0.7148
+  type: 'test'
+  ...
+# Subtest: REJECT (failure-domain): a worker mislabeled into the wrong domain
+ok 29 - REJECT (failure-domain): a worker mislabeled into the wrong domain
+  ---
+  duration_ms: 0.5608
+  type: 'test'
+  ...
+# Subtest: label keys are real (non-x-) label keys so compose does not hoist them to \#extensions
+ok 30 - label keys are real (non-x-) label keys so compose does not hoist them to \#extensions
+  ---
+  duration_ms: 0.1943
+  type: 'test'
+  ...
+# Subtest: REJECT (external stores): an embedded postgres service (must be external)
+ok 31 - REJECT (external stores): an embedded postgres service (must be external)
+  ---
+  duration_ms: 0.5028
+  type: 'test'
+  ...
+# Subtest: REJECT (image ref): a hardcoded (non-injected) worker image
+ok 32 - REJECT (image ref): a hardcoded (non-injected) worker image
+  ---
+  duration_ms: 0.417
+  type: 'test'
+  ...
+# Subtest: REJECT (image ref): a hardcoded attacker image that merely embeds the injection token
+ok 33 - REJECT (image ref): a hardcoded attacker image that merely embeds the injection token
+  ---
+  duration_ms: 0.5096
+  type: 'test'
+  ...
+# Subtest: DEP-015: the REAL overlay over the REAL staging manifest satisfies the shipped-boot contract
+ok 34 - DEP-015: the REAL overlay over the REAL staging manifest satisfies the shipped-boot contract
+  ---
+  duration_ms: 4.7451
+  type: 'test'
+  ...
+# Subtest: DEP-015: the real overlay declares exactly the three shipped-boot workers, each armed
+ok 35 - DEP-015: the real overlay declares exactly the three shipped-boot workers, each armed
+  ---
+  duration_ms: 1.8918
+  type: 'test'
+  ...
+# Subtest: DEP-015 POSITIVE CONTROL: the overlay's worker env on the BASE staging manifest still reds
+ok 36 - DEP-015 POSITIVE CONTROL: the overlay's worker env on the BASE staging manifest still reds
+  ---
+  duration_ms: 3.7315
+  type: 'test'
+  ...
+# Subtest: DEP-015 POSITIVE CONTROL: base + overlay through the UNSCOPED staging path reds on every overlay worker
+ok 37 - DEP-015 POSITIVE CONTROL: base + overlay through the UNSCOPED staging path reds on every overlay worker
+  ---
+  duration_ms: 2.8791
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: the admission is bound to the one overlay path
+ok 38 - DEP-015 REJECT: the admission is bound to the one overlay path
+  ---
+  duration_ms: 1.5826
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: the admission never reaches a BASE staging worker, even inside the overlay
+ok 39 - DEP-015 REJECT: the admission never reaches a BASE staging worker, even inside the overlay
+  ---
+  duration_ms: 2.4638
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: an UNLISTED worker in the overlay is held to default-off (enumerated by image/name)
+ok 40 - DEP-015 REJECT: an UNLISTED worker in the overlay is held to default-off (enumerated by image/name)
+  ---
+  duration_ms: 2.2034
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: a provider URL that is not the adapter-manager (e.g. a fabricating fake provider)
+ok 41 - DEP-015 REJECT: a provider URL that is not the adapter-manager (e.g. a fabricating fake provider)
+  ---
+  duration_ms: 2.2969
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: an in-worker sandbox provider is never admitted
+ok 42 - DEP-015 REJECT: an in-worker sandbox provider is never admitted
+  ---
+  duration_ms: 2.2148
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: the inline command vector is never admitted, even for an admitted key
+ok 43 - DEP-015 REJECT: the inline command vector is never admitted, even for an admitted key
+  ---
+  duration_ms: 2.7104
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: an overlay worker that LOST its provider URL (boots, enrols, never runs a job)
+ok 44 - DEP-015 REJECT: an overlay worker that LOST its provider URL (boots, enrols, never runs a job)
+  ---
+  duration_ms: 2.3591
+  type: 'test'
+  ...
+# Subtest: DEP-017: every real shipped-boot worker arms the live env-absence probe
+ok 45 - DEP-017: every real shipped-boot worker arms the live env-absence probe
+  ---
+  duration_ms: 1.025
+  type: 'test'
+  ...
+# Subtest: DEP-017 REJECT (positive control): an overlay worker that DROPPED the env probe
+ok 46 - DEP-017 REJECT (positive control): an overlay worker that DROPPED the env probe
+  ---
+  duration_ms: 2.0644
+  type: 'test'
+  ...
+# Subtest: DEP-017 REJECT: an overlay worker whose env probe is not exactly "1"
+ok 47 - DEP-017 REJECT: an overlay worker whose env probe is not exactly "1"
+  ---
+  duration_ms: 2.323
+  type: 'test'
+  ...
+# Subtest: DEP-024: every real shipped-boot worker forwards the bounded run-output redaction probe
+ok 48 - DEP-024: every real shipped-boot worker forwards the bounded run-output redaction probe
+  ---
+  duration_ms: 0.8001
+  type: 'test'
+  ...
+# Subtest: DEP-024 REJECT (positive control): an overlay worker that DROPPED the run-output probe
+ok 49 - DEP-024 REJECT (positive control): an overlay worker that DROPPED the run-output probe
+  ---
+  duration_ms: 1.7777
+  type: 'test'
+  ...
+# Subtest: DEP-024 REJECT: an overlay worker whose run-output probe is not exactly "1"
+ok 50 - DEP-024 REJECT: an overlay worker whose run-output probe is not exactly "1"
+  ---
+  duration_ms: 2.4226
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT: the E2B key on a shipped-boot worker (the provider-control boundary still holds)
+ok 51 - DEP-015 REJECT: the E2B key on a shipped-boot worker (the provider-control boundary still holds)
+  ---
+  duration_ms: 1.9565
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT (F10): a control-plane replica without the tenant-set rollout
+ok 52 - DEP-015 REJECT (F10): a control-plane replica without the tenant-set rollout
+  ---
+  duration_ms: 2.478
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT (F10): a rollout that can render empty instead of the one fail-loud job variable
+ok 53 - DEP-015 REJECT (F10): a rollout that can render empty instead of the one fail-loud job variable
+  ---
+  duration_ms: 4.3557
+  type: 'test'
+  ...
+# Subtest: DEP-015 REJECT (S0-8): the crew switch on, or merely unpinned, on any control-plane replica
+ok 54 - DEP-015 REJECT (S0-8): the crew switch on, or merely unpinned, on any control-plane replica
+  ---
+  duration_ms: 8.6536
+  type: 'test'
+  ...
+# Subtest: DEP-015 rendered mode: an engine-merged render passes scoped and reds unscoped
+ok 55 - DEP-015 rendered mode: an engine-merged render passes scoped and reds unscoped
+  ---
+  duration_ms: 3.5716
+  type: 'test'
+  ...
+# Subtest: GRANT-REACH/TRUST: the adapter-manager is the declared grant redeemer
+ok 56 - GRANT-REACH/TRUST: the adapter-manager is the declared grant redeemer
+  ---
+  duration_ms: 0.1354
+  type: 'test'
+  ...
+# Subtest: GRANT-REACH/TRUST: the REAL overlay puts the adapter-manager on the store network with the store CA
+ok 57 - GRANT-REACH/TRUST: the REAL overlay puts the adapter-manager on the store network with the store CA
+  ---
+  duration_ms: 3.0659
+  type: 'test'
+  ...
+# Subtest: POSITIVE CONTROL (GRANT-REACH): drop the store network from the adapter-manager and it reds
+ok 58 - POSITIVE CONTROL (GRANT-REACH): drop the store network from the adapter-manager and it reds
+  ---
+  duration_ms: 2.7505
+  type: 'test'
+  ...
+# Subtest: POSITIVE CONTROL (GRANT-TRUST): drop the CA env from the adapter-manager and it reds
+ok 59 - POSITIVE CONTROL (GRANT-TRUST): drop the CA env from the adapter-manager and it reds
+  ---
+  duration_ms: 2.2017
+  type: 'test'
+  ...
+# Subtest: REJECT (GRANT-TRUST): the CA env set but no file mounted at it
+ok 60 - REJECT (GRANT-TRUST): the CA env set but no file mounted at it
+  ---
+  duration_ms: 2.7163
+  type: 'test'
+  ...
+# Subtest: REJECT (GRANT-TRUST): a CA that is not the one the signing control plane trusts
+ok 61 - REJECT (GRANT-TRUST): a CA that is not the one the signing control plane trusts
+  ---
+  duration_ms: 1.9987
+  type: 'test'
+  ...
+# Subtest: REJECT: the two control-plane replicas presigning for different stores
+ok 62 - REJECT: the two control-plane replicas presigning for different stores
+  ---
+  duration_ms: 1.7688
+  type: 'test'
+  ...
+# Subtest: GRANT-REACH/TRUST in rendered mode (the lane's live check): absolute bind paths and long-form volumes
+ok 63 - GRANT-REACH/TRUST in rendered mode (the lane's live check): absolute bind paths and long-form volumes
+  ---
+  duration_ms: 2.3699
+  type: 'test'
+  ...
+# Subtest: REJECT (GRANT-TRUST): the SECOND control-plane replica without the store CA
+ok 64 - REJECT (GRANT-TRUST): the SECOND control-plane replica without the store CA
+  ---
+  duration_ms: 2.3687
+  type: 'test'
+  ...
+# Subtest: REJECT (GRANT-TRUST): the FIRST control-plane replica without the CA mount (no silent pass for the redeemer)
+ok 65 - REJECT (GRANT-TRUST): the FIRST control-plane replica without the CA mount (no silent pass for the redeemer)
+  ---
+  duration_ms: 2.3616
+  type: 'test'
+  ...
+# Subtest: REJECT (GRANT-TRUST): the replicas trusting DIFFERENT CAs
+ok 66 - REJECT (GRANT-TRUST): the replicas trusting DIFFERENT CAs
+  ---
+  duration_ms: 2.1792
+  type: 'test'
+  ...
+1..66
+# tests 66
+# suites 0
+# pass 66
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 270.2913

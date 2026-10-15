@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: pinned selector names the resolved template and immutable build
+ok 1 - pinned selector names the resolved template and immutable build
+  ---
+  duration_ms: 1.8444
+  type: 'test'
+  ...
+# Subtest: selectE2bTemplateIdentity retains the immutable current build and template ids
+ok 2 - selectE2bTemplateIdentity retains the immutable current build and template ids
+  ---
+  duration_ms: 1.1334
+  type: 'test'
+  ...
+# Subtest: template resolution follows provider pagination before selecting an alias
+ok 3 - template resolution follows provider pagination before selecting an alias
+  ---
+  duration_ms: 1.5258
+  type: 'test'
+  ...
+# Subtest: template selection fails closed when the provider runtime version is absent or blank
+ok 4 - template selection fails closed when the provider runtime version is absent or blank
+  ---
+  duration_ms: 0.4042
+  type: 'test'
+  ...
+# Subtest: template selection retains the exact meaningful provider runtime version
+ok 5 - template selection retains the exact meaningful provider runtime version
+  ---
+  duration_ms: 0.2011
+  type: 'test'
+  ...
+# Subtest: template selection fails closed on no match, ambiguity, non-ready or missing build identity
+ok 6 - template selection fails closed on no match, ambiguity, non-ready or missing build identity
+  ---
+  duration_ms: 0.5669
+  type: 'test'
+  ...
+# Subtest: sandbox build binding requires a provider event for the exact sandbox/template/build
+ok 7 - sandbox build binding requires a provider event for the exact sandbox/template/build
+  ---
+  duration_ms: 0.5011
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 152.8814

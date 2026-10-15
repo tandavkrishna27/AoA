@@ -1,0 +1,170 @@
+TAP version 13
+# Subtest: DSK-003 — the manifest declares the artifact
+    # Subtest: lists every file with its digest and size
+    ok 1 - lists every file with its digest and size
+      ---
+      duration_ms: 1.3321
+      type: 'test'
+      ...
+    # Subtest: sorts entries so the digest does not depend on walk order
+    ok 2 - sorts entries so the digest does not depend on walk order
+      ---
+      duration_ms: 1.2675
+      type: 'test'
+      ...
+    # Subtest: is byte-stable for identical input
+    ok 3 - is byte-stable for identical input
+      ---
+      duration_ms: 0.4138
+      type: 'test'
+      ...
+    # Subtest: binds the version and the platform into the digest
+    ok 4 - binds the version and the platform into the digest
+      ---
+      duration_ms: 0.3214
+      type: 'test'
+      ...
+    # Subtest: changes when any file's content changes
+    ok 5 - changes when any file's content changes
+      ---
+      duration_ms: 0.3239
+      type: 'test'
+      ...
+    # Subtest: emits a digest in the sha256 shape the admission verifier expects
+    ok 6 - emits a digest in the sha256 shape the admission verifier expects
+      ---
+      duration_ms: 0.3697
+      type: 'test'
+      ...
+    1..6
+ok 1 - DSK-003 — the manifest declares the artifact
+  ---
+  duration_ms: 6.6665
+  type: 'suite'
+  ...
+# Subtest: DSK-003 — development files never enter the artifact
+    # Subtest: refuses test files, fixtures and sourcemaps
+    ok 1 - refuses test files, fixtures and sourcemaps
+      ---
+      duration_ms: 0.7363
+      type: 'test'
+      ...
+    # Subtest: refuses third-party docs and benchmarks
+    ok 2 - refuses third-party docs and benchmarks
+      ---
+      duration_ms: 0.6726
+      type: 'test'
+      ...
+    # Subtest: KEEPS licence and notice files
+    ok 3 - KEEPS licence and notice files
+      ---
+      duration_ms: 0.3546
+      type: 'test'
+      ...
+    # Subtest: admits real runtime files — non-vacuity
+    ok 4 - admits real runtime files — non-vacuity
+      ---
+      duration_ms: 0.3842
+      type: 'test'
+      ...
+    1..4
+ok 2 - DSK-003 — development files never enter the artifact
+  ---
+  duration_ms: 2.7115
+  type: 'suite'
+  ...
+# Subtest: DSK-003 — a stray file is a failure
+    # Subtest: accepts a root that matches exactly
+    ok 1 - accepts a root that matches exactly
+      ---
+      duration_ms: 0.6219
+      type: 'test'
+      ...
+    # Subtest: REJECTS a file present on disk but absent from the manifest
+    ok 2 - REJECTS a file present on disk but absent from the manifest
+      ---
+      duration_ms: 0.2215
+      type: 'test'
+      ...
+    # Subtest: rejects a manifest entry with no file on disk
+    ok 3 - rejects a manifest entry with no file on disk
+      ---
+      duration_ms: 0.1947
+      type: 'test'
+      ...
+    # Subtest: rejects a file whose content does not match its digest
+    ok 4 - rejects a file whose content does not match its digest
+      ---
+      duration_ms: 0.1894
+      type: 'test'
+      ...
+    # Subtest: rejects SAME-LENGTH tampering, which the size check cannot see
+    ok 5 - rejects SAME-LENGTH tampering, which the size check cannot see
+      ---
+      duration_ms: 0.2003
+      type: 'test'
+      ...
+    # Subtest: rejects a file whose size does not match
+    ok 6 - rejects a file whose size does not match
+      ---
+      duration_ms: 0.1577
+      type: 'test'
+      ...
+    # Subtest: declares a closed failure vocabulary
+    ok 7 - declares a closed failure vocabulary
+      ---
+      duration_ms: 0.2494
+      type: 'test'
+      ...
+    # Subtest: refuses an empty root rather than calling it a match
+    ok 8 - refuses an empty root rather than calling it a match
+      ---
+      duration_ms: 0.1394
+      type: 'test'
+      ...
+    1..8
+ok 3 - DSK-003 — a stray file is a failure
+  ---
+  duration_ms: 2.3392
+  type: 'suite'
+  ...
+# Subtest: DSK-003 — a symlink in the artifact is refused, never followed
+    # Subtest: refuses a root containing a symlink
+    ok 1 - refuses a root containing a symlink
+      ---
+      duration_ms: 0.4892
+      type: 'test'
+      ...
+    # Subtest: collects a link-free root — non-vacuity
+    ok 2 - collects a link-free root — non-vacuity
+      ---
+      duration_ms: 0.1668
+      type: 'test'
+      ...
+    # Subtest: refuses a symlinked DIRECTORY, not just a file
+    ok 3 - refuses a symlinked DIRECTORY, not just a file
+      ---
+      duration_ms: 0.1565
+      type: 'test'
+      ...
+    # Subtest: refuses rather than skipping, so nothing the host needs goes missing
+    ok 4 - refuses rather than skipping, so nothing the host needs goes missing
+      ---
+      duration_ms: 0.2253
+      type: 'test'
+      ...
+    1..4
+ok 4 - DSK-003 — a symlink in the artifact is refused, never followed
+  ---
+  duration_ms: 1.2316
+  type: 'suite'
+  ...
+1..4
+# tests 22
+# suites 4
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 151.0865

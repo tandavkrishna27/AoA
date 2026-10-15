@@ -1,0 +1,63 @@
+{
+  "expectedSha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "runtime": "v24.19.0",
+  "platform": "linux",
+  "arch": "arm64",
+  "startedAt": "2026-10-15T16:29:36.804Z",
+  "suite": "docker/images/__tests__/image-contents.test.mjs",
+  "scope": "DEP-001 / DEP-014 live built-image least-privilege contents; WRK-009 worker test-double exclusions",
+  "authority": ".github/workflows/d1-merge-train.yml AOA_DEP001_IMAGE_TEST=1 image-contents command",
+  "images": [
+    {
+      "name": "control-plane",
+      "image": "aoa-test/control-plane:13b4e806f31a67c3c172f2216272570203132f8f",
+      "recordedDigest": "sha256:376b07d5552c2bc54f7f46b06a9096030ab37aa3a60324e77900afc6217dd0ca",
+      "imageId": "sha256:376b07d5552c2bc54f7f46b06a9096030ab37aa3a60324e77900afc6217dd0ca",
+      "revision": "13b4e806f31a67c3c172f2216272570203132f8f"
+    },
+    {
+      "name": "worker",
+      "image": "aoa-test/worker:13b4e806f31a67c3c172f2216272570203132f8f",
+      "recordedDigest": "sha256:6781334c7451563906d7c94c1b61417bf37b2479e3e0d990e092f8cdb79a41f6",
+      "imageId": "sha256:6781334c7451563906d7c94c1b61417bf37b2479e3e0d990e092f8cdb79a41f6",
+      "revision": "13b4e806f31a67c3c172f2216272570203132f8f"
+    },
+    {
+      "name": "adapter-manager",
+      "image": "aoa-test/adapter-manager:13b4e806f31a67c3c172f2216272570203132f8f",
+      "recordedDigest": "sha256:5bce08ff1ee9497bb7596d90f49bba577fce7a0a8bf05bcb03db9428e4467a07",
+      "imageId": "sha256:5bce08ff1ee9497bb7596d90f49bba577fce7a0a8bf05bcb03db9428e4467a07",
+      "revision": "13b4e806f31a67c3c172f2216272570203132f8f"
+    }
+  ],
+  "status": "passed",
+  "counts": {
+    "tests": 9,
+    "suites": 0,
+    "pass": 9,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "command": [
+    "/opt/aoa-testing/toolchain/node-v24.19.0-linux-arm64/bin/node",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "docker/images/__tests__/image-contents.test.mjs"
+  ],
+  "sourceLog": "/opt/aoa-testing/evidence/live-image-contents.log",
+  "environment": "env allowlist only: isolated Node24 PATH, empty temporary HOME/DOCKER_CONFIG, LANG; AOA_DEP001_IMAGE_TEST=1 only for test. No paid-provider keys, app variables, host mounts or fixture flags.",
+  "safety": "Reviewed unchanged suite: docker version/inspect plus docker run --rm --entrypoint sh IMAGE -c read-only presence/find/id commands. No host binds, environment injection, image entrypoint/application boot, source changes or data mutation. Image Config.Env values are consumed inside tests and never printed on passing assertions.",
+  "limitations": "Actual candidate images on Linux arm64 only; container shell/filesystem/config assertions, not live provider work, DB/tenant behavior, release admission or formal gate closure.",
+  "sha": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "digestsSha256Before": "6a6e9f7f7487bc54e64b0ddbaf8f8db92465afb35d741619b4b0f5a98894c4ab",
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "durationMs": 14461,
+  "digestsSha256After": "6a6e9f7f7487bc54e64b0ddbaf8f8db92465afb35d741619b4b0f5a98894c4ab",
+  "digestsUnchanged": true,
+  "finishedAt": "2026-10-15T16:29:52.151Z"
+}

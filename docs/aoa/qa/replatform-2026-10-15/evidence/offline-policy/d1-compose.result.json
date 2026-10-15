@@ -1,0 +1,28 @@
+{
+  "id": "d1-compose",
+  "kind": "test",
+  "file": "scripts/lib/__tests__/d1-compose-invariants.test.mjs",
+  "scope": "DEP-002 topology isolation; includes check-d1-compose and ctl-allowlist cases",
+  "command": [
+    "C:/Users/Dell/Desktop/aoa/testing-ops/toolchain/node-v24.19.0-win-x64/node.exe",
+    "--test",
+    "--test-concurrency=1",
+    "--test-reporter=tap",
+    "scripts/lib/__tests__/d1-compose-invariants.test.mjs"
+  ],
+  "startedAt": "2026-10-15T16:08:58.204Z",
+  "durationMs": 360,
+  "exitCode": 0,
+  "signal": null,
+  "error": null,
+  "status": "passed",
+  "counts": {
+    "tests": 62,
+    "suites": 0,
+    "pass": 62,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  }
+}

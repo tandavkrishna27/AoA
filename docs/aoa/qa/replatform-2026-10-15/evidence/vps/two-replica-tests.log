@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): single-winner lease race across replicas A and B (exactly one lease)
+ok 1 - E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): single-winner lease race across replicas A and B (exactly one lease)
+  ---
+  duration_ms: 1917.194076
+  type: 'test'
+  ...
+# Subtest: E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): concurrent org-capacity claims across replicas never exceed the cap
+ok 2 - E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): concurrent org-capacity claims across replicas never exceed the cap
+  ---
+  duration_ms: 1509.740983
+  type: 'test'
+  ...
+# Subtest: E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): consistent terminal across replicas (ack@A, terminal@B)
+ok 3 - E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): consistent terminal across replicas (ack@A, terminal@B)
+  ---
+  duration_ms: 3100.993817
+  type: 'test'
+  ...
+# Subtest: E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): replica-agnostic session (enroll@A, poll+ack@B)
+ok 4 - E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): replica-agnostic session (enroll@A, poll+ack@B)
+  ---
+  duration_ms: 1995.353915
+  type: 'test'
+  ...
+# Subtest: E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): replica loss (cut worker-to-control-plane-b) converges via A
+ok 5 - E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): replica loss (cut worker-to-control-plane-b) converges via A
+  ---
+  duration_ms: 4611.530723
+  type: 'test'
+  ...
+# Subtest: E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): concurrent A+B polls share ONE rate-limit window counter
+ok 6 - E6F-11 CONTROL-PLANE gate (harness-driven; no worker daemon, no device): concurrent A+B polls share ONE rate-limit window counter
+  ---
+  duration_ms: 1915.666671
+  type: 'test'
+  ...
+# Subtest: E6F-13: real store append under aoa_app RLS wakes a LISTEN connection
+ok 7 - E6F-13: real store append under aoa_app RLS wakes a LISTEN connection
+  ---
+  duration_ms: 761.012033
+  type: 'test'
+  ...
+# Subtest: E6F-13: control-plane-b converges on control-plane's durable event (shared DB)
+ok 8 - E6F-13: control-plane-b converges on control-plane's durable event (shared DB)
+  ---
+  duration_ms: 1040.818631
+  type: 'test'
+  ...
+# Subtest: E6F-13: a durable event with its NOTIFY dropped is still recovered by the safety poll
+ok 9 - E6F-13: a durable event with its NOTIFY dropped is still recovered by the safety poll
+  ---
+  duration_ms: 843.271567
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 18313.893939

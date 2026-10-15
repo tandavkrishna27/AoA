@@ -1,0 +1,319 @@
+{
+  "profile": "m1-spine",
+  "ticket": "DEP-016",
+  "usageMode": "canned",
+  "startedAt": "2026-10-15T11:10:28.239Z",
+  "finishedAt": "2026-10-15T11:10:39.693Z",
+  "tenants": {
+    "enabled": [
+      {
+        "key": "A",
+        "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+        "companyId": "0d016a01-0000-4000-8000-00000000000a"
+      },
+      {
+        "key": "B",
+        "organizationId": "0d016b00-0000-4000-8000-00000000000b",
+        "companyId": "0d016b01-0000-4000-8000-00000000000b"
+      }
+    ],
+    "control": {
+      "key": "C",
+      "organizationId": "0d016c00-0000-4000-8000-00000000000c",
+      "companyId": "0d016c01-0000-4000-8000-00000000000c"
+    }
+  },
+  "executor": "worker",
+  "replicas": {
+    "control-plane": {
+      "deploymentMode": "authenticated",
+      "deploymentEnabled": true,
+      "rolloutSha256": "02cebb95542abbd49ff4b646d8ee1dc730ce584e49d6287c08b04f1160a9012f",
+      "rolloutRaw": "{\"organizations\":{\"0d016a00-0000-4000-8000-00000000000a\":{\"mode\":\"canary\",\"workloads\":[\"batch\"]},\"0d016b00-0000-4000-8000-00000000000b\":{\"mode\":\"canary\",\"workloads\":[\"batch\"]}}}",
+      "resolved": {
+        "0d016a00-0000-4000-8000-00000000000a": "canary",
+        "0d016b00-0000-4000-8000-00000000000b": "canary",
+        "0d016c00-0000-4000-8000-00000000000c": "off"
+      },
+      "crewRaw": null,
+      "crewEnabled": false,
+      "toolSurfaceRaw": null,
+      "toolSurfaceArmed": false,
+      "organizationToolSurface": {
+        "0d016a00-0000-4000-8000-00000000000a": false,
+        "0d016b00-0000-4000-8000-00000000000b": false,
+        "0d016c00-0000-4000-8000-00000000000c": false
+      },
+      "excludedFlags": {
+        "AOA_DISTRIBUTED_PUBLIC_SERVICE_INGRESS_ENABLED": null,
+        "AOA_DISTRIBUTED_CLOUD_PLUGIN_EXECUTION_ENABLED": null,
+        "AOA_ALLOW_UNSANDBOXED_MULTITENANT": null,
+        "AOA_0188_CUTOVER_OPT_IN": null
+      },
+      "freezeExclusions": {
+        "categories": {
+          "workload": {
+            "mechanism": "rollout_allowlist",
+            "state": "batch/task_run only"
+          },
+          "desktop": {
+            "mechanism": "service_absence",
+            "state": "absent",
+            "services": []
+          },
+          "mobility": {
+            "mechanism": "route_absence",
+            "state": "absent",
+            "routes": []
+          },
+          "cutover": {
+            "mechanism": "canary_rollout_and_real_opt_in",
+            "state": "off"
+          },
+          "ha": {
+            "mechanism": "topology_observation",
+            "state": "not_claimed",
+            "runningControlPlanes": 1
+          },
+          "beta": {
+            "mechanism": "deployment_mode",
+            "state": "authenticated"
+          },
+          "crew": {
+            "mechanism": "AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED",
+            "state": null
+          },
+          "tool": {
+            "mechanism": "AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED",
+            "state": "off",
+            "raw": null
+          }
+        },
+        "actualFlags": {
+          "AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED": null,
+          "AOA_DISTRIBUTED_PUBLIC_SERVICE_INGRESS_ENABLED": null,
+          "AOA_DISTRIBUTED_CLOUD_PLUGIN_EXECUTION_ENABLED": null,
+          "AOA_ALLOW_UNSANDBOXED_MULTITENANT": null,
+          "AOA_0188_CUTOVER_OPT_IN": null,
+          "AOA_DISTRIBUTED_TOOL_SURFACE_ENABLED": null
+        },
+        "sha256": "e083efc3b3d86fec3877422faa208a14eb9a7e94c88d3f2d1161e8bbe0d7ce3b"
+      }
+    }
+  },
+  "enabled": {
+    "A": {
+      "jobId": "ef71cf93-d76a-4cef-8eee-cfb423de11a6",
+      "attemptId": "c6872ef1-65fc-4106-804c-6d298c269e8d",
+      "workerId": "1c385ac1-cdab-4e96-ac7b-a105067dc992",
+      "targetId": "d3d94201-4db5-49d2-8e53-c85c9be4cf0d",
+      "leaseId": "097b201d-0aed-4650-bad6-ceb33aa48cdd",
+      "providerUsage": {
+        "inputTokens": 120000,
+        "outputTokens": 30000,
+        "cachedInputTokens": 0,
+        "runtimeMillis": 4200
+      },
+      "attemptStatus": "succeeded",
+      "events": [
+        {
+          "eventId": "8c03a094-88db-4159-afbc-4181ccde78c6",
+          "eventType": "attempt_started",
+          "sequence": 1,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a"
+        },
+        {
+          "eventId": "d0f3afaa-6653-41d9-8e71-f3076ee2e92b",
+          "eventType": "usage",
+          "sequence": 2,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a"
+        },
+        {
+          "eventId": "dff39f70-75f8-45e6-8c73-d598002ae23f",
+          "eventType": "terminal",
+          "sequence": 3,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a"
+        }
+      ],
+      "usageEvents": [
+        {
+          "eventId": "d0f3afaa-6653-41d9-8e71-f3076ee2e92b",
+          "sequence": 2,
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "payload": {
+            "inputTokens": 120000,
+            "outputTokens": 30000,
+            "runtimeMillis": 4200,
+            "cachedInputTokens": 0
+          }
+        }
+      ],
+      "costRows": [
+        {
+          "id": "be531940-ab08-4e43-a049-fada313d7b28",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "agentId": "0d016a02-0000-4000-8000-00000000000a",
+          "provider": "claude_local",
+          "model": "claude-sonnet-4-6",
+          "inputTokens": 120000,
+          "outputTokens": 30000,
+          "cachedInputTokens": 0,
+          "costCents": 81,
+          "sourceIdempotencyKey": "cost:0d016a01-0000-4000-8000-00000000000a:d0f3afaa-6653-41d9-8e71-f3076ee2e92b",
+          "rateId": "claude-sonnet-4-6",
+          "rateVersion": 1
+        }
+      ],
+      "receipts": [
+        {
+          "projectionKind": "activity_audit",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "activity:0d016a01-0000-4000-8000-00000000000a:8c03a094-88db-4159-afbc-4181ccde78c6",
+          "aggregateKind": "activity_log",
+          "targetAggregateId": "6453290b-2c63-45c3-a4a8-ba3ad197f95b"
+        },
+        {
+          "projectionKind": "activity_audit",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "activity:0d016a01-0000-4000-8000-00000000000a:dff39f70-75f8-45e6-8c73-d598002ae23f",
+          "aggregateKind": "activity_log",
+          "targetAggregateId": "71bc76bf-a11b-4a70-97bb-4243cc9d3180"
+        },
+        {
+          "projectionKind": "attempt_started",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "8c03a094-88db-4159-afbc-4181ccde78c6",
+          "aggregateKind": null,
+          "targetAggregateId": "c6872ef1-65fc-4106-804c-6d298c269e8d"
+        },
+        {
+          "projectionKind": "attempt_terminal",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "dff39f70-75f8-45e6-8c73-d598002ae23f",
+          "aggregateKind": null,
+          "targetAggregateId": "c6872ef1-65fc-4106-804c-6d298c269e8d"
+        },
+        {
+          "projectionKind": "authoritative_cost",
+          "status": "applied",
+          "organizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "sourceIdentity": "cost:0d016a01-0000-4000-8000-00000000000a:d0f3afaa-6653-41d9-8e71-f3076ee2e92b",
+          "aggregateKind": "cost_events",
+          "targetAggregateId": "be531940-ab08-4e43-a049-fada313d7b28"
+        }
+      ],
+      "activity": [
+        {
+          "id": "6453290b-2c63-45c3-a4a8-ba3ad197f95b",
+          "action": "job.attempt_started",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "organizationId": null,
+          "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "actorType": "system",
+          "actorId": "worker:1c385ac1-cdab-4e96-ac7b-a105067dc992",
+          "entityType": "job",
+          "entityId": "ef71cf93-d76a-4cef-8eee-cfb423de11a6"
+        },
+        {
+          "id": "71bc76bf-a11b-4a70-97bb-4243cc9d3180",
+          "action": "job.attempt_terminal",
+          "companyId": "0d016a01-0000-4000-8000-00000000000a",
+          "organizationId": null,
+          "detailsOrganizationId": "0d016a00-0000-4000-8000-00000000000a",
+          "actorType": "system",
+          "actorId": "worker:1c385ac1-cdab-4e96-ac7b-a105067dc992",
+          "entityType": "job",
+          "entityId": "ef71cf93-d76a-4cef-8eee-cfb423de11a6"
+        }
+      ],
+      "criterion5EnvProbe": {
+        "observed": false,
+        "reason": "the m1-spine lane runs the reference provider, which executes no command, and its workers do not dispatch; criterion 5 is observed in the DEP-015 shipped-boot lane only",
+        "logMessages": 0
+      }
+    }
+  },
+  "workerDriven": null,
+  "workerDrivenIsolation": null,
+  "control": {
+    "placements": [
+      {
+        "replica": "control-plane",
+        "jobId": "5688f5c0-a5e4-4333-9f08-67f5b6694ee4",
+        "disposition": "legacy",
+        "owner": "legacy",
+        "targetId": null,
+        "targetClass": null,
+        "targetScope": null,
+        "targetGeneration": null,
+        "profileHash": null,
+        "providerConstraintHash": null,
+        "fallbackDisposition": "not_applicable",
+        "reasonCode": "organization_disabled",
+        "mode": "legacy",
+        "leaseEligible": false,
+        "inputDigest": "c7ae207c727f8a6b3dd503ba13407000653801b62154fc5015ea58769c32d0a5",
+        "policyDigest": "c7ae207c727f8a6b3dd503ba13407000653801b62154fc5015ea58769c32d0a5"
+      }
+    ],
+    "positiveControlPlacement": {
+      "replica": "control-plane",
+      "tenant": "A",
+      "jobId": "2f809f7b-726b-459e-a7ab-e79d264a9d88",
+      "disposition": "selected",
+      "owner": "organization_dedicated",
+      "targetId": "d3d94201-4db5-49d2-8e53-c85c9be4cf0d",
+      "targetClass": "organization_dedicated",
+      "targetScope": "organization",
+      "targetGeneration": 1,
+      "profileHash": "caad70c53e1e6ecf894e3135f5784285416ccd56baf23e6aac5b4ca987d86b84",
+      "providerConstraintHash": "6806f456d41a7608b6cef8db6115d2c1e7f53781ffbcecceaf0031df12823e2f",
+      "fallbackDisposition": "primary",
+      "reasonCode": "target_selected",
+      "mode": "active",
+      "leaseEligible": true,
+      "inputDigest": "d7249cd8cde330c42082f12906b3a23bb010af3713f979ae1a1aee75ea6352e4",
+      "policyDigest": "d7249cd8cde330c42082f12906b3a23bb010af3713f979ae1a1aee75ea6352e4"
+    },
+    "jobIds": [
+      "5688f5c0-a5e4-4333-9f08-67f5b6694ee4"
+    ],
+    "pollOutcome": "no_work",
+    "counts": {
+      "ok": true,
+      "jobEvents": 0,
+      "costRows": 0,
+      "receipts": 0,
+      "leases": 0,
+      "attempts": [
+        {
+          "jobId": "5688f5c0-a5e4-4333-9f08-67f5b6694ee4",
+          "status": "pending",
+          "disposition": "legacy",
+          "leaseEligible": false,
+          "reasonCode": "organization_disabled",
+          "mode": "legacy"
+        }
+      ]
+    }
+  },
+  "verdicts": {
+    "replicas": [],
+    "A:criterion5": [],
+    "A": [],
+    "control": []
+  }
+}

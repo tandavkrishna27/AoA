@@ -1,0 +1,16 @@
+OK: docker-compose.staging.yml satisfies the DEP-006 staging config contract
+    (8 services: migrate one-shot + 2 control-plane + 4 workers + 1 adapter-manager,
+     split into two failure domains (domain-a/domain-b: 1 CP + 2 workers each),
+     external DB/object-store/realtime/admission as x-external pointers,
+     migration-first depends_on gate, N/N-1 rollout policy, bounded worker drain,
+     bounded autoscaling, shared DEP-009 admission with no process-local fallback).
+
+    Provider-control boundary: E2B_API_KEY is injected (rotatable) ONLY into the
+    adapter-management surface on provider-ctl-net, and is ABSENT from every
+    control-plane / worker / migrate surface. Rotation/revocation/old-key-denial
+    rehearsal is contracted against DEP-008 + deferred to CLI-001/D2 (crosswalk CM-010/CM-012).
+
+OK: docker/m1-boot/docker-compose.m1-boot.yml satisfies the DEP-015 shipped-boot contract
+    (dispatch admitted ONLY on its three declared workers with the exact admitted values;
+     E2B_API_KEY only on the adapter-manager; the F10 rollout injected on EVERY
+     control-plane replica; the deployment-wide crew switch pinned "false").

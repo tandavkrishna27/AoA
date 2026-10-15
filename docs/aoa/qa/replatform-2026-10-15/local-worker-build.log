@@ -1,0 +1,305 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 13.62kB 0.0s done
+#1 DONE 0.1s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 1.6s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.1s done
+#3 CACHED
+
+#4 resolve image config for docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#4 DONE 1.1s
+
+#5 [internal] load metadata for docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#5 DONE 0.1s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 987B done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 DONE 0.0s
+
+#8 [base 1/2] FROM docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d
+#8 resolve docker.io/library/node:lts-trixie-slim@sha256:0711b541c1c33a8a530ac4f0d391baa9a15b3d804695b1b24a47daa5fb60e74d 0.1s done
+#8 CACHED
+
+#7 [internal] load build context
+#7 ...
+
+#9 docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#9 resolve docker.io/docker/buildkit-syft-scanner:stable-1 0.5s done
+#9 DONE 0.5s
+
+#7 [internal] load build context
+#7 transferring context: 4.93MB 1.2s done
+#7 DONE 1.3s
+
+#10 [base 2/2] RUN corepack enable
+#10 DONE 1.3s
+
+#11 [deps  1/11] WORKDIR /app
+#11 DONE 0.4s
+
+#12 [production 1/6] RUN test -x /usr/bin/flock
+#12 ...
+
+#13 [deps  2/11] COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+#13 DONE 0.3s
+
+#12 [production 1/6] RUN test -x /usr/bin/flock
+#12 DONE 0.8s
+
+#14 [deps  3/11] COPY packages/worker-daemon/package.json packages/worker-daemon/
+#14 DONE 0.2s
+
+#15 [deps  4/11] COPY packages/worker-protocol/package.json packages/worker-protocol/
+#15 ...
+
+#16 [production 2/6] WORKDIR /worker-app
+#16 DONE 0.3s
+
+#15 [deps  4/11] COPY packages/worker-protocol/package.json packages/worker-protocol/
+#15 DONE 0.2s
+
+#17 [deps  5/11] COPY packages/worker-networked-host/package.json packages/worker-networked-host/
+#17 DONE 0.2s
+
+#18 [deps  6/11] COPY packages/provider-wire/package.json packages/provider-wire/
+#18 DONE 0.2s
+
+#19 [deps  7/11] COPY packages/provider-capability/package.json packages/provider-capability/
+#19 DONE 0.2s
+
+#20 [deps  8/11] COPY packages/sandbox-e2b-provider/package.json packages/sandbox-e2b-provider/
+#20 DONE 0.1s
+
+#21 [deps  9/11] COPY packages/sandbox-provider-contract/package.json packages/sandbox-provider-contract/
+#21 DONE 0.1s
+
+#22 [deps 10/11] COPY patches/ patches/
+#22 DONE 0.2s
+
+#23 [deps 11/11] RUN pnpm install --frozen-lockfile   --filter-prod "@armyofagents/worker-daemon..."   --filter-prod "@armyofagents/worker-networked-host..."
+#23 0.533 ! Corepack is about to download https://registry.npmjs.org/pnpm/-/pnpm-9.15.4.tgz
+#23 4.780 Scope: 7 of 8 workspace projects
+#23 4.818 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#23 4.818 (Use `node --trace-deprecation ...` to show where the warning was created)
+#23 5.137 Lockfile is up to date, resolution step is skipped
+#23 5.371 Progress: resolved 1, reused 0, downloaded 0, added 0
+#23 5.570 .                                        | +270 +++++++++++++++++++++++++++
+#23 6.381 Progress: resolved 270, reused 0, downloaded 18, added 14
+#23 6.883 
+#23 6.883    ╭───────────────────────────────────────────────────────────────────╮
+#23 6.883    │                                                                   │
+#23 6.883    │                Update available! 9.15.4 → 12.11.2.                │
+#23 6.883    │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.11.2   │
+#23 6.883    │         Run "corepack install -g pnpm@12.11.2" to update.         │
+#23 6.883    │                                                                   │
+#23 6.883    ╰───────────────────────────────────────────────────────────────────╯
+#23 6.883 
+#23 7.382 Progress: resolved 270, reused 0, downloaded 68, added 71
+#23 8.383 Progress: resolved 270, reused 0, downloaded 118, added 122
+#23 9.375 Progress: resolved 270, reused 0, downloaded 205, added 208
+#23 10.38 Progress: resolved 270, reused 0, downloaded 258, added 261
+#23 11.38 Progress: resolved 270, reused 0, downloaded 261, added 265
+#23 12.38 Progress: resolved 270, reused 0, downloaded 263, added 267
+#23 13.38 Progress: resolved 270, reused 0, downloaded 265, added 269
+#23 14.27 Progress: resolved 270, reused 0, downloaded 266, added 270, done
+#23 14.96 .../esbuild@0.28.1/node_modules/esbuild postinstall$ node install.js
+#23 14.96 .../esbuild@0.25.12/node_modules/esbuild postinstall$ node install.js
+#23 15.21 .../esbuild@0.28.1/node_modules/esbuild postinstall: Done
+#23 15.29 .../esbuild@0.25.12/node_modules/esbuild postinstall: Done
+#23 15.79  WARN  Failed to create bin at /app/packages/worker-networked-host/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#23 15.79  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#23 15.79  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#23 15.79  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#23 17.08  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-capability/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#23 17.08  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/sandbox-e2b-provider/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#23 17.10  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-wire/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#23 17.12  WARN  Failed to create bin at /app/packages/worker-networked-host/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-networked-host/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#23 17.14 Done in 13.6s
+#23 DONE 17.7s
+
+#24 [build  1/22] WORKDIR /app
+#24 DONE 0.7s
+
+#25 [build  2/22] COPY tsconfig.json ./
+#25 DONE 0.3s
+
+#26 [build  3/22] COPY docker/apply-workspace-publish-config.mjs docker/
+#26 DONE 0.2s
+
+#27 [build  4/22] COPY packages/sandbox-fake-provider/package.json packages/sandbox-fake-provider/
+#27 DONE 0.2s
+
+#28 [build  5/22] COPY packages/worker-protocol/ packages/worker-protocol/
+#28 DONE 0.4s
+
+#29 [build  6/22] COPY packages/worker-daemon/ packages/worker-daemon/
+#29 DONE 0.5s
+
+#30 [build  7/22] COPY packages/worker-networked-host/ packages/worker-networked-host/
+#30 DONE 0.2s
+
+#31 [build  8/22] COPY packages/provider-wire/ packages/provider-wire/
+#31 DONE 0.3s
+
+#32 [build  9/22] COPY packages/provider-capability/ packages/provider-capability/
+#32 DONE 0.3s
+
+#33 [build 10/22] COPY packages/sandbox-e2b-provider/ packages/sandbox-e2b-provider/
+#33 DONE 0.3s
+
+#34 [build 11/22] COPY packages/sandbox-provider-contract/ packages/sandbox-provider-contract/
+#34 DONE 0.4s
+
+#35 [build 12/22] COPY packages/sandbox-fake-provider/ packages/sandbox-fake-provider/
+#35 DONE 0.5s
+
+#36 [build 13/22] RUN pnpm install --frozen-lockfile --filter "@armyofagents/worker-networked-host..."
+#36 2.001 Scope: 8 of 9 workspace projects
+#36 2.031 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#36 2.031 (Use `node --trace-deprecation ...` to show where the warning was created)
+#36 2.277 Lockfile is up to date, resolution step is skipped
+#36 4.376  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 4.380  WARN  Failed to create bin at /app/packages/worker-networked-host/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 4.382  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 4.384  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.225  WARN  Failed to create bin at /app/packages/provider-capability/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-capability/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.253  WARN  Failed to create bin at /app/packages/sandbox-e2b-provider/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/sandbox-e2b-provider/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.276  WARN  Failed to create bin at /app/packages/provider-wire/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/provider-wire/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.296  WARN  Failed to create bin at /app/packages/worker-networked-host/node_modules/.bin/aoa-worker-daemon. ENOENT: no such file or directory, open '/app/packages/worker-networked-host/node_modules/@armyofagents/worker-daemon/dist/bin/worker-daemon.js'
+#36 5.309 Done in 4.5s
+#36 DONE 5.5s
+
+#37 [build 14/22] RUN pnpm --filter "@armyofagents/worker-networked-host..." build
+#37 1.708 Scope: 8 of 9 workspace projects
+#37 1.720 packages/worker-protocol build$ tsc
+#37 12.96 packages/worker-protocol build: Done
+#37 12.97 packages/worker-daemon build$ tsc
+#37 12.97 packages/sandbox-fake-provider build$ tsc
+#37 20.85 packages/sandbox-fake-provider build: Done
+#37 25.20 packages/worker-daemon build: Done
+#37 25.20 packages/provider-capability build$ tsc
+#37 25.21 packages/sandbox-provider-contract build$ tsc
+#37 29.63 packages/provider-capability build: Done
+#37 29.81 packages/sandbox-provider-contract build: Done
+#37 29.81 packages/sandbox-e2b-provider build$ tsc
+#37 35.14 packages/sandbox-e2b-provider build: Done
+#37 35.14 packages/provider-wire build$ tsc
+#37 39.26 packages/provider-wire build: Done
+#37 39.26 packages/worker-networked-host build$ tsc
+#37 43.09 packages/worker-networked-host build: Done
+#37 DONE 43.2s
+
+#38 [build 15/22] RUN test -f packages/worker-daemon/dist/bin/worker-daemon.js   || (echo "ERROR: worker-daemon build output missing" && exit 1)
+#38 DONE 0.5s
+
+#39 [build 16/22] RUN test -f packages/worker-daemon/dist/bin/container-host.js   || (echo "ERROR: worker-daemon container-host build output missing" && exit 1)
+#39 DONE 0.5s
+
+#40 [build 17/22] RUN test -f packages/worker-networked-host/dist/bin/networked-host.js   || (echo "ERROR: worker-networked-host build output missing" && exit 1)
+#40 DONE 0.5s
+
+#41 [build 18/22] RUN pnpm --filter @armyofagents/worker-daemon deploy --prod /worker-app
+#41 2.304 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#41 2.304 (Use `node --trace-deprecation ...` to show where the warning was created)
+#41 2.478 Packages are copied from the content-addressable store to the virtual store.
+#41 2.478   Content-addressable store is at: /root/.local/share/pnpm/store/v3
+#41 2.478   Virtual store is at:             ../worker-app/node_modules/.pnpm
+#41 2.583 Progress: resolved 1, reused 0, downloaded 0, added 0
+#41 3.670 Progress: resolved 83, reused 83, downloaded 0, added 0
+#41 4.673 Progress: resolved 226, reused 168, downloaded 0, added 0
+#41 5.688 Progress: resolved 258, reused 180, downloaded 0, added 0
+#41 6.688 Progress: resolved 309, reused 225, downloaded 0, added 0
+#41 7.689 Progress: resolved 317, reused 233, downloaded 0, added 0
+#41 7.898 .                                        |  +15 ++
+#41 8.690 Progress: resolved 319, reused 235, downloaded 0, added 10
+#41 9.691 Progress: resolved 319, reused 235, downloaded 0, added 12
+#41 10.69 Progress: resolved 319, reused 235, downloaded 0, added 14
+#41 11.68 Progress: resolved 319, reused 235, downloaded 0, added 15, done
+#41 11.78  WARN  Failed to create bin at /app/packages/worker-app/node_modules/.bin/vite. ENOENT: no such file or directory, open '/worker-app/node_modules/.pnpm/vite@6.4.3_@types+node@24.12.0_jiti@2.6.1_lightningcss@1.30.2_tsx@4.22.4_yaml@2.8.3/node_modules/vite/bin/vite.js'
+#41 11.79  WARN  Failed to create bin at /app/packages/worker-app/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/worker-app/node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti-cli.mjs'
+#41 11.79  WARN  Failed to create bin at /app/packages/worker-app/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/worker-app/node_modules/.pnpm/tsx@4.22.4/node_modules/tsx/dist/cli.mjs'
+#41 11.79  WARN  Failed to create bin at /app/packages/worker-app/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/worker-app/node_modules/.pnpm/yaml@2.8.3/node_modules/yaml/bin.mjs'
+#41 DONE 12.1s
+
+#42 [build 19/22] RUN pnpm --filter @armyofagents/worker-networked-host deploy --prod /worker-net-app
+#42 1.706 (node:7) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#42 1.706 (Use `node --trace-deprecation ...` to show where the warning was created)
+#42 1.878 Packages are copied from the content-addressable store to the virtual store.
+#42 1.878   Content-addressable store is at: /root/.local/share/pnpm/store/v3
+#42 1.878   Virtual store is at:             ../worker-net-app/node_modules/.pnpm
+#42 1.994 Progress: resolved 1, reused 0, downloaded 0, added 0
+#42 3.006 Progress: resolved 144, reused 114, downloaded 0, added 0
+#42 4.007 Progress: resolved 259, reused 184, downloaded 0, added 0
+#42 5.007 Progress: resolved 277, reused 202, downloaded 0, added 0
+#42 6.030 Progress: resolved 348, reused 264, downloaded 0, added 0
+#42 6.254  WARN  1 deprecated subdependencies found: glob@11.1.0
+#42 6.299 .                                        |  +56 ++++++
+#42 7.031 Progress: resolved 351, reused 267, downloaded 0, added 6
+#42 8.032 Progress: resolved 351, reused 267, downloaded 0, added 24
+#42 9.032 Progress: resolved 351, reused 267, downloaded 0, added 41
+#42 10.03 Progress: resolved 351, reused 267, downloaded 0, added 49
+#42 11.03 Progress: resolved 351, reused 267, downloaded 0, added 51
+#42 12.03 Progress: resolved 351, reused 267, downloaded 0, added 53
+#42 13.04 Progress: resolved 351, reused 267, downloaded 0, added 55
+#42 14.61 Progress: resolved 351, reused 267, downloaded 0, added 56
+#42 14.61 Progress: resolved 351, reused 267, downloaded 0, added 56, done
+#42 14.84  WARN  Failed to create bin at /app/packages/worker-net-app/node_modules/.bin/vite. ENOENT: no such file or directory, open '/worker-net-app/node_modules/.pnpm/vite@6.4.3_@types+node@24.12.0_jiti@2.6.1_lightningcss@1.30.2_tsx@4.22.4_yaml@2.8.3/node_modules/vite/bin/vite.js'
+#42 14.84  WARN  Failed to create bin at /app/packages/worker-net-app/node_modules/.bin/jiti. ENOENT: no such file or directory, open '/worker-net-app/node_modules/.pnpm/jiti@2.6.1/node_modules/jiti/lib/jiti-cli.mjs'
+#42 14.84  WARN  Failed to create bin at /app/packages/worker-net-app/node_modules/.bin/tsx. ENOENT: no such file or directory, open '/worker-net-app/node_modules/.pnpm/tsx@4.22.4/node_modules/tsx/dist/cli.mjs'
+#42 14.84  WARN  Failed to create bin at /app/packages/worker-net-app/node_modules/.bin/yaml. ENOENT: no such file or directory, open '/worker-net-app/node_modules/.pnpm/yaml@2.8.3/node_modules/yaml/bin.mjs'
+#42 DONE 15.2s
+
+#43 [build 20/22] RUN node docker/apply-workspace-publish-config.mjs /worker-net-app/node_modules
+#43 0.514 applied publishConfig: @armyofagents/provider-capability (/worker-net-app/node_modules/.pnpm/@armyofagents+provider-capability@file+packages+provider-capability/node_modules/@armyofagents/provider-capability/package.json)
+#43 0.519 applied publishConfig: @armyofagents/provider-wire (/worker-net-app/node_modules/.pnpm/@armyofagents+provider-wire@file+packages+provider-wire/node_modules/@armyofagents/provider-wire/package.json)
+#43 0.572 apply-workspace-publish-config: promoted publishConfig on 2 @armyofagents package manifest(s)
+#43 DONE 0.7s
+
+#44 [build 21/22] RUN test -f /worker-net-app/dist/bin/networked-host.js   || (echo "ERROR: worker-networked-host deploy output missing" && exit 1)
+#44 DONE 0.7s
+
+#45 [build 22/22] RUN test -f /worker-app/dist/bin/container-host.js   || (echo "ERROR: worker-daemon container-host deploy output missing" && exit 1)
+#45 DONE 0.5s
+
+#46 [production 3/6] COPY --chown=node:node --from=build /worker-app /worker-app
+#46 DONE 0.6s
+
+#47 [production 4/6] COPY --chown=node:node --from=build /worker-net-app /worker-net-app
+#47 DONE 1.5s
+
+#48 [production 5/6] COPY --chown=node:node docker/worker/entrypoint.sh /usr/local/bin/worker-entrypoint.sh
+#48 DONE 0.3s
+
+#49 [production 6/6] RUN sed -i 's/\r$//' /usr/local/bin/worker-entrypoint.sh   && chmod +x /usr/local/bin/worker-entrypoint.sh   && mkdir -p /worker   && chown node:node /worker
+#49 DONE 0.5s
+
+#9 docker-image://docker.io/docker/buildkit-syft-scanner:stable-1
+#9 CACHED
+
+#50 [linux/amd64] generating sbom using docker.io/docker/buildkit-syft-scanner:stable-1
+#50 0.476 time="2026-10-15T10:31:00Z" level=info msg="starting syft scanner for buildkit v1.12.0"
+#50 DONE 14.7s
+
+#51 exporting to image
+#51 exporting layers
+#51 exporting layers 3.0s done
+#51 exporting manifest sha256:e1280df080e47efe1301b5e4d806d2ac45733a8d1bce9723e1a1f46f60e1b07f 0.0s done
+#51 exporting config sha256:d6b36ea3134e4620f9a34b2e0071f968c1f76179c7d802cc5bf96b6ff8515b3d 0.1s done
+#51 exporting attestation manifest sha256:9bfb23e94315e017702a95a2633a54169c8653aee3fac0793f1dda0884525084
+#51 exporting attestation manifest sha256:9bfb23e94315e017702a95a2633a54169c8653aee3fac0793f1dda0884525084 0.1s done
+#51 exporting manifest list sha256:87a28c6972c23b2618e29c63ff4d9cf33ce7f85ae60e4af9be295a66c6de80af 0.0s done
+#51 naming to docker.io/aoa-test/worker:13b4e806f
+#51 naming to docker.io/aoa-test/worker:13b4e806f done
+#51 unpacking to docker.io/aoa-test/worker:13b4e806f
+#51 unpacking to docker.io/aoa-test/worker:13b4e806f 3.0s done
+#51 DONE 7.6s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/9s35fk0mske2bunwbam2t6n8r

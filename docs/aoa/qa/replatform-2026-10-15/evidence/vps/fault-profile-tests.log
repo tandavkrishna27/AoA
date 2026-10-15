@@ -1,0 +1,34 @@
+✔ fault-matrix: an early hard restart fences its own live persisted lease and resumes polling (359049.588382ms)
+✔ fault-matrix: tenant A — the journey is priced once and audited (F10 per-tenant correctness) (4846.215893ms)
+✔ fault-matrix: tenant B — the journey is priced once and audited (F10 per-tenant correctness) (4695.974894ms)
+✔ fault-matrix: cross-tenant events + read — denied, with a same-tenant positive control (8123.054116ms)
+✔ fault-matrix: cross-tenant lease renew — denied, with a same-tenant positive control (899.902235ms)
+✔ fault-matrix: cross-tenant cancel — denied, with a same-tenant positive control (7345.719945ms)
+✔ fault-matrix: cross-tenant secrets — denied at the fence and invisible under RLS, with controls (1936.384822ms)
+✔ fault-matrix: cross-tenant staged inputs + outputs — denied, with same-tenant positive controls (3762.556062ms)
+✔ fault-matrix: the four legacy no-RLS tables are filtered by the query predicate, with positive and anti-vacuity controls (2538.394546ms)
+✔ fault-matrix: the control tenant is refused distributed execution and stays legacy (8348.982738ms)
+✔ fault-matrix: cross-tenant tool calls — denied by the per-Organization tool-surface gate, with an admit control (2722.679903ms)
+✔ fault-matrix: redemption AFTER the lease ends is refused — with a live-lease same-tenant control (10241.905809ms)
+✔ fault-matrix: redemption on a DIFFERENT lease is refused — with an own-lease same-tenant control (12657.767131ms)
+✔ fault-matrix: a planted credential canary is SCRUBBED from both streams, and the scrubber's own marker is observed there (14519.670175ms)
+✔ fault-matrix: cancelling an UNLEASED attempt cancels it directly (4559.21198ms)
+✔ fault-matrix: cancelling a LEASED attempt requests cancellation and fences a cancel command (5541.185379ms)
+✔ fault-matrix: a provider execute that exceeds its deadline lands as a classified FAILED terminal (9061.970605ms)
+✔ fault-matrix: a truncating toxic on worker-to-minio makes the fenced commit refuse an unverifiable object (4985.466015ms)
+✔ fault-matrix: a fence lost mid-flight makes the commit refuse and the orphan object is swept (5676.821808ms)
+✔ fault-matrix: cutting worker-to-control-plane severs real worker traffic, the lease is reclaimed, and the late ack is refused (5293.338481ms)
+✔ fault-matrix: an expired lease is reaped into a single-winner retry (3421.366282ms)
+✔ fault-matrix: restarting the control plane leaves the durable lease state intact (16092.866861ms)
+✔ fault-matrix: cutting control-plane-to-postgres severs the stack's own database link, and it recovers (3729.721869ms)
+✔ fault-matrix: the DEPLOYED worker maps a provider deadline overrun to its own classified FAILED terminal (13132.943536ms)
+✔ fault-matrix: an expired enrollment code and route refuse restart with 401 and idle (83147.749991ms)
+✔ fault-matrix: every DECLARED case fired its injection and was classified as declared (1.675246ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 596549.217576
