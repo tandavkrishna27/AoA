@@ -473,6 +473,7 @@ export function mergeServerMessagesWithTransientLocal(
 ): LocalMessage[] {
   const localById = new Map(localMessages.map((m) => [m.id, m]));
   const serverIds = new Set(serverMessages.map((m) => m.id));
+  const reconciledLocalIds = new Set<string>();
   // Carry the live-only "Worked for Xs" durationMs from the streamed local
   // message onto its persisted server counterpart. The streamed message has a
   // client temp id (≠ the server id), so match by content. This keeps the
@@ -487,21 +488,42 @@ export function mergeServerMessagesWithTransientLocal(
   }
   const merged = serverMessages.map((m, index) => {
     const base = serverToLocal(m);
-    const optionsPrompt = localById.get(m.id)?.optionsPrompt ?? base.optionsPrompt;
-    const answered = optionsPrompt && serverMessages.slice(index + 1).some((next) => next.role === "user");
+    const answered = serverMessages.slice(index + 1).some((next) => next.role === "user");
+    // A streamed choice has a temporary message/prompt ID. Reconcile its
+    // presentation state with the saved marker instead of showing two cards.
+    // Approval IDs are copied only from this trusted, same-chat live message.
+    const savedPrompt = base.optionsPrompt;
+    const local = localById.get(m.id) ?? (savedPrompt && localMessages.find((candidate) => {
+      const prompt = candidate.optionsPrompt;
+      return (
+        !serverIds.has(candidate.id) &&
+        !reconciledLocalIds.has(candidate.id) &&
+        prompt &&
+        (prompt.dismissed || !answered) &&
+        prompt.question === savedPrompt.question &&
+        prompt.options.length === savedPrompt.options.length &&
+        prompt.options.every((option, i) => option === savedPrompt.options[i])
+      );
+    }));
+    if (local) reconciledLocalIds.add(local.id);
+    const optionsPrompt = local?.optionsPrompt ?? base.optionsPrompt;
     const carriedDuration =
       base.role === "assistant" ? localDurationByContent.get(base.content) : undefined;
     return {
       ...base,
       ...(carriedDuration !== undefined ? { durationMs: carriedDuration } : {}),
-      actionConfirm: localById.get(m.id)?.actionConfirm,
-      optionsPrompt: optionsPrompt ? { ...optionsPrompt, dismissed: optionsPrompt.dismissed || Boolean(answered) } : undefined,
+      actionConfirm: local?.actionConfirm,
+      optionsPrompt: optionsPrompt ? {
+        ...optionsPrompt,
+        dismissed: optionsPrompt.dismissed || Boolean(base.optionsPrompt?.dismissed) || answered,
+      } : undefined,
     };
   });
 
   const transientMessages = localMessages.filter(
     (m) =>
       !serverIds.has(m.id) &&
+      !reconciledLocalIds.has(m.id) &&
       (
         m.actionConfirm !== undefined ||
         m.optionsPrompt !== undefined ||
@@ -604,6 +626,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   const queryClient = useQueryClient();
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const messagesScopeRef = useRef<string | null>(null);
   // The rich input is uncontrolled (the contenteditable DOM owns the live
   // text). We only track empty-ness here to drive the Send button + placeholder.
   const [inputEmpty, setInputEmpty] = useState(true);
@@ -971,8 +994,13 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     [allConversations, conversationId],
   );
 
-  // Reset messages when switching conversations
+  const messagesScope = JSON.stringify([
+    companyId, conversationId ?? null, currentUser?.userId ?? null,
+  ]);
+
+  // Reset messages when switching conversations or the authenticated owner.
   useEffect(() => {
+    messagesScopeRef.current = messagesScope;
     setMessages([]);
     setStreamingLocal(false);
     inputRefsRef.current = [];
@@ -990,7 +1018,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     setFailureDetails(null);
     savedFailedMessageRef.current = null;
     hydratedFailureKeyRef.current = null;
-  }, [conversationId, companyId]);
+  }, [messagesScope]);
 
   // Populate messages from history when historyData arrives.
   // conversationId is included so the effect re-fires when switching between
@@ -998,12 +1026,13 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   // cache hit, so [historyData] alone would not trigger a re-run).
   useEffect(() => {
     if (!historyData?.messages?.length || streamingRef.current) return;
-    const loaded = mergeServerMessagesWithTransientLocal(
+    const preserveTransient = messagesScopeRef.current === messagesScope;
+    messagesScopeRef.current = messagesScope;
+    setMessages((previous) => mergeServerMessagesWithTransientLocal(
       historyData.messages.filter((m) => m.role === "user" || m.role === "assistant"),
-      [],
-    );
-    setMessages(loaded);
-  }, [historyData, conversationId]);
+      preserveTransient ? previous : [],
+    ));
+  }, [historyData, messagesScope]);
 
   // Both saved-chat and docked history restore the same durable failure. Only
   // the selected surface's data can hydrate it. Unrelated active-chat refreshes

@@ -231,6 +231,7 @@ beforeEach(() => {
   historyState.pending = null;
   historyState.listCalls = 0;
   stableHooks.company.selectedCompanyId = "co-1";
+  stableHooks.teamAccess.currentUser.userId = "user-1";
   stableHooks.location.pathname = "/";
   liveState.connectionState = "open";
   streamState.impl = failingStream;
@@ -243,6 +244,166 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Commander composer — B-states (mock §5)", () => {
+  function persistedApprovalNotice() {
+    return [
+      {
+        id: "persisted-user",
+        role: "user",
+        content: "Create guarded task",
+        createdAt: "2026-10-16T00:00:00Z",
+      },
+      {
+        id: "persisted-assistant",
+        role: "assistant",
+        createdAt: "2026-10-16T00:00:01Z",
+        content:
+          "Action requires approval for create_task. Complete the pending approval to proceed.",
+      },
+    ];
+  }
+
+  async function renderSavedChatWithLiveApproval() {
+    let finishStream!: () => void;
+    const streamDone = new Promise<void>((resolve) => {
+      finishStream = resolve;
+    });
+    streamState.impl = () =>
+      (async function* () {
+        yield {
+          event: "action_confirm",
+          data: {
+            confirmId: "11111111-1111-4111-8111-111111111111",
+            action: "create_task",
+            description: "Create guarded task",
+          },
+        };
+        await streamDone;
+        historyState.messages = persistedApprovalNotice();
+      })();
+    const panel = renderPanel({ conversationId: "saved-chat" });
+    await waitFor(() => expect(historyState.listCalls).toBe(1));
+    sendViaEnter(typeInComposer("Create guarded task"));
+    await screen.findByRole("button", { name: "Allow once" });
+    expect(screen.getByRole("button", { name: "Deny" })).toBeInTheDocument();
+    expect(confirmActionMock).not.toHaveBeenCalled();
+    await act(async () => {
+      finishStream();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(historyState.listCalls).toBe(2));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    return panel;
+  }
+
+  it.each(["allow_once", "deny"])(
+    "keeps live approval actionable through saved-history refresh and gates %s through one API decision",
+    async (decision) => {
+      let sideEffects = 0;
+      confirmActionMock.mockImplementation(async (_companyId, body) => {
+        if (body.decision === "allow_once") sideEffects += 1;
+        return { result: body.decision === "deny" ? "denied" : "executed" };
+      });
+      const { client } = await renderSavedChatWithLiveApproval();
+      expect(screen.getByRole("button", { name: "Allow once" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Deny" })).toBeInTheDocument();
+      expect(sideEffects).toBe(0);
+      expect(confirmActionMock).not.toHaveBeenCalled();
+      fireEvent.click(
+        screen.getByRole("button", { name: decision === "deny" ? "Deny" : "Allow once" }),
+      );
+      await screen.findByText(decision === "deny" ? "Rejected" : "Confirmed");
+      expect(confirmActionMock).toHaveBeenCalledTimes(1);
+      expect(confirmActionMock).toHaveBeenCalledWith("co-1", {
+        confirmId: "11111111-1111-4111-8111-111111111111",
+        decision,
+      });
+      expect(sideEffects).toBe(decision === "deny" ? 0 : 1);
+      await act(async () => {
+        await client.refetchQueries({ queryKey: ["conversation-messages", "co-1", "saved-chat"] });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+      expect(confirmActionMock).toHaveBeenCalledTimes(1);
+      expect(sideEffects).toBe(decision === "deny" ? 0 : 1);
+    },
+  );
+
+  it.each(["company", "conversation", "owner"])(
+    "does not carry live approvals across a %s switch or reconstruct them from persisted text",
+    async (scope) => {
+      const panel = await renderSavedChatWithLiveApproval();
+      expect(screen.getByRole("button", { name: "Allow once" })).toBeInTheDocument();
+      historyState.messages = persistedApprovalNotice();
+      if (scope === "company") stableHooks.company.selectedCompanyId = "co-2";
+      if (scope === "owner") stableHooks.teamAccess.currentUser.userId = "user-2";
+      panel.rerenderPanel({ conversationId: scope === "conversation" ? "other-chat" : "saved-chat" });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(await screen.findByText(/Action requires approval for create_task/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+      expect(confirmActionMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reconciles live and persisted options once and keeps answered choices dismissed through saved-history refresh", async () => {
+    const question = "Choose the plan";
+    const options = ["Proceed", "Cancel"];
+    const persisted = [
+      {
+        id: "question-user",
+        role: "user",
+        content: "Make a plan",
+        createdAt: "2026-10-16T00:00:00Z",
+      },
+      {
+        id: "question-assistant",
+        role: "assistant",
+        content: `⚡OPTIONS:${JSON.stringify({ question, options })}⚡`,
+        createdAt: "2026-10-16T00:00:01Z",
+      },
+    ];
+    streamState.impl = () =>
+      (async function* () {
+        yield { event: "options_prompt", data: { promptId: "live-choice", question, options } };
+        historyState.messages = persisted;
+      })();
+    const { client } = renderPanel({ conversationId: "saved-chat" });
+    await waitFor(() => expect(historyState.listCalls).toBe(1));
+    sendViaEnter(typeInComposer("Make a plan"));
+    await waitFor(() => expect(historyState.listCalls).toBe(2));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.getAllByRole("button", { name: /Proceed.*recommended/ })).toHaveLength(1);
+    streamState.impl = () =>
+      (async function* () {
+        historyState.messages = [
+          ...persisted,
+          {
+            id: "choice-answer",
+            role: "user",
+            content: "Proceed",
+            createdAt: "2026-10-16T00:00:02Z",
+          },
+        ];
+      })();
+    fireEvent.click(screen.getByRole("button", { name: /Proceed.*recommended/ }));
+    await waitFor(() => expect(historyState.listCalls).toBe(3));
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ["conversation-messages", "co-1", "saved-chat"] });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.queryByRole("button", { name: /Proceed.*recommended/ })).not.toBeInTheDocument();
+    expect(streamState.calls).toHaveLength(2);
+    expect(streamState.calls[1][1]).toBe("Proceed");
+    expect(confirmActionMock).not.toHaveBeenCalled();
+  });
+
   function durableFailure(id = "saved-user", submissionId = "original-send") {
     const retry = {
       message: "Original request with reference id=old-asset",
