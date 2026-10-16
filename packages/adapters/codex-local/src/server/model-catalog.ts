@@ -10,6 +10,7 @@ import {
   type CodexModelCatalog,
   type CodexModelCatalogIdentity,
 } from "./model-availability.js";
+import { ensurePathInEnv, mergeChildEnv } from "@armyofagents/adapter-utils/server-utils";
 import { parseCodexAuthStatus } from "./auth-status.js";
 import { spawnAppServerClient } from "./app-server/jsonrpc-client.js";
 
@@ -49,7 +50,9 @@ const runCommand = async (
 ): Promise<{ stdout: string; stderr: string }> => {
   const result = await execFileAsync(command, args, {
     cwd: options.cwd,
-    env: options.env,
+    env: ensurePathInEnv(
+      mergeChildEnv(process.env, options.env, ["OPENAI_API_KEY", "CODEX_API_KEY"]),
+    ),
     timeout: options.timeout,
     windowsHide: true,
     shell: options.shell,
