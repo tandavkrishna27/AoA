@@ -148,7 +148,7 @@ describe("getCodexModelCatalog", () => {
       helperPath,
       [
         "const fs = require('node:fs');",
-        "fs.appendFileSync(process.env.AOA_TEST_CAPTURE, JSON.stringify({ args: process.argv.slice(2), path: process.env.PATH, openai: process.env.OPENAI_API_KEY, codex: process.env.CODEX_API_KEY }) + '\\n');",
+        `fs.appendFileSync(${JSON.stringify(capturePath)}, JSON.stringify({ args: process.argv.slice(2), path: process.env.PATH, openai: process.env.OPENAI_API_KEY, codex: process.env.CODEX_API_KEY }) + '\\n');`,
         "if (process.argv[2] === '--version') {",
         "  process.stdout.write('codex-cli 0.145.0\\n');",
         "} else if (process.argv[2] === 'login' && process.argv[3] === 'status') {",
@@ -175,19 +175,16 @@ describe("getCodexModelCatalog", () => {
     const originalPath = process.env.PATH;
     const originalOpenAiKey = process.env.OPENAI_API_KEY;
     const originalCodexKey = process.env.CODEX_API_KEY;
-    const originalCapture = process.env.AOA_TEST_CAPTURE;
     const explicitKey = "sk-explicit-codex-catalog-test";
     const ambientCodexKey = "sk-ambient-codex-catalog-test";
     try {
       process.env.PATH = [binDir, originalPath].filter(Boolean).join(path.delimiter);
       process.env.OPENAI_API_KEY = "sk-ambient-openai-catalog-test";
       process.env.CODEX_API_KEY = ambientCodexKey;
-      process.env.AOA_TEST_CAPTURE = capturePath;
-
       const h = makeDeps();
       const catalog = await getCodexModelCatalog(
         {
-          ...request({ OPENAI_API_KEY: explicitKey, AOA_TEST_CAPTURE: capturePath }, "apikey"),
+          ...request({ OPENAI_API_KEY: explicitKey }, "apikey"),
           cwd: tempRoot,
           command,
         },
@@ -217,7 +214,6 @@ describe("getCodexModelCatalog", () => {
           ...request({
             PATH: explicitPath,
             OPENAI_API_KEY: explicitKey,
-            AOA_TEST_CAPTURE: capturePath,
           }, "apikey"),
           companyId: "company-explicit-path-test",
           cwd: tempRoot,
@@ -236,7 +232,7 @@ describe("getCodexModelCatalog", () => {
       const subscriptionHarness = makeDeps();
       await getCodexModelCatalog(
         {
-          ...request({ AOA_TEST_CAPTURE: capturePath }, "subscription"),
+          ...request({}, "subscription"),
           companyId: "company-subscription-env-test",
           cwd: tempRoot,
           command,
@@ -262,8 +258,6 @@ describe("getCodexModelCatalog", () => {
       else process.env.OPENAI_API_KEY = originalOpenAiKey;
       if (originalCodexKey === undefined) delete process.env.CODEX_API_KEY;
       else process.env.CODEX_API_KEY = originalCodexKey;
-      if (originalCapture === undefined) delete process.env.AOA_TEST_CAPTURE;
-      else process.env.AOA_TEST_CAPTURE = originalCapture;
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
   });
