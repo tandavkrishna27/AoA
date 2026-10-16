@@ -3,11 +3,36 @@ import { act, render, screen, fireEvent, waitFor, within } from "@testing-librar
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AgentPanelContent } from "./InternalAgentPanel";
 import { composerDraftStorageKey, deserializeComposerDraft, serializeComposerDraft } from "../lib/composerDraft";
-import { parseCommanderDistributedOutput } from "../../../server/src/services/commander-distributed-output";
-import { persistCommanderDistributedReply } from "../../../server/src/services/commander-distributed-reply";
-import { createCommanderDistributedPort } from "../../../server/src/services/commander-distributed-port";
-import { createCommanderResultRecovery } from "../../../server/src/services/commander-result-recovery";
-import type { CapturedOneShotResult } from "../../../server/src/services/one-shot-distributed-result";
+
+interface CapturedFixtureResult {
+  version: 1;
+  operationId: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  timedOut: boolean;
+  durationMs: number;
+  captureError: null;
+  usageAccepted?: boolean;
+}
+
+// Load the real server implementations only inside Vitest. A static import
+// makes UI tsc traverse server routes without their server-only Express types.
+async function loadDistributedFixtureServices() {
+  const serviceRoot = "../../../server/src/services/";
+  const [output, reply, port, recovery] = await Promise.all([
+    import(/* @vite-ignore */ `${serviceRoot}commander-distributed-output.ts`),
+    import(/* @vite-ignore */ `${serviceRoot}commander-distributed-reply.ts`),
+    import(/* @vite-ignore */ `${serviceRoot}commander-distributed-port.ts`),
+    import(/* @vite-ignore */ `${serviceRoot}commander-result-recovery.ts`),
+  ]);
+  return {
+    parseCommanderDistributedOutput: output.parseCommanderDistributedOutput,
+    persistCommanderDistributedReply: reply.persistCommanderDistributedReply,
+    createCommanderDistributedPort: port.createCommanderDistributedPort,
+    createCommanderResultRecovery: recovery.createCommanderResultRecovery,
+  };
+}
 
 // Exercise accepted worker output through the production parser, writer and
 // delivery/recovery orchestration. Only database and authority I/O are replaced.
@@ -288,6 +313,12 @@ describe("Commander composer — B-states (mock §5)", () => {
   it.each([false, true])(
     "hydrates accepted distributed choices after delivery and repeated recovery (surrounding text: %s)",
     async (surrounding) => {
+      const {
+        parseCommanderDistributedOutput,
+        persistCommanderDistributedReply,
+        createCommanderDistributedPort,
+        createCommanderResultRecovery,
+      } = await loadDistributedFixtureServices();
       const operationId = "22222222-2222-4222-8222-222222222222";
       const candidate = {
         organizationId: "org",
@@ -358,8 +389,8 @@ describe("Commander composer — B-states (mock §5)", () => {
         }),
       };
       completionAuditMock.mockClear();
-      const project = async (_candidate: unknown, accepted: CapturedOneShotResult) => {
-        const chunks = await parseCommanderDistributedOutput({
+      const project = async (_candidate: unknown, accepted: CapturedFixtureResult) => {
+        const chunks: { type: string }[] = await parseCommanderDistributedOutput({
           result: accepted,
           cliTool: "codex",
           turnId: operationId,
@@ -378,7 +409,7 @@ describe("Commander composer — B-states (mock §5)", () => {
         rollout: { resolveExecutionOwner: placement },
         read: async () => ({ state: "result", result }),
         cancel: async () => undefined,
-        persistReply: async (_input: unknown, _scope: unknown, accepted: CapturedOneShotResult) =>
+        persistReply: async (_input: unknown, _scope: unknown, accepted: CapturedFixtureResult) =>
           project(candidate, accepted),
       } as never);
       const delivered = await port.execute({
