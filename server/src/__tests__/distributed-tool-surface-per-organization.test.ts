@@ -263,7 +263,8 @@ describe("CLI-016 — classifyToolSurfaceAtUse (the /mcp use-side per-Organizati
 // standing CLI-003/005/006 limitation). As `cli-008-unit-d-seam-wiring.test.ts` does, assert
 // its shape against the SOURCE rather than assert nothing about the one call site that matters.
 describe("CLI-016 — the heartbeat dispatch seam combines the flag WITH the run's Organization", () => {
-  const source = readFileSync(new URL("../services/heartbeat.ts", import.meta.url), "utf8");
+  // Source-shape assertions are identical on CRLF Windows and LF CI checkouts.
+  const source = readFileSync(new URL("../services/heartbeat.ts", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
   it("the deployment flag alone no longer decides the tool surface", () => {
     expect(source).not.toContain("const toolSurfaceAuthorized = readDistributedToolSurfaceFlag(process.env);");

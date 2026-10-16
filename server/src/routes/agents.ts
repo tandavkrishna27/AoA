@@ -619,7 +619,7 @@ export function agentRoutes(db: Db) {
         } else {
           const runtimeConfig = await secretsSvc.resolveAdapterConfigForRuntime(
             companyId,
-            "codex_local",
+            agent.adapterType,
             asRecord(agent.adapterConfig) ?? {},
             {
               consumerType: "agent",

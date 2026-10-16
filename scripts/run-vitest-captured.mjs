@@ -11,6 +11,13 @@ import { finished } from "node:stream/promises";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 
+function readGitSha(cwd) {
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null;
+  } catch { /* A capture can run outside a Git checkout; null preserves that unknown identity. */ }
+  return null;
+}
+
 /**
  * Run a child while teeing its native output to the terminal and raw capture files.
  * Buffers are written as-is, so neither PowerShell nor a text decoder can rewrite output.
@@ -47,6 +54,8 @@ export async function runCapturedProcess({
   const stderrFinished = finished(stderrFile).catch((error) => error);
   const startedAt = new Date().toISOString();
   const startTime = performance.now();
+  // Bind this capture to the source revision that existed before the child could mutate HEAD.
+  const gitSha = readGitSha(cwd);
 
   let captureError = null;
   const child = spawn(command, args, { cwd, env, windowsHide: true, stdio: ["inherit", "pipe", "pipe"] });
@@ -127,11 +136,6 @@ export async function runCapturedProcess({
   const [stdoutFinishError, stderrFinishError] = await Promise.all([stdoutFinished, stderrFinished]);
   captureError ??= stdoutFinishError === undefined ? null : `stdout capture failed: ${stdoutFinishError.message}`;
   captureError ??= stderrFinishError === undefined ? null : `stderr capture failed: ${stderrFinishError.message}`;
-
-  let gitSha = null;
-  try {
-    gitSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null;
-  } catch { /* A capture can run outside a Git checkout; null preserves that unknown identity. */ }
 
   const result = {
     schemaVersion: 1,

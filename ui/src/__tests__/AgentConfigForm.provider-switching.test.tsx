@@ -13,10 +13,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentConfigForm } from "../components/AgentConfigForm";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { DEFAULT_CODEX_LOCAL_MODEL } from "@armyofagents/adapter-codex-local";
+import { agentsApi } from "../api/agents";
 
 // ── Shared mocks ─────────────────────────────────────────────────────────────
 
@@ -24,9 +25,13 @@ vi.mock("../context/CompanyContext", () => ({
   useCompany: () => ({ selectedCompanyId: "company-1" }),
 }));
 
+const mockAdapterModels = vi.hoisted(() => vi.fn().mockResolvedValue([
+  { id: "gpt-fixture-listed", label: "GPT Fixture Listed" },
+]));
+
 vi.mock("../api/agents", () => ({
   agentsApi: {
-    adapterModels: vi.fn().mockResolvedValue([]),
+    adapterModels: mockAdapterModels,
     org: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -85,6 +90,10 @@ const baseAgent = {
   updatedAt: new Date().toISOString(),
 };
 
+beforeEach(() => {
+  mockAdapterModels.mockClear();
+});
+
 function makeQC() {
   return new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
@@ -110,65 +119,64 @@ function renderEditForm(agentPatch: Record<string, unknown>, onSave = vi.fn()) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("DEFAULT_CODEX_LOCAL_MODEL value", () => {
-  it("is gpt-5.5 (not gpt-5.3-codex)", () => {
-    // This test locks the cleanup — if the constant regresses the test fails.
-    expect(DEFAULT_CODEX_LOCAL_MODEL).toBe("gpt-5.5");
-    expect(DEFAULT_CODEX_LOCAL_MODEL).not.toBe("gpt-5.3-codex");
+  it("is blank so a new Codex config inherits its account catalog default", () => {
+    expect(DEFAULT_CODEX_LOCAL_MODEL).toBe("");
   });
 });
 
 describe("AgentConfigForm codex model picker default label", () => {
-  it("shows 'Default → gpt-5.5' when codex adapter has no explicit model", async () => {
+  it("shows the account default when no model is explicitly set and queries with the agent identity", async () => {
     renderEditForm({
       adapterType: "codex_local",
       adapterConfig: { model: "" },
     });
 
-    // The model picker trigger should show the resolved default label.
-    // We look for the button text that includes "Default → gpt-5.5".
     const modelBtn = await screen.findByRole("button", {
-      name: /Default → gpt-5\.5/i,
+      name: /Account default \(Codex CLI\)/i,
     });
     expect(modelBtn).toBeInTheDocument();
+    expect(agentsApi.adapterModels).toHaveBeenCalledWith("company-1", "codex_local", "agent-ps");
   });
 
   it("shows selected model label when model is explicitly set", async () => {
     renderEditForm({
       adapterType: "codex_local",
-      adapterConfig: { model: "gpt-5.3-codex" },
+      adapterConfig: { model: "gpt-fixture-listed" },
     });
 
-    // gpt-5.3-codex is still a valid explicit selection in the picker list.
     const modelBtn = await screen.findByRole("button", {
-      name: /gpt-5\.3-codex/i,
+      name: /GPT Fixture Listed/i,
     });
     expect(modelBtn).toBeInTheDocument();
   });
-});
 
-describe("AgentConfigForm codex default option writes the explicit default model (P2-3)", () => {
-  it("choosing 'Default → gpt-5.5' for codex selects gpt-5.5 explicitly, not an empty model", async () => {
+  it("keeps an unavailable saved model visible without replacing it", async () => {
     renderEditForm({
       adapterType: "codex_local",
-      adapterConfig: { model: "gpt-5.3-codex" },
+      adapterConfig: { model: "gpt-fixture-retired" },
     });
 
-    // Open the model picker (trigger currently shows the explicit model).
-    await userEvent.click(await screen.findByRole("button", { name: /gpt-5\.3-codex/i }));
-    // Pick the default option.
-    await userEvent.click(await screen.findByRole("button", { name: /Default → gpt-5\.5/i }));
-
-    // P2-3: the default option must write the real default (gpt-5.5), so the
-    // trigger now reflects an explicit gpt-5.5 selection — NOT the empty
-    // "Default → gpt-5.5" placeholder, which would run the codex CLI default
-    // instead of gpt-5.5 on an edited agent.
-    expect(screen.queryByRole("button", { name: /Default → gpt-5\.5/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /^gpt-5\.5/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /gpt-fixture-retired/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Account default \(Codex CLI\)/i })).toBeNull();
   });
 });
 
-describe("AgentConfigForm adapter type switch defaults model to gpt-5.5", () => {
-  it("switching to codex_local in create mode sets model to DEFAULT_CODEX_LOCAL_MODEL (gpt-5.5)", async () => {
+describe("AgentConfigForm codex account-default option", () => {
+  it("choosing the account default clears the explicit model override", async () => {
+    renderEditForm({
+      adapterType: "codex_local",
+      adapterConfig: { model: "gpt-fixture-listed" },
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /GPT Fixture Listed/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /Account default \(Codex CLI\)/i }));
+
+    expect(screen.getByRole("button", { name: /Account default \(Codex CLI\)/i })).toBeInTheDocument();
+  });
+});
+
+describe("AgentConfigForm adapter type switch inherits Codex account default", () => {
+  it("switching to codex_local in create mode leaves model blank", async () => {
     const onChange = vi.fn();
     const { unmount } = render(
       <QueryClientProvider client={makeQC()}>
@@ -216,7 +224,8 @@ describe("AgentConfigForm adapter type switch defaults model to gpt-5.5", () => 
     expect(codexBtn).toBeTruthy();
     await userEvent.click(codexBtn!);
 
-    // The onChange call for adapter-type switch should include model: DEFAULT_CODEX_LOCAL_MODEL
+    // Switching adapters still changes the selected adapter; Codex model
+    // selection stays blank so the eventual account resolves its own default.
     const calls = onChange.mock.calls;
     const switchCall = calls.find((args: unknown[]) => {
       const patch = args[0] as Record<string, unknown>;
@@ -224,7 +233,7 @@ describe("AgentConfigForm adapter type switch defaults model to gpt-5.5", () => 
     });
     expect(switchCall).toBeTruthy();
     const patch = switchCall![0] as Record<string, unknown>;
-    expect(patch.model).toBe("gpt-5.5");
+    expect(patch.model).toBe("");
 
     unmount();
   });

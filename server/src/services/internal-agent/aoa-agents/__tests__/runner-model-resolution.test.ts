@@ -3,9 +3,15 @@ import { applyModelResolutionToConfig } from "../runner-model-resolution.js";
 
 const status = { authMode: "chatgpt" as const, defaultModelResolved: "gpt-5.5" };
 describe("applyModelResolutionToConfig", () => {
-  it("rewrites an incompatible codex model to the safe default", () => {
-    const cfg = applyModelResolutionToConfig("codex_local", { model: "gpt-5.3-codex", env: {} }, status);
-    expect(cfg.model).toBe("gpt-5.5");
+  it("refuses an incompatible explicit Codex model without substituting or mutating it", () => {
+    const explicit = { model: "gpt-5.3-codex", env: {} };
+    expect(() => applyModelResolutionToConfig("codex_local", explicit, status))
+      .toThrow(/not compatible with ChatGPT subscription auth/i);
+    expect(explicit.model).toBe("gpt-5.3-codex");
+  });
+  it("leaves a blank Codex model unset for account-catalog inheritance", () => {
+    const cfg = applyModelResolutionToConfig("codex_local", { model: "", env: {} }, status);
+    expect(cfg).not.toHaveProperty("model");
   });
   it("strips a stray (company) OPENAI_API_KEY when the agent did NOT set one", () => {
     const cfg = applyModelResolutionToConfig("codex_local", { model: "gpt-5.5", env: {} }, status,

@@ -11,11 +11,16 @@ describe("resolveCommanderAdapterFor (keyed on cliTool, not provider)", () => {
     expect(resolveCommanderAdapterFor("codex", null).adapterType).toBe("codex_local");
   });
   it("honors a valid Commander model override per cliTool", () => {
-    expect(resolveCommanderAdapterFor("codex", "gpt-5.5").adapterConfig.model).toBe("gpt-5.5");
+    expect(resolveCommanderAdapterFor("codex", "gpt-fixture-listed").adapterConfig.model).toBe("gpt-fixture-listed");
     expect(resolveCommanderAdapterFor("claude_cli", "claude-opus-4-1").adapterConfig.model).toBe("claude-opus-4-1");
   });
-  it("rejects a cliTool-incompatible model → per-CLI default", () => {
-    // claude default model survives validation only on claude; on codex it's rejected.
-    expect(resolveCommanderAdapterFor("codex", "claude-sonnet-4-6").adapterConfig.model).not.toBe("claude-sonnet-4-6");
+  it("preserves an explicit incompatible model so execution can refuse it without rewriting", () => {
+    // The account-scoped execution resolver owns compatibility checks; this
+    // persistence/config helper must not replace an explicit stored choice.
+    expect(resolveCommanderAdapterFor("codex", "claude-sonnet-4-6").adapterConfig.model)
+      .toBe("claude-sonnet-4-6");
+  });
+  it("leaves a blank Codex model unset for account-catalog inheritance", () => {
+    expect(resolveCommanderAdapterFor("codex", "").adapterConfig).not.toHaveProperty("model");
   });
 });

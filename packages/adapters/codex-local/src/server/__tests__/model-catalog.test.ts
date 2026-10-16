@@ -13,6 +13,7 @@ const API_KEY = "sk-unit-test-not-a-real-credential";
 
 function makeDeps(options: {
   authStatus?: string;
+  loginStatusError?: Error;
   modelPage?: unknown;
 } = {}) {
   const commandEnvs: Record<string, string>[] = [];
@@ -27,6 +28,7 @@ function makeDeps(options: {
     ) => {
       commandEnvs.push(commandOptions.env);
       if (args[0] === "--version") return { stdout: "codex-cli 0.145.0", stderr: "" };
+      if (options.loginStatusError) throw options.loginStatusError;
       return { stdout: options.authStatus ?? "Logged in using ChatGPT", stderr: "" };
     },
   );
@@ -80,7 +82,7 @@ function request(
 describe("getCodexModelCatalog", () => {
   beforeEach(() => resetCodexModelCatalogCacheForTests());
 
-  it("keeps explicit API-key auth in both probes and model/list discovery", async () => {
+  it("keeps explicit API-key auth in version and model/list discovery without persisted login", async () => {
     const h = makeDeps({ authStatus: "Logged in using ChatGPT" });
     const catalog = await getCodexModelCatalog(
       request({ CODEX_HOME: "C:/ambient", OPENAI_API_KEY: API_KEY }, "apikey"),
@@ -88,9 +90,31 @@ describe("getCodexModelCatalog", () => {
     );
 
     expect(catalog.identity.authMode).toBe("apikey");
-    expect(h.commandEnvs).toHaveLength(2);
+    expect(h.commandEnvs).toHaveLength(1);
     expect(h.commandEnvs.every((env) => env.OPENAI_API_KEY === API_KEY)).toBe(true);
     expect(h.commandEnvs.every((env) => env.CODEX_HOME === request().authHome)).toBe(true);
+    expect(h.serverOptions[0]!.env.OPENAI_API_KEY).toBe(API_KEY);
+    expect(h.serverOptions[0]!.unsetEnvKeys).not.toContain("OPENAI_API_KEY");
+    expect(h.closed).toHaveBeenCalledOnce();
+    expect(h.terminated).toHaveBeenCalledOnce();
+  });
+
+  it("discovers key-only models when the empty home makes login status fail", async () => {
+    const h = makeDeps({ loginStatusError: new Error("Codex login status exited 1: Not logged in") });
+    const catalog = await getCodexModelCatalog(
+      request({ OPENAI_API_KEY: API_KEY }),
+      h.deps,
+    );
+
+    expect(catalog.identity.authMode).toBe("apikey");
+    expect(catalog.identity.authGeneration).not.toContain(API_KEY);
+    expect(h.deps.runCommand).toHaveBeenCalledOnce();
+    expect(h.deps.runCommand).toHaveBeenCalledWith(
+      "codex",
+      ["--version"],
+      expect.objectContaining({ env: expect.objectContaining({ OPENAI_API_KEY: API_KEY }) }),
+    );
+    expect(h.serverOptions).toHaveLength(1);
     expect(h.serverOptions[0]!.env.OPENAI_API_KEY).toBe(API_KEY);
     expect(h.serverOptions[0]!.unsetEnvKeys).not.toContain("OPENAI_API_KEY");
     expect(h.closed).toHaveBeenCalledOnce();

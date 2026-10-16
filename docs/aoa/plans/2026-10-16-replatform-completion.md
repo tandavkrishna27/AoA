@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This request authorizes the plan, not implementation or new deployments.
 
+**Implementation authorization, 2026-10-16:** TK authorized W00 followed by W01/W03/W04 and local/CI verification. Environment rebuilds and live campaigns remain separate. Current implementation/check evidence is tracked in [PR #692](https://github.com/tandavkrishna27/AoA/pull/692); pending checks and live acceptance must not be inferred from the completed implementation items below.
+
 **Goal:** Finish the outstanding replatform functionality and reliability work identified by the 15 October tests, then prove the supported product and release requirements on a new candidate.
 
 **Architecture:** Preserve one logical control-plane authority per environment, with enrolled workers and independently fenced execution. Extend the existing routing, broker, sandbox and output paths; keep personal device credentials on the device. Reuse shipped implementations and repair demonstrated gaps before widening deployment or workload exposure.
@@ -195,10 +197,11 @@ Record the chosen route, exact topology and executed case IDs in each new attemp
 
 **Interfaces:** Keep `resolveCodexChatModel(configModel, sharedModel): string` callers synchronized during migration. Separate identifier syntax/CLI compatibility from account availability. The API-key `/v1/models` catalog is not proof that a subscription can use a model. Catalog/cache inputs must be scoped to the actual CLI version, auth mode and managed auth home; never share one account's availability across companies.
 
-- [ ] Add failing cases for empty config, a stored retired default, explicitly selected unavailable model, API-only entry under subscription auth, catalog outage, account change, malformed identifier, and mismatched pinned CLI. Assert that no API-key fallback or unsafe model reaches execution.
-- [ ] Resolve inherited defaults against the pinned client's supported account catalog. Preserve a valid explicit selection; surface an actionable refusal for an unavailable explicit selection. Do not blindly rewrite stored agent/company configurations whose selection provenance is unknown.
-- [ ] Update the duplicated server/adapter resolver, model picker, auth verification and managed config generation consistently. Yesterday's successful `gpt-5.6-luna` is a historical probe result, not a permanent future default. Review the CLI pin against the chosen supported path rather than simply adopting the Desktop CLI version.
-- [ ] Run the existing resolver, model-routing, environment and CLI-auth tests; then a fresh onboarding → verify → Commander → crew → extraction smoke with no test-company model override. Reopen TST-004 only if its scoped behavior regresses. **Exit:** normal configuration works without yesterday's workaround; commit the bounded fix and regression evidence.
+- [x] Add regression cases for empty config, a stored retired default, explicitly selected unavailable model, API-only entry under subscription auth, catalog outage, account change, malformed identifier, and mismatched CLI/catalog identity. Assert that no API-key fallback or unsafe model reaches execution.
+- [x] Resolve inherited defaults against the pinned client's supported account catalog. Preserve a valid explicit selection; surface an actionable refusal for an unavailable explicit selection. Do not blindly rewrite stored agent/company configurations whose selection provenance is unknown.
+- [x] Update the duplicated server/adapter resolver, model picker, auth verification and managed config generation consistently. Yesterday's successful `gpt-5.6-luna` is a historical probe result, not a permanent future default. The existing pinned CLI supports `model/list`; its catalog establishes compatibility, not inference entitlement. No CLI pin upgrade is needed.
+- [x] Run the existing resolver, model-routing, environment and CLI-auth regressions, plus authorized per-agent picker and company/credential-boundary tests. Fresh Codex configuration stores an inherited blank; unknown-provenance saved selections remain explicit and are never backfilled.
+- [ ] Run a fresh native subscription onboarding → verify → Commander → crew → extraction smoke with no test-company model override. Required TST-008 acceptance is deferred to the separate [live-validation plan](2026-10-16-local-vps-validation.md) after local/CI verification and a fresh application setup. No suitable live application was rebuilt or exercised during this implementation. Reopen TST-004 only if its scoped behavior regresses.
 
 ### W02 — Diagnose and repair native background crew operation
 
@@ -221,10 +224,10 @@ Record the chosen route, exact topology and executed case IDs in each new attemp
 
 **Contract:** The version installed in the sandbox image equals the Playwright runtime actually resolved by the declared package dependency; Chromium is installed and asserted during image build.
 
-- [ ] Reproduce the parity failure in a clean strict pnpm install. Keep a deliberate image/runtime pin-mismatch negative control.
-- [ ] Resolve `playwright-core/package.json` through the declared `playwright` dependency's require context, rather than relying on a root/transitive hoist. Keep the declared runtime dependency and exact image/version comparison; no new package is needed for this resolution-only approach.
-- [ ] Run `pnpm exec vitest run packages/browser-runtime/src/__tests__/image-playwright-parity.test.ts` and the browser-runtime package suite. The real match passes; an intentionally mismatched fixture fails, and Chromium assertions remain active.
-- [ ] Commit the fix with any necessary manifest/lockfile pair. **Exit:** fresh strict installation resolves the parity assertion without weakening it.
+- [x] Compare against a clean strict frozen install on Node 24.19.0 / pnpm 9.15.4. The original Vitest parity file passed 4/4 on this machine; the historical Vitest failure was not reproduced. A plain Node require from the package's strict context fails to resolve the undeclared direct `playwright-core` import, while resolution through declared `playwright` succeeds. Keep a deliberate image/runtime pin-mismatch negative control.
+- [x] Resolve `playwright-core/package.json` through the declared `playwright` dependency's require context, rather than relying on a root/transitive hoist. Keep the declared runtime dependency and exact image/version comparison; no new package is needed for this resolution-only approach.
+- [x] Run the parity file and browser-runtime package suite: 5/5 parity tests; 175 package tests passed with 19 existing skips. The real match passes; an intentionally mismatched fixture fails, and Chromium assertions remain active.
+- [x] Commit the resolution-only fix (`a8d94293c`); manifests and lockfile remain unchanged. **Exit:** fresh strict installation resolves the parity assertion without weakening it.
 
 ### W04 — Make fixture lifecycle and test-result capture reliable
 
@@ -236,10 +239,10 @@ Record the chosen route, exact topology and executed case IDs in each new attemp
 
 Split implementation into separately reviewable commits: output capture; ACL/startup isolation; async log/UI/liveness observation; import/AST diagnostic correction.
 
-- [ ] First add a capture self-test whose child writes both streams and exits nonzero; assert complete output and exact exit propagation. Preserve the original Windows whole-lane limitation rather than reconstructing an invented final summary.
+- [x] First add a capture self-test whose child writes both streams and exits nonzero; assert complete output and exact exit propagation. Also test bounded backpressure with multi-megabyte streams, slow sinks, spawn/capture failures and platform-specific signals/write failures. Preserve the original Windows whole-lane limitation rather than reconstructing an invented final summary.
 - [ ] Reproduce the exhaustive ACL sweep and each subsequent operator/child assertion in separate fresh databases. On timeout or test abort, stop the mutation loop, await cleanup and verify role grants/schema ownership against a healthy snapshot. Test intentional mid-sweep abort followed by a healthy next case. Then run the entire startup file on Windows and required Linux CI. Five failures together are not evidence of five independent security defects.
-- [ ] Replace fixed sleeps/swallowed read errors in log evidence with an observable flush/completion boundary. Assert the positive `job_submission_internal_error` marker before checking absence of SQL/stack/secret canaries. Pin UI readiness to the state actually used by Archive; test renewed/stale heartbeats using explicit lifecycle observation. Keep the original behavior assertions.
-- [ ] Diagnose app-import and whole-tree AST costs separately from fixture contamination and process load. Reduce duplicated harness work or isolate documented import constraints where justified. Do not simply extend timeouts, skip tests or remove the static/security assertion to get green.
+- [x] Replace fixed sleeps/swallowed read errors in log evidence with an observable flush/completion boundary. Assert the positive `job_submission_internal_error` marker before checking absence of SQL/stack/secret canaries. Pin UI readiness to the state actually used by Archive; retain the renewed/stale heartbeat regressions (13/13). Keep the original behavior assertions.
+- [x] Diagnose app-import and whole-tree AST costs separately from fixture contamination and process load. Extract pure migration-identity loading without importing the DB runtime; replace the unsupported eager Vitest app import with the real production composition checker plus runtime process controls. Strengthen that checker to reject every constructor outside the guarded body, with mutation tests. The isolated AST contract test passes without weakening it or extending timeouts. Normalize one source-shape fixture's line endings for Windows/CI parity.
 - [ ] Run affected files separately, then their interacting group, then three clean critical-suite executions on the same candidate under the declared normal concurrency. **Exit:** complete native summaries, zero unhandled errors, clean post-abort state and no acceptance-by-rerun. Commit each bounded repair independently.
 
 ### W05 — Settle artifact export/deadline/destroy ordering

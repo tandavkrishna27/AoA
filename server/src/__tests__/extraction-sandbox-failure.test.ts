@@ -140,7 +140,9 @@ describe("extractViaCli — sandbox_unavailable classification (U13.3)", () => {
     let caught: CliExtractionError | undefined;
     try {
       await extractViaCli("codex", "sys", "content", {
-        credential: { ...FAKE_CREDENTIAL, envName: "OPENAI_API_KEY", provider: "openai" },
+        // The provider override must not retain Anthropic's model identifier;
+        // blank deliberately exercises the target account's inherited default.
+        credential: { ...FAKE_CREDENTIAL, envName: "OPENAI_API_KEY", provider: "openai", model: "" },
         companyId: "company-1",
         db: FAKE_DB,
       });

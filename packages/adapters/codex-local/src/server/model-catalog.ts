@@ -235,8 +235,18 @@ export async function getCodexModelCatalog(
   try {
     const versionResult = await commandRunner(request.command, ["--version"], execOptions);
     const version = parseCliVersion(`${versionResult.stdout}\n${versionResult.stderr}`);
-    const authResult = await commandRunner(request.command, ["login", "status"], execOptions);
-    const activeAuthMode = parseCliAuthMode(`${authResult.stdout}\n${authResult.stderr}`, env);
+    // The CLI's `login status` reads persisted Codex auth storage. It does not
+    // recognize an API key supplied only through the execution environment, so
+    // require that probe only for subscription/file-login discovery. An
+    // explicitly supplied key is the auth context used by both model/list and
+    // the eventual run, and its fingerprint is included in authGeneration.
+    let activeAuthMode: CodexModelAuthMode | null;
+    if (hasExplicitApiKey(env)) {
+      activeAuthMode = "apikey";
+    } else {
+      const authResult = await commandRunner(request.command, ["login", "status"], execOptions);
+      activeAuthMode = parseCliAuthMode(`${authResult.stdout}\n${authResult.stderr}`, env);
+    }
     const compatibleAuthModes = request.authMode === "auto"
       ? ["apikey", "subscription"]
       : request.authMode === "chatgpt"

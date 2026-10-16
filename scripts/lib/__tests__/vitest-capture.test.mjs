@@ -67,6 +67,39 @@ test("captures complete native stdout and stderr and preserves a nonzero child e
   }
 });
 
+test("binds gitSha to the revision present before the child runs", async () => {
+  const directory = temporaryDirectory();
+  const child = path.join(directory, "advance-head.mjs");
+  const capture = path.join(directory, "capture");
+  const git = (args) => {
+    const result = spawnSync("git", args, { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    return result.stdout.trim();
+  };
+
+  try {
+    git(["init", "--quiet"]);
+    git(["config", "user.name", "Capture test"]);
+    git(["config", "user.email", "capture-test@example.invalid"]);
+    git(["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "before capture"]);
+    const startSha = git(["rev-parse", "HEAD"]);
+    writeFileSync(child, [
+      'import { execFileSync } from "node:child_process";',
+      'execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "during capture"], { cwd: process.cwd(), stdio: "ignore" });',
+    ].join("\n"));
+
+    const result = await runCapturedProcess({ command: NODE, args: [child], captureDir: capture, cwd: directory });
+    const endSha = git(["rev-parse", "HEAD"]);
+    const metadata = JSON.parse(readFileSync(path.join(capture, "result.json"), "utf8"));
+
+    assert.equal(result.exitCode, 0);
+    assert.notEqual(endSha, startSha, "the child should have advanced HEAD");
+    assert.equal(metadata.identity.gitSha, startSha);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("preserves multiple MiB per stream through simultaneous file and terminal backpressure", async () => {
   const directory = temporaryDirectory();
   const child = path.join(directory, "emit-large-streams.mjs");
