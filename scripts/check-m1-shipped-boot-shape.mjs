@@ -25,7 +25,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 let text;
 try {
-  text = readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8");
+  // The checker uses LF-anchored line patterns; normalize Windows checkouts at the read boundary.
+  text = readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8").replace(/\r\n/g, "\n");
 } catch (err) {
   console.error(`FAIL: could not read ${SHIPPED_BOOT_WORKFLOW}: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(2);

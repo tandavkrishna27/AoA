@@ -1,10 +1,17 @@
 import { readFileSync } from "node:fs";
 import ts from "typescript";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-afterEach(() => {
-  vi.doUnmock("postgres");
-  vi.resetModules();
+const postgresFactory = vi.hoisted(() => vi.fn());
+vi.mock("postgres", () => ({ default: postgresFactory }));
+
+// Load the Drizzle/schema module graph during test collection, outside the
+// per-test timeout. The connection factory remains fully controlled by the
+// mock below, so neither a network connection nor a database is opened.
+import { createTenantAppDbConnection } from "../client.js";
+
+beforeEach(() => {
+  postgresFactory.mockReset();
 });
 
 describe("non-owner connection close contract", () => {
@@ -35,11 +42,7 @@ describe("non-owner connection close contract", () => {
       end,
       options: { parsers: {}, serializers: {} },
     });
-    const postgresFactory = vi.fn(() => sqlClient);
-    vi.doMock("postgres", () => ({ default: postgresFactory }));
-    vi.resetModules();
-
-    const { createTenantAppDbConnection } = await import("../client.js");
+    postgresFactory.mockReturnValue(sqlClient);
     const connection = createTenantAppDbConnection(
       "postgres://bounded-role:fixture@127.0.0.1/example",
     );
@@ -58,10 +61,7 @@ describe("non-owner connection close contract", () => {
       end,
       options: { parsers: {}, serializers: {} },
     });
-    vi.doMock("postgres", () => ({ default: vi.fn(() => sqlClient) }));
-    vi.resetModules();
-
-    const { createTenantAppDbConnection } = await import("../client.js");
+    postgresFactory.mockReturnValue(sqlClient);
     const connection = createTenantAppDbConnection(
       "postgres://bounded-role:fixture@127.0.0.1/example",
     );
