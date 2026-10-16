@@ -19,6 +19,29 @@ export {
   CODEX_ENV_TEST_AGENT_ID,
 } from "./codex-home.js";
 export { runCodexLogin } from "./login.js";
+export {
+  getCodexModelCatalog,
+  resetCodexModelCatalogCacheForTests,
+} from "./model-catalog.js";
+export type {
+  CodexModelCatalogDeps,
+  CodexModelCatalogRequest,
+} from "./model-catalog.js";
+export {
+  CodexModelAvailabilityError,
+  CodexModelCatalogCache,
+  codexModelCatalogIdentityMatches,
+  isCodexCompatibleModel,
+  isSafeCodexModelIdentifier,
+  resolveCodexChatModel,
+} from "./model-availability.js";
+export type {
+  CodexCatalogModel,
+  CodexModelAuthMode,
+  CodexModelAvailabilityErrorCode,
+  CodexModelCatalog,
+  CodexModelCatalogIdentity,
+} from "./model-availability.js";
 import type { AdapterSessionCodec } from "@armyofagents/adapter-utils";
 
 function readNonEmptyString(value: unknown): string | null {

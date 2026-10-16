@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import type { Db } from "@armyofagents/db";
 import { showRefSchema } from "@armyofagents/shared";
 import type { HumanQuestionRuntimeCapabilities } from "@armyofagents/adapter-utils";
+import { mergeChildEnv } from "@armyofagents/adapter-utils/server-utils";
 import {
   mergeExternalMcpServers,
   withSynthesizedBearerHeader,
@@ -27,7 +28,6 @@ import {
 import { StreamJsonParser } from "./parse-stream-json.js";
 import { COMMANDER_MAX_THINKING_TOKENS } from "./thinking-config.js";
 import {
-  resolveCodexChatModel,
   COMMANDER_CODEX_REASONING_EFFORT,
   SAFE_MODEL_RE,
 } from "./codex-model.js";
@@ -505,8 +505,10 @@ const IDLE_CHECK_INTERVAL_MS = 5 * 60 * 1000; // check every 5 min
 interface CliInvocation {
   binary: string;
   args: string[];
-  /** Extra env merged over process.env at spawn time (e.g. CODEX_HOME). */
+  /** Extra env merged over process.env at spawn time (e.g. session CODEX_HOME). */
   spawnEnv?: Record<string, string>;
+  /** Ambient provider keys removed after catalog auth-mode selection. */
+  unsetEnvKeys?: string[];
   /** Primary temp artifact to record as session.mcpConfigPath for cleanup. */
   mcpArtifactPath: string;
   /** Resolved model actually used for this invocation (for provenance, not cost). */
@@ -598,6 +600,8 @@ export async function resolveCliInvocation(
   // unaffected (string is assignable to the prior commanderModel slot, so a
   // mid-list insert mis-bound rawContent without a typecheck error).
   commanderModel?: string | null,
+  /** Credential patch that will be overlaid on the actual Codex spawn. */
+  credentialEnv?: Record<string, string>,
 ): Promise<CliInvocation | null> {
   const isWin = platform() === "win32";
   const claudeBypassArgs = vendorCliBypassEnabled
@@ -692,9 +696,41 @@ export async function resolveCliInvocation(
       // there via the MX3 writer. Prompt is delivered over stdin: `codex
       // exec --json -` reads instructions from stdin (matches the chat's
       // persistent stdin-piping model for multi-turn).
-      const { writeCodexMcpConfigToml, ensureCodexAuthInHome, readSharedCodexModel } =
+      const {
+        writeCodexMcpConfigToml,
+        ensureCodexAuthInHome,
+        readSharedCodexModel,
+        getCodexModelCatalog,
+        resolveCodexChatModel: resolveFromCatalog,
+      } =
         await import("@armyofagents/adapter-codex-local/server");
       const codexHomeDir = codexHomeDirFor(params.companyId, params.userId);
+      const authSourceEnv = credentialEnv?.CODEX_HOME
+        ? { ...process.env, CODEX_HOME: credentialEnv.CODEX_HOME }
+        : process.env;
+      // Copy the exact provider-connection login into the session home before
+      // discovery. The catalog and eventual CLI then use the same auth.json and
+      // explicit credential patch, while MCP config remains session-scoped.
+      await ensureCodexAuthInHome(codexHomeDir, authSourceEnv);
+      const catalogEnv: Record<string, string> = {
+        ...buildScrubbedCliEnv(),
+        ...(credentialEnv ?? {}),
+        CODEX_HOME: codexHomeDir,
+      } as Record<string, string>;
+      const catalog = await getCodexModelCatalog({
+        companyId: params.companyId,
+        authHome: codexHomeDir,
+        authMode: "auto",
+        command: "codex",
+        cwd: tmpdir(),
+        env: catalogEnv,
+      });
+      const sharedCodexModel = await readSharedCodexModel();
+      const resolvedCodexModel = resolveFromCatalog(codexModel, sharedCodexModel, catalog, {
+        ...catalog.identity,
+        companyId: params.companyId,
+        authHome: codexHomeDir,
+      });
       // FU-8: deliver EXTERNAL connectors alongside the bridge, exactly the way
       // the codex ADAPTER does (execute.ts) — the SAME writer renders the bridge
       // and every connector into one fenced region. `params.extraMcpServers`
@@ -712,21 +748,9 @@ export async function resolveCliInvocation(
       await writeCodexMcpConfigToml(codexHomeDir, buildCodexAoaMcpSpec(params), {
         externalServers: params.extraMcpServers ?? {},
       });
-      // MX-chatauth: the per-session CODEX_HOME has config.toml but no
-      // credentials, so `codex exec` run with it 401s ("Missing bearer or
-      // basic authentication"). Provision auth.json into the SAME dir by
-      // copying the user's shared ~/.codex/auth.json (no-op if absent).
-      // Session-isolated: this home/config.toml encodes THIS chat
-      // session's identity and must not be shared with the agent path.
-      await ensureCodexAuthInHome(codexHomeDir);
-      // MX-chatmodel: pin a subscription-supported model + effort. The
-      // per-session CODEX_HOME has no `model` line, so without --model codex
-      // falls back to its default (gpt-5.3-codex), which a ChatGPT-account
-      // codex rejects with a 400 → empty turn. effort=high is REQUIRED for
-      // codex to emit reasoning summaries (medium emits none). The summary
-      // flag stays BARE (quoted emits nothing). See codex-model.ts + the plan.
-      const sharedCodexModel = await readSharedCodexModel(); // shared ~/.codex, NOT the per-session home
-      const resolvedCodexModel = resolveCodexChatModel(codexModel, sharedCodexModel);
+      // Model discovery completed before writing config, so stale/unknown
+      // selections cannot be silently replaced. effort=high remains required
+      // for Codex reasoning summaries; the summary flag stays BARE.
       const modelArgs = ["--model", resolvedCodexModel];
       const reasoningArgs = [
         "-c",
@@ -741,6 +765,9 @@ export async function resolveCliInvocation(
         binary: "codex",
         args: codexArgs,
         spawnEnv: { CODEX_HOME: codexHomeDir },
+        unsetEnvKeys: ["OPENAI_API_KEY", "CODEX_API_KEY"].filter(
+          (key) => !(typeof catalogEnv[key] === "string" && catalogEnv[key]!.trim().length > 0),
+        ),
         // Record the config.toml so the existing best-effort unlink cleanup
         // (cli-session-store.killSession) reaps the primary artifact, the
         // same way it reaps claude's tmp .json. Parity, no new machinery.
@@ -969,7 +996,9 @@ export function cliModeService(db: Db) {
 
       const distributedCommander = getCommanderDistributedPort();
       if (distributedCommander && params.runId && params.userMessageId) {
-        const model = config.cliTool === "codex" ? resolveCodexChatModel(config.model, null) : config.model ?? "claude-sonnet-4-6";
+        // Distributed execution resolves Codex against the worker's own login.
+        // Preserve the stored explicit value (or empty inherited signal) here.
+        const model = config.cliTool === "codex" ? config.model ?? "" : config.model ?? "claude-sonnet-4-6";
         const experimental = await instanceSettingsService(db).getExperimental().catch(() => null);
         const commanderTurnId = params.runId; const commanderMessageId = params.userMessageId; const commanderCliTool = config.cliTool;
         const live = createCommanderStreamQueue((emit) => distributedCommander.execute({ companyId: params.companyId, userId: params.userId,
@@ -1850,11 +1879,9 @@ interface RunCodexTurnArgs {
   connectorEnv: Record<string, string>;
   /**
    * Phase 4 (Task 13): the resolved Commander provider-credential env patch
-   * (api-key value / gateway / subscription home). Empty ⇒ host login (byte-
-   * identical spawn env). Overlaid LAST so a configured connection wins over the
-   * ambient login. NOTE: for a personal_subscription this carries CODEX_HOME (the
-   * scoped auth home) which shadows the managed MCP CODEX_HOME from
-   * resolveCliInvocation — a known beta limitation for codex + subscription.
+  * (api-key value / gateway / subscription home). Empty ⇒ host login. The
+  * selected CODEX_HOME auth.json is copied into the session home for discovery;
+  * the session home then supplies both the model catalog and managed MCP config.
    */
   credentialEnv?: Record<string, string>;
   prompt: string;
@@ -1898,6 +1925,9 @@ async function* runCodexTurn(
       undefined,
       args.vendorCliBypassEnabled,
       args.codexModel ?? null,
+      undefined,
+      undefined,
+      args.credentialEnv,
     );
     if (!invocation) {
       // codex is a wired CLI — resolveCliInvocation never returns null for
@@ -1926,13 +1956,14 @@ async function* runCodexTurn(
     // Phase 4 (Task 13): the resolved Commander credential patch overlays LAST so a
     // configured provider_connection wins over the ambient login. Empty ⇒ no-op.
     const credentialEnv = args.credentialEnv ?? {};
-    const spawnEnv = connectorsPresent
-      ? {
-          ...mergeConnectorEnv(buildScrubbedCliEnv(), args.connectorEnv),
-          ...(invocation.spawnEnv ?? {}),
-          ...credentialEnv,
-        }
-      : { ...process.env, ...invocation.spawnEnv, ...credentialEnv };
+    const spawnBaseEnv: NodeJS.ProcessEnv = connectorsPresent
+      ? mergeConnectorEnv(buildScrubbedCliEnv(), args.connectorEnv)
+      : process.env;
+    const spawnEnv = mergeChildEnv(
+      spawnBaseEnv,
+      { ...credentialEnv, ...(invocation.spawnEnv ?? {}) },
+      invocation.unsetEnvKeys,
+    );
     const proc = spawn(invocation.binary, invocation.args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: spawnEnv,

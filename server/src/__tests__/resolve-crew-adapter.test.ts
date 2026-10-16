@@ -1,104 +1,27 @@
 // server/src/__tests__/resolve-crew-adapter.test.ts
 //
-// Task 5 (Unit B): Verify that the persisted bad default model `gpt-5.3-codex`
-// has been removed from resolveCrewAdapterFor and that needsAdapterBackfill
-// correctly flags existing bad codex rows for self-healing backfill.
+// Verify provider-switch behavior while preserving Codex model selections for
+// execution-time account-catalog validation.
 //
 // Companion to resolve-crew-adapter-opencode.test.ts (same import/mock pattern).
 
 import { describe, it, expect } from "vitest";
 import { resolveCrewAdapterFor, needsAdapterBackfill, shouldRewriteCrewAdapter, mergeAdapterConfig, mergeCrewAdapterConfig } from "../services/internal-agent/aoa-agents/resolve-crew-adapter.js";
-import { DEFAULT_CODEX_CHAT_MODEL } from "../services/internal-agent/codex-model.js";
 
 describe("resolve-crew-adapter (provider-switching fixes)", () => {
-  it("codex default is no longer the API-key-only gpt-5.3-codex", () => {
+  it("omits a blank Codex model so each managed account can inherit its own catalog default", () => {
     const a = resolveCrewAdapterFor("openai");
     expect(a.adapterType).toBe("codex_local");
-    expect(a.adapterConfig.model).not.toBe("gpt-5.3-codex"); // empty or gpt-5.5
+    expect(a.adapterConfig).not.toHaveProperty("model");
   });
   it("opencode default is a valid provider/model slash id, not a bare codex id", () => {
     const a = resolveCrewAdapterFor("opencode");
     expect(String(a.adapterConfig.model)).toMatch(/\//);
   });
-  it("backfill flags an existing codex row pinned to gpt-5.3-codex", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex" })).toBe(true);
-  });
-  it("backfill leaves a compatible codex row alone", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.5" })).toBe(false);
-  });
-  it("is a stable fixpoint: a codex row rewritten to the default is not re-flagged", () => {
-    expect(needsAdapterBackfill("codex_local", { model: DEFAULT_CODEX_CHAT_MODEL })).toBe(false);
-  });
-
-  // Codex P2: a founder may intentionally run codex_local in api-key mode (where
-  // gpt-5.3-codex is valid — resolveModel's apikey branch). A per-agent
-  // OPENAI_API_KEY signals that intent; don't "self-heal" (rewrite) it.
-  it("backfill does NOT flag an intentional apikey codex row (has its own OPENAI_API_KEY)", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: { OPENAI_API_KEY: "sk-founder" } })).toBe(false);
-  });
-  it("backfill still flags a bad codex row with no per-agent key", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: {} })).toBe(true);
-  });
-  it("backfill ignores a blank per-agent OPENAI_API_KEY (still flags)", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: { OPENAI_API_KEY: "  " } })).toBe(true);
-  });
-  // Persisted env is normalized to binding objects, NOT raw strings (Codex P2):
-  it("backfill does NOT flag an apikey codex row with a normalized plain-binding key", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: { OPENAI_API_KEY: { type: "plain", value: "sk-founder" } } })).toBe(false);
-  });
-  it("backfill does NOT flag an apikey codex row with a secret_ref-binding key", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: { OPENAI_API_KEY: { type: "secret_ref", secretId: "sec-1", version: "latest" } } })).toBe(false);
-  });
-  it("backfill still flags a codex row with an empty plain-binding key", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: { OPENAI_API_KEY: { type: "plain", value: "" } } })).toBe(true);
-  });
-
-  // Codex P2: api-key auth can come from the SHARED ~/.codex/auth.json (no per-agent
-  // env key). The caller detects it (getProviderStatus) and passes opts.isApiKeyAuth
-  // so an explicit api-key-only codex model is preserved, not self-healed to gpt-5.5.
-  it("backfill does NOT flag an apikey codex row via opts.isApiKeyAuth (shared auth.json, no per-agent key)", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: {} }, { isApiKeyAuth: true })).toBe(false);
-    expect(needsAdapterBackfill("codex_local", { model: "codex-mini-latest", env: {} }, { isApiKeyAuth: true })).toBe(false);
-  });
-  it("backfill STILL flags a bad codex row when NOT apikey (subscription) + no per-agent key", () => {
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: {} }, { isApiKeyAuth: false })).toBe(true);
-    expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex", env: {} })).toBe(true); // no opts → unchanged old behavior
-  });
-
-  // BUG-6: an EMPTY persisted model on a ChatGPT/subscription codex_local run must
-  // also be healed — with no model, codex 0.130 falls back to the incompatible
-  // gpt-5.3-codex and 400s → empty turn. Case 3's length gate is dropped so the
-  // empty and non-empty-incompatible cases heal identically (isCodexCompatibleModel("")
-  // is false), while api-key/own-key runs still return false before the model check.
-  describe("needsAdapterBackfill — codex_local empty model (BUG-6 fix)", () => {
-    it("heals an EMPTY model on chatgpt-auth codex_local (subscription)", () => {
-      // No api-key auth, no own key, empty model → must backfill to the default.
-      expect(needsAdapterBackfill("codex_local", { model: "" })).toBe(true);
-      expect(needsAdapterBackfill("codex_local", {})).toBe(true);
-    });
-
-    it("does NOT heal an empty model when the run is api-key auth", () => {
-      expect(
-        needsAdapterBackfill("codex_local", { model: "" }, { isApiKeyAuth: true }),
-      ).toBe(false);
-    });
-
-    it("does NOT heal an empty model when the agent carries its own OPENAI_API_KEY", () => {
-      expect(
-        needsAdapterBackfill("codex_local", {
-          model: "",
-          env: { OPENAI_API_KEY: "sk-live" },
-        }),
-      ).toBe(false);
-    });
-
-    it("still heals a non-empty incompatible model (gpt-5.3-codex) — unchanged", () => {
-      expect(needsAdapterBackfill("codex_local", { model: "gpt-5.3-codex" })).toBe(true);
-    });
-
-    it("leaves a compatible model untouched (gpt-5.5)", () => {
-      expect(needsAdapterBackfill("codex_local", { model: "gpt-5.5" })).toBe(false);
-    });
+  it("does not rewrite explicit, blank, or absent Codex choices during backfill", () => {
+    expect(needsAdapterBackfill("codex_local", { model: "gpt-fixture-codex" })).toBe(false);
+    expect(needsAdapterBackfill("codex_local", { model: "" })).toBe(false);
+    expect(needsAdapterBackfill("codex_local", {})).toBe(false);
   });
 
   // Codex P2 (Case 4): the previous opencode crew default seeded a BARE
@@ -165,20 +88,19 @@ describe("shouldRewriteCrewAdapter — provider-switch migration", () => {
     ).toBe(false);
     expect(shouldRewriteCrewAdapter("codex_local", { model: "gpt-5.5" }, "codex_local", { model: "gpt-5.5" })).toBe(false);
   });
-  it("still rewrites a broken SAME-adapter row (delegates to needsAdapterBackfill)", () => {
-    // codex subscription row pinned to an API-key-only model → backfill.
-    // Target config carries the SAME model so the model-drift branch is not the
-    // trigger — this asserts the needsAdapterBackfill delegation (case 3).
-    expect(shouldRewriteCrewAdapter("codex_local", { model: "gpt-5.3-codex", env: {} }, "codex_local", { model: "gpt-5.3-codex", env: {} })).toBe(true);
+  it("does not rewrite a Codex row based on guessed model compatibility", () => {
+    // The execution-time account catalog owns availability; persisted choices
+    // have no reliable explicit-versus-inherited provenance and stay untouched.
+    expect(shouldRewriteCrewAdapter("codex_local", { model: "gpt-fixture-codex", env: {} }, "codex_local", { model: "gpt-fixture-codex", env: {} })).toBe(false);
   });
   it("preserves a founder's api-key codex row on the same adapter (opts.isApiKeyAuth)", () => {
     expect(
-      shouldRewriteCrewAdapter("codex_local", { model: "gpt-5.3-codex", env: {} }, "codex_local", { model: "gpt-5.3-codex", env: {} }, { isApiKeyAuth: true }),
+      shouldRewriteCrewAdapter("codex_local", { model: "gpt-fixture-codex", env: {} }, "codex_local", { model: "gpt-fixture-codex", env: {} }, { isApiKeyAuth: true }),
     ).toBe(false);
   });
   it("is consistent with needsAdapterBackfill when the adapter is unchanged", () => {
-    const cfg = { model: "gpt-5.3-codex", env: {} };
-    expect(shouldRewriteCrewAdapter("codex_local", cfg, "codex_local", { model: "gpt-5.3-codex", env: {} })).toBe(
+    const cfg = { model: "gpt-fixture-codex", env: {} };
+    expect(shouldRewriteCrewAdapter("codex_local", cfg, "codex_local", { model: "gpt-fixture-codex", env: {} })).toBe(
       needsAdapterBackfill("codex_local", cfg),
     );
   });

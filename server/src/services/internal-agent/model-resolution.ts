@@ -1,16 +1,9 @@
-/**
- * Generalized model resolution for all adapter types (Unit B core).
- * Reuses the proven helpers from codex-model.ts for shell-safety validation
- * and Codex-specific compatibility checks.
- *
- * See docs/aoa/plans/ Phase 1 provider-switching engine.
- */
+/** Generalized model resolution for all adapter types (Unit B core). */
 import {
   isShellSafeModel,
   isCodexCompatibleModel,
   isOpenAiFamilyModel,
-  resolveCodexChatModel,
-  DEFAULT_CODEX_CHAT_MODEL,
+  CodexModelAvailabilityError,
 } from "./codex-model.js";
 
 export class ShellUnsafeModelError extends Error {
@@ -28,79 +21,55 @@ export interface ResolveModelStatus {
 export interface ResolvedModel {
   model?: string;
   omitModelFlag: boolean;
-  /** Operator-facing reason a model was corrected. Caller must wrap before surfacing to the UI (never forward raw). */
   note?: string;
 }
 
 /**
- * Resolve the model identifier to pass to an adapter's CLI invocation.
- *
- * Tier order:
- *   1. Shell-safety gate — throws `ShellUnsafeModelError` for any non-empty
- *      model that contains shell-special characters. This is always first,
- *      regardless of adapter.
- *   2. Adapter-specific logic:
- *      - `codex_local`: delegates to `resolveCodexChatModel` (validates
- *        compatibility, falls back to gpt-5.5).
- *      - `gemini_local`: "auto" (or empty) → omit the model flag entirely so
- *        Gemini CLI applies its own default.
- *      - All others (claude_local, opencode_local, …): empty → omit; else
- *        pass through verbatim (adapter applies its own default when omitted).
+ * Validate stored selections without replacing them. Subscription defaults
+ * are resolved later by codex-local against its managed home and exact CLI
+ * catalog, immediately before the selected model reaches execution.
  */
 export function resolveModel(
   adapterType: string,
   requested: string | null | undefined,
   status: ResolveModelStatus,
 ): ResolvedModel {
-  const m = (requested ?? "").trim();
-
-  // Shell-safety is the unconditional first gate.
-  if (m && !isShellSafeModel(m)) throw new ShellUnsafeModelError(m);
+  const model = (requested ?? "").trim();
+  if (model && !isShellSafeModel(model)) throw new ShellUnsafeModelError(model);
 
   if (adapterType === "codex_local") {
-    // In apikey mode, codex-family/API-key-only models (e.g. gpt-5.3-codex) are
-    // valid — pass the (already shell-safe-checked) model through; no correction.
     if (status.authMode === "apikey") {
-      // An EXPLICIT api-key model must still be an OpenAI/Codex-family identifier
-      // (incl. gpt-*-codex). `m` was shell-safety-checked at the top, but a
-      // shell-safe NON-OpenAI value — a slash/opencode-style id (openai/gpt-5.5),
-      // a claude-…/gemini-… alias, or an unknown alias — must NOT be passed to
-      // `codex --model`; correct it to the safe default (Codex P2).
-      if (m) {
-        if (isOpenAiFamilyModel(m)) return { model: m, omitModelFlag: false };
-        return {
-          model: DEFAULT_CODEX_CHAT_MODEL,
-          omitModelFlag: false,
-          note: `"${m}" is not an OpenAI/Codex model; using ${DEFAULT_CODEX_CHAT_MODEL}.`,
-        };
+      if (model) {
+        if (isOpenAiFamilyModel(model)) return { model, omitModelFlag: false };
+        throw new CodexModelAvailabilityError(
+          "model_unavailable",
+          `The configured Codex model "${model}" is not an OpenAI/Codex model. Choose a model from this API-key account's Codex model list.`,
+        );
       }
-      // No explicit model: the fallback comes from the shared ~/.codex/config.toml,
-      // which is untrusted. (a) Reject a shell-unsafe value loudly, surfacing the
-      // broken config rather than running it. (b) Constrain to an OpenAI/Codex-family
-      // model — a shell-safe NON-OpenAI alias (e.g. claude-…, gemini-…) must NOT be
-      // passed to `codex --model` with an OpenAI key (it would fail); fall back to
-      // the safe default instead (Codex P2).
       const shared = (status.defaultModelResolved ?? "").trim();
       if (shared && !isShellSafeModel(shared)) throw new ShellUnsafeModelError(shared);
-      return { model: isOpenAiFamilyModel(shared) ? shared : DEFAULT_CODEX_CHAT_MODEL, omitModelFlag: false };
+      return isOpenAiFamilyModel(shared)
+        ? { model: shared, omitModelFlag: false }
+        : { omitModelFlag: true };
     }
-    // Otherwise (chatgpt/subscription/unknown): validate against ChatGPT
-    // compatibility and fall back to the safe default, with a note if corrected.
-    const resolved = resolveCodexChatModel(m || null, status.defaultModelResolved);
-    const note = (m && !isCodexCompatibleModel(m))
-      ? `"${m}" is not supported on a ChatGPT Codex login; using ${resolved}.` : undefined;
-    return { model: resolved, omitModelFlag: false, note };
+
+    // A blank setting means inherit from the CLI catalog. Do not materialize a
+    // permanent slug before the adapter can see that account's catalog.
+    if (!model) return { omitModelFlag: true };
+    if (!isCodexCompatibleModel(model)) {
+      throw new CodexModelAvailabilityError(
+        "model_auth_mode_incompatible",
+        `The configured Codex model "${model}" is not compatible with ChatGPT subscription auth. Choose a listed subscription model or configure API-key auth explicitly.`,
+      );
+    }
+    return { model, omitModelFlag: false };
   }
 
   if (adapterType === "gemini_local") {
-    // Gemini CLI picks its own best model when no flag is passed; "auto" is
-    // the canonical AoA signal for "let the CLI decide".
-    return !m || m === "auto"
+    return !model || model === "auto"
       ? { omitModelFlag: true }
-      : { model: m, omitModelFlag: false };
+      : { model, omitModelFlag: false };
   }
 
-  // claude_local / opencode_local / openclaw / process / http / others:
-  // empty → omit (adapter applies its own default); non-empty → pass through.
-  return m ? { model: m, omitModelFlag: false } : { omitModelFlag: true };
+  return model ? { model, omitModelFlag: false } : { omitModelFlag: true };
 }

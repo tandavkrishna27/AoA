@@ -193,9 +193,9 @@ describe("agents PATCH — auth-mismatch soft-warn contract (Unit C)", () => {
     mockEnsureOpenCode.mockResolvedValue([]);
   });
 
-  it("200 with warnings[] when model would be corrected for chatgpt auth mode", async () => {
-    // A codex model that is API-key-only (e.g. gpt-5.3-codex) on a ChatGPT login
-    // → resolveModel should produce a note → soft-warn surfaced in response.
+  it("200 without guessed model correction when an explicit Codex model is incompatible", async () => {
+    // Account-scoped catalog validation occurs at execution. PATCH preserves
+    // the explicit choice and does not substitute a host/shared default.
     mockAgentService.getById.mockResolvedValue(existingCodexAgent);
     mockAgentService.update.mockResolvedValue({
       ...existingCodexAgent,
@@ -207,12 +207,12 @@ describe("agents PATCH — auth-mismatch soft-warn contract (Unit C)", () => {
       .send({ adapterConfig: { model: "gpt-5.3-codex" } });
 
     expect(res.status).toBe(200);
-    // The response must include a non-empty warnings array
-    expect(Array.isArray(res.body.warnings)).toBe(true);
-    expect(res.body.warnings.length).toBeGreaterThan(0);
-    // The warning should mention gpt-5.5 (the resolved fallback) or ChatGPT
-    const warn: string = res.body.warnings[0];
-    expect(warn).toMatch(/gpt-5\.5|chatgpt|ChatGPT|not supported/i);
+    expect(res.body.warnings).toBeUndefined();
+    expect(mockAgentService.update).toHaveBeenCalledWith(
+      AGENT_ID,
+      expect.objectContaining({ adapterConfig: { model: "gpt-5.3-codex" } }),
+      expect.anything(),
+    );
   });
 
   it("200 with no warnings key when model needs no correction (apikey auth mode)", async () => {

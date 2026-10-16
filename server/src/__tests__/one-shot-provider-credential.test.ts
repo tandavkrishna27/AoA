@@ -52,10 +52,6 @@ vi.mock("../services/secrets.js", () => ({ secretService: secretServiceMock }));
 
 import { resolveCompanyProviderCredential } from "../services/one-shot-provider-credential.js";
 import { ProviderUnavailableError } from "../services/provider-resolution.js";
-import {
-  DEFAULT_CODEX_CHAT_MODEL,
-  isCodexCompatibleModel,
-} from "../services/internal-agent/codex-model.js";
 
 const COMPANY_ID = "co-1";
 
@@ -189,7 +185,7 @@ describe("resolveCompanyProviderCredential (U13.0)", () => {
       source: "connection",
       envPatch: { OPENAI_API_KEY: "sk-oai-co" },
     });
-    const db = fakeDb({ model: "gpt-5.5" });
+    const db = fakeDb({ model: "gpt-fixture-listed" });
 
     const result = await resolveCompanyProviderCredential(db, COMPANY_ID, { cliTool: "codex" });
 
@@ -199,7 +195,7 @@ describe("resolveCompanyProviderCredential (U13.0)", () => {
       envName: "OPENAI_API_KEY",
       value: "sk-oai-co",
       provider: "openai",
-      model: "gpt-5.5",
+      model: "gpt-fixture-listed",
     });
   });
 
@@ -212,23 +208,16 @@ describe("resolveCompanyProviderCredential (U13.0)", () => {
     ).rejects.toMatchObject({ name: "ProviderUnavailableError", reason: "empty_credential" });
   });
 
-  // RW3-B (Wave 3 adversarial review, CONFIRMED HIGH): internal_agent_config.model
-  // DEFAULTS to a claude model string ("claude-sonnet-4-6") for EVERY company —
-  // including codex ones. Before this fix that claude string was handed straight
-  // to `codex --model`, which rejects any non-OpenAI model id, breaking cloud
-  // codex extraction/compaction/readiness for every default-config company.
-  it("REGRESSION: codex company whose internal_agent_config.model is a claude default -> coerces to a codex-compatible model, NOT the claude string", async () => {
+  it("refuses a stale cross-provider Claude model before returning one-shot spawn config", async () => {
     resolveProviderCredentialMock.mockResolvedValue({
       source: "connection",
       envPatch: { OPENAI_API_KEY: "sk-oai-co" },
     });
     const db = fakeDb({ model: "claude-sonnet-4-6" });
 
-    const result = await resolveCompanyProviderCredential(db, COMPANY_ID, { cliTool: "codex" });
-
-    expect(result.model).not.toBe("claude-sonnet-4-6");
-    expect(isCodexCompatibleModel(result.model)).toBe(true);
-    expect(result.model).toBe(DEFAULT_CODEX_CHAT_MODEL);
+    await expect(
+      resolveCompanyProviderCredential(db, COMPANY_ID, { cliTool: "codex" }),
+    ).rejects.toMatchObject({ code: "model_identifier_invalid" });
   });
 
   it("codex company whose internal_agent_config.model IS already codex-compatible -> returned unchanged (not forced to the hardcoded default)", async () => {
@@ -236,11 +225,11 @@ describe("resolveCompanyProviderCredential (U13.0)", () => {
       source: "connection",
       envPatch: { OPENAI_API_KEY: "sk-oai-co" },
     });
-    const db = fakeDb({ model: "gpt-5.6-mini" });
+    const db = fakeDb({ model: "gpt-fixture-listed" });
 
     const result = await resolveCompanyProviderCredential(db, COMPANY_ID, { cliTool: "codex" });
 
-    expect(result.model).toBe("gpt-5.6-mini");
+    expect(result.model).toBe("gpt-fixture-listed");
   });
 
   it("claude company keeps whatever internal_agent_config.model holds UNCHANGED (coercion is codex/openai-only)", async () => {

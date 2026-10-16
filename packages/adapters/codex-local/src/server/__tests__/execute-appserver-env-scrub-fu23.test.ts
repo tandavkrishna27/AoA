@@ -16,6 +16,7 @@ import path from "node:path";
 import type { McpServerSpec, AdapterRuntimeDecisionBroker } from "@armyofagents/adapter-utils";
 import { execute } from "../execute.js";
 import type { RunAppServerTurnInput } from "../execute-app-server.js";
+import { testModelCatalog } from "./model-catalog-fixture.js";
 
 // A real, resolvable fake `codex` command so `ensureCommandResolvable` passes on
 // CI (which has no codex binary in PATH). The injected runAppServerTurn spy means
@@ -134,6 +135,7 @@ async function captureAppServerInput(
             clearSession: false,
           };
         },
+        getModelCatalog: async (request) => testModelCatalog(request),
       },
     );
   } finally {
@@ -160,9 +162,9 @@ describe("codex_local FU-23 env scrub (app-server path)", () => {
     expect(input.env.AOA_API_KEY).toBeUndefined();
   });
 
-  it("no connectors → app-server keeps only the pre-existing OPENAI_API_KEY strip", async () => {
+  it("no connectors → app-server keeps only the pre-existing provider-key strip", async () => {
     const input = await captureAppServerInput("none");
-    expect(input.unsetEnvKeys).toEqual(["OPENAI_API_KEY"]);
+    expect(input.unsetEnvKeys).toEqual(["OPENAI_API_KEY", "CODEX_API_KEY"]);
   });
 
   it("no connectors → the run token still rides the env (byte-identity)", async () => {
@@ -174,9 +176,9 @@ describe("codex_local FU-23 env scrub (app-server path)", () => {
   // stay byte-identical to no-connectors: only the always-on OPENAI_API_KEY
   // billing strip, and the agent's own AOA_API_KEY bearer KEPT (else authenticated
   // REST 401s merely because an http connector was enabled).
-  it("HTTP-ONLY connector → only the OPENAI_API_KEY billing strip, bearer KEPT", async () => {
+  it("HTTP-ONLY connector → only the provider-key billing strip, bearer KEPT", async () => {
     const input = await captureAppServerInput("http");
-    expect(input.unsetEnvKeys).toEqual(["OPENAI_API_KEY"]);
+    expect(input.unsetEnvKeys).toEqual(["OPENAI_API_KEY", "CODEX_API_KEY"]);
     expect(input.env.AOA_API_KEY).toBe("secret-run-token");
   });
 });

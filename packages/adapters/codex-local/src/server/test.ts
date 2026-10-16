@@ -27,9 +27,15 @@ import { parseCodexJsonl } from "./parse.js";
 import { parseCodexAuthStatus, CODEX_AUTH_STATUS_ARGS } from "./auth-status.js";
 import {
   prepareManagedCodexHome,
+  readSharedCodexModel,
   resolveSharedCodexHomeDir,
   CODEX_ENV_TEST_AGENT_ID,
 } from "./codex-home.js";
+import { getCodexModelCatalog, type CodexModelCatalogRequest } from "./model-catalog.js";
+import {
+  isSafeCodexModelIdentifier,
+  resolveCodexChatModel,
+} from "./model-availability.js";
 import { SANDBOX_INSTALL_COMMAND } from "../index.js";
 
 function summarizeStatus(checks: AdapterEnvironmentCheck[]): AdapterEnvironmentTestResult["status"] {
@@ -70,6 +76,7 @@ function shellDoubleQuote(value: string): string {
 
 export async function testEnvironment(
   ctx: AdapterEnvironmentTestContext,
+  deps: { getModelCatalog?: (request: CodexModelCatalogRequest) => ReturnType<typeof getCodexModelCatalog> } = {},
 ): Promise<AdapterEnvironmentTestResult> {
   const checks: AdapterEnvironmentCheck[] = [];
   const config = parseObject(ctx.config);
@@ -139,8 +146,10 @@ export async function testEnvironment(
   // Codex auth.json. The ambient server process.env.OPENAI_API_KEY is STRIPPED
   // from agent runs, so it must NOT be reported as usable auth — otherwise the
   // probe passes while the saved agent immediately runs without auth.
-  const configOpenAiKey = env.OPENAI_API_KEY;
-  const hostOpenAiKey = targetIsRemote ? undefined : process.env.OPENAI_API_KEY;
+  const configOpenAiKey = env.OPENAI_API_KEY ?? env.CODEX_API_KEY;
+  const hostOpenAiKey = targetIsRemote
+    ? undefined
+    : process.env.OPENAI_API_KEY ?? process.env.CODEX_API_KEY;
   const authSourceEnv = {
     ...process.env,
     ...(isNonEmpty(env.CODEX_HOME) ? { CODEX_HOME: env.CODEX_HOME } : {}),
@@ -151,7 +160,7 @@ export async function testEnvironment(
     checks.push({
       code: "codex_openai_api_key_present",
       level: "info",
-      message: "OPENAI_API_KEY is set for Codex authentication.",
+      message: "A Codex API key is set for authentication.",
       detail: "Detected in adapter config env.",
     });
   } else if (sharedAuthReady) {
@@ -164,20 +173,77 @@ export async function testEnvironment(
     checks.push({
       code: "codex_openai_api_key_server_env_only",
       level: "warn",
-      message: "OPENAI_API_KEY is set only in the server environment; agent runs do not use it.",
-      hint: "Set a per-agent OPENAI_API_KEY in the adapter config, or run `codex login`, so agent runs can authenticate.",
+      message: "A Codex API key is set only in the server environment; agent runs do not use it.",
+      hint: "Set a per-agent OPENAI_API_KEY or CODEX_API_KEY in the adapter config, or run `codex login`, so agent runs can authenticate.",
     });
   } else {
     checks.push({
       code: "codex_openai_api_key_missing",
       level: "warn",
-      message: "OPENAI_API_KEY is not set. Codex runs may fail until authentication is configured.",
-      hint: "Set a per-agent OPENAI_API_KEY in the adapter config, or run `codex login`.",
+      message: "No Codex API key is set. Codex runs may fail until authentication is configured.",
+      hint: "Set a per-agent OPENAI_API_KEY or CODEX_API_KEY in the adapter config, or run `codex login`.",
     });
   }
 
-  const canRunProbe =
+  let canRunProbe =
     checks.every((check) => check.code !== "codex_cwd_invalid" && check.code !== "codex_command_unresolvable");
+  let resolvedModel = asString(config.model, "").trim();
+  let managedCodexHome: string | null = null;
+  let probeEnv: Record<string, string> | null = null;
+  if (canRunProbe && commandLooksLike(command, "codex")) {
+    const configuredApiKey =
+      [env.OPENAI_API_KEY, env.CODEX_API_KEY].find((value) => isNonEmpty(value))?.trim() ?? null;
+    managedCodexHome = targetIsRemote
+      ? `${adapterExecutionTargetRemoteCwd(target, cwd).replace(/\/+$/, "")}/.aoa-codex-home`
+      : await prepareManagedCodexHome(
+          authSourceEnv,
+          () => {},
+          ctx.companyId,
+          // This probe has no saved agent id; its dedicated home cannot clobber
+          // a real agent's managed config.
+          CODEX_ENV_TEST_AGENT_ID,
+          { apiKey: configuredApiKey },
+        );
+    probeEnv = { ...env, CODEX_HOME: managedCodexHome };
+
+    try {
+      if (targetIsRemote) {
+        // The target owns its Codex binary, account and inherited default. Never
+        // consult the host catalog or shared model for remote execution.
+        if (resolvedModel && !isSafeCodexModelIdentifier(resolvedModel)) {
+          throw new Error(
+            `The configured Codex model "${resolvedModel}" is not a valid Codex model identifier. Choose a valid model or clear the override to inherit the target account default.`,
+          );
+        }
+      } else {
+        const catalog = await (deps.getModelCatalog ?? getCodexModelCatalog)({
+          companyId: ctx.companyId,
+          authHome: managedCodexHome!,
+          authMode: "auto",
+          command,
+          cwd,
+          env: probeEnv!,
+        });
+        resolvedModel = resolveCodexChatModel(
+          resolvedModel,
+          await readSharedCodexModel(authSourceEnv),
+          catalog,
+          catalog.identity,
+        );
+      }
+    } catch (err) {
+      checks.push({
+        code: "codex_model_catalog_unavailable",
+        level: "error",
+        message: err instanceof Error
+          ? err.message
+          : "Could not resolve the Codex model for this account. Verify Codex sign-in and retry.",
+        hint: "No API-key billing fallback was attempted. Choose a listed model, clear an unavailable override, or reauthenticate the intended account.",
+      });
+      canRunProbe = false;
+    }
+  }
+
   if (canRunProbe) {
     if (!commandLooksLike(command, "codex")) {
       checks.push({
@@ -188,7 +254,6 @@ export async function testEnvironment(
         hint: "Use the `codex` CLI command to run the automatic login and installation probe.",
       });
     } else {
-      const model = asString(config.model, "").trim();
       const modelReasoningEffort = asString(
         config.modelReasoningEffort,
         asString(config.reasoningEffort, ""),
@@ -204,20 +269,6 @@ export async function testEnvironment(
         return asStringArray(config.args);
       })();
 
-      // Environment probes commonly run from the packaged application directory
-      // (`/app` in Docker), which is intentionally not a Git checkout. Codex
-      // rejects `exec` outside a trusted repository unless this explicit flag is
-      // present, so omitting it makes a healthy installation look broken.
-      const args = ["exec", "--json", "--skip-git-repo-check"];
-      if (search) args.unshift("--search");
-      if (bypass) args.push("--dangerously-bypass-approvals-and-sandbox");
-      if (model) args.push("--model", model);
-      if (modelReasoningEffort) {
-        args.push("-c", `model_reasoning_effort=${JSON.stringify(modelReasoningEffort)}`);
-      }
-      if (extraArgs.length > 0) args.push(...extraArgs);
-      args.push("-");
-
       // Codex CLI 0.122+ reads auth from $CODEX_HOME/auth.json rather than env.
       // Materialize auth.json into a managed per-company home dir before the probe.
       // On Windows, the shell trap variant is not supported (Issue #114); we fall back
@@ -229,31 +280,21 @@ export async function testEnvironment(
       // Do NOT fall back to the ambient process.env.OPENAI_API_KEY: agent runs strip
       // that key, so materializing it here would let "Test environment" report a
       // passing connection while the saved agent immediately runs without auth.
-      const configuredOpenAiApiKey =
-        typeof env.OPENAI_API_KEY === "string" && env.OPENAI_API_KEY.trim().length > 0
-          ? env.OPENAI_API_KEY.trim()
-          : null;
+      const args = ["exec", "--json", "--skip-git-repo-check"];
+      if (search) args.unshift("--search");
+      if (bypass) args.push("--dangerously-bypass-approvals-and-sandbox");
+      if (resolvedModel) args.push("--model", resolvedModel);
+      if (modelReasoningEffort) {
+        args.push("-c", `model_reasoning_effort=${JSON.stringify(modelReasoningEffort)}`);
+      }
+      if (extraArgs.length > 0) args.push(...extraArgs);
+      args.push("-");
 
-      const managedCodexHome = targetIsRemote
-        ? `${adapterExecutionTargetRemoteCwd(target, cwd).replace(/\/+$/, "")}/.aoa-codex-home`
-        : await prepareManagedCodexHome(
-            authSourceEnv,
-            () => {},
-            ctx.companyId,
-            // AdapterEnvironmentTestContext carries no agent id (the probe can
-            // run against unsaved config), and managed homes are per-AGENT now.
-            // Use the reserved probe id so this never writes into — or reads a
-            // stale config.toml from — a real agent's home. Auth is provisioned
-            // through the identical path a run uses.
-            CODEX_ENV_TEST_AGENT_ID,
-            { apiKey: configuredOpenAiApiKey },
-          );
-      const probeEnv = { ...env, CODEX_HOME: managedCodexHome };
       const runtimeCommandSpec = targetIsRemote
         ? {
             command,
             installCommand: [
-              `mkdir -p ${shellDoubleQuote(managedCodexHome)}`,
+              `mkdir -p ${shellDoubleQuote(managedCodexHome!)}`,
               SANDBOX_INSTALL_COMMAND,
               `if [ -n "$OPENAI_API_KEY" ]; then printf '%s' "$OPENAI_API_KEY" | codex login --with-api-key; fi`,
             ].join("\n"),
@@ -267,14 +308,16 @@ export async function testEnvironment(
           command,
           args,
           cwd,
-          env: probeEnv,
+          env: probeEnv!,
           // Strip the ambient server OPENAI_API_KEY from the probe child too, so
           // the diagnostic uses the SAME auth a real run does (per-agent key in
           // probeEnv survives — mergeChildEnv keeps overlay-set keys; only the
           // inherited process.env key is removed). Without this the probe could
           // authenticate with the ambient key and pass while real runs strip it
           // and fail (Codex P2). Matches execute.ts' unsetEnvKeys.
-          unsetEnvKeys: ["OPENAI_API_KEY"],
+          unsetEnvKeys: ["OPENAI_API_KEY", "CODEX_API_KEY"].filter(
+            (key) => !(typeof probeEnv![key] === "string" && probeEnv![key]!.trim().length > 0),
+          ),
           runtimeCommandSpec,
           timeoutSec: 45,
           graceSec: 5,
@@ -365,8 +408,10 @@ export async function testEnvironment(
                   command,
                   args: [...CODEX_AUTH_STATUS_ARGS],
                   cwd,
-                  env: probeEnv,
-                  unsetEnvKeys: ["OPENAI_API_KEY"],
+                  env: probeEnv!,
+                  unsetEnvKeys: ["OPENAI_API_KEY", "CODEX_API_KEY"].filter(
+                    (key) => !(typeof probeEnv![key] === "string" && probeEnv![key]!.trim().length > 0),
+                  ),
                   runtimeCommandSpec: null,
                   timeoutSec: 10,
                   graceSec: 2,

@@ -8,7 +8,7 @@ The `codex_local` adapter runs OpenAI's Codex CLI locally. It supports session p
 ## Prerequisites
 
 - Codex CLI installed (`codex` command available)
-- `OPENAI_API_KEY` set in the environment or agent config
+- A Codex subscription login, or explicitly configured API-key authentication
 
 ## Configuration Fields
 
@@ -16,7 +16,7 @@ The `codex_local` adapter runs OpenAI's Codex CLI locally. It supports session p
 |-------|------|----------|-------------|
 | `cwd` | string | No | Working directory for the agent process (absolute path; created automatically if missing when permissions allow) |
 | `instructionsFilePath` | string | No | Absolute path to a markdown instructions file prepended to stdin prompt at runtime |
-| `model` | string | No | Codex model to use (default: `gpt-5.5`). The runtime corrects API-key-only models (e.g. `gpt-5.3-codex`) to a ChatGPT-login-compatible model when the login isn't API-key mode — see the provider-switching engine. |
+| `model` | string | No | Empty means inherit the active CLI account's default. Local runs resolve through that managed account's CLI catalog; explicit unavailable or incompatible choices fail with a repair message. Saved selections are not automatically rewritten. |
 | `modelReasoningEffort` | string | No | Reasoning effort override (`minimal` \| `low` \| `medium` \| `high`) — passed via `-c model_reasoning_effort=...` |
 | `promptTemplate` | string | No | Prompt used for all runs |
 | `search` | boolean | No | Run Codex with `--search` |
@@ -27,6 +27,20 @@ The `codex_local` adapter runs OpenAI's Codex CLI locally. It supports session p
 | `env` | object | No | Environment variables (supports secret refs) |
 | `timeoutSec` | number | No | Process timeout in seconds (0 = no timeout) |
 | `graceSec` | number | No | Grace period before force-kill after timeout/cancel |
+
+## Model selection
+
+Local catalog discovery is scoped by company, managed auth home, credential generation,
+authentication mode and CLI version. A supported inherited shared preference is retained;
+otherwise an inherited selection uses the CLI catalog default. Discovery never switches a
+subscription run to API billing. The catalog is a compatibility list, not proof of inference
+entitlement: an inference refusal is surfaced to the operator.
+
+The model picker accepts an existing agent context through `agentId`; configuration-read
+permission and company access are required. It uses that agent's resolved credential and
+existing managed home, without copying a host login during discovery. Creation without an
+account context offers inherited/default and custom choices. Cloud and remote targets use
+their own target-side selection; a local catalog does not certify those targets.
 
 ## Session Persistence
 
@@ -42,7 +56,7 @@ The environment test checks:
 
 - Codex CLI is installed and accessible
 - Working directory is absolute and available (auto-created if missing and permitted)
-- Authentication signal (`OPENAI_API_KEY` presence)
+- Authentication mode and account-scoped CLI catalog before selecting a local model
 - A live hello probe (`codex exec --json -` with prompt `Respond with hello.`) to verify the CLI can actually run
 
 ## Runtime-decision bridge (W5c)
@@ -80,7 +94,7 @@ Codex uses `app-server` **only** when supervised because it is the only codex mo
 ### Security posture
 
 - **Out-of-tree writes are declined automatically** — a file-change whose target resolves outside the agent's working directory is rejected **without** ever surfacing as an approvable prompt (the founder can't accidentally approve a path-escape write).
-- **`OPENAI_API_KEY` is never leaked to the app-server child.** The tracked-child spawn strips it from the inherited environment, so supervised runs neither expose the key nor accidentally switch billing modes.
+- **Subscription runs strip ambient `OPENAI_API_KEY` and `CODEX_API_KEY`.** An explicitly selected API-key run keeps its own credential context; catalog discovery does not activate an API-key fallback.
 - A cancelled run tears down cleanly — the pending approval is denied, the child process is signalled, and the turn unwinds without hanging.
 
 The full JSON-RPC framing, approval-policy matrix, decision-enum mapping, token-usage shape, and cross-path resume behavior are documented in `docs/adapters/codex-appserver-protocol.md`.

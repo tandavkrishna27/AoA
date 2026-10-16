@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { AgentConfigForm } from "../components/AgentConfigForm";
 import { TooltipProvider } from "../components/ui/tooltip";
+import { defaultCreateValues } from "../components/agent-config-defaults";
+import { queryKeys } from "../lib/queryKeys";
+
+const mockAdapterModels = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 
 vi.mock("../context/CompanyContext", () => ({
   useCompany: () => ({ selectedCompanyId: "company-1" }),
@@ -11,7 +15,7 @@ vi.mock("../context/CompanyContext", () => ({
 
 vi.mock("../api/agents", () => ({
   agentsApi: {
-    adapterModels: vi.fn().mockResolvedValue([]),
+    adapterModels: mockAdapterModels,
     org: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -110,7 +114,72 @@ function renderForm(agentPatch: Record<string, unknown>, onSave = vi.fn()) {
   return { onSave };
 }
 
+function renderCreateForm(onChange = vi.fn()) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AgentConfigForm
+          mode="create"
+          values={{ ...defaultCreateValues, adapterType: "codex_local", model: "" }}
+          onChange={onChange}
+        />
+      </TooltipProvider>
+    </QueryClientProvider>,
+  );
+
+  return { onChange };
+}
+
 describe("AgentConfigForm model API key binding", () => {
+  it("requests picker choices using the edited Codex agent identity", async () => {
+    mockAdapterModels.mockReset().mockResolvedValue([
+      { id: "gpt-account-default", label: "Account Default" },
+      { id: "gpt-custom", label: "Custom GPT" },
+    ]);
+    renderForm({
+      id: "agent-1",
+      adapterType: "codex_local",
+      adapterConfig: { model: "gpt-custom" },
+    });
+
+    await waitFor(() => {
+      expect(mockAdapterModels).toHaveBeenCalledWith("company-1", "codex_local", "agent-1");
+    });
+    expect(
+      queryKeys.agents.adapterModels("company-1", "codex_local", "agent-1"),
+    ).not.toEqual(queryKeys.agents.adapterModels("company-1", "codex_local", "agent-2"));
+    expect(await screen.findByRole("button", { name: "Custom GPT" })).toBeInTheDocument();
+  });
+
+  it("keeps create mode on inherited default and allows an explicit model choice without an agent catalog", async () => {
+    mockAdapterModels.mockReset().mockResolvedValue([
+      { id: "gpt-custom", label: "Custom GPT" },
+    ]);
+    const onChange = vi.fn();
+    renderCreateForm(onChange);
+
+    await waitFor(() => {
+      expect(mockAdapterModels).toHaveBeenCalledWith("company-1", "codex_local", undefined);
+    });
+    expect(await screen.findByRole("button", { name: "Account default (Codex CLI)" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Account default (Codex CLI)" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Custom GPT" }));
+    expect(onChange).toHaveBeenCalledWith({ model: "gpt-custom" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Account default (Codex CLI)" }));
+    const defaultOptions = await screen.findAllByRole("button", { name: "Account default (Codex CLI)" });
+    await userEvent.click(defaultOptions[1]!);
+    expect(onChange).toHaveBeenLastCalledWith({ model: "" });
+  });
+
   it("binds an OpenAI secret into codex_local env without manual env-row editing", async () => {
     const { onSave } = renderForm({
       adapterType: "codex_local",

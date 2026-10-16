@@ -1,108 +1,144 @@
-// server/src/__tests__/codex-model.test.ts
 import { describe, it, expect } from "vitest";
 import {
   resolveCodexChatModel,
+  CodexModelAvailabilityError,
   isCodexCompatibleModel,
   isOpenAiFamilyModel,
   isShellSafeModel,
   DEFAULT_CODEX_CHAT_MODEL,
   COMMANDER_CODEX_REASONING_EFFORT,
+  type CodexModelCatalog,
+  type CodexModelCatalogIdentity,
 } from "../services/internal-agent/codex-model.js";
 
+const identity: CodexModelCatalogIdentity = {
+  companyId: "company-fixture",
+  authHome: "C:/tmp/aoa-codex-home-fixture",
+  authGeneration: "fixture-auth-generation",
+  authMode: "subscription",
+  cliVersion: "0.130.0-fixture",
+};
+
+const catalog: CodexModelCatalog = {
+  identity,
+  models: [
+    { id: "gpt-test-default", isDefault: true },
+    { id: "gpt-test-listed", isDefault: false },
+    { id: "gpt-test-hidden", isDefault: false, hidden: true },
+    { id: "gpt-test-retired", isDefault: false, retired: true },
+    { id: "gpt-test-codex", isDefault: false },
+  ],
+};
+
+function availabilityError(run: () => unknown, code: string) {
+  try {
+    run();
+    throw new Error(`Expected CodexModelAvailabilityError(${code})`);
+  } catch (error) {
+    expect(error).toBeInstanceOf(CodexModelAvailabilityError);
+    expect((error as CodexModelAvailabilityError).code).toBe(code);
+  }
+}
+
 describe("isShellSafeModel", () => {
-  it("accepts bare ids, provider/model, AND nested-namespace opencode ids (no segment cap) — Codex P2", () => {
-    expect(isShellSafeModel("gpt-5.5")).toBe(true);
-    expect(isShellSafeModel("openai/gpt-5.2-codex")).toBe(true);
-    expect(isShellSafeModel("openrouter/anthropic/claude-sonnet-4")).toBe(true); // 3 segments — was wrongly rejected
-    expect(isShellSafeModel("  anthropic/claude-3.5-sonnet  ")).toBe(true); // trims
-    expect(isShellSafeModel("ollama/llama3.1:8b")).toBe(true); // `:` tag separator (Codex P2)
+  it("accepts bare ids, provider/model, and nested namespace opencode ids", () => {
+    expect(isShellSafeModel("gpt-test-listed")).toBe(true);
+    expect(isShellSafeModel("openai/gpt-test-listed")).toBe(true);
+    expect(isShellSafeModel("openrouter/anthropic/claude-sonnet-fixture")).toBe(true);
+    expect(isShellSafeModel("  anthropic/claude-sonnet-fixture  ")).toBe(true);
+    expect(isShellSafeModel("ollama/llama3.1:8b")).toBe(true);
   });
   it("rejects shell-unsafe segments, empty segments, and empty input", () => {
-    expect(isShellSafeModel("gpt-5.5; rm -rf /")).toBe(false);
+    expect(isShellSafeModel("gpt-test; rm -rf /")).toBe(false);
     expect(isShellSafeModel("a/b && calc")).toBe(false);
-    expect(isShellSafeModel("a//b")).toBe(false); // empty middle segment
+    expect(isShellSafeModel("a//b")).toBe(false);
     expect(isShellSafeModel("/leading")).toBe(false);
     expect(isShellSafeModel("")).toBe(false);
     expect(isShellSafeModel(null)).toBe(false);
   });
 });
 
-describe("isOpenAiFamilyModel", () => {
-  it("accepts OpenAI/Codex-family identifiers INCLUDING codex-* and *-codex (api-key-valid)", () => {
-    expect(isOpenAiFamilyModel("gpt-5.5")).toBe(true);
-    expect(isOpenAiFamilyModel("gpt-5.3-codex")).toBe(true);
-    expect(isOpenAiFamilyModel("o3-mini")).toBe(true);
-    expect(isOpenAiFamilyModel("chatgpt-4o")).toBe(true);
-    expect(isOpenAiFamilyModel("codex-mini-latest")).toBe(true); // the fix — was wrongly rejected
-    expect(isOpenAiFamilyModel("  codex-mini  ")).toBe(true); // trims
-  });
-  it("rejects non-OpenAI families, slash/opencode ids, and empty", () => {
-    expect(isOpenAiFamilyModel("claude-sonnet-4-5-20250929")).toBe(false);
-    expect(isOpenAiFamilyModel("gemini-2.5-pro")).toBe(false);
-    expect(isOpenAiFamilyModel("openai/gpt-5.5")).toBe(false); // slash rejected by SAFE_MODEL_RE
-    expect(isOpenAiFamilyModel("")).toBe(false);
-    expect(isOpenAiFamilyModel(null)).toBe(false);
-  });
-  it("widening CODEX_FAMILY_RE does NOT loosen isCodexCompatibleModel — codex-* stays ChatGPT-INcompatible", () => {
-    expect(isCodexCompatibleModel("codex-mini-latest")).toBe(false);
-    expect(isCodexCompatibleModel("gpt-5.3-codex")).toBe(false);
-    expect(isCodexCompatibleModel("gpt-5.5")).toBe(true);
-  });
-});
-
-describe("isCodexCompatibleModel", () => {
-  it("accepts ChatGPT-account openai chat families", () => {
-    expect(isCodexCompatibleModel("gpt-5.5")).toBe(true);
-    expect(isCodexCompatibleModel("gpt-4.1")).toBe(true);
-    expect(isCodexCompatibleModel("gpt-4o")).toBe(true);
-    expect(isCodexCompatibleModel("o3-mini")).toBe(true);
-    expect(isCodexCompatibleModel("o1")).toBe(true);
-    expect(isCodexCompatibleModel("chatgpt-4o")).toBe(true);
-    expect(isCodexCompatibleModel("  gpt-5.5  ")).toBe(true); // trims
-  });
-  it("rejects the known-bad GPT-Codex variants (ChatGPT-account 400s) — REVIEW FIX C1/C2", () => {
-    // The exact model that 400s on a ChatGPT account; it passed a naive /^gpt-/.
-    expect(isCodexCompatibleModel("gpt-5.3-codex")).toBe(false);
-    expect(isCodexCompatibleModel("gpt-5-codex")).toBe(false);
-    expect(isCodexCompatibleModel("o1-codex")).toBe(false);
-    expect(isCodexCompatibleModel("codex-mini")).toBe(false);
-  });
-  it("rejects non-openai families + empty", () => {
-    expect(isCodexCompatibleModel("claude-sonnet-4-6")).toBe(false);
-    expect(isCodexCompatibleModel("gemini-2.0")).toBe(false);
-    expect(isCodexCompatibleModel("opus")).toBe(false);
-    expect(isCodexCompatibleModel("")).toBe(false);
-    expect(isCodexCompatibleModel(null)).toBe(false);
-    expect(isCodexCompatibleModel(undefined)).toBe(false);
-  });
-  it("rejects shell-unsafe strings (spawn uses shell:true on Windows) — REVIEW FIX C10/S5", () => {
-    expect(isCodexCompatibleModel("gpt-5.5; rm -rf /")).toBe(false);
-    expect(isCodexCompatibleModel("gpt-5.5 && calc")).toBe(false);
-    expect(isCodexCompatibleModel("gpt-5.5\nmalicious")).toBe(false);
-    expect(isCodexCompatibleModel("gpt-5.5`whoami`")).toBe(false);
+describe("Codex model family checks", () => {
+  it("distinguishes OpenAI API-key family ids from subscription-compatible ids", () => {
+    expect(isOpenAiFamilyModel("gpt-test-listed")).toBe(true);
+    expect(isOpenAiFamilyModel("codex-test-api")).toBe(true);
+    expect(isOpenAiFamilyModel("openai/gpt-test-listed")).toBe(false);
+    expect(isCodexCompatibleModel("gpt-test-listed")).toBe(true);
+    expect(isCodexCompatibleModel("gpt-test-codex")).toBe(false);
+    expect(isCodexCompatibleModel("codex-test-api")).toBe(false);
+    expect(isCodexCompatibleModel("claude-test")).toBe(false);
   });
 });
 
 describe("resolveCodexChatModel", () => {
-  it("uses config.model when codex-compatible", () => {
-    expect(resolveCodexChatModel("gpt-4.1", "gpt-5.5")).toBe("gpt-4.1");
-    expect(resolveCodexChatModel("  o3-mini ", "gpt-5.5")).toBe("o3-mini");
+  it("requires an account catalog and does not guess a permanent model id", () => {
+    availabilityError(() => resolveCodexChatModel(null, null), "catalog_required");
+    expect(DEFAULT_CODEX_CHAT_MODEL).toBe("");
   });
-  it("falls back to the shared model when config.model is a claude default", () => {
-    expect(resolveCodexChatModel("claude-sonnet-4-6", "gpt-5.5")).toBe("gpt-5.5");
+
+  it("preserves an explicitly selected model only when it is listed for the exact account", () => {
+    expect(resolveCodexChatModel("gpt-test-listed", null, catalog, identity)).toBe("gpt-test-listed");
   });
-  it("VALIDATES the shared model too (not trusted as-is) — REVIEW FIX C1", () => {
-    // shared ~/.codex could hold a claude alias or a GPT-Codex model → must not pass it through
-    expect(resolveCodexChatModel(null, "claude-3-opus")).toBe(DEFAULT_CODEX_CHAT_MODEL);
-    expect(resolveCodexChatModel(null, "gpt-5.3-codex")).toBe(DEFAULT_CODEX_CHAT_MODEL);
-    expect(resolveCodexChatModel(null, "gpt-5.5")).toBe("gpt-5.5"); // valid shared still honored
+
+  it("uses a listed inherited model, otherwise the single catalog default", () => {
+    expect(resolveCodexChatModel(null, "gpt-test-listed", catalog, identity)).toBe("gpt-test-listed");
+    expect(resolveCodexChatModel("", "gpt-test-no-longer-listed", catalog, identity)).toBe("gpt-test-default");
+    expect(resolveCodexChatModel(null, null, catalog, identity)).toBe("gpt-test-default");
   });
-  it("falls back to the safe default when nothing usable is available", () => {
-    expect(resolveCodexChatModel(null, null)).toBe(DEFAULT_CODEX_CHAT_MODEL);
-    expect(resolveCodexChatModel("claude-sonnet-4-6", "  ")).toBe(DEFAULT_CODEX_CHAT_MODEL);
+
+  it.each([
+    ["unlisted", "gpt-test-unlisted", "model_unavailable"],
+    ["hidden", "gpt-test-hidden", "model_unavailable"],
+    ["retired", "gpt-test-retired", "model_unavailable"],
+    ["subscription-incompatible", "gpt-test-codex", "model_auth_mode_incompatible"],
+    ["invalid", "gpt-test;calc", "model_identifier_invalid"],
+  ])("refuses an explicit %s choice without silently substituting", (_case, model, code) => {
+    availabilityError(() => resolveCodexChatModel(model, null, catalog, identity), code);
   });
-  it("exposes the proven defaults", () => {
-    expect(DEFAULT_CODEX_CHAT_MODEL).toBe("gpt-5.5");
+
+  it("refuses a catalog from another company, auth home, generation, mode, or CLI version", () => {
+    const mismatches: Partial<CodexModelCatalogIdentity>[] = [
+      { companyId: "other-company" },
+      { authHome: "C:/tmp/other-home" },
+      { authGeneration: "replaced-login" },
+      { authMode: "apikey" },
+      { cliVersion: "0.131.0-fixture" },
+    ];
+    for (const mismatch of mismatches) {
+      const other: CodexModelCatalog = {
+        ...catalog,
+        identity: { ...identity, ...mismatch },
+      };
+      availabilityError(
+        () => resolveCodexChatModel(null, null, other, identity),
+        "catalog_identity_mismatch",
+      );
+    }
+  });
+
+  it("allows a listed Codex API-key model only with an API-key catalog", () => {
+    const apiCatalog: CodexModelCatalog = {
+      identity: { ...identity, authMode: "apikey" },
+      models: [
+        { id: "gpt-test-api-codex", isDefault: true },
+        { id: "gpt-test-listed", isDefault: false },
+      ],
+    };
+    expect(resolveCodexChatModel("gpt-test-api-codex", null, apiCatalog)).toBe("gpt-test-api-codex");
+    availabilityError(() => resolveCodexChatModel("gpt-test-codex", null, catalog), "model_auth_mode_incompatible");
+  });
+
+  it("requires one safe, visible, non-retired account default when inheritance has no valid choice", () => {
+    const noDefault = { ...catalog, models: catalog.models.map((model) => ({ ...model, isDefault: false })) };
+    availabilityError(() => resolveCodexChatModel(null, null, noDefault), "catalog_default_missing");
+    const multipleDefaults = {
+      ...catalog,
+      models: [...catalog.models, { id: "gpt-test-second-default", isDefault: true }],
+    };
+    availabilityError(() => resolveCodexChatModel(null, null, multipleDefaults), "catalog_default_missing");
+  });
+
+  it("exposes the Commander reasoning-effort setting", () => {
     expect(COMMANDER_CODEX_REASONING_EFFORT).toBe("high");
   });
 });

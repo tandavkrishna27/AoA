@@ -14,8 +14,10 @@ export const queryKeys = {
     taskSessions: (id: string) => ["agents", "task-sessions", id] as const,
     keys: (agentId: string) => ["agents", "keys", agentId] as const,
     configRevisions: (agentId: string) => ["agents", "config-revisions", agentId] as const,
-    adapterModels: (companyId: string, adapterType: string) =>
-      ["agents", companyId, "adapter-models", adapterType] as const,
+    adapterModels: (companyId: string, adapterType: string, agentId?: string) =>
+      agentId
+        ? (["agents", companyId, "adapter-models", adapterType, agentId] as const)
+        : (["agents", companyId, "adapter-models", adapterType] as const),
     instructionsBundle: (id: string) => ["agents", "instructions-bundle", id] as const,
     instructionsFile: (id: string, relativePath: string) =>
       ["agents", "instructions-bundle", id, "file", relativePath] as const,

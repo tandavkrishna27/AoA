@@ -285,7 +285,7 @@ GET /api/companies/{companyId}/adapters/{adapterType}/models
 
 Returns selectable models for an adapter type.
 
-- `codex_local` — merged with OpenAI model discovery when available.
+- `codex_local` — optional `agentId` selects an existing same-company Codex agent's managed CLI catalog. This requires configuration-read permission and resolves that agent's credential context. No agent context, cloud/remote execution, or an uninitialized subscription home returns an empty list; the UI still permits inherited/default or explicit custom selection. No host-global or API `/v1/models` fallback is used. A missing or foreign-company agent returns `404`, malformed `agentId` returns `422`, and a different adapter type returns an empty list.
 - `opencode_local` — discovered from `opencode models` in `provider/model` format. Can be empty if discovery is unavailable.
 
 ## Heartbeat Runs

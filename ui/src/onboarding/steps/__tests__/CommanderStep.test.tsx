@@ -49,7 +49,7 @@ describe("CommanderStep (Stage C / order 4)", () => {
     });
   });
 
-  it("maps the Codex card to the codex cliTool", async () => {
+  it("saves a blank Codex model so sessions inherit their own account catalog default", async () => {
     render(<CommanderStep ctx={ctx} onComplete={vi.fn()} onBack={() => {}} />);
     fireEvent.click(screen.getByText("Codex"));
     fireEvent.click(screen.getByText("Continue"));

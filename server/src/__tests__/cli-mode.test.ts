@@ -47,8 +47,20 @@ vi.mock("@armyofagents/adapter-codex-local/server", async (importOriginal) => {
     ...actual,
     writeCodexMcpConfigToml: vi.fn(async () => {}),
     ensureCodexAuthInHome: vi.fn(async () => true),
-    // REVIEW FIX S3/C7: stub so argv tests never read the host's ~/.codex
-    // and the resolved model is always deterministic (falls through to DEFAULT).
+    // Keep account catalog resolution deterministic and isolated from host CLI I/O.
+    getCodexModelCatalog: vi.fn(async (request: { companyId: string; authHome: string }) => ({
+      identity: {
+        companyId: request.companyId,
+        authHome: request.authHome,
+        authGeneration: "cli-mode-test-auth",
+        authMode: "subscription" as const,
+        cliVersion: "0.130.0-fixture",
+      },
+      models: [
+        { id: "gpt-fixture-default", isDefault: true },
+        { id: "gpt-fixture-listed", isDefault: false },
+      ],
+    })),
     readSharedCodexModel: vi.fn(async () => null),
   };
 });
@@ -1617,9 +1629,9 @@ describe("cliModeService.chat — codex JSONL parse + one-shot/resume (MX-chatpa
     expect((spawnOpts as any).env.AOA_MCP_NOTION_TOKEN).toBeUndefined();
   });
 
-  it("codex argv (first-turn): full argv shape — model + effort + summary — claude default config → DEFAULT_CODEX_CHAT_MODEL", async () => {
-    // readSharedCodexModel is stubbed to null (top-level vi.mock); config.model
-    // is a claude default → resolver returns DEFAULT_CODEX_CHAT_MODEL ("gpt-5.5").
+  it("codex argv (first-turn): full argv shape — inherited account model + effort + summary", async () => {
+    // A blank setting inherits the synthetic active account default from the
+    // test catalog.
     const cp = await import("node:child_process");
     vi.mocked(cp.execSync).mockReturnValue("/usr/local/bin/codex\n" as any);
     const proc = makeOneShotProcess({ stdout: CODEX_TURN1_JSONL });
@@ -1629,7 +1641,7 @@ describe("cliModeService.chat — codex JSONL parse + one-shot/resume (MX-chatpa
       "../services/internal-agent/cli-mode.js"
     );
     const service = cliModeService({} as any);
-    await drainChat(service, "codex", "hi codex", { model: "claude-sonnet-4-6" });
+    await drainChat(service, "codex", "hi codex", { model: null });
 
     const captured = vi.mocked(cp.spawn).mock.calls[0][1] as string[];
     expect(captured).toEqual([
@@ -1637,7 +1649,7 @@ describe("cliModeService.chat — codex JSONL parse + one-shot/resume (MX-chatpa
       "--json",
       "--dangerously-bypass-approvals-and-sandbox",
       "--model",
-      "gpt-5.5", // claude default rejected → readSharedCodexModel stubbed null → DEFAULT_CODEX_CHAT_MODEL
+      "gpt-fixture-default",
       "-c",
       "model_reasoning_effort=high", // F7: bare value, no JSON.stringify quoting
       "-c",
@@ -1662,12 +1674,12 @@ describe("cliModeService.chat — codex JSONL parse + one-shot/resume (MX-chatpa
     const service = cliModeService({} as any);
 
     // Turn 1 — store the codex session id.
-    await drainChat(service, "codex", "first message", { model: "gpt-4.1" });
+    await drainChat(service, "codex", "first message", { model: "gpt-fixture-listed" });
     const afterT1 = service.getSessionStore().get("comp1:user1:conversation-a");
     expect(afterT1.codexSessionId).toBe("codex-sess-aaa");
 
     // Turn 2 — resume with codex-compatible config.model.
-    await drainChat(service, "codex", "second message", { model: "gpt-4.1" });
+    await drainChat(service, "codex", "second message", { model: "gpt-fixture-listed" });
 
     const captured = vi.mocked(cp.spawn).mock.calls[1][1] as string[];
     expect(captured).toEqual([
@@ -1675,7 +1687,7 @@ describe("cliModeService.chat — codex JSONL parse + one-shot/resume (MX-chatpa
       "--json",
       "--dangerously-bypass-approvals-and-sandbox",
       "--model",
-      "gpt-4.1", // codex-compatible config.model → used as-is (no shared/default lookup)
+      "gpt-fixture-listed",
       "-c",
       "model_reasoning_effort=high", // F7: bare value
       "-c",

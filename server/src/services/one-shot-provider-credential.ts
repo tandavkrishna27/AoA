@@ -26,7 +26,11 @@ import { buildResolveDeps } from "./provider-resolution-deps.js";
 import { secretService } from "./secrets.js";
 import { resolveCliAuthTopology } from "./cli-auth-topology.js";
 import { loadConfig } from "../config.js";
-import { DEFAULT_CODEX_CHAT_MODEL, resolveCodexChatModel } from "./internal-agent/codex-model.js";
+import {
+  CodexModelAvailabilityError,
+  DEFAULT_CODEX_CHAT_MODEL,
+  isOpenAiFamilyModel,
+} from "./internal-agent/codex-model.js";
 
 export interface CompanyProviderCredential {
   envName: string;
@@ -43,8 +47,7 @@ export interface CompanyProviderCredential {
  * and Provider-SDK/embeddings-only per CLAUDE.md) — so this mirrors the two
  * real defaults that already exist elsewhere: the `internal_agent_config.model`
  * DB column default ("claude-sonnet-4-6", packages/db/src/schema/internal_agent.ts)
- * for anthropic, and the exported `DEFAULT_CODEX_CHAT_MODEL` ("gpt-5.5",
- * internal-agent/codex-model.ts) for openai/codex.
+ * for anthropic, and the empty inherited value for openai/codex.
  */
 function providerDefaultModel(provider: string): string {
   return provider === "openai" ? DEFAULT_CODEX_CHAT_MODEL : "claude-sonnet-4-6";
@@ -133,19 +136,20 @@ export async function resolveCompanyProviderPricing(db: Db, companyId: string, o
     .from(internalAgentConfig)
     .where(eq(internalAgentConfig.companyId, companyId));
 
-  // RW3-B (Wave 3 adversarial review, CONFIRMED HIGH): internal_agent_config.model
-  // DEFAULTS to a claude model string for EVERY company (it's a separate column
-  // from cliTool), so for a codex one-shot that default (or any other
-  // non-codex-compatible value) must never be handed to `codex --model` as-is —
-  // mirror the desktop safeguard (resolveCodexChatModel) so all three sinks
-  // (extraction/compaction/readiness) inherit it. No `~/.codex/config.toml`
-  // layer exists for a one-shot sandbox spawn, so sharedModel is always null.
-  // The anthropic/claude branch is UNCHANGED — internal_agent_config.model is
-  // already the correct model family there.
-  const model =
-    provider === "openai"
-      ? resolveCodexChatModel(row?.model, null)
-      : (row?.model ?? providerDefaultModel(provider));
+  // Pricing metadata cannot resolve a company's account catalog. Preserve a
+  // valid OpenAI/Codex model selection. A non-empty model from another provider
+  // has unknown provenance, so refuse with a repair path rather than passing a
+  // known-wrong model to the selected Codex CLI or silently inheriting.
+  const storedModel = typeof row?.model === "string" ? row.model.trim() : "";
+  if (provider === "openai" && storedModel && !isOpenAiFamilyModel(storedModel)) {
+    throw new CodexModelAvailabilityError(
+      "model_identifier_invalid",
+      `The configured Codex model "${storedModel}" is not an OpenAI/Codex model. Choose a Codex model or clear the model override to inherit the account default.`,
+    );
+  }
+  const model = provider === "openai"
+    ? (storedModel || DEFAULT_CODEX_CHAT_MODEL)
+    : (row?.model ?? providerDefaultModel(provider));
 
   return { provider, model };
 }

@@ -48,12 +48,12 @@ import {
 } from "./authz.js";
 import { assertHumanRole, assertRole } from "../middleware/rbac.js";
 import { findActiveServerAdapter, findServerAdapter, listAdapterModels } from "../adapters/index.js";
+import { listCodexModels, listCodexModelsForAgent } from "../adapters/codex-models.js";
 import { redactEventPayload, redactRunEventPayload, redactSecretsInString } from "../redaction.js";
 import { runClaudeLogin } from "@armyofagents/adapter-claude-local/server";
 import {
   DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX,
 } from "@armyofagents/adapter-codex-local";
-import { DEFAULT_CODEX_CHAT_MODEL } from "../services/internal-agent/codex-model.js";
 import { DEFAULT_CURSOR_LOCAL_MODEL } from "@armyofagents/adapter-cursor-local";
 import { ensureOpenCodeModelConfiguredAndAvailable } from "@armyofagents/adapter-opencode-local/server";
 import {
@@ -389,9 +389,6 @@ export function agentRoutes(db: Db) {
   ): Record<string, unknown> {
     const next = { ...adapterConfig };
     if (adapterType === "codex_local") {
-      if (!asNonEmptyString(next.model)) {
-        next.model = DEFAULT_CODEX_CHAT_MODEL;
-      }
       const hasBypassFlag =
         typeof next.dangerouslyBypassApprovalsAndSandbox === "boolean" ||
         typeof next.dangerouslyBypassSandbox === "boolean";
@@ -602,7 +599,47 @@ export function agentRoutes(db: Db) {
     const companyId = req.params.companyId as string;
     await assertCompanyAccess(db, req, companyId);
     const type = req.params.type as string;
-    const models = await listAdapterModels(type);
+    let models: Awaited<ReturnType<typeof listAdapterModels>>;
+    if (type === "codex_local") {
+      const requestedAgentId = req.query.agentId;
+      if (requestedAgentId === undefined) {
+        models = await listCodexModels();
+      } else {
+        if (typeof requestedAgentId !== "string" || !requestedAgentId.trim()) {
+          throw unprocessable("agentId must identify an existing Codex local agent");
+        }
+        // A model catalog uses the target agent's resolved credential. Require
+        // the same configuration permission as other secret-backed agent
+        // settings before resolving those bindings.
+        await assertCanReadConfigurations(req, companyId);
+        const agent = await svc.getById(requestedAgentId.trim());
+        if (!agent || agent.companyId !== companyId) throw notFound("Agent not found");
+        if (agent.adapterType !== "codex_local") {
+          models = [];
+        } else {
+          const runtimeConfig = await secretsSvc.resolveAdapterConfigForRuntime(
+            companyId,
+            "codex_local",
+            asRecord(agent.adapterConfig) ?? {},
+            {
+              consumerType: "agent",
+              consumerId: agent.id,
+              actorType: req.actor.type === "agent" ? "agent" : "user",
+              actorId: req.actor.type === "agent"
+                ? req.actor.agentId
+                : req.actor.userId ?? "board",
+            },
+          );
+          models = await listCodexModelsForAgent({
+            companyId,
+            agentId: agent.id,
+            adapterConfig: asRecord(runtimeConfig) ?? {},
+          });
+        }
+      }
+    } else {
+      models = await listAdapterModels(type);
+    }
     res.json(models);
   });
 
@@ -651,16 +688,13 @@ export function agentRoutes(db: Db) {
           },
         );
 
-        // Unit D (Part B): resolve the model the SAME way a real run would, so
-        // the probe tests reality. Best-effort detection; shell-unsafe is a hard 422.
+        // Unit D (Part B): resolve constrained adapter models the same way a
+        // real run would, so the probe tests reality. Codex resolves inside
+        // testEnvironment using the exact account-scoped managed auth home;
+        // this route must not substitute the host/shared CLI model. Best-effort
+        // detection; shell-unsafe is a hard 422.
         let probeAdapterConfig: Record<string, unknown> = runtimeAdapterConfig;
-        if (ADAPTER_CONSTRAINT_TYPES.has(type)) {
-          // Codex finding P2-1: resolve the model even when it's EMPTY (the UI
-          // default-model path). resolveModel maps an empty codex model to the
-          // gpt-5.5 default, omits the flag for gemini/claude/opencode — exactly
-          // what a real run does. Skipping the empty case made codex probes run
-          // with the CLI default instead of gpt-5.5, falsely failing on a ChatGPT
-          // login even though the saved run would be corrected.
+        if (ADAPTER_CONSTRAINT_TYPES.has(type) && type !== "codex_local") {
           const reqModel = typeof runtimeAdapterConfig.model === "string" ? runtimeAdapterConfig.model : "";
           try {
             const status = await getProviderStatus(type, { companyId, adapterConfig: runtimeAdapterConfig }, realProviderStatusDeps);

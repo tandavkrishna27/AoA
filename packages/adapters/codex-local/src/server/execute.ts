@@ -35,6 +35,14 @@ import { stripCodexRolloutNoise } from "./parse-shared.js";
 import { isCodexLocalFastModeSupported, CODEX_LOCAL_FAST_MODE_SUPPORTED_MODELS } from "../index.js";
 import { prepareManagedCodexHome, readSharedCodexModel } from "./codex-home.js";
 import { resolveCodexChatModel } from "./resolve-chat-model.js";
+import {
+  getCodexModelCatalog,
+  type CodexModelCatalogRequest,
+} from "./model-catalog.js";
+import {
+  CodexModelAvailabilityError,
+  isSafeCodexModelIdentifier,
+} from "./model-availability.js";
 import { writeCodexMcpConfigToml } from "./codex-config-toml.js";
 import {
   runAppServerTurn as realRunAppServerTurn,
@@ -50,10 +58,12 @@ import type { DriverResult } from "./app-server/driver.js";
  */
 export interface CodexExecuteDeps {
   runAppServerTurn: (input: RunAppServerTurnInput) => Promise<DriverResult>;
+  getModelCatalog?: (request: CodexModelCatalogRequest) => ReturnType<typeof getCodexModelCatalog>;
 }
 
 const defaultCodexExecuteDeps: CodexExecuteDeps = {
   runAppServerTurn: realRunAppServerTurn,
+  getModelCatalog: getCodexModelCatalog,
 };
 
 /**
@@ -105,7 +115,9 @@ function hasNonEmptyEnvValue(env: Record<string, string>, key: string): boolean 
 
 function resolveCodexBillingType(env: Record<string, string>): "api" | "subscription" {
   // Codex uses API-key auth when OPENAI_API_KEY is present; otherwise rely on local login/session auth.
-  return hasNonEmptyEnvValue(env, "OPENAI_API_KEY") ? "api" : "subscription";
+  return hasNonEmptyEnvValue(env, "OPENAI_API_KEY") || hasNonEmptyEnvValue(env, "CODEX_API_KEY")
+    ? "api"
+    : "subscription";
 }
 
 function codexHomeDir(): string {
@@ -219,7 +231,7 @@ export async function execute(
     ].join("\n\n"),
   );
   const command = asString(config.command, "codex");
-  const model = asString(config.model, "");
+  let model = asString(config.model, "");
   const modelReasoningEffort = asString(
     config.modelReasoningEffort,
     asString(config.reasoningEffort, ""),
@@ -230,7 +242,7 @@ export async function execute(
     asBoolean(config.dangerouslyBypassSandbox, false),
   );
   const fastModeRequested = asBoolean(config.fastMode, false);
-  const fastModeApplied = fastModeRequested && isCodexLocalFastModeSupported(model);
+  let fastModeApplied = fastModeRequested && isCodexLocalFastModeSupported(model);
 
   const workspaceContext = parseObject(context.paperclipWorkspace);
   const workspaceCwd = asString(workspaceContext.cwd, "");
@@ -335,6 +347,41 @@ export async function execute(
   const isRemoteExecutionTarget = adapterExecutionTargetIsRemote(executionTarget);
   const remoteCodexHome = `${adapterExecutionTargetRemoteCwd(executionTarget, cwd).replace(/\/+$/, "")}/${REMOTE_CODEX_HOME_DIR_NAME}`;
   env.CODEX_HOME = isRemoteExecutionTarget ? remoteCodexHome : managedCodexHome;
+  let billingType = resolveCodexBillingType(env);
+  if (isRemoteExecutionTarget) {
+    // A remote target has its own Codex installation, CODEX_HOME and account.
+    // Never consult the host account's catalog or shared ~/.codex/config.toml.
+    // Keep an explicit model selection intact and let the target CLI report an
+    // entitlement failure. A blank model remains unset so the target account
+    // chooses its own inherited default.
+    const explicitModel = model.trim();
+    if (explicitModel && !isSafeCodexModelIdentifier(explicitModel)) {
+      throw new CodexModelAvailabilityError(
+        "model_identifier_invalid",
+        `The configured Codex model "${explicitModel}" is not a valid Codex model identifier. Choose a valid model identifier or clear the override to inherit the target account default.`,
+      );
+    }
+    model = explicitModel;
+  } else {
+    const catalog = await (deps.getModelCatalog ?? getCodexModelCatalog)({
+      companyId: agent.companyId,
+      authHome: managedCodexHome,
+      authMode: "auto",
+      command,
+      cwd,
+      env,
+      graceSec: asNumber(config.graceSec, 20),
+    });
+    billingType = catalog.identity.authMode === "apikey" ? "api" : "subscription";
+    model = resolveCodexChatModel(model, await readSharedCodexModel(process.env), catalog, {
+      companyId: agent.companyId,
+      authHome: managedCodexHome,
+      authGeneration: catalog.identity.authGeneration,
+      authMode: catalog.identity.authMode,
+      cliVersion: catalog.identity.cliVersion,
+    });
+    fastModeApplied = fastModeRequested && isCodexLocalFastModeSupported(model);
+  }
   const runtimeCommandSpec: AdapterRuntimeCommandSpec | null | undefined = isRemoteExecutionTarget
     ? {
         command: ctx.runtimeCommandSpec?.command ?? command,
@@ -458,8 +505,8 @@ export async function execute(
       (s) => isStdioServerSpec(s) && !stdioSpecCarriesSecretPlaceholder(s),
     );
   const codexUnsetEnvKeys = hasStdioConnector
-    ? [...new Set(["OPENAI_API_KEY", ...aoaAmbientSecretEnvKeys()])]
-    : ["OPENAI_API_KEY"];
+    ? [...new Set(["OPENAI_API_KEY", "CODEX_API_KEY", ...aoaAmbientSecretEnvKeys()])]
+    : ["OPENAI_API_KEY", "CODEX_API_KEY"];
   // WS1 — strip the run bearer from the overlay so neither codex spawn path (exec
   // or app-server) hands it to a connector child. Covers both because both use
   // this shared `env`. No-op without a stdio connector (F4).
@@ -468,7 +515,6 @@ export async function execute(
     secretValues: [authToken],
   });
 
-  const billingType = resolveCodexBillingType(env);
   const runtimeEnv = ensurePathInEnv({ ...process.env, ...env });
   if (executionTarget.type === "local") {
     await ensureCommandResolvable(command, cwd, runtimeEnv);
@@ -856,14 +902,11 @@ export async function execute(
       });
     }
 
-    // BUG-6 fix 1: resolve a codex-compatible chat model and deliver it via the
-    // managed config.toml (writeCodexModelConfigToml, inside runAppServerTurn).
-    // Preserve api-key mode: a valid api-key model (gpt-5.3-codex) must not be
-    // forced/rewritten, so only resolve when the run is subscription auth.
-    const supervisedModel =
-      billingType === "subscription"
-        ? resolveCodexChatModel(model, await readSharedCodexModel(process.env))
-        : undefined;
+    // Model syntax, picker membership, and the known auth-mode compatibility
+    // rule were checked against this managed login's CLI catalog before any
+    // config write. Catalog membership is not an entitlement guarantee; the
+    // target CLI's inference error is surfaced without billing fallback.
+    const supervisedModel = model;
 
     const driverResult = await deps.runAppServerTurn({
       runId,

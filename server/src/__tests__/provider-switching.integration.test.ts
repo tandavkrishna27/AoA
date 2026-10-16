@@ -9,18 +9,16 @@
  *  1. SWITCH + PERSIST: update an agent's adapterType + model via the real
  *     agentService.update() and assert the persisted row carries the new values.
  *
- *  2. RESOLUTION AT SERVICE LEVEL: seed a codex_local agent with model
- *     "gpt-5.3-codex", then call applyModelResolutionToConfig with
- *     authMode="chatgpt" and assert the resolved config corrects to "gpt-5.5".
+ *  2. RESOLUTION AT SERVICE LEVEL: seed an explicitly configured Codex model
+ *     and assert ChatGPT-incompatible choices fail closed without rewriting it.
  *     (The runner sub-test is skipped: wiring a no-spawn run inside this
  *     harness would require the full runner + adapters stack, which is
  *     beyond what the embedded-postgres integration harness can support
  *     deterministically without CLI binaries on the runner.)
  *
- *  3. BACKFILL DETECT: seed an agent row with adapterType="codex_local" and
- *     model="gpt-5.3-codex", call needsAdapterBackfill(), assert true;
- *     then simulate the backfill write (update to gpt-5.5) and assert the
- *     re-check returns false.
+ *  3. BACKFILL DETECT: Codex model availability is account-scoped, so startup
+ *     does not rewrite explicit or blank Codex choices without that account's
+ *     live catalog.
  *
  *  4. MANAGED-HOME AUTH MODE (documented SKIP): determining authMode requires
  *     reading the real ~/.codex auth files (codex-home FS state). This harness
@@ -41,7 +39,6 @@ import { applyPendingMigrations, createDb, type Db } from "@armyofagents/db";
 import { agentService } from "../services/agents.js";
 import { applyModelResolutionToConfig } from "../services/internal-agent/aoa-agents/runner-model-resolution.js";
 import { needsAdapterBackfill, resolveCrewAdapterFor } from "../services/internal-agent/aoa-agents/resolve-crew-adapter.js";
-import { DEFAULT_CODEX_CHAT_MODEL } from "../services/internal-agent/codex-model.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Embedded-postgres harness (mirrors aoa-backend.integration.test.ts exactly)
@@ -134,7 +131,7 @@ describe.skipIf(process.platform === "win32")(
           ${companyId},
           'Test Codex Agent',
           'codex_local',
-          ${JSON.stringify({ model: "gpt-5.3-codex", dangerouslyBypassApprovalsAndSandbox: true })}::jsonb
+          ${JSON.stringify({ model: "gpt-fixture-codex", dangerouslyBypassApprovalsAndSandbox: true })}::jsonb
         )
         RETURNING id
       `));
@@ -173,14 +170,14 @@ describe.skipIf(process.platform === "win32")(
 
     // ── 2. RESOLUTION AT SERVICE LEVEL ──────────────────────────────────────
 
-    it("2: applyModelResolutionToConfig corrects gpt-5.3-codex → gpt-5.5 under chatgpt authMode", async () => {
+    it("2: applyModelResolutionToConfig refuses an incompatible explicit Codex model without rewriting it", async () => {
       if (setupError) throw new Error(String(setupError));
 
       // Reset agent back to codex_local with the incompatible model for this test
       await db.execute(sql`
         UPDATE agents
         SET adapter_type = 'codex_local',
-            adapter_config = ${JSON.stringify({ model: "gpt-5.3-codex", dangerouslyBypassApprovalsAndSandbox: true })}::jsonb
+            adapter_config = ${JSON.stringify({ model: "gpt-fixture-codex", dangerouslyBypassApprovalsAndSandbox: true })}::jsonb
         WHERE id = ${agentId}
       `);
 
@@ -193,18 +190,16 @@ describe.skipIf(process.platform === "win32")(
         : (row as any).rows?.[0]?.adapter_config;
 
       expect(persistedConfig).toBeTruthy();
-      expect((persistedConfig as any).model).toBe("gpt-5.3-codex");
+      expect((persistedConfig as any).model).toBe("gpt-fixture-codex");
 
-      // Run the model resolution as the runner would, under chatgpt authMode
-      const resolved = applyModelResolutionToConfig(
+      // The runner refuses an incompatible explicit selection without selecting
+      // a substitute or mutating the persisted config.
+      expect(() => applyModelResolutionToConfig(
         "codex_local",
         persistedConfig as Record<string, unknown>,
         { authMode: "chatgpt", defaultModelResolved: null },
-      );
-
-      // The persisted incompatible model must be corrected to the safe default
-      expect(resolved.model).toBe(DEFAULT_CODEX_CHAT_MODEL); // "gpt-5.5"
-      expect(resolved.model).not.toBe("gpt-5.3-codex");
+      )).toThrow(/not compatible with ChatGPT subscription auth/i);
+      expect((persistedConfig as any).model).toBe("gpt-fixture-codex");
 
       // NOTE: The resolved argv sub-test (asserting that the resolved model
       // appears in the actual spawn argv via onMeta.commandArgs) is skipped.
@@ -218,10 +213,10 @@ describe.skipIf(process.platform === "win32")(
 
     // ── 3. BACKFILL DETECT ──────────────────────────────────────────────────
 
-    it("3a: needsAdapterBackfill returns true for codex_local row with incompatible model", async () => {
+    it("3a: needsAdapterBackfill leaves an explicit Codex selection for execution-time validation", async () => {
       if (setupError) throw new Error(String(setupError));
 
-      // The agent is currently codex_local + gpt-5.3-codex (set in test 2)
+      // The agent is currently codex_local + the explicit fixture model (test 2).
       const row = await db.execute<{ adapter_type: string; adapter_config: unknown }>(sql`
         SELECT adapter_type, adapter_config FROM agents WHERE id = ${agentId}
       `);
@@ -229,25 +224,16 @@ describe.skipIf(process.platform === "win32")(
         ? row[0] as any
         : (row as any).rows?.[0] as any;
 
-      // The row should need backfill (gpt-5.3-codex is ChatGPT-incompatible)
-      expect(needsAdapterBackfill(adapter_type, adapter_config as Record<string, unknown>)).toBe(true);
+      expect(needsAdapterBackfill(adapter_type, adapter_config as Record<string, unknown>)).toBe(false);
     });
 
-    it("3b: after backfill write (gpt-5.5), needsAdapterBackfill returns false", async () => {
+    it("3b: a blank fresh Codex config inherits its catalog default without a startup write", async () => {
       if (setupError) throw new Error(String(setupError));
 
-      // Simulate what the boot backfill consumer does: resolve the right adapter
-      // for the company's provider and write it back.
-      const newAdapter = resolveCrewAdapterFor("openai"); // openai → codex_local + gpt-5.5
+      const newAdapter = resolveCrewAdapterFor("openai");
       expect(newAdapter.adapterType).toBe("codex_local");
-      expect((newAdapter.adapterConfig as any).model).toBe(DEFAULT_CODEX_CHAT_MODEL);
-
-      // Write the corrected config to the DB
-      await db.execute(sql`
-        UPDATE agents
-        SET adapter_config = ${JSON.stringify(newAdapter.adapterConfig)}::jsonb
-        WHERE id = ${agentId}
-      `);
+      expect(newAdapter.adapterConfig).not.toHaveProperty("model");
+      expect(needsAdapterBackfill(newAdapter.adapterType, newAdapter.adapterConfig)).toBe(false);
 
       // Re-read and re-check
       const row = await db.execute<{ adapter_type: string; adapter_config: unknown }>(sql`
@@ -257,8 +243,8 @@ describe.skipIf(process.platform === "win32")(
         ? row[0] as any
         : (row as any).rows?.[0] as any;
 
-      // After backfill, the model is gpt-5.5 which is ChatGPT-compatible
-      expect((adapter_config as any).model).toBe(DEFAULT_CODEX_CHAT_MODEL);
+      // Existing explicit configuration remains untouched; no guessed model is written.
+      expect((adapter_config as any).model).toBe("gpt-fixture-codex");
       expect(needsAdapterBackfill(adapter_type, adapter_config as Record<string, unknown>)).toBe(false);
     });
 
@@ -297,13 +283,13 @@ describe.skipIf(process.platform === "win32")(
           ${company2Id},
           'Isolated Agent',
           'codex_local',
-          ${JSON.stringify({ model: "gpt-5.3-codex" })}::jsonb
+          ${JSON.stringify({ model: "gpt-fixture-codex" })}::jsonb
         )
         RETURNING id
       `));
 
-      // Confirm the original company's agent was ONLY updated by its own backfill
-      // (test 3b wrote gpt-5.5 to agentId). Company 2's agent is still gpt-5.3-codex.
+      // Both companies retain their own explicit value; no startup model rewrite
+      // is based on a different company's account/catalog.
       const row2 = await db.execute<{ adapter_config: unknown }>(sql`
         SELECT adapter_config FROM agents WHERE id = ${agent2Id}
       `);
@@ -311,15 +297,15 @@ describe.skipIf(process.platform === "win32")(
         ? (row2[0] as any)?.adapter_config
         : (row2 as any).rows?.[0]?.adapter_config;
 
-      expect((cfg2 as any)?.model).toBe("gpt-5.3-codex"); // untouched
-      // And the original agent is still gpt-5.5 (from test 3b)
+      expect((cfg2 as any)?.model).toBe("gpt-fixture-codex");
+      // The original agent remains untouched as well.
       const row1 = await db.execute<{ adapter_config: unknown }>(sql`
         SELECT adapter_config FROM agents WHERE id = ${agentId}
       `);
       const cfg1 = Array.isArray(row1)
         ? (row1[0] as any)?.adapter_config
         : (row1 as any).rows?.[0]?.adapter_config;
-      expect((cfg1 as any)?.model).toBe(DEFAULT_CODEX_CHAT_MODEL);
+      expect((cfg1 as any)?.model).toBe("gpt-fixture-codex");
     });
   },
 );

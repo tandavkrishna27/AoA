@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { readFile } from "node:fs/promises";
 import { resolveRunScopedModel } from "../services/heartbeat-provider-resolution.js";
 import { applyModelResolutionToConfig } from "../services/internal-agent/aoa-agents/runner-model-resolution.js";
-import { DEFAULT_CODEX_CHAT_MODEL } from "../services/internal-agent/codex-model.js";
 import { applyResolvedCredential } from "../services/provider-resolution.js";
 
 // Phase 4 (Task 12) helper contract: the org heartbeat merges the resolved
@@ -23,21 +22,24 @@ describe("heartbeat resolver merge preserves 3-scope env", () => {
   });
 });
 
-const chatgpt = { adapterType: "codex_local", installed: true, authenticated: true, authMode: "chatgpt" as const, defaultModelResolved: "gpt-5.5" };
+const chatgpt = { adapterType: "codex_local", installed: true, authenticated: true, authMode: "chatgpt" as const, defaultModelResolved: null };
 
 describe("resolveRunScopedModel (heartbeat/org path)", () => {
-  it("corrects an incompatible codex model on chatgpt to gpt-5.5", () => {
-    const cfg = resolveRunScopedModel("codex_local", { model: "gpt-5.3-codex", env: {} }, chatgpt);
-    expect(cfg.model).toBe("gpt-5.5");
+  it("refuses a subscription-incompatible explicit model without rewriting stored config", () => {
+    const requested = "gpt-fixture-codex";
+    expect(() => resolveRunScopedModel("codex_local", { model: requested, env: {} }, chatgpt))
+      .toThrow(/not compatible with ChatGPT subscription auth/i);
+    expect(requested).toBe("gpt-fixture-codex");
   });
-  it("EDGE #5: resolves the budget-SWAPPED model, not the original (operates on the passed config only)", () => {
+  it("leaves a blank budget-swapped model unset for the selected account catalog", () => {
     // The seam is config-only and pure; the ordering guarantee (resolve AFTER the
     // cheap-model swap, BEFORE resolveGuardedAdapterExecutionContext) lives in the caller
     // and is proven by the "heartbeat wiring — edge #5 source-order guard" describe
     // below.
-    const swapped = { model: "gpt-5.3-codex", env: {} };
+    const swapped = { model: "", env: {} };
     const cfg = resolveRunScopedModel("codex_local", swapped, chatgpt);
-    expect(cfg.model).toBe("gpt-5.5");
+    expect(cfg).not.toHaveProperty("model");
+    expect(swapped.model).toBe("");
   });
   it("strips an inherited company OPENAI_API_KEY (codex) the agent didn't set", () => {
     const cfg = resolveRunScopedModel("codex_local", { model: "gpt-5.5", env: {} }, chatgpt, { inheritedEnvOpenAiKey: "sk-company" });
@@ -50,17 +52,17 @@ describe("resolveRunScopedModel (heartbeat/org path)", () => {
   // beforeAll to run on the Windows CI runner, where Postgres cannot start —
   // Issue #114 — tainting the whole suite; here it gains real Windows-CI signal.)
   it("case-2: resolveRunScopedModel is a faithful pass-through of applyModelResolutionToConfig (org↔crew parity)", () => {
-    const status = { authMode: "chatgpt", defaultModelResolved: "gpt-5.5" } as const;
+    const status = { authMode: "chatgpt", defaultModelResolved: null } as const;
     // Pass the 4th `opts` arg on BOTH sides so the parity check also covers the
     // opts-forwarding path of the wrapper. (`inheritedEnvOpenAiKey` has no
     // observable effect on the returned config when the agent did not set its
     // own env key — the deeper env-strip hardening is owned by a separate PR;
     // here we only assert the org seam is a faithful pass-through.)
     const opts = { inheritedEnvOpenAiKey: "sk-company" };
-    const viaOrg = resolveRunScopedModel("codex_local", { model: "gpt-5.3-codex", env: {} }, status, opts);
-    const viaCrew = applyModelResolutionToConfig("codex_local", { model: "gpt-5.3-codex", env: {} }, status, opts);
+    const viaOrg = resolveRunScopedModel("codex_local", { model: "gpt-fixture-listed", env: {} }, status, opts);
+    const viaCrew = applyModelResolutionToConfig("codex_local", { model: "gpt-fixture-listed", env: {} }, status, opts);
 
-    expect(viaOrg.model).toBe(DEFAULT_CODEX_CHAT_MODEL); // incompatible model corrected
+    expect(viaOrg.model).toBe("gpt-fixture-listed");
     // Full-config deep-equal — non-tautological (a `.model`-only assertion would
     // miss divergence in env or any other field). Catches a future regression
     // where the wrapper stops forwarding args or the two paths drift apart.

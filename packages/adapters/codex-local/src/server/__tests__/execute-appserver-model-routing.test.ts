@@ -25,6 +25,7 @@ import type {
   AdapterExecutionContext,
   AdapterRuntimeDecisionBroker,
 } from "@armyofagents/adapter-utils";
+import { testModelCatalog } from "./model-catalog-fixture.js";
 
 async function writeFakeCodexCommand(commandBase: string): Promise<string> {
   const script = `#!/usr/bin/env node
@@ -113,14 +114,17 @@ function baseCtx(
 }
 
 describe("execute — supervised model routing (BUG-6 fix 1)", () => {
-  it("resolves gpt-5.5 for an empty config model and threads model + managedCodexHome to runAppServerTurn", async () => {
+  it("resolves the signed-in account default and threads it + managedCodexHome to runAppServerTurn", async () => {
     await withWorkspace(async (workspace, commandPath) => {
       const runAppServerTurn = makeSpy();
-      const deps: CodexExecuteDeps = { runAppServerTurn };
+      const deps: CodexExecuteDeps = {
+        runAppServerTurn,
+        getModelCatalog: async (request) => testModelCatalog(request),
+      };
       await execute(baseCtx(workspace, commandPath, { model: "" }), deps);
       expect(runAppServerTurn).toHaveBeenCalledTimes(1);
       const arg = runAppServerTurn.mock.calls[0][0];
-      expect(arg.model).toBe("gpt-5.5");
+      expect(arg.model).toBe("gpt-account-default");
       expect(typeof arg.managedCodexHome).toBe("string");
       expect((arg.managedCodexHome as string).length).toBeGreaterThan(0);
     });
@@ -129,7 +133,10 @@ describe("execute — supervised model routing (BUG-6 fix 1)", () => {
   it("passes a codex-compatible config model through unchanged (gpt-4o)", async () => {
     await withWorkspace(async (workspace, commandPath) => {
       const runAppServerTurn = makeSpy();
-      await execute(baseCtx(workspace, commandPath, { model: "gpt-4o" }), { runAppServerTurn });
+      await execute(baseCtx(workspace, commandPath, { model: "gpt-4o" }), {
+        runAppServerTurn,
+        getModelCatalog: async (request) => testModelCatalog(request),
+      });
       expect(runAppServerTurn.mock.calls[0][0].model).toBe("gpt-4o");
     });
   });
@@ -142,9 +149,12 @@ describe("execute — supervised model routing (BUG-6 fix 1)", () => {
           model: "gpt-5.3-codex",
           env: { OPENAI_API_KEY: "sk-live" },
         }),
-        { runAppServerTurn },
+        {
+          runAppServerTurn,
+          getModelCatalog: async (request) => testModelCatalog(request),
+        },
       );
-      expect(runAppServerTurn.mock.calls[0][0].model).toBeUndefined();
+      expect(runAppServerTurn.mock.calls[0][0].model).toBe("gpt-5.3-codex");
     });
   });
 });

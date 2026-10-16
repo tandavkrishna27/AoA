@@ -35,6 +35,19 @@ interface SpawnCall {
 
 let nextSpawn: SpawnScript = { stdout: [], exitCode: 0 };
 const spawnCalls: SpawnCall[] = [];
+const runOneShotCliInSandboxMock = vi.hoisted(() => vi.fn(async (_request: { companyId: string; command: string; args: string[] }) => ({
+  stdout: [
+    JSON.stringify({ type: "thread.started", thread_id: "sandbox-fixture" }),
+    JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "[]" } }),
+  ].join("\n"),
+  stderr: "",
+  exitCode: 0,
+})));
+
+vi.mock("../services/one-shot-sandbox-cli.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../services/one-shot-sandbox-cli.js")>();
+  return { ...actual, runOneShotCliInSandbox: runOneShotCliInSandboxMock };
+});
 
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
@@ -132,6 +145,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 
 beforeEach(() => {
   spawnCalls.length = 0;
+  runOneShotCliInSandboxMock.mockClear();
   nextSpawn = { stdout: [], exitCode: 0 };
 });
 
@@ -351,8 +365,20 @@ vi.mock("@armyofagents/adapter-codex-local/server", async (importOriginal) => {
     ...actual,
     ensureCodexAuthInHome: vi.fn(async () => true),
     readSharedCodexModel: vi.fn(async () => null),
+    getCodexModelCatalog: vi.fn(async (request: { companyId: string; authHome: string }) => ({
+      identity: {
+        companyId: request.companyId,
+        authHome: request.authHome,
+        authGeneration: "extraction-test-auth",
+        authMode: "subscription" as const,
+        cliVersion: "0.130.0-fixture",
+      },
+      models: [{ id: "gpt-fixture-default", isDefault: true }],
+    })),
   };
 });
+
+const CODEX_EXTRACTION_OPTIONS = { companyId: "extraction-fixture-company" };
 
 /** Build a minimal codex JSONL stream whose agent_message text = `text`. */
 function codexJsonl(text: string): string {
@@ -370,6 +396,25 @@ function codexJsonl(text: string): string {
 }
 
 describe("extractViaCli — codex", () => {
+  it("requires company account scope before catalog lookup or process spawn", async () => {
+    const { extractViaCli } = await import("../services/extraction-cli.ts");
+    await expect(extractViaCli("codex", "SYSTEM", "content")).rejects.toThrow(
+      /company account scope/i,
+    );
+    expect(spawnCalls).toHaveLength(0);
+  });
+
+  it("refuses a stale cross-provider model before process spawn", async () => {
+    const { extractViaCli } = await import("../services/extraction-cli.ts");
+    await expect(
+      extractViaCli("codex", "SYSTEM", "content", {
+        ...CODEX_EXTRACTION_OPTIONS,
+        codexModel: "claude-fixture-model",
+      }),
+    ).rejects.toMatchObject({ code: "model_identifier_invalid" });
+    expect(spawnCalls).toHaveLength(0);
+  });
+
   it("parses items from the codex assistant summary", async () => {
     const prev = { ...process.env };
     process.env.OPENAI_API_KEY = "sk-embeddings";
@@ -382,7 +427,7 @@ describe("extractViaCli — codex", () => {
       nextSpawn = { stdout: [codexJsonl(JSON.stringify(items))], exitCode: 0 };
 
       const { extractViaCli } = await import("../services/extraction-cli.ts");
-      const result = await extractViaCli("codex", "SYSTEM", "content");
+      const result = await extractViaCli("codex", "SYSTEM", "content", CODEX_EXTRACTION_OPTIONS);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ type: "decision", title: "Use stdin delivery" });
@@ -392,6 +437,8 @@ describe("extractViaCli — codex", () => {
       expect(call).toBeDefined();
       expect(call!.args).toContain("exec");
       expect(call!.args).toContain("--json");
+      expect(call!.args).toContain("--model");
+      expect(call!.args[call!.args.indexOf("--model") + 1]).toBe("gpt-fixture-default");
       expect(call!.args[call!.args.length - 1]).toBe("-");
       expect(call!.stdinEnded).toBe(true);
       // SECURITY (Codex re-review P1): scrubbed env — CODEX_HOME set (codex
@@ -415,7 +462,7 @@ describe("extractViaCli — codex", () => {
   it("unparseable codex summary → CliExtractionError kind 'unparseable'", async () => {
     nextSpawn = { stdout: [codexJsonl("not json")], exitCode: 0 };
     const { extractViaCli } = await import("../services/extraction-cli.ts");
-    await expect(extractViaCli("codex", "SYSTEM", "content")).rejects.toMatchObject({
+    await expect(extractViaCli("codex", "SYSTEM", "content", CODEX_EXTRACTION_OPTIONS)).rejects.toMatchObject({
       kind: "unparseable",
     });
   });
@@ -423,7 +470,7 @@ describe("extractViaCli — codex", () => {
   it("codex nonzero exit → CliExtractionError kind 'nonzero_exit'", async () => {
     nextSpawn = { stdout: [""], stderr: ["crashed"], exitCode: 3 };
     const { extractViaCli } = await import("../services/extraction-cli.ts");
-    await expect(extractViaCli("codex", "SYSTEM", "content")).rejects.toMatchObject({
+    await expect(extractViaCli("codex", "SYSTEM", "content", CODEX_EXTRACTION_OPTIONS)).rejects.toMatchObject({
       kind: "nonzero_exit",
     });
   });
@@ -439,7 +486,7 @@ describe("extractViaCli — codex", () => {
       exitCode: 1,
     };
     const { extractViaCli } = await import("../services/extraction-cli.ts");
-    await expect(extractViaCli("codex", "SYSTEM", "content")).rejects.toMatchObject({
+    await expect(extractViaCli("codex", "SYSTEM", "content", CODEX_EXTRACTION_OPTIONS)).rejects.toMatchObject({
       kind: "not_authed",
     });
   });
@@ -453,7 +500,7 @@ describe("extractViaCli — codex", () => {
     nextSpawn = { stdout: [validPrefix, spam], exitCode: 0 };
 
     const { extractViaCli } = await import("../services/extraction-cli.ts");
-    await expect(extractViaCli("codex", "SYSTEM", "content")).rejects.toMatchObject({
+    await expect(extractViaCli("codex", "SYSTEM", "content", CODEX_EXTRACTION_OPTIONS)).rejects.toMatchObject({
       kind: "nonzero_exit",
     });
 
@@ -493,6 +540,7 @@ describe("extractViaCli — cloud_auth routes through the sandbox (U13.2)", () =
     // sandbox execution goes through the provider-runtime seam, never
     // node:child_process.
     expect(spawnCalls).toHaveLength(0);
+    expect(runOneShotCliInSandboxMock).not.toHaveBeenCalled();
   });
 
   it("refuses codex extraction on cloud_auth the same way (no credential/companyId/db)", async () => {
@@ -503,7 +551,54 @@ describe("extractViaCli — cloud_auth routes through the sandbox (U13.2)", () =
       kind: "nonzero_exit",
     });
     expect(spawnCalls).toHaveLength(0);
+    expect(runOneShotCliInSandboxMock).not.toHaveBeenCalled();
   });
+
+  it("runs a blank Codex model through the company sandbox and omits --model for target-account inheritance", async () => {
+    setDeploymentMode("cloud_auth");
+    const { extractViaCli } = await import("../services/extraction-cli.ts");
+    const result = await extractViaCli("codex", "sys", "content", {
+      companyId: "company-fixture",
+      db: {} as never,
+      credential: {
+        envName: "OPENAI_API_KEY",
+        value: "sk-fixture-company-key",
+        provider: "openai",
+        model: "",
+      },
+    });
+
+    expect(result).toEqual([]);
+    expect(spawnCalls).toHaveLength(0);
+    expect(runOneShotCliInSandboxMock).toHaveBeenCalledTimes(1);
+    const [request] = runOneShotCliInSandboxMock.mock.calls[0]!;
+    expect(request).toMatchObject({ companyId: "company-fixture", command: "codex" });
+    expect(request.args).not.toContain("--model");
+  });
+
+  it.each(["claude-fixture-model", "gpt-fixture;calc"])(
+    "refuses Codex cloud credential model %s before sandbox acquisition",
+    async (model) => {
+      setDeploymentMode("cloud_auth");
+      const { extractViaCli } = await import("../services/extraction-cli.ts");
+      await expect(extractViaCli("codex", "sys", "content", {
+        companyId: "company-fixture",
+        db: {} as never,
+        credential: {
+          envName: "OPENAI_API_KEY",
+          value: "sk-fixture-company-key",
+          provider: "openai",
+          model,
+        },
+      })).rejects.toMatchObject({
+        name: "CliExtractionError",
+        kind: "nonzero_exit",
+        message: `The configured Codex model "${model}" is not an OpenAI/Codex model. Choose a Codex model or clear the model override to inherit the account default.`,
+      });
+      expect(runOneShotCliInSandboxMock).not.toHaveBeenCalled();
+      expect(spawnCalls).toHaveLength(0);
+    },
+  );
 
   it("does NOT refuse off-cloud — the guard is a no-op on self-hosted (HERMETIC, no spawn)", async () => {
     setDeploymentMode("local_trusted");

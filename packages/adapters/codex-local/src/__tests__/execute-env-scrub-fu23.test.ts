@@ -29,6 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import type { McpServerSpec } from "@armyofagents/adapter-utils";
 import { execute } from "../server/execute.js";
+import { testModelCatalogLoader } from "../server/__tests__/model-catalog-fixture.js";
 
 const AMBIENT_SECRETS: Record<string, string> = {
   DATABASE_URL: "postgres://user:pw@localhost:5432/aoa",
@@ -147,6 +148,9 @@ async function runOnce(
       ...mcpFields,
       authToken: "secret-run-token",
       onLog: async () => {},
+    }, {
+      runAppServerTurn: async () => { throw new Error("bridged path not expected in this test"); },
+      getModelCatalog: testModelCatalogLoader,
     });
     expect(result.exitCode).toBe(0);
     return JSON.parse(await fs.readFile(capturePath, "utf8")) as Record<string, string>;
