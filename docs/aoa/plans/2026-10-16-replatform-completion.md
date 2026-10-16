@@ -10,7 +10,7 @@
 
 **Tech Stack:** TypeScript, Node 24 CI, pnpm 9.15.4, Vitest, PostgreSQL/Drizzle, Docker, worker-protocol v1, adapter-manager, E2B, Playwright and the existing desktop keystore/host packages.
 
-**Spec:** [Test report and findings](../qa/replatform-2026-10-15/REPLATFORM-TEST-REPORT.txt), [normative test gates](../../replatform/test-gates.md), [current M1/M2 implementation](../../replatform/m1-m2-code-execution.md), [M3 implementation](../../replatform/m3-code-execution.md), [M4 implementation ledger](../../replatform/m4-code-execution.md), [M4 requirement audit](../../replatform/m4-requirements-evidence.md), and [milestone allocation](../../replatform/epic-regrooming/scope-triage.md). These existing contracts govern this plan; it does not approve new architecture or waive a gate.
+**Spec:** [Immutable test report and findings](https://github.com/tandavkrishna27/AoA/blob/c065cdc89/docs/aoa/qa/replatform-2026-10-15/REPLATFORM-TEST-REPORT.txt), [normative test gates](../../replatform/test-gates.md), [current M1/M2 implementation](../../replatform/m1-m2-code-execution.md), [M3 implementation](../../replatform/m3-code-execution.md), [M4 implementation ledger](../../replatform/m4-code-execution.md), [M4 requirement audit](../../replatform/m4-requirements-evidence.md), and [milestone allocation](../../replatform/epic-regrooming/scope-triage.md). The raw historical QA package remains unchanged on `docs/testing-results-2026-10-15`; it is not copied into this implementation branch. These existing contracts govern this plan; it does not approve new architecture or waive a gate.
 
 ## 1. Baseline and what completion means
 
@@ -227,7 +227,7 @@ Record the chosen route, exact topology and executed case IDs in each new attemp
 - [x] Compare against a clean strict frozen install on Node 24.19.0 / pnpm 9.15.4. The original Vitest parity file passed 4/4 on this machine; the historical Vitest failure was not reproduced. A plain Node require from the package's strict context fails to resolve the undeclared direct `playwright-core` import, while resolution through declared `playwright` succeeds. Keep a deliberate image/runtime pin-mismatch negative control.
 - [x] Resolve `playwright-core/package.json` through the declared `playwright` dependency's require context, rather than relying on a root/transitive hoist. Keep the declared runtime dependency and exact image/version comparison; no new package is needed for this resolution-only approach.
 - [x] Run the parity file and browser-runtime package suite: 5/5 parity tests; 175 package tests passed with 19 existing skips. The real match passes; an intentionally mismatched fixture fails, and Chromium assertions remain active.
-- [x] Commit the resolution-only fix (`a8d94293c`); manifests and lockfile remain unchanged. **Exit:** fresh strict installation resolves the parity assertion without weakening it.
+- [x] Commit the resolution-only fix (`72e980eb6`); manifests and lockfile remain unchanged. **Exit:** fresh strict installation resolves the parity assertion without weakening it.
 
 ### W04 — Make fixture lifecycle and test-result capture reliable
 
