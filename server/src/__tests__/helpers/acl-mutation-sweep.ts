@@ -35,12 +35,16 @@ export async function sweepAclGrantOptions(input: {
       SELECT has_table_privilege('aoa_app', ${`public.${relation}`}, 'SELECT') AS app,
         has_table_privilege('aoa_operator', ${`public.${relation}`}, 'SELECT') AS operator`;
     signal.throwIfAborted();
-    const role = access?.app ? "aoa_app" : access?.operator ? "aoa_operator" : null;
-    if (role) {
+    const tableRoles = [
+      ...(access?.app ? ["aoa_app"] : []),
+      ...(access?.operator ? ["aoa_operator"] : []),
+    ];
+    for (const role of tableRoles) {
+      signal.throwIfAborted();
       try {
         await admin.unsafe(`GRANT SELECT ON TABLE ${quote(relation)} TO ${role} WITH GRANT OPTION`);
         signal.throwIfAborted();
-        if (await input.captureFailure() === undefined) accepted.push(`${relation}:relacl`);
+        if (await input.captureFailure() === undefined) accepted.push(`${relation}:${role}:relacl`);
       } finally {
         // Cleanup deliberately ignores cancellation: teardown must wait for the original ACL.
         await admin.unsafe(`REVOKE GRANT OPTION FOR SELECT ON TABLE ${quote(relation)} FROM ${role}`);
@@ -59,27 +63,39 @@ export async function sweepAclGrantOptions(input: {
       ORDER BY attribute.attnum`;
     for (const column of columns) {
       signal.throwIfAborted();
-      const columnRole = column.app ? "aoa_app" : column.operator ? "aoa_operator" : "aoa_app";
-      const [prior] = await admin<{ explicit_select: boolean }[]>`
-        SELECT EXISTS (
-          SELECT 1 FROM pg_class relation
-          JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
-          JOIN pg_attribute attribute ON attribute.attrelid = relation.oid
-          CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
-          LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
-          WHERE namespace.nspname = 'public' AND relation.relname = ${relation}
-            AND attribute.attname = ${column.column_name}
-            AND grantee.rolname = ${columnRole} AND acl.privilege_type = 'SELECT'
-        ) AS explicit_select`;
-      signal.throwIfAborted();
-      try {
-        await admin.unsafe(`GRANT SELECT (${quote(column.column_name)}) ON ${quote(relation)} TO ${columnRole} WITH GRANT OPTION`);
+      const columnRoles = [
+        ...(column.app ? ["aoa_app"] : []),
+        ...(column.operator ? ["aoa_operator"] : []),
+      ];
+      // A column with no SELECT grant still gets the historical app-role probe,
+      // so the startup API must reject a newly granted select+grant-option tuple.
+      if (columnRoles.length === 0) columnRoles.push("aoa_app");
+
+      for (const columnRole of columnRoles) {
         signal.throwIfAborted();
-        if (await input.captureFailure() === undefined) accepted.push(`${relation}.${column.column_name}:attacl`);
-      } finally {
-        await admin.unsafe(`REVOKE SELECT (${quote(column.column_name)}) ON ${quote(relation)} FROM ${columnRole}`);
-        if (prior?.explicit_select) {
-          await admin.unsafe(`GRANT SELECT (${quote(column.column_name)}) ON ${quote(relation)} TO ${columnRole}`);
+        const [prior] = await admin<{ explicit_select: boolean }[]>`
+          SELECT EXISTS (
+            SELECT 1 FROM pg_class relation
+            JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+            JOIN pg_attribute attribute ON attribute.attrelid = relation.oid
+            CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
+            LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
+            WHERE namespace.nspname = 'public' AND relation.relname = ${relation}
+              AND attribute.attname = ${column.column_name}
+              AND grantee.rolname = ${columnRole} AND acl.privilege_type = 'SELECT'
+          ) AS explicit_select`;
+        signal.throwIfAborted();
+        try {
+          await admin.unsafe(`GRANT SELECT (${quote(column.column_name)}) ON ${quote(relation)} TO ${columnRole} WITH GRANT OPTION`);
+          signal.throwIfAborted();
+          if (await input.captureFailure() === undefined) {
+            accepted.push(`${relation}.${column.column_name}:${columnRole}:attacl`);
+          }
+        } finally {
+          await admin.unsafe(`REVOKE SELECT (${quote(column.column_name)}) ON ${quote(relation)} FROM ${columnRole}`);
+          if (prior?.explicit_select) {
+            await admin.unsafe(`GRANT SELECT (${quote(column.column_name)}) ON ${quote(relation)} TO ${columnRole}`);
+          }
         }
       }
     }
