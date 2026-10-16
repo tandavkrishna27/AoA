@@ -585,6 +585,10 @@ interface CommanderSendAttempt {
   attachmentAssetIds: string[];
   refsForTurn: CommanderInputRef[];
   revision: number;
+  /** Only locally captured drafts belong to this attempt. History recovery
+   * must never consume a draft or refs already present in the composer. */
+  clearComposerOnSuccess: boolean;
+  recoveredFailureKey?: string;
   clientSubmissionId: string;
   requestContext: { conversationId: string | null; pageContext: string | null; contextScope: CommanderContextScope | null; departmentContext: string | null };
 }
@@ -619,6 +623,14 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   const [failureDetails, setFailureDetails] = useState<{ message: string; retryUnavailableReason: string | null } | null>(null);
   const savedFailedMessageRef = useRef<string | null>(null);
   const lastAttemptRef = useRef<CommanderSendAttempt | null>(null);
+  const hydratedFailureKeyRef = useRef<string | null>(null);
+  const handledFailureKeysRef = useRef(new Set<string>());
+  const dismissSavedRecovery = useCallback(() => {
+    if (hydratedFailureKeyRef.current) {
+      handledFailureKeysRef.current.add(hydratedFailureKeyRef.current);
+      hydratedFailureKeyRef.current = null;
+    }
+  }, []);
   // Bumped on every draft-changing edit (typing, ref add/remove, Discard) so a
   // retry that succeeds AFTER the draft diverged skips the clears instead of
   // wiping the newer edits (peer pattern: CommentThread / WorkspaceTimeline).
@@ -977,6 +989,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     setSendFailed(false);
     setFailureDetails(null);
     savedFailedMessageRef.current = null;
+    hydratedFailureKeyRef.current = null;
   }, [conversationId, companyId]);
 
   // Populate messages from history when historyData arrives.
@@ -993,13 +1006,21 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   }, [historyData, conversationId]);
 
   // Both saved-chat and docked history restore the same durable failure. Only
-  // data/entity changes hydrate it; streaming toggles must not re-arm old data.
+  // the selected surface's data can hydrate it. Unrelated active-chat refreshes
+  // and refetches of a locally handled failure must not re-arm recovery.
+  const recoveryMessages = conversationId ? historyData?.messages : conversation?.messages;
+  const recoveryConversationId = conversationId ?? conversation?.conversation?.id ?? null;
   useEffect(() => {
     if (streamingRef.current) return;
-    const savedMessages = conversationId ? historyData?.messages : conversation?.messages;
-    const latestUser = savedMessages?.filter((m) => m.role === "user").at(-1);
+    const latestUser = recoveryMessages?.filter((m) => m.role === "user").at(-1);
     const failure = latestUser?.failure;
     if (failure) {
+      const failureKey = JSON.stringify([companyId, recoveryConversationId, latestUser.id]);
+      if (
+        handledFailureKeysRef.current.has(failureKey) ||
+        hydratedFailureKeyRef.current === failureKey
+      ) return;
+      hydratedFailureKeyRef.current = failureKey;
       savedFailedMessageRef.current = latestUser.content ?? "";
       setFailureDetails(failure);
       const retry = failure.retry;
@@ -1012,9 +1033,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
             v: 1, kind: "asset", id, label: "Saved attachment",
           })),
           revision: composerRevisionRef.current,
+          clearComposerOnSuccess: false,
+          recoveredFailureKey: failureKey,
           clientSubmissionId: retry.clientSubmissionId,
           requestContext: {
-            conversationId: conversationId ?? conversation?.conversation?.id ?? null,
+            conversationId: recoveryConversationId,
             pageContext: retry.pageContext,
             contextScope: retry.contextScope,
             departmentContext: retry.departmentContext,
@@ -1023,7 +1046,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         : null;
       setSendFailed(true);
     }
-  }, [historyData, conversation, conversationId, companyId]);
+  }, [recoveryMessages, recoveryConversationId, companyId]);
 
   // Sync server messages into local state (only when not streaming AND no specific conversation is selected)
   useEffect(() => {
@@ -1169,6 +1192,10 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         abortRef.current = null;
         // Refresh conversation from server
         queryClient.invalidateQueries({ queryKey: queryKeys.agentConversation(companyId) });
+        const sentConversationId = requestContext ? requestContext.conversationId : conversationId;
+        if (sentConversationId) {
+          queryClient.invalidateQueries({ queryKey: ["conversation-messages", companyId, sentConversationId] });
+        }
         queryClient.invalidateQueries({ queryKey: ["commander-conversations"] });
       }
       return accepted;
@@ -1182,13 +1209,19 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     async (attempt: CommanderSendAttempt) => {
       const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId, attempt.requestContext);
       if (accepted) {
+        if (attempt.recoveredFailureKey) {
+          handledFailureKeysRef.current.add(attempt.recoveredFailureKey);
+          if (hydratedFailureKeyRef.current === attempt.recoveredFailureKey) {
+            hydratedFailureKeyRef.current = null;
+          }
+        }
         setSendFailed(false);
         setFailureDetails(null);
         savedFailedMessageRef.current = null;
         lastAttemptRef.current = null;
         // Retry-success safety: only clear when the draft still matches the
         // snapshot — mid-flight edits/ref changes must survive the clear.
-        if (composerRevisionRef.current === attempt.revision) {
+        if (attempt.clearComposerOnSuccess && composerRevisionRef.current === attempt.revision) {
           inputRef.current?.clear();
           const remaining = settleCommanderInputRefsAfterSend(
             inputRefsRef.current,
@@ -1207,7 +1240,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         // suppressed while streaming), the snapshot is stale — a re-armed
         // banner's Retry would post it (e.g. a removed reference). Leave the
         // banner down; the user sends fresh with a NEW clientSubmissionId.
-        setSendFailed(composerRevisionRef.current === attempt.revision);
+        const unchanged = composerRevisionRef.current === attempt.revision;
+        if (!unchanged && attempt.recoveredFailureKey) {
+          handledFailureKeysRef.current.add(attempt.recoveredFailureKey);
+        }
+        setSendFailed(unchanged);
       }
     },
     [sendText],
@@ -1219,6 +1256,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       const refsForTurn = inputRefsRef.current;
       if ((!trimmed && refsForTurn.length === 0) || uploadingFiles.length > 0 || isOffline) return;
       setSendFailed(false);
+      dismissSavedRecovery();
       setFailureDetails(null);
       savedFailedMessageRef.current = null;
       const baseText = trimmed || "Use the referenced context.";
@@ -1231,6 +1269,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         attachmentAssetIds: refsForTurn.filter((r) => r.kind === "asset").map((r) => r.id),
         refsForTurn,
         revision: composerRevisionRef.current,
+        clearComposerOnSuccess: true,
         clientSubmissionId: createComposerSubmissionId(),
         requestContext: {
           conversationId: conversationId ?? conversation?.conversation?.id ?? null,
@@ -1242,7 +1281,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       lastAttemptRef.current = attempt;
       await performCommanderSend(attempt);
     },
-    [performCommanderSend, uploadingFiles.length, isOffline, pageContext, contextScope, conversationId, conversation?.conversation?.id],
+    [performCommanderSend, uploadingFiles.length, isOffline, pageContext, contextScope, conversationId, conversation?.conversation?.id, dismissSavedRecovery],
   );
 
   /** Banner Retry: re-send the IDENTICAL stored attempt (same clientSubmissionId). */
@@ -1253,6 +1292,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   }, [performCommanderSend, isOffline]);
 
   const handleEditFailedSend = useCallback(() => {
+    dismissSavedRecovery();
     if (savedFailedMessageRef.current !== null) {
       inputRef.current?.clear();
       inputRef.current?.insertText(savedFailedMessageRef.current);
@@ -1263,9 +1303,10 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       inputRef.current?.focus();
     }
     setSendFailed(false);
-  }, []);
+  }, [dismissSavedRecovery]);
 
   const handleDiscardFailedSend = useCallback(() => {
+    dismissSavedRecovery();
     lastAttemptRef.current = null;
     setSendFailed(false);
     setFailureDetails(null);
@@ -1275,7 +1316,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     inputRefsRef.current = [];
     setInputRefs([]);
     setAttachmentError(null);
-  }, []);
+  }, [dismissSavedRecovery]);
 
   // Stale-snapshot guard (mock §5: failure never eats your work): once the
   // draft diverges from the failed attempt, Retry would post stale content and
@@ -1285,9 +1326,10 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     composerRevisionRef.current += 1;
     const attempt = lastAttemptRef.current;
     if (attempt && !streamingRef.current && text.trim() !== attempt.rawText) {
+      dismissSavedRecovery();
       setSendFailed(false);
     }
-  }, []);
+  }, [dismissSavedRecovery]);
 
   const addInputRef = useCallback((ref: CommanderInputRef, suggestedPrompt?: string) => {
     const next = buildCommanderInputRefState(inputRefsRef.current, ref);
@@ -1300,13 +1342,16 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     // banner goes down and the next send mints a fresh submission.
     if (next.duplicateKey === null) {
       composerRevisionRef.current += 1;
-      if (!streamingRef.current) setSendFailed(false);
+      if (!streamingRef.current) {
+        dismissSavedRecovery();
+        setSendFailed(false);
+      }
     }
     if (suggestedPrompt && next.duplicateKey === null) {
       inputRef.current?.insertText(suggestedPrompt);
     }
     requestAnimationFrame(() => inputRef.current?.focus());
-  }, []);
+  }, [dismissSavedRecovery]);
 
   const uploadCommanderFiles = useCallback(async (files: File[], replacingFailedId?: number) => {
     if (!companyId || files.length === 0 || streaming) return;
@@ -1377,8 +1422,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     setDuplicateInputRefKey((current) => (current === key ? null : current));
     // Retry must never post a removed (possibly sensitive) attachment.
     composerRevisionRef.current += 1;
-    if (!streamingRef.current) setSendFailed(false);
-  }, []);
+    if (!streamingRef.current) {
+      dismissSavedRecovery();
+      setSendFailed(false);
+    }
+  }, [dismissSavedRecovery]);
 
   const handleOpenInputRef = useCallback(
     (ref: CommanderInputRef) => {

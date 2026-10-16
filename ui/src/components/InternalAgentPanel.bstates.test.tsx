@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AgentPanelContent } from "./InternalAgentPanel";
+import { composerDraftStorageKey, deserializeComposerDraft, serializeComposerDraft } from "../lib/composerDraft";
 
 /**
  * Commander composer B-states (mock §5): send-failed banner with idempotent
@@ -110,7 +111,13 @@ const streamState = vi.hoisted(() => ({
   calls: [] as unknown[][],
 }));
 const confirmActionMock = vi.hoisted(() => vi.fn());
-const historyState = vi.hoisted(() => ({ messages: [] as unknown[], activeMessages: [] as unknown[] }));
+const historyState = vi.hoisted(() => ({
+  messages: [] as unknown[],
+  activeMessages: [] as unknown[],
+  activeConversationId: "active-chat",
+  pending: null as Promise<{ messages: unknown[] }> | null,
+  listCalls: 0,
+}));
 
 vi.mock("../api/internal-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/internal-agent")>();
@@ -125,7 +132,7 @@ vi.mock("../api/internal-agent", async (importOriginal) => {
     internalAgentApi: {
       ...actual.internalAgentApi,
       confirmAction: confirmActionMock,
-      getConversation: vi.fn(async () => ({ conversation: historyState.activeMessages.length ? { id: "active-chat" } : null, messages: historyState.activeMessages })),
+      getConversation: vi.fn(async () => ({ conversation: historyState.activeMessages.length ? { id: historyState.activeConversationId } : null, messages: historyState.activeMessages })),
       getGreeting: vi.fn().mockResolvedValue(null),
       getRuntimeSettings: vi.fn().mockResolvedValue({ runtimeAllowAlwaysEnabled: true }),
       listSkills: vi.fn().mockResolvedValue({ skills: [] }),
@@ -136,7 +143,10 @@ vi.mock("../api/internal-agent", async (importOriginal) => {
     },
     conversationMessagesApi: {
       ...actual.conversationMessagesApi,
-      list: vi.fn(async () => ({ messages: historyState.messages })),
+      list: vi.fn(async () => {
+        historyState.listCalls += 1;
+        return historyState.pending ?? { messages: historyState.messages };
+      }),
     },
   };
 });
@@ -192,6 +202,7 @@ function renderPanel(props: React.ComponentProps<typeof AgentPanelContent> = {})
   const result = render(makeUi(props));
   return {
     ...result,
+    client,
     // Same mounted panel, new props — simulates switching conversations.
     rerenderPanel: (next: React.ComponentProps<typeof AgentPanelContent>) =>
       result.rerender(makeUi(next)),
@@ -216,6 +227,9 @@ function sendViaEnter(box: HTMLElement) {
 beforeEach(() => {
   historyState.messages = [];
   historyState.activeMessages = [];
+  historyState.activeConversationId = "active-chat";
+  historyState.pending = null;
+  historyState.listCalls = 0;
   stableHooks.company.selectedCompanyId = "co-1";
   stableHooks.location.pathname = "/";
   liveState.connectionState = "open";
@@ -229,6 +243,161 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Commander composer — B-states (mock §5)", () => {
+  function durableFailure(id = "saved-user", submissionId = "original-send") {
+    const retry = {
+      message: "Original request with reference id=old-asset",
+      clientSubmissionId: submissionId,
+      pageContext: "Original page",
+      contextScope: { surface: "memory", route: "/original" },
+      departmentContext: null,
+      attachmentAssetIds: ["old-asset"],
+    };
+    return {
+      id,
+      role: "user",
+      content: retry.message,
+      turnStatus: "failed",
+      createdAt: "2026-10-16T00:00:00Z",
+      failure: { message: "Check company provider settings", retry, retryUnavailableReason: null },
+    };
+  }
+
+  it.each(["typed", "persisted"])(
+    "preserves a newer %s draft and refs when failed history arrives before an accepted Retry",
+    async (draftSource) => {
+      let resolveHistory!: (value: { messages: unknown[] }) => void;
+      historyState.pending = new Promise((resolve) => {
+        resolveHistory = resolve;
+      });
+      const draftKey = composerDraftStorageKey({
+        companyId: "co-1",
+        userId: "user-1",
+        surface: "commander",
+        entityId: "saved-chat",
+      });
+      if (draftSource === "persisted") {
+        window.localStorage.setItem(
+          draftKey,
+          serializeComposerDraft({
+            text: "Newer unsent draft",
+            tokens: [],
+            attachments: [],
+          }),
+        );
+      }
+      renderPanel({ conversationId: "saved-chat" });
+      if (draftSource === "typed") typeInComposer("Newer unsent draft");
+      await waitFor(() => expect(composerInput().textContent).toBe("Newer unsent draft"));
+      uploadFileMock.mockResolvedValue({
+        assetId: "old-asset",
+        originalFilename: "newer.txt",
+        contentPath: "/api/assets/old-asset/content",
+        contentType: "text/plain",
+        byteSize: 5,
+      });
+      fireEvent.drop(screen.getByTestId("commander-composer-frame"), {
+        dataTransfer: {
+          types: ["Files"],
+          files: [new File(["hello"], "newer.txt", { type: "text/plain" })],
+        },
+      });
+      expect(await screen.findByTestId("commander-input-refs")).toHaveTextContent("newer.txt");
+      const failed = durableFailure();
+      await act(async () => {
+        historyState.pending = null;
+        historyState.messages = [failed];
+        resolveHistory({ messages: [failed] });
+      });
+      const banner = await screen.findByTestId("composer-send-failed-banner");
+      streamState.impl = () =>
+        (async function* () {
+          historyState.messages = [{ ...failed, failure: undefined, turnStatus: "done" }];
+        })();
+      fireEvent.click(within(banner).getByRole("button", { name: "Retry" }));
+      await waitFor(() =>
+        expect(screen.queryByTestId("composer-send-failed-banner")).not.toBeInTheDocument(),
+      );
+      expect(streamState.calls).toHaveLength(1);
+      expect(streamState.calls[0][1]).toBe(failed.content);
+      expect(streamState.calls[0][6]).toEqual(["old-asset"]);
+      expect(streamState.calls[0][7]).toBe("original-send");
+      expect(composerInput().textContent).toBe("Newer unsent draft");
+      expect(screen.getByTestId("commander-input-refs")).toHaveTextContent("newer.txt");
+      expect(deserializeComposerDraft(window.localStorage.getItem(draftKey))?.text).toBe(
+        "Newer unsent draft",
+      );
+    },
+  );
+
+  it.each(["Retry", "Edit", "Discard", "divergence"])(
+    "does not resurrect resolved saved recovery after %s and real active/history refetches",
+    async (action) => {
+      const failed = durableFailure();
+      historyState.messages = [failed];
+      historyState.activeMessages = [failed];
+      historyState.activeConversationId = "saved-chat";
+      const { client } = renderPanel({ conversationId: "saved-chat" });
+      const banner = await screen.findByTestId("composer-send-failed-banner");
+      if (action === "Retry") {
+        streamState.impl = () =>
+          (async function* () {
+            const completed = { ...failed, turnStatus: "done", failure: undefined };
+            historyState.messages = [completed];
+            historyState.activeMessages = [completed];
+          })();
+        fireEvent.click(within(banner).getByRole("button", { name: "Retry" }));
+        await waitFor(() => expect(streamState.calls).toHaveLength(1));
+        await screen.findByRole("button", { name: "Send message" });
+      } else if (action === "divergence") {
+        typeInComposer("New draft after dismissing the old failure");
+      } else {
+        fireEvent.click(within(banner).getByRole("button", { name: action }));
+      }
+      await act(async () => {
+        historyState.activeMessages = [
+          ...historyState.activeMessages,
+          {
+            id: "active-refresh",
+            role: "assistant",
+            content: "Unrelated active refresh",
+          },
+        ];
+        await client.refetchQueries({ queryKey: ["agent-conversation", "co-1"] });
+        // Flush TanStack Query's scheduled observer notification before asserting
+        // the resulting component state, rather than only its synchronous cache.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(screen.queryByTestId("composer-send-failed-banner")).not.toBeInTheDocument();
+      if (action === "Retry") {
+        await waitFor(() => expect(historyState.listCalls).toBeGreaterThanOrEqual(2));
+        const savedHistory = client.getQueryData<{ messages: Array<{ turnStatus: string }> }>([
+          "conversation-messages",
+          "co-1",
+          "saved-chat",
+        ]);
+        expect(savedHistory?.messages[0].turnStatus).toBe("done");
+      }
+      await act(async () => {
+        historyState.messages = [
+          { ...failed, failure: { ...failed.failure, message: "Refreshed old failure" } },
+        ];
+        await client.refetchQueries({ queryKey: ["conversation-messages", "co-1", "saved-chat"] });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      expect(screen.queryByTestId("composer-send-failed-banner")).not.toBeInTheDocument();
+      expect(streamState.calls).toHaveLength(action === "Retry" ? 1 : 0);
+      if (action === "divergence")
+        expect(composerInput().textContent).toBe("New draft after dismissing the old failure");
+      await act(async () => {
+        historyState.messages = [durableFailure("new-failed-user", "new-submission")];
+        await client.refetchQueries({ queryKey: ["conversation-messages", "co-1", "saved-chat"] });
+      });
+      expect(await screen.findByTestId("composer-send-failed-banner")).toHaveTextContent(
+        "Check company provider settings",
+      );
+    },
+  );
+
   it("restores docked failure recovery bound to the persisted conversation rather than the current active-chat default", async () => {
     historyState.activeMessages = [
       {
