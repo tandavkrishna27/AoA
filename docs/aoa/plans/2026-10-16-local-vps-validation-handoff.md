@@ -1,21 +1,33 @@
 # Local + VPS Validation Pickup Checklist
 
 - **Branch:** `codex/replatform-baseline-w00-w04`
-- **Tested baseline:** `05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd`
+- **Original tested baseline:** `05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd`
+- **Latest live retest candidate:** `fe3db70fea7fd4413429bc92d81b56ea67ccd386`; [retest report](../reports/2026-10-16-f01-f05-live-retest-report.md) and [portable retest evidence](../evidence/2026-10-16-f01-f05-live-retest-summary.json).
 - **Source of truth for this attempt:** [validation report](../reports/2026-10-16-local-vps-validation-report.md) and [portable evidence summary](../evidence/2026-10-16-local-vps-validation-summary.json).
 **Status:** Mutable coordination checklist; no application fixes were implemented by the validation/documentation work.
 
-**Implementation follow-up:** F01–F05 have code fixes after this validation attempt. The [engineering verification record](../reports/2026-10-16-f01-f05-engineering-verification.md) records the corrected candidate's passing full Windows suite, typecheck, build and all 16 CI jobs. Their separately scoped [Local and VPS retest cases](2026-10-16-f01-f05-live-retest.md) remain required for live acceptance; implementation and local/CI checks do not close those cases or amend the original results. The original unchecked live-journey requirements below remain open.
+**Current pickup:** F01–F05 engineering fixes and their full Windows/CI checks are recorded in the [engineering verification record](../reports/2026-10-16-f01-f05-engineering-verification.md). The subsequent exact-candidate live retest now establishes **F03's bounded Planning case passed**, but **F01 extraction, F02 saved-chat failure guidance, F04 streaming/answered-choice hydration and F05 full built onboarding remain open**. F06–F09 are qualified investigations, not established production defects. The original validation report is unchanged; checked history below does not replace current-candidate evidence.
 
 Checked items mean the stated implementation observation or verification happened, **not** that an entire W package or release gate passed. F01–F09 are handoff labels, not newly filed repository tickets or assigned owners. Priorities are triage suggestions. Recheck current HEAD and superseding fixes before starting; keep each fix focused and attach its regression test and new-candidate evidence. This checklist is not fresh authority for infrastructure changes, credential transfer, paid calls or rollout flags.
 
-## Completed / verified
+## Latest retest completed / verified
+
+- [x] Matched origin at `fe3db70fe`, rebuilt/upgraded both owned review apps while preserving databases/history, and retained exact-candidate health/artifact receipts.
+- [x] Pinned frozen installs, authoritative builds, **16 targeted files / 236 tests on each host**, and shared/server/UI/CLI typechecks passed. This was not another full-suite or all-package typecheck run.
+- [x] Native real hello/verify and Commander turns succeeded with inherited `gpt-5.6-sol`; saved model selections remained null. Crew stayed paused, with no task agent run started.
+- [x] Cloud negative-boundary persistence now records failed outcome/error and null model/provider/summary; send/reload retained one failed user turn/run. The remaining UI gap is F02 below.
+- [x] **F03 passed:** QAN-2 persisted as Planning/Backlog/Unassigned/Not started with no execution-run link after separate Allow once approval. Consumed-approval replay returned 404 and left tasks identical. QAN-1 remains unchanged.
+- [x] F04 conversational intent remained separate from runtime approval. Legacy/canonical persisted choices render; full streaming/dismissal acceptance is still red below.
+- [x] F05 original zod error no longer reproduced; all nine doctor checks passed. Separate TS-loader diagnostic reached healthy exact candidate; raw command remains blocked and diagnostic UI check failed in the scratch runner. Owned diagnostic process/listener cleanup verified.
+- [x] Published sanitized observed values and finalized raw-file hashes with the new report; no raw auth/config/runtime homes, credentials or production source edits included.
+
+## Original baseline completed / verified (historical)
 
 - [x] Pulled and tested the named branch; tested application matched origin at `05522b0f2` on the final verification. W00/W01/W03/W04 implementation was present per the existing completion plan.
 - [x] Fresh frozen Node 24.19.0 / pnpm 9.15.4 installs, root builds and recursive typechecks passed on Windows x64 and Linux ARM64. Global local tools preserved.
 - [x] Capture self-tests executed: Windows 6 pass / 2 Linux-only skips; Linux 8 pass. Native streams/exits retained, unavailable capture counters left unknown.
 - [x] Complete 149-test startup/PostgreSQL/ACL file passed on both hosts, including opted-in native Windows integration. This does not close the separate residual-process finding F09.
-- [x] Focused regressions executed: Windows 252 pass / 1 fail; Linux 253 pass. Normal full suites executed: Windows 24,360 pass / 3 fail / 2,132 skip plus one unhandled error; Linux 26,414 pass / 81 skip, exit 0. **Windows remains red.**
+- [x] Focused regressions executed: Windows 252 pass / 1 fail; Linux 253 pass. Normal full suites executed: Windows 24,360 pass / 3 fail / 2,132 skip plus one unhandled error; Linux 26,414 pass / 81 skip, exit 0. **That original Windows attempt remains red; it is not the corrected candidate's verdict.**
 - [x] Three Windows full-lane failure files passed 55/55 in quiet isolation; corrected artifact diagnostic passed 34/34. Original failures remain open, not waived by reruns.
 - [x] Exact-source deterministic Docker spine 10/10, verdict controls 129/129 and Linux slot/ownership fixtures 2/2 passed.
 - [x] Fault profile executed with 25/26 Windows-runner passes; selected Linux-only expired-enrollment case passed on a real Linux runner. No complete Linux profile verdict claimed.
@@ -27,78 +39,88 @@ Checked items mean the stated implementation observation or verification happene
 
 ## Pending fixes and investigations
 
-### F01: Native extraction argv
+The [live retest report](../reports/2026-10-16-f01-f05-live-retest-report.md) supplies reproduction steps, source-path investigation pointers, QA entity IDs and evidence limits. All statuses below are for the named candidate, not an inference about later commits.
+
+### F01: Native extraction trusted-directory preflight
 
 **Priority:** P1. **Related work:** W01 native acceptance / TST-008.
 
-- [ ] Reproduce Codex 0.145.0 rejecting `--ask-for-approval` after `exec` in `server/src/services/internal-agent/codex-exec.ts`; add a regression for the real supported CLI argument contract. The parser-only root-option control passed; it is not an extraction success.
-- [ ] Correct argument construction without changing approval/sandbox policy, introducing a model override or adding an API fallback.
-- [ ] Re-run an actual native discussion extraction with inherited model configuration and verify useful persisted extracted items. Then re-run the complete native acceptance journey, not just a hello probe.
+- [x] Engineering corrected the root approval-option placement; real verification passed and the actual extraction no longer failed on the original unsupported argv.
+- [ ] Correct the next demonstrated blocker: isolated temporary-directory extraction exits 1 with `Not inside a trusted directory and --skip-git-repo-check was not specified.` Preserve read-only sandbox, scoped auth and inherited model; no API fallback.
+- [ ] Add a regression reaching the supported CLI's real preflight, then repeat one actual extraction and verify useful persisted items. Failed QA entry `6eea9934-6818-4df8-b0c7-d58f77a9a526` is retained.
+- [ ] Complete native TST-008 only after extraction and the remaining journey evidence pass; new Scout/crew acceptance was not executed in this retest.
 
-### F02: Cloud empty response, false completion and model label
+### F02: Cloud failure guidance lost on saved-chat reload
 
 **Priority:** P1. **Related work:** Commander failure handling / W01 provenance.
 
-- [ ] Reproduce the unsupported/no-company-key send on `cloud_auth`: only user text remains, turn failed, run completed with NULL error/summary and a legacy `gpt-4.1` label.
-- [ ] Trace streamed error handling through `server/src/routes/internal-agent.ts`, run persistence and the UI. Add tests that distinguish a genuine completion from yielded errors, empty/config-denied outcomes and thrown failures; keep idempotency/rejoin behavior intact.
-- [ ] Surface an actionable refusal/deferred state; record an honest failed outcome and do not imply a model ran when no runtime provenance exists. Verify no personal-host-login fallback or tenant execution on the control-plane host.
-- [ ] Re-test this negative boundary independently of positive cloud inference, which remains credential/configuration-dependent below.
+- [x] Initial no-provider send visibly refused unsupported cloud execution. Durable run `aa97d1f9-e793-4abc-acb1-7ceae2f94be7` is failed with error text and null model/provider/summary; no false completion or shared-host execution.
+- [ ] Restore actionable refusal/error and retry controls after reload/reopening saved chat. The new chat currently shows only the failed user's message, despite the correct failed run.
+- [ ] Cover failed-user-turn/run hydration, not just failed assistant messages or transient failed-send state. Investigate `InternalAgentPanel.tsx` saved-conversation loading.
+- [ ] Retest retry/rejoin using the original submission identity and prove no duplicated run/side effect or host fallback. UI retry was unavailable after reload; this requirement is **not passed**.
+- [ ] Keep this negative boundary independent of positive cloud inference. Do not enable unsandboxed multi-tenancy or introduce a personal-host credential fallback to evade the refusal.
 
-### F03: Commander ignores requested Planning mode
+### F03: Planning creation — bounded live case passed
 
 **Priority:** P2. **Related work:** task-tool contract / native useful-tool journey.
 
-- [ ] Trace mode through the tool schema, approval payload and task creation path. Reproduce a task described as planning being persisted with `workMode=standard`; do not infer mode from description text.
-- [ ] Preserve explicit Planning mode through governed creation, or refuse clearly if unsupported. Add a regression asserting `workMode=planning`, no assignee, no execution dispatch/run and no duplicate task on replay/retry.
-- [ ] Re-run the real Commander planning-task journey and verify both durable state and UI mode. Existing `QAN-1` was left unchanged as evidence; creation alone is not the full acceptance criterion.
+- [x] Explicit `workMode=planning` survived governed approval and persisted on exactly one new QAN-2 (`c63290a6-16ee-4d95-8af4-7c2473f4b37f`).
+- [x] Reloaded UI showed Planning, Backlog, Unassigned and Not started; no execution-run link or task dispatch was observed.
+- [x] Conversational choice alone created nothing; Allow once was separate. Replaying that consumed confirmation returned 404 with identical before/after task arrays.
+- [x] Existing Standard-mode QAN-1 was not converted or duplicated. **F03 is closed for this bounded retest**, not whole native TST-008 or W02 acceptance.
 
-### F04: Literal OPTIONS markup / approval presentation
+### F04: Codex streaming choices and answered-choice hydration
 
-**Priority:** P2. **Related work:** Commander approval UI/protocol.
+**Priority:** P2. **Related work:** Commander UI/protocol; two demonstrated remaining gaps.
 
-- [ ] Investigate why `⚡OPTIONS:{"confirm": true}⚡` persists as ordinary response text instead of a usable governed approval interaction. Distinguish conversational confirmation from actual runtime approval; do not assume an extra legitimate approval is itself a bug.
-- [ ] Add protocol/UI regressions for approval presentation, retry and persisted replay. Never treat arbitrary model text as authorization, disable approval gates, or auto-approve to hide the symptom.
-- [ ] Verify a single approved side effect, an understandable final state and no duplicate task. Preserve the original upstream 503 record; the user's retry already proved creation can succeed.
+- [x] Historical legacy and new canonical payloads render as choices when loaded from persistence. Selecting a choice sends intent; a distinct durable runtime approval gates the single task creation.
+- [ ] Parse canonical OPTIONS on the actual Codex summary stream: the original response displayed literal markup, with buttons only after reload. Investigate `cli-mode.ts:2069` (`parsed.summary` yielded directly as text).
+- [ ] Keep answered choices dismissed after reload/reopening an explicit saved conversation. The Create button reappears above the recorded user answer and successful creation. Investigate `InternalAgentPanel.tsx:979` history mapping versus its separate merge/dismissal path.
+- [ ] Add regressions for both actual paths and repeat stream → reload → answer → governed approval → reload/replay. Do not click the resurrected choice, auto-approve, disable gates or create duplicate tasks as a workaround.
+- [x] Consumed-approval replay itself was safe in this retest. The original upstream 503 remains historical, not a proven deterministic defect.
 
-### F05: Built CLI missing dependency under strict pnpm
+### F05: Full built onboarding — workspace loader versus installed artifact
 
-**Priority:** P2. **Related work:** native onboarding packaging.
+**Priority:** P2. **Related work:** native onboarding packaging; artifact acceptance remains incomplete.
 
-- [ ] Reproduce `node cli/dist/index.js onboard --yes` failing to resolve `zod` after a clean frozen install/build. Source CLI success does not prove packaged CLI success. Onboarding may start a server; use disposable data/owned processes.
-- [ ] Trace bundling/package dependency ownership and fix the distributable contract, not global dependency resolution. Keep manifests and lockfile synchronized if a real dependency change is needed.
-- [ ] Verify the built CLI's disposable onboarding and clean shutdown with no global installation workarounds.
+- [x] Original zod module-load failure no longer reproduced; raw built onboard created fresh configuration and passed all nine doctor checks.
+- [ ] Resolve/test the intended built-command contract: plain `node cli/dist/index.js onboard --yes` in this workspace fails importing `server/src/env-compat.js` from `server/src/index.ts`. Workspace server exports source; publishConfig exports dist.
+- [x] A separate fresh-home `--import tsx` diagnostic reached healthy exact candidate, supporting a workspace-loader distinction. Its later PowerShell UI check threw a null-reference; retained diagnostic verdict remains **fail**, not full onboarding success.
+- [ ] Demonstrate usable UI and owned cleanup with the intended installed/packed artifact or repaired supported workspace command. **Published installation was not tested; a published packaging defect is not established.**
+- [x] Both diagnostic attempts were cleaned with no owned app/DB process/listener remaining. Private generated config/auth homes must not be committed.
 
-### F06: Long custom Windows data/auth home
+### F06: Long custom Windows auth home — investigation, default paths unproven
 
-**Priority:** P2. **Related work:** W01 catalog/auth environment handling.
+**Priority:** P2. Not an independently confirmed current-candidate production defect.
 
-- [ ] Reproduce the managed nested auth-home SQLite initialization failure with pinned Codex 0.145.0; compare the same account/CLI with a short home. Original evidence does not prove default home paths fail.
-- [ ] Determine and fix or clearly constrain the supported path contract; add a Windows regression. Preserve owner/company isolation, credential custody and account-scoped model resolution.
-- [ ] Verify catalog, onboarding and an actual native turn on the supported path without model override, global auth mutation or secret disclosure. The short-home test setup was only a workaround.
+- [x] Located historical exact SQLite initialization stderr, child exit 1 and failing nested auth path on the original PC. The portable retest summary includes sanitized excerpts and original-file hashes: failing home length 248 versus successful short-home diagnostic 210.
+- [ ] Independently reproduce with the pinned CLI/account and capture supported/default versus custom path behavior. The comparison does not establish causation or default-path failure.
+- [ ] Only after establishing cause, define/fix or constrain the supported path contract and add Windows coverage without weakening owner/company isolation or credential custody.
 
-### F07: Artifact race error contract and unhandled rejection
+### F07: Artifact race/unhandled rejection — test investigation first
 
-**Priority:** P1. **Related work:** W05 / TST-013.
+**Priority:** P1 triage, **production defect unproven**. Related work: W05 / TST-013.
 
-- [ ] Reproduce both the focused stalled-upload/destroy error-class mismatch and full-lane queued-export/deadline unhandled rejection. Start in `packages/adapter-manager/src/__tests__/server-artifact-export.test.ts` and the provider-wire/gated operation path.
-- [ ] Repair ownership, deadline/cancellation/destroy ordering and error propagation at the demonstrated cause; observe every promise and prevent late artifact promotion. Do not merely broaden the expected error vocabulary to green the test.
-- [ ] Verify controlled races plus interacting/full Windows coverage with zero unhandled errors. The 34/34 isolated pass is diagnostic evidence, not a fix. The separate live W05 output journey is still deferred.
+- [ ] Establish upload entry before racing destroy/export; a destroy-first `ResourceNotAvailableError` can be legitimate. Start in `packages/adapter-manager/src/__tests__/server-artifact-export.test.ts`.
+- [ ] Attach rejection observation immediately to queued promises; investigate whether late handler attachment explains the reported unhandled rejection.
+- [ ] Distinguish a fixture/timing defect from a runtime defect with retained ordering/error evidence. Repair only a demonstrated cause, preserve error semantics and prevent late artifact promotion; do not merely broaden expectations.
+- [ ] Verify the corrected reproducer/interacting lane has no unhandled errors. Isolated passes do not establish a production fix; separate live W05 acceptance remains deferred.
 
-### F08: Windows full-lane stability
+### F08: Historical Windows full-lane failures — causes unresolved
 
-**Priority:** P2. **Related work:** trustworthy W04/whole-lane evidence.
+**Priority:** P2. Later engineering full-suite/affected-file passes are separate evidence, not proof of an original root cause.
 
-- [ ] Diagnose the 30-second AST test timeout in `server/src/__tests__/job-leasing-contract.test.ts` and the 180-second exhaustive IPv4 timeout in `server/src/__tests__/w13-oauth-deny-table-divergence.test.ts`, including interaction/resource load. Preserve security/AST assertions; don't blindly raise timeouts or weaken coverage.
-- [ ] Capture the actual failing address/port in `packages/adapter-manager/src/__tests__/component.test.ts` and verify whether OS-selected `listen(0)` ports hit fetch's restricted-port list. That explanation is currently an inference, not an observed failing port.
-- [ ] Repair demonstrated fixture/scheduling causes, then obtain a fresh complete Windows full-lane native result with no failures/unhandled errors. Passing three files in isolation does not meet this exit criterion.
+- [ ] Recover diagnostics for the AST and exhaustive IPv4 timeouts in `job-leasing-contract.test.ts` and `w13-oauth-deny-table-divergence.test.ts` if further investigation is required; preserve assertions.
+- [ ] Obtain the original failing address/port for `packages/adapter-manager/src/__tests__/component.test.ts` before attributing it to restricted ports. Resource-load/restricted-port explanations remain unsupported.
+- [ ] Only repair demonstrated fixture/scheduling causes. The latest engineering full Windows suite is reported green; this retest ran only the documented 16-file selection, not another complete lane.
 
-### F09: Detached Windows PostgreSQL fixture child
+### F09: Historical residual PostgreSQL incident — attribution unproven
 
-**Priority:** P2. **Related work:** W04 fixture lifecycle.
+**Priority:** P2. Reported cleanup incident, not an established production defect.
 
-- [ ] Investigate the focused fixture's detached PostgreSQL child after its parent exited; retain process ownership, creation/parent identity and fixture-port evidence. The observer stopped only the identified residual child, not the native app DB.
-- [ ] Exercise normal teardown and timeout/abort/failure cleanup, verifying owned descendants terminate and next-case DB health. Do not use blanket PostgreSQL/Node kills or global Docker prune as a repair.
-- [ ] Re-run the complete Windows startup file and its interacting lane, and verify no owned fixture processes or servers remain. Passing assertions alone do not prove process cleanup.
+- [ ] Recover original process ownership, creation/parent identity, command line and fixture-port records before assigning attribution/cause.
+- [ ] Exercise owned normal/timeout/abort/failure teardown and explicitly observe process termination; swallowed stop errors and passing assertions alone cannot certify cleanup.
+- [ ] Repair only a demonstrated cause, without blanket PostgreSQL/Node kills or global Docker prune. This retest's clean owned diagnostic teardown does not disprove the original incident.
 
 ## Acceptance still pending / prerequisites
 
@@ -110,8 +132,8 @@ Checked items mean the stated implementation observation or verification happene
 
 ## Next-agent workflow and exit evidence
 
-1. Read the report, `CLAUDE.md`, locked decisions and the completion plan; select/coordinate ownership of one finding and check for superseding changes. Inspect available local/VPS resources rather than assuming retained services/credentials still exist.
+1. Read the latest retest report and portable evidence above, `CLAUDE.md`, locked decisions and the completion plan; select/coordinate ownership of one finding and check for superseding changes. Inspect available local/VPS resources rather than assuming retained services/credentials still exist.
 2. Add a reproducing test, implement the focused fix, and retain before/after evidence. No application fix is already hidden in this documentation commit.
 3. Use isolated Node 24.19.0 / pnpm 9.15.4. Start with the exact failing files; run interacting lanes and the required root typecheck, test and build checks before claiming a repaired candidate. For real Windows DB integration use `AOA_RUN_WIN_INTEGRATION=1` and disposable PostgreSQL resources.
 4. Capture full native stdout, stderr, exit, counts/skips, unhandled errors, candidate SHA and actual execution location; use a **new** capture directory/attempt. For example, `node scripts/run-vitest-captured.mjs --capture-dir <new-attempt> -- run <selected-files>`; consult existing scripts for opt-ins rather than assuming mocked/skipped runs are live evidence.
-5. Publish a new same-candidate report with a backward `Supersedes` reference where applicable; preserve original failures and this immutable report. Check off a finding only with linked regression/fresh acceptance evidence. Do not mark whole W packages or release acceptance green from isolated passes.
+5. Publish a new same-candidate report with a backward `Supersedes` reference where applicable; preserve original failures and immutable report/evidence records; this pickup checklist is mutable. Check off a finding only with linked regression/fresh acceptance evidence. Do not mark whole W packages or release acceptance green from isolated passes.

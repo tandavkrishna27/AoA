@@ -1,0 +1,486 @@
+{
+  "schemaVersion": 1,
+  "recordDate": "2026-10-16",
+  "timezone": "Asia/Calcutta",
+  "branch": "codex/replatform-baseline-w00-w04",
+  "testedApplication": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+  "publicationScope": "Sanitized retained-retest summary and finalized raw-file hash receipts, not raw logs, private homes, or a new test execution",
+  "verdict": "F03 bounded live case passed; F01/F02/F04 live gaps remain; F05 workspace built onboarding blocked, published installation untested",
+  "tooling": {
+    "pnpm": "9.15.4",
+    "node": "24.19.0",
+    "nativeCodex": "0.145.0"
+  },
+  "selectedTests": [
+    "cli/src/__tests__/bundle-runtime.test.ts",
+    "server/src/__tests__/action-tools.test.ts",
+    "server/src/__tests__/agent-loop.test.ts",
+    "server/src/__tests__/cli-008-unit-b-byte-source.integration.test.ts",
+    "server/src/__tests__/cli-summarizer-sandbox.test.ts",
+    "server/src/__tests__/commander-options-prompt.test.ts",
+    "server/src/__tests__/commander-runtime-approvals-routes.test.ts",
+    "server/src/__tests__/extraction-cli.test.ts",
+    "server/src/__tests__/extraction-file-import-sandbox.test.ts",
+    "server/src/__tests__/internal-agent-chat-route-sse.test.ts",
+    "server/src/__tests__/internal-agent-run-persist.test.ts",
+    "server/src/__tests__/sandbox-readiness-probe.test.ts",
+    "ui/src/components/InternalAgentPanel.bstates.test.tsx",
+    "ui/src/components/InternalAgentPanel.toolCalls.test.tsx",
+    "ui/src/components/settings/sections/RunHistoryTabContent.test.tsx",
+    "server/src/__tests__/cli-mode.test.ts"
+  ],
+  "automated": {
+    "windows": {
+      "targeted": {
+        "node": "24.19.0",
+        "durationSeconds": 54.6,
+        "stage": "targeted",
+        "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+        "exitCode": 0,
+        "pnpm": "9.15.4",
+        "startedAt": "2026-10-16T16:18:02.0266033Z"
+      },
+      "nativeSummary": {
+        "source": "targeted.stdout.log",
+        "files": "16 passed (16)",
+        "tests": "236 passed (236)"
+      },
+      "typecheckAffected": {
+        "node": "24.19.0",
+        "durationSeconds": 71.76,
+        "stage": "typecheck-affected",
+        "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+        "exitCode": 0,
+        "pnpm": "9.15.4",
+        "startedAt": "2026-10-16T16:18:56.7155791Z"
+      },
+      "build": {
+        "startedAt": "2026-10-16T16:13:55.0241556Z",
+        "pnpm": "9.15.4",
+        "node": "24.19.0",
+        "durationSeconds": 233.48,
+        "stage": "build-correct-path",
+        "exitCode": 0,
+        "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386"
+      }
+    },
+    "scope": "Targeted only; not a new complete suite or all-package typecheck",
+    "linux": {
+      "targeted": {
+        "stage": "targeted",
+        "exitCode": 0,
+        "durationSeconds": 60,
+        "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "nativeSummary": {
+        "source": "vps/targeted.log",
+        "files": "16 passed (16)",
+        "tests": "236 passed (236)"
+      },
+      "typecheckAffected": {
+        "stage": "typecheck-affected",
+        "exitCode": 0,
+        "durationSeconds": 165,
+        "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "build": {
+        "stage": "build",
+        "exitCode": 0,
+        "durationSeconds": 329,
+        "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      }
+    }
+  },
+  "nativeVerify": {
+    "helperResult": "observed; raw probe is verified",
+    "hello": "codex_hello_probe_passed",
+    "outcome": "verified"
+  },
+  "F01": {
+    "source": "native-server.stdout.log, original lines 186-215; active log is not hash-pinned",
+    "stderrExcerpt": "Not inside a trusted directory and --skip-git-repo-check was not specified.",
+    "discussionId": "b1081dc1-f103-43b9-8186-faf7569540e3",
+    "observedNativeExit": 1,
+    "errorKind": "nonzero_exit",
+    "extraction": {
+      "id": "6eea9934-6818-4df8-b0c7-d58f77a9a526",
+      "extractionStatus": "failed",
+      "extractedItems": []
+    }
+  },
+  "F02": {
+    "retry": "Not exercised: UI retry control absent after reload",
+    "source": "f02-cloud-after-reload-ui.txt",
+    "durableAfterReload": {
+      "observedAt": "2026-10-16T21:59:05.704389+05:30",
+      "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+      "messages": [
+        {
+          "id": "88958f54-c654-45d9-a4e8-31d5cd32583c",
+          "role": "user",
+          "content": "QA F02 retest fe3db70fe: reply only AOA_F02_OK. Do not use tools or make changes.",
+          "turn_status": "failed",
+          "client_submission_id": "d3015793-57ec-4e24-bb82-7335cd08862f",
+          "conversation_id": "ceaeba4d-a565-4d04-a8f2-080988d07dbf"
+        }
+      ],
+      "runs": [
+        {
+          "id": "aa97d1f9-e793-4abc-acb1-7ceae2f94be7",
+          "status": "failed",
+          "error_message": "Refusing to dispatch a Commander run without genuine per-tenant isolation (the unsandboxed control-plane host, or a local Docker target) under enforced tenant isolation (cloud_auth). Per-tenant execution isolation is not yet implemented; set AOA_ALLOW_UNSANDBOXED_MULTITENANT=1 to explicitly allow unsandboxed runs on this shared deployment, or configure a provider-sandbox execution target. A tenant-authored runtime name is not proof of worker isolation.",
+          "summary": null,
+          "provider": null,
+          "model": null,
+          "duration_ms": null,
+          "created_at": "2026-10-16T21:54:53.900747+05:30"
+        }
+      ]
+    },
+    "uiAfterReload": "Saved retest chat shows only user message; no refusal or Retry/Edit/Discard banner"
+  },
+  "F03": {
+    "config": {
+      "cliTool": "codex",
+      "model": null,
+      "crewModel": null,
+      "crewPaused": true
+    },
+    "approvalReplay": {
+      "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+      "observedAt": "2026-10-16T16:31:07.562Z",
+      "approvals": [
+        {
+          "id": "9953e4fa-0911-4d42-9d78-7af9652603f3",
+          "tool_name": "create_task",
+          "params": {
+            "title": "QA Planning retest fe3db70fe",
+            "workMode": "planning"
+          },
+          "status": "approved",
+          "decision": "allow_once",
+          "executed_at": "2026-10-16T16:29:59.712Z",
+          "result_summary": "Created task \"QA Planning retest fe3db70fe\"",
+          "result_error": null
+        }
+      ],
+      "before": [
+        {
+          "id": "c63290a6-16ee-4d95-8af4-7c2473f4b37f",
+          "title": "QA Planning retest fe3db70fe",
+          "workMode": "planning",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        },
+        {
+          "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+          "title": "QA Commander tool smoke 05522b0f2",
+          "workMode": "standard",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        }
+      ],
+      "replay": {
+        "status": 404,
+        "body": {
+          "error": "No pending confirmation for id: 9953e4fa-0911-4d42-9d78-7af9652603f3"
+        }
+      },
+      "after": [
+        {
+          "id": "c63290a6-16ee-4d95-8af4-7c2473f4b37f",
+          "title": "QA Planning retest fe3db70fe",
+          "workMode": "planning",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        },
+        {
+          "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+          "title": "QA Commander tool smoke 05522b0f2",
+          "workMode": "standard",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        }
+      ],
+      "pass": true
+    },
+    "newActiveRuns": 0,
+    "finalTasks": [
+      {
+        "id": "c63290a6-16ee-4d95-8af4-7c2473f4b37f",
+        "identifier": "QAN-2",
+        "title": "QA Planning retest fe3db70fe",
+        "workMode": "planning",
+        "status": "backlog",
+        "assigneeAgentId": null,
+        "assigneeUserId": null,
+        "executionRunId": null
+      },
+      {
+        "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+        "identifier": "QAN-1",
+        "title": "QA Commander tool smoke 05522b0f2",
+        "workMode": "standard",
+        "status": "backlog",
+        "assigneeAgentId": null,
+        "assigneeUserId": null,
+        "executionRunId": null
+      }
+    ]
+  },
+  "F04": {
+    "savedAnsweredChoice": "Answered Create planning task button reappears after reload/reopen, above recorded user answer and successful creation",
+    "approval": "Separate Allow once gate was required; consumed-approval replay returned 404 with identical tasks",
+    "originalCanonicalStream": "Literal OPTIONS markup observed via browser tool output; no initial-stream screenshot saved",
+    "source": "f04-answered-choice-reappears-ui.txt and .png"
+  },
+  "F05": {
+    "finalOwnedProcessCount": 0,
+    "doctorPassed": 9,
+    "finalOwnedListenerCount": 0,
+    "publishedArtifact": "Not tested",
+    "plainBuilt": {
+      "stage": "f05-built-onboard",
+      "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+      "result": "fail",
+      "command": "node cli/dist/index.js onboard --yes --data-dir <fresh-owned-home>",
+      "error": "Built CLI exited before usable setup: 1",
+      "remainingListeners": []
+    },
+    "loaderDiagnostic": {
+      "stage": "f05-loader-diagnostic",
+      "candidate": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+      "result": "fail",
+      "command": "node --import tsx cli/dist/index.js onboard --yes --data-dir <different-fresh-owned-home>",
+      "health": {
+        "status": "ok",
+        "revision": "fe3db70fea7fd4413429bc92d81b56ea67ccd386",
+        "deploymentMode": "local_trusted",
+        "deploymentExposure": "private",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": true
+        }
+      },
+      "error": "Object reference not set to an instance of an object.",
+      "operatorStoppedLongRunningServer": true,
+      "remainingListeners": []
+    },
+    "plainBuiltStderr": "Cannot find module <repo>/server/src/env-compat.js imported from <repo>/server/src/index.ts"
+  },
+  "F06HistoricalOnly": {
+    "scope": "Historical locally available diagnostics, not an independent current-candidate rerun and not default-path or root-cause proof",
+    "observations": [
+      {
+        "file": "native-catalog-diagnostic-absolute-managed.json",
+        "sha256": "534afc2178475dedcb1c7873df77c9d236ecd8f9428bf1229a4d6c1285b3d92a",
+        "observedAt": "2026-10-16T12:09:10.709Z",
+        "result": "fail",
+        "managed": true,
+        "authHomeLength": 248,
+        "stderr": "Error: failed to initialize sqlite state runtime under <validation-root>\\native-app\\execution-targets\\<scope-hash>\\auth\\<scope-hash>\\<scope-hash>\\openai\\aoa-instances\\<company-id>\\_env-test: failed to initialize state runtime at <validation-root>\\native-app\\execution-targets\\<scope-hash>\\auth\\<scope-hash>\\<scope-hash>\\openai\\aoa-instances\\<company-id>\\_env-test\n",
+        "childExit": {
+          "code": 1,
+          "signal": null
+        },
+        "requestResults": [
+          {
+            "method": "initialize",
+            "error": {
+              "name": "Error",
+              "message": "JSON-RPC client closed",
+              "cause": null
+            }
+          }
+        ]
+      },
+      {
+        "file": "native-catalog-diagnostic-basename-managed.json",
+        "sha256": "7ebb9ac2d2caf7ef33a7159e17b7a964d0d3505733429002f803e33efddde2dc",
+        "observedAt": "2026-10-16T12:09:04.946Z",
+        "result": "fail",
+        "managed": true,
+        "authHomeLength": 248,
+        "stderr": "Error: failed to initialize sqlite state runtime under <validation-root>\\native-app\\execution-targets\\<scope-hash>\\auth\\<scope-hash>\\<scope-hash>\\openai\\aoa-instances\\<company-id>\\_env-test: failed to initialize state runtime at <validation-root>\\native-app\\execution-targets\\<scope-hash>\\auth\\<scope-hash>\\<scope-hash>\\openai\\aoa-instances\\<company-id>\\_env-test\n",
+        "childExit": {
+          "code": 1,
+          "signal": null
+        },
+        "requestResults": [
+          {
+            "method": "initialize",
+            "error": {
+              "name": "Error",
+              "message": "JSON-RPC client closed",
+              "cause": null
+            }
+          }
+        ]
+      },
+      {
+        "file": "native-catalog-diagnostic-absolute-managed-short-home.json",
+        "sha256": "2a17363c0866708a53b59ad4d5caaad2321ab218ee040a1c46256d9cc012abd1",
+        "observedAt": "2026-10-16T12:10:22.88Z",
+        "result": "pass",
+        "managed": true,
+        "authHomeLength": 210,
+        "requestResults": [
+          {
+            "method": "initialize",
+            "resultKeys": [
+              "userAgent",
+              "codexHome",
+              "platformFamily",
+              "platformOs"
+            ]
+          },
+          {
+            "method": "model/list",
+            "resultKeys": [
+              "data",
+              "nextCursor"
+            ],
+            "modelCount": 5
+          }
+        ]
+      }
+    ]
+  },
+  "F06ThroughF09": {
+    "scope": "F06-F09 feedback reviewed while testing F01-F05; not new acceptance or source fixes",
+    "F06": "Historical locally captured long-home SQLite initialization/catalog failure exists, including exact stderr and failing nested path; same pinned CLI/account succeeded with the short home. Other agents could not independently inspect those originals from the clone. Neither default-path failure nor a specific root cause is established; not independently retested on this candidate.",
+    "F07": "Investigation item. Source starts export and destroy without an upload-entry barrier, so destroy winning and ResourceNotAvailableError can be legitimate. Queued export rejection handler is attached after awaiting the predecessor, consistent with an unhandled-rejection harness explanation. No demonstrated production race defect or repair claim.",
+    "F08": "Historical native failures retained, affected files passed in quiet isolation and the engineering candidate's later full suite. Resource load and restricted-port explanations are not independently established; no failing address/port was captured.",
+    "F09": "Reported cleanup incident. Prior narrative/process inspection associated a detached child with a former fixture parent; complete original process ownership records are not portable/committed. Attribution and cause are not fully established by passing assertions or swallowed teardown errors. Not a confirmed production defect."
+  },
+  "rawEvidenceAvailability": {
+    "note": "Access requires the test owner; a fresh clone alone has this summary, not raw files or credentials",
+    "windows": "Sibling validation-2026-10-16-retest-fe3db70fe directory on the original test PC; finalized receipts below are not committed raw attachments",
+    "linux": "/opt/aoa-validation-2026-10-16-retest-fe3db70fe/evidence on the test VPS; copied receipts under local vps/"
+  },
+  "rawFileReceipts": [
+    {
+      "file": "targeted.stdout.log",
+      "sha256": "c8d3e4fba3886654ed613dc1e637820bf4f958ad3d96bf7000211c83b06bc201"
+    },
+    {
+      "file": "targeted.result.json",
+      "sha256": "313a59e1818cf96a5704bb8c6e2ccc9deae3cf16a39e3646e94415984b235a13"
+    },
+    {
+      "file": "build-correct-path.result.json",
+      "sha256": "b3c72a1edbac24442f5c7e6058fd1de1716426bfa2ad987baec259d557763c76"
+    },
+    {
+      "file": "typecheck-affected.result.json",
+      "sha256": "3a1a97deebc1f4b9b95afc7645c7f5aec475f643c23713e9ee18710f77797525"
+    },
+    {
+      "file": "vps/targeted.log",
+      "sha256": "758e0917d984513975d6b853c17c04479bfb61d9b8d0180b1edd28662a9a2135"
+    },
+    {
+      "file": "vps/targeted.result.json",
+      "sha256": "fdba37808d7e7dcab40a4083ddf5c06b2152c779b2ad351b88904ead03e01c8e"
+    },
+    {
+      "file": "vps/build.result.json",
+      "sha256": "91afce711dc8eeab1c2ac4863a49ce6003bad4e2329506c903c28aab8a498960"
+    },
+    {
+      "file": "vps/typecheck-affected.result.json",
+      "sha256": "5ba557dfc4ac9cd69125184b210a64dc3bd504afcbed17364cbd63b10bc4a285"
+    },
+    {
+      "file": "native-verify-ready.json",
+      "sha256": "344aad433b2391f1d7f70ab2306a0cfdb0053dd8747b5fabf7011e03a0cd1d46"
+    },
+    {
+      "file": "native-extraction-observe.json",
+      "sha256": "e06bf6cbae16dab0bf57802532d12d93bf097d3544925460197e3edd800d3e58"
+    },
+    {
+      "file": "cloud-boundary-after-reload.json",
+      "sha256": "9b88d746ba34e2dc78b0facbbff90c02bdb8429ccb470189cc6d0efc54750ca6"
+    },
+    {
+      "file": "native-snapshot-before-approval.json",
+      "sha256": "6c24b8de052770477aa35c40463f5b71458a64b55e9ee2634d0fa9dd7a646eb0"
+    },
+    {
+      "file": "native-snapshot-after-approval.json",
+      "sha256": "32d098661a8e8883f4599d694eea9476425edf7d42593e35faa016c5de0ecf6c"
+    },
+    {
+      "file": "native-snapshot-final.json",
+      "sha256": "676eaa29424c451bbd5a4e56149179110a9495b77734c2979065474f29b7e587"
+    },
+    {
+      "file": "native-approval-replay.json",
+      "sha256": "03127be5b2ef42e244b46d23ae8f4e9018f761c6550c5a2d6c795d2f8c9a71a5"
+    },
+    {
+      "file": "f03-planning-ui.txt",
+      "sha256": "4a8b79714565d5808c81bafd9092e753904d5819b442b1b2c60eb24b35d3334c"
+    },
+    {
+      "file": "f03-planning-ui.png",
+      "sha256": "050a1b194dc266367b0c0c277c48998c2b64020da6742aeb04b043be4b2d9f3c"
+    },
+    {
+      "file": "f04-answered-choice-reappears-ui.txt",
+      "sha256": "3cc5026307032501ec67d1c3fc7bd0f57a07f9681e6fada2db5f83cfdb6d6f3a"
+    },
+    {
+      "file": "f04-answered-choice-reappears.png",
+      "sha256": "c0ba648443b90f4ae16a94de22c3606a82e5d00aa914fe7de65237f66ea1281d"
+    },
+    {
+      "file": "f02-cloud-after-reload-ui.txt",
+      "sha256": "3ea9acbc5a34d87210951bad251324395edd4ba4da5c65cd42ca55f100ee20fc"
+    },
+    {
+      "file": "f05-built-onboard.result.json",
+      "sha256": "c7ed05d28366e9e9e13d2f6d10bcc060b04eadfde4b2ab15f04bd79d1e97a5cb"
+    },
+    {
+      "file": "f05-built-onboard.stdout.log",
+      "sha256": "c03fe2e13d29ac388fc2f7713aac75115d826da9ad9db4d9a400de01b418ee06"
+    },
+    {
+      "file": "f05-built-onboard.stderr.log",
+      "sha256": "c6f74e825925db625b94fa14186ec8389f45bd348272dcb354348391503105a7"
+    },
+    {
+      "file": "f05-loader-diagnostic.result.json",
+      "sha256": "add6df48082bfe01c5cf238d9fe06affb6010d20f3b69229bed7e1f1db07e7e3"
+    },
+    {
+      "file": "final-audit.json",
+      "sha256": "a4a803f8d3311dd32c9e99bce7be9d58b834ab14f95a3ab57fa54d582191867d"
+    },
+    {
+      "file": "vps-final-artifacts.txt",
+      "sha256": "502ef86a833fad6e90ecdb3c5d3a67927453c961945527d13e4f615276fff08d"
+    },
+    {
+      "file": "f06-evidence-clarification.json",
+      "sha256": "1b9860fc95bc9211375aa0f2805b36e5025a6a3623a2a1507f76692d0fe2e251"
+    }
+  ]
+}
