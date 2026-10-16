@@ -53,6 +53,9 @@ for (const name of externalWorkspacePackages) {
 // npm consumers do not inherit this workspace's pnpm.patchedDependencies.
 // Bundle the patched driver so COPY rejection completes instead of hanging.
 externals.delete("postgres");
+// Shared validators are bundled workspace code. Bundle their pure-JS runtime too
+// so the built entrypoint does not depend on an undeclared CLI-level zod link.
+externals.delete("zod");
 
 /** @type {import('esbuild').BuildOptions} */
 export default {

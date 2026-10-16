@@ -1,7 +1,38 @@
 import { describe, expect, it } from "vitest";
 import { parseCliOutput } from "../services/internal-agent/cli-mode.js";
+import { COMMANDER_SKILL_PREAMBLE } from "../services/internal-agent/commander-preamble.js";
+import { readFileSync } from "node:fs";
 
 describe("parseCliOutput: options_prompt extraction", () => {
+  it.each([
+    COMMANDER_SKILL_PREAMBLE,
+    readFileSync(new URL("../onboarding-assets/commander/AGENTS.md", import.meta.url), "utf8"),
+  ])("renders every OPTIONS example in Commander instructions", (instructions) => {
+    const markers = instructions.match(/⚡OPTIONS:\{[^\n]*?\}⚡/g) ?? [];
+    expect(markers.length).toBeGreaterThan(0);
+    for (const marker of markers) {
+      expect(parseCliOutput(marker)).toEqual([
+        expect.objectContaining({ type: "options_prompt", options: expect.any(Array) }),
+      ]);
+    }
+  });
+
+  it.each([
+    ['⚡OPTIONS:{"confirm":true}⚡', "Proceed with this action?", ["Proceed", "Cancel"]],
+    ['⚡OPTIONS:{"choices":["Option A","Option B"]}⚡', "Choose an option", ["Option A", "Option B"]],
+  ])("renders legacy OPTIONS from an existing prompt or replay as a choice, never approval", (marker, question, options) => {
+    const chunks = parseCliOutput(marker as string);
+    expect(chunks).toEqual([
+      expect.objectContaining({ type: "options_prompt", question, options }),
+    ]);
+    expect(chunks.some((chunk) => chunk.type === "action_confirmation")).toBe(false);
+  });
+
+  it("refuses non-string choices instead of passing unsafe values to the UI", () => {
+    const line = '⚡OPTIONS:{"question":"Pick one","options":[{"toolName":"create_task"}]}⚡';
+    expect(parseCliOutput(line)).toEqual([{ type: "text", delta: line }]);
+  });
+
   it("emits options_prompt chunk for OPTIONS marker", () => {
     const payload = {
       question: "Which adapter fits your workflow?",

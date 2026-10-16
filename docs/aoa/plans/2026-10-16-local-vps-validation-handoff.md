@@ -5,6 +5,8 @@
 - **Source of truth for this attempt:** [validation report](../reports/2026-10-16-local-vps-validation-report.md) and [portable evidence summary](../evidence/2026-10-16-local-vps-validation-summary.json).
 **Status:** Mutable coordination checklist; no application fixes were implemented by the validation/documentation work.
 
+**Implementation follow-up:** F01–F05 have code fixes after this validation attempt. Their separately scoped [Local and VPS retest cases](2026-10-16-f01-f05-live-retest.md) remain required for live acceptance; implementation and local/CI checks do not close those cases or amend the original results. The original unchecked live-journey requirements below remain open.
+
 Checked items mean the stated implementation observation or verification happened, **not** that an entire W package or release gate passed. F01–F09 are handoff labels, not newly filed repository tickets or assigned owners. Priorities are triage suggestions. Recheck current HEAD and superseding fixes before starting; keep each fix focused and attach its regression test and new-candidate evidence. This checklist is not fresh authority for infrastructure changes, credential transfer, paid calls or rollout flags.
 
 ## Completed / verified

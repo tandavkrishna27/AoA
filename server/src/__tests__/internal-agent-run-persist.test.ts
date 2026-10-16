@@ -93,18 +93,18 @@ describe("T2 resolveRunCostCentsFromSummary (estimate-vs-reported)", () => {
 describe("T2 resolvePersistedProvenance (F1 — adapter-reported over cost-label)", () => {
   it("uses adapter-reported model and provider when finalSummary carries them", () => {
     const summary: RunFinalSummary = { durationMs: 0, costCents: 0, model: "gpt-5.5", provider: "openai" };
-    const result = resolvePersistedProvenance(summary, "gpt-4.1", "openai");
+    const result = resolvePersistedProvenance(summary);
     expect(result).toEqual({ model: "gpt-5.5", provider: "openai" });
   });
-  it("falls back to cost-label model/provider when finalSummary carries no model", () => {
+  it("leaves runtime provenance empty when the adapter reports no model", () => {
     const summary: RunFinalSummary = { durationMs: 0, costCents: 0 };
-    const result = resolvePersistedProvenance(summary, "gpt-4.1", "openai");
-    expect(result).toEqual({ model: "gpt-4.1", provider: "openai" });
+    const result = resolvePersistedProvenance(summary);
+    expect(result).toEqual({ model: null, provider: null });
   });
-  it("falls back to cost-label when finalSummary is null", () => {
-    expect(resolvePersistedProvenance(null, "claude-sonnet-4-6", "anthropic")).toEqual({
-      model: "claude-sonnet-4-6",
-      provider: "anthropic",
+  it("leaves runtime provenance empty when there is no final summary", () => {
+    expect(resolvePersistedProvenance(null)).toEqual({
+      model: null,
+      provider: null,
     });
   });
   it("cost pricing still uses cost-label model even when adapter-reported model differs", () => {
@@ -121,7 +121,7 @@ describe("T2 resolvePersistedProvenance (F1 — adapter-reported over cost-label
     const cost = resolveRunCostCentsFromSummary(summary, "openai", "gpt-4.1");
     expect(cost).toBeGreaterThan(0);
     // Provenance: adapter-reported = gpt-5.5
-    const prov = resolvePersistedProvenance(summary, "gpt-4.1", "openai");
+    const prov = resolvePersistedProvenance(summary);
     expect(prov.model).toBe("gpt-5.5");
   });
 });

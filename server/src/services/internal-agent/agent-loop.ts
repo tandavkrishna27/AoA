@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import { internalAgentConfig, agents } from "@armyofagents/db";
 import type { CommanderContextScope, ShowRef } from "@armyofagents/shared";
+import { normalizeCommanderOptions } from "@armyofagents/shared";
 import type { ToolResult } from "./types.js";
 import { conversationService, COMMANDER_TURN_HEARTBEAT_MS } from "./conversation.js";
 import { cliModeService } from "./cli-mode.js";
@@ -121,10 +122,12 @@ export interface ChatInput {
  * reasoning, tool calls/results, and content back as the original run would.
  */
 function* replayPersistedReply(reply: {
+  id?: string;
   content?: string | null;
   reasoning?: string | null;
   toolCalls?: unknown;
   outputRefs?: unknown;
+  turnStatus?: string | null;
 }): Generator<AgentStreamChunk> {
   if (reply.reasoning) {
     yield { type: "reasoning", delta: reply.reasoning };
@@ -142,6 +145,14 @@ function* replayPersistedReply(reply: {
       summary: typeof tc.summary === "string" ? tc.summary : "",
       data: tc.result,
     };
+    // A failed stream can stop after tool_call and before its tool_result.
+    // Replay the observed call, but do not invent a success/failure result.
+    if (
+      reply.turnStatus === "failed" &&
+      tc.success === undefined &&
+      tc.summary === undefined &&
+      tc.result === undefined
+    ) continue;
     const chunk: AgentStreamChunk = { type: "tool_result", name, result };
     if (tc.id) (chunk as { id?: string }).id = tc.id;
     // Re-attach the turn's merged output refs to the first tool_result so the
@@ -152,10 +163,36 @@ function* replayPersistedReply(reply: {
     }
     yield chunk;
   }
-  if (reply.content) {
-    yield { type: "text", delta: reply.content };
+  const content = reply.content ?? "";
+  const optionMarker = /⚡OPTIONS:(.*?)⚡/g;
+  let contentOffset = 0;
+  let promptIndex = 0;
+  for (const match of content.matchAll(optionMarker)) {
+    const start = match.index ?? 0;
+    const plainText = content.slice(contentOffset, start);
+    if (plainText) yield { type: "text", delta: plainText };
+    try {
+      const prompt = normalizeCommanderOptions(JSON.parse(match[1] ?? ""));
+      if (prompt) {
+        yield {
+          type: "options_prompt",
+          ...prompt,
+          promptId: `${reply.id ?? "replay"}-options-${promptIndex++}`,
+        };
+      } else if (match[0]) {
+        yield { type: "text", delta: match[0] };
+      }
+    } catch {
+      if (match[0]) yield { type: "text", delta: match[0] };
+    }
+    contentOffset = start + match[0].length;
   }
+  const trailingText = content.slice(contentOffset);
+  if (trailingText) yield { type: "text", delta: trailingText };
 }
+
+const PARTIAL_FAILURE_REPLAY_MESSAGE =
+  "This turn stopped before it finished. The partial reply above may be incomplete. Review it before relying on it; retry will not repeat completed tool actions.";
 
 /**
  * A same-key request that could not acquire/keep the turn (lost the atomic claim
@@ -165,11 +202,11 @@ function* replayPersistedReply(reply: {
  */
 async function* replayWinnerOrSignalInProgress(
   convService: {
-    getMessageByClientSubmissionId: (conversationId: string, key: string) => Promise<{ id: string } | null>;
+    getMessageByClientSubmissionId: (conversationId: string, key: string) => Promise<{ id: string; turnStatus?: string | null } | null>;
     getAssistantReplyForUserMessage: (
       conversationId: string,
       userMessageId: string,
-    ) => Promise<{ content?: string | null; reasoning?: string | null; toolCalls?: unknown; outputRefs?: unknown } | null>;
+    ) => Promise<{ content?: string | null; reasoning?: string | null; toolCalls?: unknown; outputRefs?: unknown; turnStatus?: string | null } | null>;
   },
   conversationId: string,
   clientSubmissionId: string | null,
@@ -183,6 +220,9 @@ async function* replayWinnerOrSignalInProgress(
       const reply = await convService.getAssistantReplyForUserMessage(conversationId, winner.id);
       if (reply) {
         yield* replayPersistedReply(reply);
+        if (winner.turnStatus === "failed" || reply.turnStatus === "failed") {
+          yield { type: "error", message: PARTIAL_FAILURE_REPLAY_MESSAGE };
+        }
         return;
       }
     }
@@ -208,10 +248,11 @@ async function* replayWinnerOrSignalInProgress(
  * - Persist the inbound user message (for history + audit)
  * - Fetch the company's Commander config and surface "not configured" errors
  * - Dispatch to cli-mode, forwarding its stream chunks to the caller
- * - Persist the assistant turn after a clean stream (MX-chatpersist):
+ * - Persist the assistant turn after useful output (MX-chatpersist):
  *   cli-mode streams the reply but never writes it back, so the
  *   conversation-owning layer accumulates the text chunks and appends one
- *   role:"assistant" message (skipped on empty / error-only / throw)
+ *   role:"assistant" message; partial output on a failed stream is marked
+ *   failed so retries replay it without rerunning side-effect tools
  *
  * Responsibilities moved to cli-mode.ts:
  * - Session management, CLI subprocess spawn + stdin piping
@@ -245,6 +286,35 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
       // Release the durable claim exactly once, owner-token-guarded. Idempotent
       // (turnFinalized latch) so the success/error/finally paths cooperate.
       let turnFinalized = false;
+      let conversationId: string | null = null;
+      let userMessageId: string | null = null;
+      let completedTurnRunId: string | null = null;
+      let replyAlreadyPersisted = false;
+      let accumulatedAssistant = "";
+      const REASONING_CAP = 16000;
+      let accumulatedReasoning = "";
+      const turnRefs: ShowRef[] = [];
+      const turnToolCalls: Array<{ id?: string; name: string; input?: unknown; success?: boolean; summary?: string; result?: unknown }> = [];
+      let failureMessage: string | null = null;
+      let sawDone = false;
+      let meaningfulResponse = false;
+      const turnHasPersistedEvidence = () =>
+        Boolean(accumulatedAssistant.trim()) || turnToolCalls.length > 0 || Boolean(accumulatedReasoning.trim());
+      const persistAssistantReply = async (failed: boolean): Promise<void> => {
+        if (!conversationId || !turnHasPersistedEvidence() || replyAlreadyPersisted) return;
+        const outputRefs = turnRefs.length > 0 ? mergeOutputRefs([], turnRefs) : undefined;
+        await convService.appendMessage(conversationId, {
+          role: "assistant",
+          ...(completedTurnRunId ? { runId: completedTurnRunId } : {}),
+          content: accumulatedAssistant,
+          ...(userMessageId ? { replyToUserMessageId: userMessageId } : {}),
+          ...(outputRefs ? { outputRefs } : {}),
+          ...(turnToolCalls.length > 0 ? { toolCalls: turnToolCalls } : {}),
+          ...(accumulatedReasoning.trim() ? { reasoning: accumulatedReasoning } : {}),
+          ...(failed ? { turnStatus: "failed" as const } : {}),
+        });
+        replyAlreadyPersisted = true;
+      };
       const finalizeClaim = async (status: "done" | "failed"): Promise<void> => {
         if (!claimedUserMessageId || !claimToken || turnFinalized) return;
         turnFinalized = true;
@@ -265,6 +335,7 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           yield { type: "error", message: "Conversation not found." };
           return;
         }
+        conversationId = conversation.id;
 
         // Ownership guard: when a specific conversationId was requested, reject
         // if the fetched conversation belongs to a different user or company.
@@ -289,7 +360,6 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
         // The persisted user message this turn's reply must be linked to. Set on
         // both the fresh-insert and reuse-existing paths so the assistant row we
         // persist below carries an explicit back-link (PR #291 review, C2).
-        let userMessageId: string | null = null;
         if (params.clientSubmissionId) {
           const priorUser = await convService.getMessageByClientSubmissionId(
             conversation.id,
@@ -310,6 +380,9 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
               // No CLI run — signal the route to skip recording a run (round-8 #3).
               yield { type: "run_skipped" };
               yield* replayPersistedReply(reply);
+              if (priorUser.turnStatus === "failed" || reply.turnStatus === "failed") {
+                yield { type: "error", message: PARTIAL_FAILURE_REPLAY_MESSAGE };
+              }
               return;
             }
             // No linked reply yet. Reuse the row; the durable CAS below is the
@@ -411,13 +484,12 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
         // was dead). We forward every chunk UNCHANGED (SSE/streaming stays
         // byte-identical for claude AND codex — we only ADD post-stream
         // persistence here; cli-mode spawn/args/parsing is untouched) and
-        // separately accumulate type:"text" deltas. After a CLEAN stream
-        // completion, if there is non-empty assistant text, append one
-        // role:"assistant" message. Nothing is persisted on the empty,
-        // error-only, or mid-stream-throw paths (the catch below handles
-        // throws; a partial accumulation is intentionally discarded so a
-        // failed turn never leaves a truncated assistant message — the
-        // persisted user turn + the streamed error are the durable record).
+        // separately accumulate type:"text" deltas. After useful output,
+        // append one linked role:"assistant" message. If the stream reports
+        // an error or throws after producing partial output, persist it with
+        // turnStatus="failed" so a keyed retry can replay the failure without
+        // repeating tools. Error-only and empty turns persist no assistant row
+        // and remain reclaimable through the durable claim CAS.
 
         // Assemble the per-turn prompt (Option B). cli-mode is UNCHANGED:
         // it sends params.content verbatim, so substituting content here
@@ -536,13 +608,6 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           cliTool: (config as { cliTool?: string | null }).cliTool ?? "claude_cli",
         };
 
-        let completedTurnRunId: string | null = null;
-        let replyAlreadyPersisted = false;
-        let accumulatedAssistant = "";
-        const REASONING_CAP = 16000;
-        let accumulatedReasoning = "";
-        const turnRefs: ShowRef[] = [];
-        const turnToolCalls: Array<{ id?: string; name: string; input?: unknown; success?: boolean; summary?: string; result?: unknown }> = [];
         // Lease heartbeat (round-7 #1): refresh turn_claimed_at during a long
         // stream so an actively-progressing turn never ages into the staleness
         // window and gets reclaimed + double-run. Throttled to the heartbeat
@@ -559,7 +624,12 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           }
           if (chunk.type === "reply_persisted") replyAlreadyPersisted = true;
           if (chunk.type === "done" && chunk.summary.runId) completedTurnRunId = chunk.summary.runId;
-          if (chunk.type === "text") accumulatedAssistant += chunk.delta;
+          if (chunk.type === "done") sawDone = true;
+          if (chunk.type === "error") failureMessage ??= chunk.message || "Commander could not complete this turn.";
+          if (chunk.type === "text") {
+            if (chunk.delta.trim()) meaningfulResponse = true;
+            accumulatedAssistant += chunk.delta;
+          }
           if (chunk.type === "reasoning") {
             // F5: cap accumulation exactly — once at/over cap, stop appending and
             // skip forwarding to avoid holding a huge string in memory.
@@ -571,9 +641,11 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
             accumulatedReasoning = (accumulatedReasoning + chunk.delta).slice(0, REASONING_CAP);
           }
           if (chunk.type === "tool_call") {
+            meaningfulResponse = true;
             turnToolCalls.push({ id: chunk.id, name: chunk.name, input: chunk.input });
           }
           if (chunk.type === "tool_result") {
+            meaningfulResponse = true;
             const enriched = {
               success: chunk.result?.success ?? true,
               summary: humanToolSummary(chunk.name, chunk.result?.summary ?? chunk.result?.data),
@@ -583,40 +655,30 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
             if (match) Object.assign(match, enriched);
             else turnToolCalls.push({ id: chunk.id, name: chunk.name, ...enriched });
           }
+          if (chunk.type === "options_prompt") {
+            meaningfulResponse = true;
+            const marker = `⚡OPTIONS:${JSON.stringify({ question: chunk.question, options: chunk.options })}⚡`;
+            accumulatedAssistant += `${accumulatedAssistant ? "\n" : ""}${marker}`;
+          }
+          if (chunk.type === "action_confirmation") {
+            meaningfulResponse = true;
+            const notice = `Action requires approval for ${chunk.toolName}. Complete the pending approval to proceed.`;
+            accumulatedAssistant += `${accumulatedAssistant ? "\n" : ""}${notice}`;
+          }
           collectChunkRefs(turnRefs, chunk);
           yield chunk;
         }
 
-        const turnProducedReply =
-          Boolean(accumulatedAssistant.trim()) || turnToolCalls.length > 0 || Boolean(accumulatedReasoning.trim());
-        if (turnProducedReply && !replyAlreadyPersisted) {
-          // Assistant replies have no originating page / department-persona
-          // context (those describe where the USER was), so we omit them —
-          // appendMessage defaults the optional fields to null, matching the
-          // internal_agent_messages schema. role:"assistant" is a valid role
-          // per the schema's role enum.
-          const outputRefs = turnRefs.length > 0 ? mergeOutputRefs([], turnRefs) : undefined;
-          await convService.appendMessage(conversation.id, {
-            role: "assistant",
-            ...(completedTurnRunId ? { runId: completedTurnRunId } : {}),
-            content: accumulatedAssistant,
-            // C2 (PR #291 review): back-link the reply to the user turn that
-            // produced it so an idempotent retry replays THIS reply, never a
-            // later turn's. Null only if assembly ran without a user row.
-            ...(userMessageId ? { replyToUserMessageId: userMessageId } : {}),
-            ...(outputRefs ? { outputRefs } : {}),
-            ...(turnToolCalls.length > 0 ? { toolCalls: turnToolCalls } : {}),
-            // F5: accumulatedReasoning is already capped during accumulation — no slice needed.
-            ...(accumulatedReasoning.trim() ? { reasoning: accumulatedReasoning } : {}),
-          });
-        }
+        if (!sawDone) failureMessage ??= "Commander stopped before completing this turn.";
+        if (sawDone && !meaningfulResponse) failureMessage ??= "Commander completed without a reply or action.";
+        await persistAssistantReply(Boolean(failureMessage));
 
-        // Release the durable claim (PR #291 round-6, #1). 'done' when a reply
-        // persisted (retries replay it); 'failed' when the turn produced nothing
-        // — error-only, empty, or config failure — so a retry can reclaim + re-
-        // run (round-2 Retry-after-error recovery). Persist the reply BEFORE
-        // marking done so a retry arriving in that window replays, never re-runs.
-        await finalizeClaim(turnProducedReply ? "done" : "failed");
+        // Release the durable claim (PR #291 round-6, #1). A clean reply is
+        // marked done; failures are marked failed. Partial failed replies carry
+        // their own failure marker before release, so retries replay them
+        // without rerunning side effects. Error-only and empty turns have no
+        // assistant row and remain reclaimable.
+        await finalizeClaim(meaningfulResponse && !failureMessage ? "done" : "failed");
 
         // Post-turn compaction (graceful: never blocks/raises into the turn).
         // U13.6: on AoA Cloud, a compaction throw previously degraded SILENTLY
@@ -650,12 +712,18 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
           // swallow — a failed compaction must never affect the delivered reply
         }
       } catch (err: any) {
+        const terminalMessage = failureMessage ?? err?.message ?? "An unexpected error occurred.";
+        failureMessage = terminalMessage;
+        // A CLI can yield useful partial text/tool results and then throw. Save
+        // that linked reply with a failure marker before releasing the claim so
+        // retries replay the evidence without executing side-effect tools again.
+        await persistAssistantReply(true).catch(() => {});
         // Mark the durable claim 'failed' so a retry can reclaim + re-run the
         // turn (#1). Best-effort — never let it mask the original error.
         await finalizeClaim("failed");
         yield {
           type: "error",
-          message: err?.message ?? "An unexpected error occurred.",
+          message: terminalMessage,
         };
         yield {
           type: "done",

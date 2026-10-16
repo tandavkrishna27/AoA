@@ -66,6 +66,12 @@ five company-owned assets.
 An accepted or in-progress replay does not launch a second CLI turn or persist a
 duplicate user message.
 
+Yielded runtime errors are terminal failures, even when a lower-level stream follows them with a synthetic completion summary. A stream ending without a completion summary or meaningful response also fails. Failed legacy runs retain actionable `errorMessage`; missing runtime model/provider provenance stays null rather than using a pricing estimate. A failed partial reply is recorded with its failure state: retrying the same submission replays its evidence and failure without repeating tool side effects. An error-only turn without a linked reply remains retryable. Rejoined distributed runs retain their existing ownership rules.
+
+The governed `create_task` tool accepts optional `workMode` (`standard` or `planning`). Omission retains Standard behavior; explicit Planning mode passes through the stored runtime approval payload and does not auto-dispatch. Description text does not select a mode.
+
+Conversational choices use `⚡OPTIONS:{"question":"Proceed?","options":["Proceed","Cancel"]}⚡`. Older `confirm:true` and `choices` payloads are normalized as choices, including persisted legacy markup in the board UI. They never grant runtime approval; the separate durable approval remains authoritative.
+
 The stream may emit `thinking`, `content`, `reasoning`, `tool_call`,
 `tool_result`, `action_confirm`, `options_prompt`, `error`, and `done` events.
 Clients should treat event payloads as typed stream events and wait for `done`

@@ -6,7 +6,7 @@ import { platform, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@armyofagents/db";
-import { showRefSchema } from "@armyofagents/shared";
+import { normalizeCommanderOptions, showRefSchema } from "@armyofagents/shared";
 import type { HumanQuestionRuntimeCapabilities } from "@armyofagents/adapter-utils";
 import { mergeChildEnv } from "@armyofagents/adapter-utils/server-utils";
 import {
@@ -441,21 +441,12 @@ export function parseCliOutput(line: string): AgentStreamChunk[] {
   const optMatch = line.match(OPTIONS_RE);
   if (optMatch) {
     try {
-      const payload = JSON.parse(optMatch[1]) as {
-        question?: string;
-        options?: unknown;
-      };
-      if (
-        typeof payload.question !== "string" || payload.question.trim() === "" ||
-        !Array.isArray(payload.options) || payload.options.length === 0
-      ) {
-        throw new Error("invalid OPTIONS payload");
-      }
+      const normalized = normalizeCommanderOptions(JSON.parse(optMatch[1]));
+      if (!normalized) throw new Error("invalid OPTIONS payload");
       return [
         {
           type: "options_prompt",
-          question: payload.question,
-          options: payload.options as string[],
+          ...normalized,
           promptId: crypto.randomUUID(),
         },
       ];

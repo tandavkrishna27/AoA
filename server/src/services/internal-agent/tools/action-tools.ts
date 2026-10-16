@@ -6,7 +6,7 @@ export function createActionTools(): AgentTool[] {
     {
       name: "create_task",
       description:
-        "Create a new task with title, optional description, priority, department, goal, assignee, and responsible human. Assignee means who does the task; responsible human owns the outcome.",
+        "Create a new task with title, optional description, priority, department, goal, work mode, assignee, and responsible human. Planning tasks are saved for human curation and do not auto-dispatch. Assignee means who does the task; responsible human owns the outcome.",
       parameters: {
         type: "object",
         properties: {
@@ -15,6 +15,11 @@ export function createActionTools(): AgentTool[] {
           priority: { type: "string", enum: ["urgent", "high", "medium", "low"], description: "Task priority" },
           departmentId: { type: "string", description: "Department to assign task to" },
           goalId: { type: "string", description: "Goal to link task to" },
+          workMode: {
+            type: "string",
+            enum: ["standard", "planning"],
+            description: "Task mode. Planning keeps the task in human-curated planning until changed to Standard.",
+          },
           assigneeType: { type: "string", enum: ["agent", "user"], description: "Whether assigneeId is an agent id or human user id" },
           assigneeId: { type: "string", description: "Assignee id for the agent or human doing the task" },
           responsibleUserId: {
@@ -28,7 +33,15 @@ export function createActionTools(): AgentTool[] {
       requiredRole: "team_lead",
       requiresConfirmation: true,
       execute: async (params: unknown, ctx) => {
-        const { title, description, priority, departmentId, goalId, assigneeId, assigneeType, responsibleUserId } = (params ?? {}) as Record<string, unknown>;
+        const { title, description, priority, departmentId, goalId, workMode, assigneeId, assigneeType, responsibleUserId } = (params ?? {}) as Record<string, unknown>;
+        if (workMode !== undefined && workMode !== "standard" && workMode !== "planning") {
+          return {
+            success: false,
+            data: null,
+            error: "workMode must be standard or planning",
+            summary: "Invalid task mode",
+          };
+        }
         if (assigneeId && assigneeType !== "agent" && assigneeType !== "user") {
           return {
             success: false,
@@ -57,6 +70,7 @@ export function createActionTools(): AgentTool[] {
           ...(priority ? { priority: priority as string } : {}),
           ...(departmentId ? { projectId: departmentId as string } : {}),
           ...(goalId ? { goalId: goalId as string } : {}),
+          ...(workMode !== undefined ? { workMode: workMode as "standard" | "planning" } : {}),
           ...assigneePatch,
           ...(responsibleUserId
             ? { responsibleUserId: responsibleUserId as string }

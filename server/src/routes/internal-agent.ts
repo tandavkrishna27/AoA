@@ -211,8 +211,51 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
       // round-8 #3: set when chat() signals an idempotent replay / in-progress
       // defer (no CLI run) so the pre-created run row is deleted, not finalized.
       let runSkipped = false;
+      let failureMessage: string | null = null;
+      let meaningfulResponse = false;
       let rejoinedRunId: string | null = null;
+      let rejoinCleanupAttempted = false;
       let completedRunId = run.id;
+
+      const cleanupFailedRejoin = async () => {
+        if (!rejoinedRunId || rejoinCleanupAttempted) return;
+        rejoinCleanupAttempted = true;
+        // This validates the distributed source against the same company, user,
+        // and conversation binding as a successful rejoin, then removes only
+        // this request's placeholder. The distributed run remains authoritative.
+        await rejoinCommanderRun(db, {
+          companyId,
+          userId: actor.actorId,
+          originalRunId: rejoinedRunId,
+          placeholderRunId: run.id,
+          conversationId: req.body.conversationId ?? req.body.contextScope?.conversationId,
+        }).catch(() => {
+          // Keep the original stream failure. If validation/cleanup refuses,
+          // persistFailure can still mark the local placeholder failed.
+        });
+      };
+
+      const persistFailure = async (message: string, emitError: boolean) => {
+        if (emitError) {
+          res.write(
+            `event: error\ndata: ${JSON.stringify({ code: "INTERNAL", message })}\n\n`,
+          );
+        }
+        // HTTP failure owns only legacy status; distributed completion/recovery owns its run.
+        await db
+          .update(internalAgentRuns)
+          .set({
+            status: "failed",
+            completedAt: new Date(),
+            errorMessage: message,
+            model: null,
+            provider: null,
+          })
+          .where(and(eq(internalAgentRuns.id, run.id), eq(internalAgentRuns.companyId, companyId),
+            eq(internalAgentRuns.status, "running"),
+            or(isNull(internalAgentRuns.executionOwner), eq(internalAgentRuns.executionOwner, "legacy"))))
+          .catch(() => {});
+      };
 
       try {
         const svc = agentLoopService(db, storageService);
@@ -262,16 +305,19 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
         for await (const chunk of stream) {
           switch (chunk.type) {
             case "text":
+              if (chunk.delta.trim()) meaningfulResponse = true;
               res.write(
                 `event: content\ndata: ${JSON.stringify({ text: chunk.delta })}\n\n`,
               );
               break;
             case "tool_call":
+              meaningfulResponse = true;
               res.write(
                 `event: tool_call\ndata: ${JSON.stringify({ name: chunk.name })}\n\n`,
               );
               break;
             case "tool_result":
+              meaningfulResponse = true;
               // refs are validated/screened + MCP-gated at the parser layer; the
               // persistence boundary re-validates independently. Forward as-is.
               // REVIEW FIX (Lens A/B/C): do NOT forward input — unbounded + unused by render.
@@ -285,6 +331,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
               );
               break;
             case "action_confirmation": {
+              meaningfulResponse = true;
               const confirmId = chunk.runId;
               const paramsSummary =
                 chunk.params &&
@@ -304,6 +351,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
               break;
             }
             case "options_prompt":
+              meaningfulResponse = true;
               res.write(
                 `event: options_prompt\ndata: ${JSON.stringify({
                   promptId: chunk.promptId,
@@ -313,8 +361,9 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
               );
               break;
             case "error":
+              failureMessage ??= chunk.message || "Commander could not complete this turn.";
               res.write(
-                `event: error\ndata: ${JSON.stringify({ code: "INTERNAL", message: chunk.message })}\n\n`,
+                `event: error\ndata: ${JSON.stringify({ code: "INTERNAL", message: failureMessage })}\n\n`,
               );
               break;
             case "reasoning":
@@ -345,9 +394,28 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
             .delete(internalAgentRuns)
             .where(and(eq(internalAgentRuns.id, run.id), eq(internalAgentRuns.companyId, companyId)))
             .catch(() => {});
-          res.write(
-            `event: done\ndata: ${JSON.stringify({ messageId: run.id, runId: run.id })}\n\n`,
-          );
+          // A replay/in-progress skip is a successful no-op only when the
+          // stream did not also report a failure. Preserve the error event and
+          // close without a contradictory done event when both were yielded.
+          if (!failureMessage) {
+            res.write(
+              `event: done\ndata: ${JSON.stringify({ messageId: run.id, runId: run.id })}\n\n`,
+            );
+          }
+          res.end();
+          return;
+        }
+
+        // An error chunk is terminal even if the lower-level generator follows it
+        // with a synthetic done summary. A stream that simply ends without either
+        // an error or a summary is also not a successful turn.
+        if (failureMessage || !finalSummary || !meaningfulResponse) {
+          const message = failureMessage ??
+            (!finalSummary
+              ? "Commander did not complete this turn. Check its runtime and company provider setup in Settings, then retry."
+              : "Commander completed without a reply or action. Check its runtime and company provider setup in Settings, then retry.");
+          await cleanupFailedRejoin();
+          await persistFailure(message, !failureMessage);
           res.end();
           return;
         }
@@ -369,9 +437,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
         // over the cost-label defaults (which are pricing inputs, not provenance).
         // Cost PRICING still uses runModel/runProvider via resolveRunCostCentsFromSummary above.
         const { model: persistedModel, provider: persistedProvider } = resolvePersistedProvenance(
-          finalSummary ?? null,
-          runModel,
-          runProvider,
+          finalSummary,
         );
 
         await db
@@ -404,22 +470,8 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Internal error";
-        res.write(
-          `event: error\ndata: ${JSON.stringify({ code: "INTERNAL", message })}\n\n`,
-        );
-
-        // HTTP failure owns only legacy status; distributed completion/recovery owns its run.
-        await db
-          .update(internalAgentRuns)
-          .set({
-            status: "failed",
-            completedAt: new Date(),
-            errorMessage: message,
-          })
-          .where(and(eq(internalAgentRuns.id, run.id), eq(internalAgentRuns.companyId, companyId),
-            eq(internalAgentRuns.status, "running"),
-            or(isNull(internalAgentRuns.executionOwner), eq(internalAgentRuns.executionOwner, "legacy"))))
-          .catch(() => {});
+        await cleanupFailedRejoin();
+        await persistFailure(message, true);
       }
 
       res.end();

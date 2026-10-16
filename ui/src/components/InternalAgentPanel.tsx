@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { normalizeCommanderOptions } from "@armyofagents/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -426,6 +427,22 @@ export interface LocalMessage {
 }
 
 function serverToLocal(m: AgentMessage): LocalMessage {
+  let optionsPrompt: LocalMessage["optionsPrompt"];
+  const originalContent = m.content ?? "";
+  const parsedContent = m.role !== "assistant" ? originalContent : originalContent.replace(/⚡OPTIONS:(.*?)⚡/g, (marker, json: string) => {
+    try {
+      const normalized = normalizeCommanderOptions(JSON.parse(json));
+      if (!normalized) return marker;
+      optionsPrompt = { ...normalized, promptId: `${m.id}-options`, dismissed: m.turnStatus === "failed" };
+      return "";
+    } catch {
+      return marker;
+    }
+  });
+  let content = optionsPrompt ? parsedContent.trim() : originalContent;
+  if (m.role === "assistant" && m.turnStatus === "failed") {
+    content += "\n\nThis reply is incomplete. See Run History for failure details before starting a new turn.";
+  }
   const calls = Array.isArray(m.toolCalls) ? m.toolCalls : [];
   const toolCalls: ToolCallEntry[] | undefined =
     calls.length > 0
@@ -440,7 +457,8 @@ function serverToLocal(m: AgentMessage): LocalMessage {
   return {
     id: m.id,
     role: m.role === "tool" ? "system" : m.role,
-    content: m.content ?? "",
+    content,
+    ...(optionsPrompt ? { optionsPrompt } : {}),
     streamingDone: true,
     outputRefs: m.outputRefs ?? undefined,
     ...(toolCalls ? { toolCalls } : {}),
@@ -467,15 +485,17 @@ export function mergeServerMessagesWithTransientLocal(
       localDurationByContent.set(lm.content, lm.durationMs);
     }
   }
-  const merged = serverMessages.map((m) => {
+  const merged = serverMessages.map((m, index) => {
     const base = serverToLocal(m);
+    const optionsPrompt = localById.get(m.id)?.optionsPrompt ?? base.optionsPrompt;
+    const answered = optionsPrompt && serverMessages.slice(index + 1).some((next) => next.role === "user");
     const carriedDuration =
       base.role === "assistant" ? localDurationByContent.get(base.content) : undefined;
     return {
       ...base,
       ...(carriedDuration !== undefined ? { durationMs: carriedDuration } : {}),
       actionConfirm: localById.get(m.id)?.actionConfirm,
-      optionsPrompt: localById.get(m.id)?.optionsPrompt,
+      optionsPrompt: optionsPrompt ? { ...optionsPrompt, dismissed: optionsPrompt.dismissed || Boolean(answered) } : undefined,
     };
   });
 
@@ -1365,8 +1385,12 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
           "Commander hit an error. Please try again.";
         setMessages((prev) =>
           settleRunningToolCalls(prev, assistantId).map((m) =>
-            m.id === assistantId && !m.content
-              ? { ...m, content: message, streamingDone: true }
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: m.content ? `${m.content}\n\n${message}` : message,
+                  streamingDone: true,
+                }
               : m,
           ),
         );

@@ -437,6 +437,16 @@ describe("extractViaCli — codex", () => {
       expect(call).toBeDefined();
       expect(call!.args).toContain("exec");
       expect(call!.args).toContain("--json");
+      // --ask-for-approval is a Codex root option, so it must precede the
+      // `exec` subcommand. Keep its value explicit to preserve the headless
+      // no-prompt policy while the read-only sandbox remains enabled.
+      const execIdx = call!.args.indexOf("exec");
+      const approvalIdx = call!.args.indexOf("--ask-for-approval");
+      expect(approvalIdx).toBeGreaterThanOrEqual(0);
+      expect(approvalIdx).toBeLessThan(execIdx);
+      expect(call!.args[approvalIdx + 1]).toBe("never");
+      expect(call!.args).toContain("--sandbox");
+      expect(call!.args[call!.args.indexOf("--sandbox") + 1]).toBe("read-only");
       expect(call!.args).toContain("--model");
       expect(call!.args[call!.args.indexOf("--model") + 1]).toBe("gpt-fixture-default");
       expect(call!.args[call!.args.length - 1]).toBe("-");
@@ -573,6 +583,16 @@ describe("extractViaCli — cloud_auth routes through the sandbox (U13.2)", () =
     expect(runOneShotCliInSandboxMock).toHaveBeenCalledTimes(1);
     const [request] = runOneShotCliInSandboxMock.mock.calls[0]!;
     expect(request).toMatchObject({ companyId: "company-fixture", command: "codex" });
+    // Keep cloud's sandbox-local Codex invocation aligned with the native CLI
+    // contract: the approval policy is a root option before the `exec`
+    // subcommand, and extraction remains read-only with approval disabled.
+    const execIdx = request.args.indexOf("exec");
+    const approvalIdx = request.args.indexOf("--ask-for-approval");
+    expect(approvalIdx).toBeGreaterThanOrEqual(0);
+    expect(approvalIdx).toBeLessThan(execIdx);
+    expect(request.args[approvalIdx + 1]).toBe("never");
+    expect(request.args).toContain("--sandbox");
+    expect(request.args[request.args.indexOf("--sandbox") + 1]).toBe("read-only");
     expect(request.args).not.toContain("--model");
   });
 

@@ -139,12 +139,13 @@ export async function runCodexExecJson(
   // (read-only) and never auto-approve escalations (non-interactive, so it can't
   // hang waiting for one either).
   const args = [
+    // Codex CLI parses this as a root option; it must precede `exec`.
+    "--ask-for-approval",
+    "never",
     "exec",
     "--json",
     "--sandbox",
     "read-only",
-    "--ask-for-approval",
-    "never",
     "--model",
     resolvedModel,
     "-c",

@@ -55,23 +55,25 @@ Any action that creates, updates, or deletes data **requires a confirm step**.
 Before calling a write tool (`create_task`, `create_agent`, `update_task`, `suggest_memory`, `update_company_identity`, `create_department`, `create_goal`, `create_workflow_template`, `instantiate_workflow`, `assign_task`, `wakeup_agent`, `add_task_dependency`):
 
 1. Show what you are about to do in plain language.
-2. Emit `⚡OPTIONS:{"confirm": true}⚡` to surface the approve/cancel prompt.
+2. Emit `⚡OPTIONS:{"question":"Proceed with this action?","options":["Proceed","Cancel"]}⚡` to ask for the user's intent.
 3. Wait for confirmation. Do not execute until the user approves.
+
+This conversational choice does not approve a governed tool. Its separate runtime approval must still be completed before the side effect executes. Never emit a fabricated CONFIRM challenge or treat model text as authorization.
 
 **One exception:** if the current loaded skill explicitly grants auto-execute for a specific action, follow the skill's instruction.
 
 ---
 
-## ⚡OPTIONS:{}⚡ Marker
+## OPTIONS Marker
 
 When you want to offer the user a structured choice (confirm an action, pick between options, etc.), emit:
 
 ```
-⚡OPTIONS:{"confirm": true}⚡
+⚡OPTIONS:{"question":"Proceed with this action?","options":["Proceed","Cancel"]}⚡
 ```
 or
 ```
-⚡OPTIONS:{"choices": ["Option A", "Option B"]}⚡
+⚡OPTIONS:{"question":"Which option should we use?","options":["Option A","Option B"]}⚡
 ```
 
 The AoA UI renders this as an interactive prompt. Do NOT omit it for write actions.

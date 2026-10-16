@@ -20,6 +20,9 @@ export interface MessageInput {
   reasoning?: string | null;
   clientSubmissionId?: string | null;
   replyToUserMessageId?: string | null;
+  /** Marks a durable partial assistant reply as failed so idempotent replay
+   * preserves the failure even before the user-turn claim is released. */
+  turnStatus?: "failed" | null;
 }
 
 const MESSAGE_THRESHOLD = 20;
@@ -102,6 +105,7 @@ export function conversationService(db: Db) {
           reasoning: message.reasoning ?? null,
           clientSubmissionId: message.clientSubmissionId ?? null,
           replyToUserMessageId: message.replyToUserMessageId ?? null,
+          turnStatus: message.turnStatus ?? null,
         })
         // Concurrency backstop for the replay check in agent-loop.chat(): a
         // simultaneous duplicate key resolves to one row via the partial

@@ -354,12 +354,13 @@ async function extractViaCliSandbox(
       // own argv value instead of being concatenated into stdinContent.
       binary === "codex"
       ? [
+          // Codex parses --ask-for-approval as a root option, before `exec`.
+          "--ask-for-approval",
+          "never",
           "exec",
           "--json",
           "--sandbox",
           "read-only",
-          "--ask-for-approval",
-          "never",
           ...(opts.credential.model.trim()
             ? ["--model", opts.credential.model.trim()]
             : []),
@@ -368,12 +369,13 @@ async function extractViaCliSandbox(
       : ["--print", "--tools", "", "--strict-mcp-config", "--system-prompt", systemPrompt, "--output-format", "text"]
     : binary === "codex"
       ? [
+          // Codex parses --ask-for-approval as a root option, before `exec`.
+          "--ask-for-approval",
+          "never",
           "exec",
           "--json",
           "--sandbox",
           "read-only",
-          "--ask-for-approval",
-          "never",
           ...(opts.credential.model.trim()
             ? ["--model", opts.credential.model.trim()]
             : []),

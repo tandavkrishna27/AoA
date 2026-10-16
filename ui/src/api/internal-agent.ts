@@ -26,6 +26,7 @@ export interface AgentMessage {
   id: string;
   role: "assistant" | "user" | "system" | "tool";
   content: string | null;
+  turnStatus?: string | null;
   toolCalls: AgentMessageToolCall[] | null;
   reasoning: string | null;
   outputRefs: ShowRef[] | null;
@@ -75,9 +76,10 @@ export interface AgentRun {
   triggerType: "conversation" | "proactive" | "event" | "sub_agent";
   triggerSource: string;
   status: "running" | "completed" | "failed";
+  errorMessage: string | null;
   toolsCalled: AgentRunToolCall[];
-  tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
-  costCents: number;
+  tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | null;
+  costCents: number | null;
   durationMs: number;
   activeExecutionMs: number;
   humanQuestionWaitMs: number;

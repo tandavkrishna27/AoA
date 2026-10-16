@@ -109,11 +109,13 @@ const streamState = vi.hoisted(() => ({
   impl: undefined as ((...args: unknown[]) => AsyncGenerator<unknown>) | undefined,
   calls: [] as unknown[][],
 }));
+const confirmActionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../api/internal-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/internal-agent")>();
   return {
     ...actual,
+    confirmAction: confirmActionMock,
     streamAgentChat: (...args: unknown[]) => {
       streamState.calls.push(args);
       if (!streamState.impl) throw new Error("streamState.impl not set");
@@ -121,6 +123,7 @@ vi.mock("../api/internal-agent", async (importOriginal) => {
     },
     internalAgentApi: {
       ...actual.internalAgentApi,
+      confirmAction: confirmActionMock,
       getConversation: vi.fn().mockResolvedValue({ conversation: null, messages: [] }),
       getGreeting: vi.fn().mockResolvedValue(null),
       getRuntimeSettings: vi.fn().mockResolvedValue({ runtimeAllowAlwaysEnabled: true }),
@@ -169,6 +172,13 @@ function erroringStream(): AsyncGenerator<unknown> {
   })();
 }
 
+function partialThenErrorStream(): AsyncGenerator<unknown> {
+  return (async function* () {
+    yield { event: "content", data: { text: "I started an answer." } };
+    yield { event: "error", data: { code: "INTERNAL", message: "No company provider key is configured. Add one in Settings → Providers, then retry." } };
+  })();
+}
+
 function renderPanel(props: React.ComponentProps<typeof AgentPanelContent> = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchInterval: false } },
@@ -207,12 +217,29 @@ beforeEach(() => {
   streamState.impl = failingStream;
   streamState.calls = [];
   uploadFileMock.mockReset();
+  confirmActionMock.mockReset();
   window.localStorage.clear();
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Commander composer — B-states (mock §5)", () => {
+  it("renders choices and sends selected intent without approving a governed action", async () => {
+    streamState.impl = () => (async function* () {
+      yield { event: "options_prompt", data: { promptId: "choice-1", question: "Proceed with this action?", options: ["Proceed", "Cancel"] } };
+    })();
+    renderPanel();
+    sendViaEnter(typeInComposer("Create a planning task"));
+    const proceed = await screen.findByRole("button", { name: /Proceed.*recommended/ });
+    await screen.findByRole("button", { name: "Send message" });
+    streamState.impl = completingStream;
+    fireEvent.click(proceed);
+    await waitFor(() => expect(streamState.calls).toHaveLength(2));
+    expect(streamState.calls[1][1]).toBe("Proceed");
+    expect(confirmActionMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Proceed.*recommended/ })).not.toBeInTheDocument();
+  });
+
   it("raises the banner on send failure keeping the draft; Retry replays the IDENTICAL request incl. the same clientSubmissionId; retry-success clears", async () => {
     renderPanel();
     const box = typeInComposer("deploy the beta");
@@ -261,6 +288,17 @@ describe("Commander composer — B-states (mock §5)", () => {
     );
     expect(streamState.calls).toHaveLength(2);
     expect(streamState.calls[1][7]).toBe(streamState.calls[0][7]);
+  });
+
+  it("shows the actionable SSE failure after partial assistant output", async () => {
+    streamState.impl = partialThenErrorStream;
+    renderPanel();
+    sendViaEnter(typeInComposer("check the provider setup"));
+
+    expect(await screen.findByText(/I started an answer\./)).toBeInTheDocument();
+    expect(screen.getByText(/Add one in Settings → Providers, then retry\./)).toBeInTheDocument();
+    expect(await screen.findByTestId("composer-send-failed-banner")).toBeInTheDocument();
+    expect(composerInput().textContent).toBe("check the provider setup");
   });
 
   it("dismisses the banner on Edit but keeps the draft; the next send mints a NEW clientSubmissionId", async () => {

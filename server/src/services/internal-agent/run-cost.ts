@@ -106,12 +106,11 @@ export function resolveRunCostCentsFromSummary(
  */
 export function resolvePersistedProvenance(
   finalSummary: RunFinalSummary | null,
-  runModel: string,
-  runProvider: string,
-): { model: string; provider: string } {
+): { model: string | null; provider: string | null } {
   return {
-    model: finalSummary?.model ?? runModel,
-    provider: finalSummary?.provider ?? runProvider,
+    // Pricing defaults describe an estimate, not the runtime that actually ran.
+    model: finalSummary?.model ?? null,
+    provider: finalSummary?.provider ?? null,
   };
 }
 

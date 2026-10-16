@@ -148,7 +148,7 @@ async function summarizeViaCliSandbox(args: SummarizeArgs, prompt: string): Prom
   const command = args.cliTool === "codex" ? "codex" : "claude";
   const cliArgs =
     command === "codex"
-      ? ["exec", "--json", "--sandbox", "read-only", "--ask-for-approval", "never", "--model", model, "-"]
+      ? ["--ask-for-approval", "never", "exec", "--json", "--sandbox", "read-only", "--model", model, "-"]
       : ["--print", "--tools", "", "--strict-mcp-config", "--output-format", "text", "--model", model];
 
   const result = await runOneShotCliInSandbox({

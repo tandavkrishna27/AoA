@@ -163,7 +163,7 @@ function makeApproval() {
     companyId: COMPANY_ID,
     userId: "user-1",
     toolName: "create_task",
-    params: { title: "Stored title" },
+    params: { title: "Stored title", workMode: "planning" },
     status: "executing",
     paramsHash: "hash-1",
     paramsHashVersion: "v1",
@@ -232,7 +232,7 @@ describe("POST /internal-agent/confirm durable runtime approvals", () => {
     );
     expect(executeToolMock).toHaveBeenCalledWith(
       expect.objectContaining({ name: "create_task" }),
-      { title: "Stored title" },
+      { title: "Stored title", workMode: "planning" },
       expect.objectContaining({ userRole: "team_member" }),
     );
     expect(svc.markExecuted).toHaveBeenCalledWith(CONFIRM_ID, COMPANY_ID, {
@@ -268,7 +268,7 @@ describe("POST /internal-agent/confirm durable runtime approvals", () => {
       companyId: COMPANY_ID,
       userId: "user-1",
       toolName: "create_task",
-      params: { title: "Stored title" },
+      params: { title: "Stored title", workMode: "planning" },
       createdByUserId: "user-1",
     });
     expect(executeToolMock).toHaveBeenCalledOnce();
