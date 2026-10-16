@@ -99,29 +99,31 @@ const mockWorkspaces = [
 
 // --- Mocks ---
 
+const readyCloseReadiness = {
+  workspaceId: "ws-1",
+  state: "ready",
+  blockingReasons: [],
+  warnings: [],
+  linkedIssues: [],
+  plannedActions: [
+    {
+      kind: "archive_record",
+      label: "Archive workspace record",
+      description: "Keep the execution workspace history.",
+      command: null,
+    },
+  ],
+  isDestructiveCloseAllowed: true,
+  isSharedWorkspace: false,
+  isProjectPrimaryWorkspace: false,
+  git: null,
+  runtimeServices: [],
+};
+
 const executionWorkspacesApiMock = {
   list: vi.fn().mockResolvedValue(mockWorkspaces),
   update: vi.fn().mockResolvedValue({}),
-  getCloseReadiness: vi.fn().mockResolvedValue({
-    workspaceId: "ws-1",
-    state: "ready",
-    blockingReasons: [],
-    warnings: [],
-    linkedIssues: [],
-    plannedActions: [
-      {
-        kind: "archive_record",
-        label: "Archive workspace record",
-        description: "Keep the execution workspace history.",
-        command: null,
-      },
-    ],
-    isDestructiveCloseAllowed: true,
-    isSharedWorkspace: false,
-    isProjectPrimaryWorkspace: false,
-    git: null,
-    runtimeServices: [],
-  }),
+  getCloseReadiness: vi.fn().mockResolvedValue(readyCloseReadiness),
 };
 
 const projectsApiMock = {
@@ -262,26 +264,7 @@ beforeEach(() => {
   // Re-establish implementations that individual tests may override.
   executionWorkspacesApiMock.list.mockResolvedValue(mockWorkspaces);
   executionWorkspacesApiMock.update.mockResolvedValue({});
-  executionWorkspacesApiMock.getCloseReadiness.mockResolvedValue({
-    workspaceId: "ws-1",
-    state: "ready",
-    blockingReasons: [],
-    warnings: [],
-    linkedIssues: [],
-    plannedActions: [
-      {
-        kind: "archive_record",
-        label: "Archive workspace record",
-        description: "Keep the execution workspace history.",
-        command: null,
-      },
-    ],
-    isDestructiveCloseAllowed: true,
-    isSharedWorkspace: false,
-    isProjectPrimaryWorkspace: false,
-    git: null,
-    runtimeServices: [],
-  });
+  executionWorkspacesApiMock.getCloseReadiness.mockResolvedValue(readyCloseReadiness);
   projectsApiMock.get.mockResolvedValue(mockProject);
   projectsApiMock.update.mockResolvedValue(mockProject);
   projectsApiMock.listAgents.mockResolvedValue([]);
@@ -511,6 +494,10 @@ describe("ProjectDetail — Workspaces tab", () => {
   });
 
   it("calls update with archived status when Archive is confirmed via dialog", async () => {
+    let resolveReadiness!: (value: typeof readyCloseReadiness) => void;
+    executionWorkspacesApiMock.getCloseReadiness.mockReturnValue(new Promise((resolve) => {
+      resolveReadiness = resolve;
+    }));
     renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/workspaces");
 
     // Settle the executionWorkspaces list query BEFORE interacting: wait for
@@ -525,14 +512,13 @@ describe("ProjectDetail — Workspaces tab", () => {
     await screen.findByTestId("archive-workspace-ws-2", {}, { timeout: 15000 });
     fireEvent.click(screen.getByTestId("archive-workspace-ws-1"));
 
-    // Readiness loads via getCloseReadiness mock; the AlertDialog action starts
-    // disabled while readiness is loading. Wait for the dialog to open, THEN for
-    // the action to enable. Re-query each waitFor tick so a React re-render
-    // between query and assertion can't leave us holding a stale DOM node.
+    // Hold the real readiness request so the actual loading gate is observed
+    // before returning the existing ready fixture.
     await screen.findByTestId("confirm-archive-workspace", {}, { timeout: 15000 });
-    await waitFor(() => {
-      expect(screen.getByTestId("confirm-archive-workspace")).not.toBeDisabled();
-    }, { timeout: 15000 });
+    expect(screen.getByTestId("confirm-archive-workspace")).toBeDisabled();
+    expect(executionWorkspacesApiMock.getCloseReadiness).toHaveBeenCalledWith("ws-1");
+    resolveReadiness(readyCloseReadiness);
+    await waitFor(() => expect(screen.getByTestId("confirm-archive-workspace")).not.toBeDisabled());
 
     fireEvent.click(screen.getByTestId("confirm-archive-workspace"));
 

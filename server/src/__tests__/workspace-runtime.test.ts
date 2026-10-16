@@ -1361,7 +1361,10 @@ describe("ensureRuntimeServicesForRun", () => {
   it("observes a rejecting runtime log sink without escaping the service lifecycle", async () => {
     const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-runtime-log-sink-"));
     const executionWorkspaceId = "execution-workspace-log-sink";
+    let observeLog!: () => void;
+    const observedLog = new Promise<void>((resolve) => { observeLog = resolve; });
     const onLog = vi.fn(async () => {
+      observeLog();
       throw new Error("log persistence unavailable");
     });
 
@@ -1384,7 +1387,11 @@ describe("ensureRuntimeServicesForRun", () => {
       scopeId: executionWorkspaceId,
     });
 
-    await vi.waitFor(() => expect(onLog).toHaveBeenCalled());
+    // Await the actual process-output callback instead of polling the spy with
+    // vi.waitFor's 1s default. This preserves a positive observation while
+    // allowing normal process scheduling under a loaded test worker.
+    await observedLog;
+    expect(onLog).toHaveBeenCalled();
     await expect(stopRuntimeServicesForExecutionWorkspace({
       executionWorkspaceId,
       workspaceCwd: workspaceRoot,
