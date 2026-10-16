@@ -30,6 +30,10 @@ function imagePin(): string | null {
   return m === null ? null : m[1];
 }
 
+function expectImagePinToMatchRuntime(pin: string | null, runtimeVersion: string): void {
+  expect(pin).toBe(runtimeVersion);
+}
+
 describe("BRW-003b — image Playwright pin vs resolved Playwright", () => {
   it("the Dockerfile pins an exact Playwright version", () => {
     // A range here would reintroduce the drift this test exists to prevent.
@@ -37,9 +41,17 @@ describe("BRW-003b — image Playwright pin vs resolved Playwright", () => {
   });
 
   it("that pin equals the version this repo actually resolves", () => {
-    const require_ = createRequire(import.meta.url);
-    const resolved = (require_("playwright-core/package.json") as { version: string }).version;
-    expect(imagePin()).toBe(resolved);
+    const workspaceRequire = createRequire(import.meta.url);
+    // Resolve Playwright from this package's declared dependency, then resolve its
+    // playwright-core from that package's real require context. This remains correct
+    // under pnpm's isolated linker and cannot accidentally read a root hoist.
+    const playwrightRequire = createRequire(workspaceRequire.resolve("playwright"));
+    const resolved = (playwrightRequire("playwright-core/package.json") as { version: string }).version;
+    expectImagePinToMatchRuntime(imagePin(), resolved);
+  });
+
+  it("rejects a deliberate image/runtime version mismatch", () => {
+    expect(() => expectImagePinToMatchRuntime("1.59.0", "1.59.1")).toThrow();
   });
 
   it("the image installs a browser, not just the module", () => {
