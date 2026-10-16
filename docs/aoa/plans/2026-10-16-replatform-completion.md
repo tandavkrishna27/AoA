@@ -4,6 +4,8 @@
 
 **Implementation authorization, 2026-10-16:** TK authorized W00 followed by W01/W03/W04 and local/CI verification. Environment rebuilds and live campaigns remain separate. Current implementation/check evidence is tracked in [PR #692](https://github.com/tandavkrishna27/AoA/pull/692); pending checks and live acceptance must not be inferred from the completed implementation items below.
 
+**Validation follow-up, 16 October:** A later, separately user-authorized fresh Windows/VPS run tested application `05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd`. Its [immutable report](../reports/2026-10-16-local-vps-validation-report.md) and [pickup checklist](2026-10-16-local-vps-validation-handoff.md) distinguish verified work, pending fixes and deferred gates, including the user's successful task-creation retry with an unresolved Planning-mode mismatch. This does not rewrite the historical baseline or close W01 native end-to-end/W04 lifecycle/W05 artifact acceptance by implication.
+
 **Goal:** Finish the outstanding replatform functionality and reliability work identified by the 15 October tests, then prove the supported product and release requirements on a new candidate.
 
 **Architecture:** Preserve one logical control-plane authority per environment, with enrolled workers and independently fenced execution. Extend the existing routing, broker, sandbox and output paths; keep personal device credentials on the device. Reuse shipped implementations and repair demonstrated gaps before widening deployment or workload exposure.

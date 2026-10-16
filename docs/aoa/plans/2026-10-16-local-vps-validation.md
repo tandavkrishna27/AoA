@@ -2,6 +2,8 @@
 
 Prepared 2026-10-16 from the current replatform completion plan. This document scopes independent live validation only. It does not rebuild or deploy either environment, request credentials, activate rollout flags, or claim results. The previous local and VPS installations were torn down; any future run needs a fresh disposable resource manifest, authority direction, credential custody, expected calls, spending bounds, and cleanup procedure.
 
+**Execution follow-up, 16 October:** The user separately authorized fresh local/VPS validation after this plan. Read the [immutable validation report](../reports/2026-10-16-local-vps-validation-report.md) and [completed-items/pending-fixes pickup checklist](2026-10-16-local-vps-validation-handoff.md). The report includes the subsequent user retry and the test apps retained at handoff; the torn-down installations above describe the pre-validation baseline. Neither successful isolated reruns nor the retry close the remaining native acceptance or broader release gates.
+
 ## W01, W03 and W04
 
 These packages have no Local + VPS hard predecessor. Their authorized implementation can proceed against local fixtures, native Windows checks, and required Linux CI.
