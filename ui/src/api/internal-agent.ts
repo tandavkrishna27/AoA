@@ -1,4 +1,4 @@
-import type { CommanderContextScope, CompanySkillListItem, ShowRef, UpdateInternalAgentConfig } from "@armyofagents/shared";
+import type { ChatMessage, CommanderContextScope, CompanySkillListItem, ShowRef, UpdateInternalAgentConfig } from "@armyofagents/shared";
 import { api, ApiError } from "./client";
 
 /* ------------------------------------------------------------------ */
@@ -27,6 +27,11 @@ export interface AgentMessage {
   role: "assistant" | "user" | "system" | "tool";
   content: string | null;
   turnStatus?: string | null;
+  failure?: {
+    message: string;
+    retry: Required<Pick<ChatMessage, "message" | "pageContext" | "departmentContext" | "contextScope" | "attachmentAssetIds" | "clientSubmissionId">> | null;
+    retryUnavailableReason: string | null;
+  };
   toolCalls: AgentMessageToolCall[] | null;
   reasoning: string | null;
   outputRefs: ShowRef[] | null;
@@ -203,6 +208,7 @@ export async function* streamAgentChat(
   contextScope?: CommanderContextScope | null,
   attachmentAssetIds?: string[],
   clientSubmissionId?: string,
+  departmentContext?: string | null,
 ): AsyncGenerator<SSEEvent> {
   const response = await fetch(
     `/api/companies/${encodeURIComponent(companyId)}/internal-agent/chat`,
@@ -213,6 +219,7 @@ export async function* streamAgentChat(
       body: JSON.stringify({
         message,
         pageContext,
+        ...(departmentContext !== undefined ? { departmentContext } : {}),
         ...(conversationId ? { conversationId } : {}),
         ...(contextScope ? { contextScope } : {}),
         ...(attachmentAssetIds && attachmentAssetIds.length > 0 ? { attachmentAssetIds } : {}),

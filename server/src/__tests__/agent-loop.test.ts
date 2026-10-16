@@ -199,6 +199,75 @@ describe("agentLoopService.chat — runtime attachment delivery (text)", () => {
 });
 
 describe("agentLoopService.chat — idempotent retry (clientSubmissionId)", () => {
+  it("saves the original replay payload and run link before a user-only failure", async () => {
+    scriptStream([{ type: "error", message: "Provider missing" }]);
+    const input = {
+      ...BASE_PARAMS,
+      conversationId: "conv-1",
+      clientSubmissionId: "saved-key",
+      runId: "run-original",
+      content: "Review Task id=task-original",
+      pageContext: "Original page",
+      departmentContext: null,
+      contextScope: { surface: "memory", route: "/original" },
+      attachmentAssetIds: ["11111111-1111-4111-8111-111111111111"],
+    };
+    const svc = agentLoopService(dbWithConfig({ cliTool: "codex" }));
+    for await (const _ of svc.chat(input as any)) {
+      void _;
+    }
+    const saved = appendMessage.mock.calls.find((call) => (call[1] as any).role === "user")?.[1];
+    expect(saved).toMatchObject({
+      runId: "run-original",
+      clientSubmissionId: "saved-key",
+      toolResults: {
+        kind: "commander_submission",
+        v: 1,
+        payload: {
+          message: input.content,
+          pageContext: input.pageContext,
+          departmentContext: null,
+          contextScope: input.contextScope,
+          attachmentAssetIds: input.attachmentAssetIds,
+        },
+      },
+    });
+  });
+
+  it("refuses a changed saved retry payload before reclaiming or executing the original turn", async () => {
+    getMessageByClientSubmissionId.mockResolvedValue({
+      id: "saved-user",
+      content: "Original",
+      toolResults: {
+        kind: "commander_submission",
+        v: 1,
+        payload: {
+          message: "Original",
+          pageContext: null,
+          departmentContext: null,
+          contextScope: null,
+          attachmentAssetIds: [],
+        },
+      },
+    });
+    const svc = agentLoopService(dbWithConfig({ cliTool: "codex" }));
+    const out: any[] = [];
+    for await (const chunk of svc.chat({
+      ...BASE_PARAMS,
+      conversationId: "conv-1",
+      clientSubmissionId: "saved-key",
+    } as any))
+      out.push(chunk);
+    expect(out).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringMatching(/original.*payload|different.*submission/i),
+      }),
+    );
+    expect(claimTurn).not.toHaveBeenCalled();
+    expect(cliChat).not.toHaveBeenCalled();
+  });
+
   async function drainWithKey(svc: ReturnType<typeof agentLoopService>, key: string) {
     const out: any[] = [];
     for await (const chunk of svc.chat({ ...BASE_PARAMS, conversationId: "conv-1", clientSubmissionId: key } as any)) {
@@ -206,6 +275,22 @@ describe("agentLoopService.chat — idempotent retry (clientSubmissionId)", () =
     }
     return out;
   }
+
+  it("refuses a tagged but incomplete saved payload rather than treating it as a legacy retry", async () => {
+    getMessageByClientSubmissionId.mockResolvedValue({
+      id: "corrupt-user",
+      content: "what is up",
+      toolResults: { kind: "commander_submission", v: 1, payload: { message: "what is up" } },
+    });
+    const svc = agentLoopService(dbWithConfig({ cliTool: "codex" }));
+    const out = await drainWithKey(svc, "corrupt-key");
+    expect(out).toContainEqual(expect.objectContaining({
+      type: "error",
+      message: expect.stringMatching(/original.*payload.*unavailable/i),
+    }));
+    expect(claimTurn).not.toHaveBeenCalled();
+    expect(cliChat).not.toHaveBeenCalled();
+  });
 
   it("replays the original assistant reply and does NOT persist a new message or run the CLI", async () => {
     // The key was already recorded → this is a retry.

@@ -3,6 +3,35 @@ import { parseCommanderDistributedOutput } from "../services/commander-distribut
 const result = { version: 1 as const, operationId: "turn", stdout: [JSON.stringify({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "accepted answer" } } }), JSON.stringify({ type: "result", is_error: false, usage: { input_tokens: 4, output_tokens: 2 }, total_cost_usd: 0 })].join("\n"), stderr: "", exitCode: 0, timedOut: false, durationMs: 20, captureError: null };
 const base = { result, cliTool: "claude_cli", turnId: "turn", model: "claude-sonnet-4-6" };
 describe("Commander accepted output parsing", () => {
+  it("emits choices from the actual Codex summary without inventing runtime approval", async () => {
+    const stdout = [
+      JSON.stringify({
+        type: "item.completed",
+        item: {
+          type: "agent_message",
+          text: 'Before ⚡OPTIONS:{"question":"Choose","options":["Proceed","Cancel"]}⚡ After ⚡OPTIONS:{bad}⚡',
+        },
+      }),
+      JSON.stringify({ type: "turn.completed", usage: { input_tokens: 4, output_tokens: 2 } }),
+    ].join("\n");
+    const chunks = await parseCommanderDistributedOutput({
+      ...base,
+      cliTool: "codex",
+      model: "gpt-4.1",
+      result: { ...result, stdout },
+    });
+    expect(chunks.filter((c) => c.type === "options_prompt")).toEqual([
+      expect.objectContaining({ question: "Choose", options: ["Proceed", "Cancel"] }),
+    ]);
+    expect(
+      chunks
+        .filter((c) => c.type === "text")
+        .map((c) => c.delta)
+        .join(""),
+    ).toBe("Before  After ⚡OPTIONS:{bad}⚡");
+    expect(chunks.some((c) => c.type === "action_confirmation")).toBe(false);
+  });
+
   it("returns ordinary text/tools and one done with the actual pinned provenance", async () => {
     const chunks = await parseCommanderDistributedOutput(base);
     expect(chunks).toContainEqual({ type: "text", delta: "accepted answer" });

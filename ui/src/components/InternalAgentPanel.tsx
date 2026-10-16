@@ -586,6 +586,7 @@ interface CommanderSendAttempt {
   refsForTurn: CommanderInputRef[];
   revision: number;
   clientSubmissionId: string;
+  requestContext: { conversationId: string | null; pageContext: string | null; contextScope: CommanderContextScope | null; departmentContext: string | null };
 }
 
 export function AgentPanelContent({ conversationId, onSelectConversation, onOpenSessions, enableViewerPanel, cardChrome = false, sessionsCollapsed, onSetSessionsCollapsed }: AgentPanelContentProps = {}) {
@@ -615,6 +616,8 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   const [streaming, setStreamingLocal] = useState(false);
   // ─── Composer B-states (mock §5) ────────────────────────────────────────
   const [sendFailed, setSendFailed] = useState(false);
+  const [failureDetails, setFailureDetails] = useState<{ message: string; retryUnavailableReason: string | null } | null>(null);
+  const savedFailedMessageRef = useRef<string | null>(null);
   const lastAttemptRef = useRef<CommanderSendAttempt | null>(null);
   // Bumped on every draft-changing edit (typing, ref add/remove, Discard) so a
   // retry that succeeds AFTER the draft diverged skips the clears instead of
@@ -958,7 +961,6 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
 
   // Reset messages when switching conversations
   useEffect(() => {
-    if (!conversationId) return;
     setMessages([]);
     setStreamingLocal(false);
     inputRefsRef.current = [];
@@ -973,19 +975,55 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     composerRevisionRef.current += 1;
     lastAttemptRef.current = null;
     setSendFailed(false);
-  }, [conversationId]);
+    setFailureDetails(null);
+    savedFailedMessageRef.current = null;
+  }, [conversationId, companyId]);
 
   // Populate messages from history when historyData arrives.
   // conversationId is included so the effect re-fires when switching between
   // cached conversations (TanStack Query returns the same object reference on a
   // cache hit, so [historyData] alone would not trigger a re-run).
   useEffect(() => {
-    if (!historyData?.messages?.length) return;
-    const loaded: LocalMessage[] = historyData.messages
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .map(serverToLocal);
+    if (!historyData?.messages?.length || streamingRef.current) return;
+    const loaded = mergeServerMessagesWithTransientLocal(
+      historyData.messages.filter((m) => m.role === "user" || m.role === "assistant"),
+      [],
+    );
     setMessages(loaded);
   }, [historyData, conversationId]);
+
+  // Both saved-chat and docked history restore the same durable failure. Only
+  // data/entity changes hydrate it; streaming toggles must not re-arm old data.
+  useEffect(() => {
+    if (streamingRef.current) return;
+    const savedMessages = conversationId ? historyData?.messages : conversation?.messages;
+    const latestUser = savedMessages?.filter((m) => m.role === "user").at(-1);
+    const failure = latestUser?.failure;
+    if (failure) {
+      savedFailedMessageRef.current = latestUser.content ?? "";
+      setFailureDetails(failure);
+      const retry = failure.retry;
+      lastAttemptRef.current = retry?.clientSubmissionId
+        ? {
+          rawText: retry.message,
+          message: retry.message,
+          attachmentAssetIds: retry.attachmentAssetIds,
+          refsForTurn: retry.attachmentAssetIds.map((id) => ({
+            v: 1, kind: "asset", id, label: "Saved attachment",
+          })),
+          revision: composerRevisionRef.current,
+          clientSubmissionId: retry.clientSubmissionId,
+          requestContext: {
+            conversationId: conversationId ?? conversation?.conversation?.id ?? null,
+            pageContext: retry.pageContext,
+            contextScope: retry.contextScope,
+            departmentContext: retry.departmentContext,
+          },
+        }
+        : null;
+      setSendFailed(true);
+    }
+  }, [historyData, conversation, conversationId, companyId]);
 
   // Sync server messages into local state (only when not streaming AND no specific conversation is selected)
   useEffect(() => {
@@ -1053,7 +1091,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   );
 
   const sendText = useCallback(
-    async (text: string, attachmentAssetIds?: string[], clientSubmissionId?: string): Promise<boolean> => {
+    async (text: string, attachmentAssetIds?: string[], clientSubmissionId?: string, requestContext?: CommanderSendAttempt["requestContext"]): Promise<boolean> => {
       if (!text || !companyId || streaming) return false;
 
       // New user turn: allow exactly one auto-opened viewer tab for the refs
@@ -1098,7 +1136,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       let sawError = false;
 
       try {
-        const stream = streamAgentChat(companyId, text, pageContext, controller.signal, conversationId, contextScope, attachmentAssetIds, clientSubmissionId);
+        const stream = streamAgentChat(companyId, text, requestContext ? requestContext.pageContext : pageContext, controller.signal, requestContext ? requestContext.conversationId : conversationId, requestContext ? requestContext.contextScope : contextScope, attachmentAssetIds, clientSubmissionId, requestContext?.departmentContext);
 
         for await (const event of stream) {
           if (event.event === "error") sawError = true;
@@ -1142,9 +1180,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
    *  banner's Retry replays the stored one (same clientSubmissionId). */
   const performCommanderSend = useCallback(
     async (attempt: CommanderSendAttempt) => {
-      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId);
+      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId, attempt.requestContext);
       if (accepted) {
         setSendFailed(false);
+        setFailureDetails(null);
+        savedFailedMessageRef.current = null;
         lastAttemptRef.current = null;
         // Retry-success safety: only clear when the draft still matches the
         // snapshot — mid-flight edits/ref changes must survive the clear.
@@ -1179,6 +1219,8 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       const refsForTurn = inputRefsRef.current;
       if ((!trimmed && refsForTurn.length === 0) || uploadingFiles.length > 0 || isOffline) return;
       setSendFailed(false);
+      setFailureDetails(null);
+      savedFailedMessageRef.current = null;
       const baseText = trimmed || "Use the referenced context.";
       // Minted ONCE per submission and snapshotted BEFORE the await so the
       // banner's Retry re-sends the exact same attempt (same clientSubmissionId
@@ -1190,11 +1232,17 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         refsForTurn,
         revision: composerRevisionRef.current,
         clientSubmissionId: createComposerSubmissionId(),
+        requestContext: {
+          conversationId: conversationId ?? conversation?.conversation?.id ?? null,
+          pageContext,
+          contextScope,
+          departmentContext: contextScope?.departmentId ?? null,
+        },
       };
       lastAttemptRef.current = attempt;
       await performCommanderSend(attempt);
     },
-    [performCommanderSend, uploadingFiles.length, isOffline],
+    [performCommanderSend, uploadingFiles.length, isOffline, pageContext, contextScope, conversationId, conversation?.conversation?.id],
   );
 
   /** Banner Retry: re-send the IDENTICAL stored attempt (same clientSubmissionId). */
@@ -1205,12 +1253,23 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   }, [performCommanderSend, isOffline]);
 
   const handleEditFailedSend = useCallback(() => {
+    if (savedFailedMessageRef.current !== null) {
+      inputRef.current?.clear();
+      inputRef.current?.insertText(savedFailedMessageRef.current);
+      const refs = lastAttemptRef.current?.refsForTurn ?? [];
+      inputRefsRef.current = refs;
+      setInputRefs(refs);
+      composerRevisionRef.current += 1;
+      inputRef.current?.focus();
+    }
     setSendFailed(false);
   }, []);
 
   const handleDiscardFailedSend = useCallback(() => {
     lastAttemptRef.current = null;
     setSendFailed(false);
+    setFailureDetails(null);
+    savedFailedMessageRef.current = null;
     composerRevisionRef.current += 1;
     inputRef.current?.clear();
     inputRefsRef.current = [];
@@ -2184,6 +2243,8 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
                   onEdit={handleEditFailedSend}
                   onDiscard={handleDiscardFailedSend}
                   retrying={streaming}
+                  message={failureDetails?.message}
+                  retryUnavailableReason={failureDetails?.retryUnavailableReason}
                 />
               )}
             </div>

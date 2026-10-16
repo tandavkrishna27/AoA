@@ -1017,6 +1017,32 @@ describe("cliModeService.chat — codex JSONL parse + one-shot/resume (MX-chatpa
     return chunks;
   }
 
+  it("Codex parsed summary emits canonical choices, preserves surrounding and malformed text, and grants no approval", async () => {
+    const cp = await import("node:child_process");
+    vi.mocked(cp.execSync).mockReturnValue("/usr/local/bin/codex\n" as any);
+    const text =
+      'Before\n⚡OPTIONS:{"question":"Choose","options":["Proceed","Cancel"]}⚡\nAfter ⚡OPTIONS:{bad}⚡';
+    const stdout = [
+      JSON.stringify({ type: "thread.started", thread_id: "choices-session" }),
+      JSON.stringify({ type: "item.completed", item: { type: "agent_message", text } }),
+      JSON.stringify({ type: "turn.completed", usage: { input_tokens: 10, output_tokens: 5 } }),
+    ].join("\n");
+    vi.mocked(cp.spawn).mockReturnValue(makeOneShotProcess({ stdout }) as any);
+    const { cliModeService } = await import("../services/internal-agent/cli-mode.js");
+    const chunks = await drainChat(cliModeService({} as any), "codex", "choices");
+    expect(chunks.filter((chunk) => chunk.type === "options_prompt")).toEqual([
+      expect.objectContaining({ question: "Choose", options: ["Proceed", "Cancel"] }),
+    ]);
+    expect(
+      chunks
+        .filter((chunk) => chunk.type === "text")
+        .map((chunk) => chunk.delta)
+        .join(""),
+    ).toBe("Before\n\nAfter ⚡OPTIONS:{bad}⚡");
+    expect(chunks.some((chunk) => chunk.type === "action_confirmation")).toBe(false);
+    expect(chunks.filter((chunk) => chunk.type === "done")).toHaveLength(1);
+  });
+
   it("codex turn-1: yields the parsed summary (NOT raw JSON), stores the sessionId, emits done after exit, and writes the per-session CODEX_HOME config.toml", async () => {
     const cp = await import("node:child_process");
     vi.mocked(cp.execSync).mockReturnValue("/usr/local/bin/codex\n" as any);

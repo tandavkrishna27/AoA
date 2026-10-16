@@ -32,6 +32,8 @@ import {
   createRuntimeAttachmentDeps,
 } from "./runtime-attachments.js";
 import type { Readable } from "node:stream";
+import { isDeepStrictEqual } from "node:util";
+import { readSubmissionSnapshot, submissionSnapshot } from "./submission-recovery.js";
 
 /** Minimal storage surface needed to read attachment bytes for runtime delivery. */
 export interface RuntimeAttachmentStorage {
@@ -366,6 +368,22 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
             params.clientSubmissionId,
           );
           if (priorUser) {
+            const saved = readSubmissionSnapshot(priorUser.toolResults);
+            if (priorUser.toolResults?.kind === "commander_submission" && !saved) {
+              yield {
+                type: "error",
+                message: "The original submission payload is unavailable. Edit and review the message and references before sending a new submission.",
+              };
+              return;
+            }
+            const retryPayload = readSubmissionSnapshot(submissionSnapshot(params))?.payload;
+            if (saved && !isDeepStrictEqual(saved.payload, retryPayload)) {
+              yield {
+                type: "error",
+                message: "Retry must use the original submission payload. Edit and send a new submission to change the message, references or context.",
+              };
+              return;
+            }
             // C2: replay ONLY the reply explicitly linked to this user turn, not
             // the first assistant row after its timestamp — which could belong to
             // a later, unrelated turn if this send died before it replied.
@@ -401,6 +419,8 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
             pageContext: params.pageContext ?? null,
             departmentContext: params.departmentContext ?? null,
             clientSubmissionId: params.clientSubmissionId ?? null,
+            runId: params.runId ?? null,
+            toolResults: submissionSnapshot(params),
           });
           // C3 (PR #291 review): a same-key request that lost the unique-index
           // insert race gets back an undefined insert — the winner owns the turn.
@@ -426,7 +446,9 @@ export function agentLoopService(db: Db, storage?: RuntimeAttachmentStorage) {
         // prior-row run path. A CAS loser defers to the owner (replay its reply,
         // or in-progress) and never starts a second CLI run.
         if (params.clientSubmissionId && userMessageId) {
-          const token = await convService.claimTurn(userMessageId);
+          const token = params.runId
+            ? await convService.claimTurn(userMessageId, params.runId)
+            : await convService.claimTurn(userMessageId);
           if (!token) {
             yield* replayWinnerOrSignalInProgress(
               convService,

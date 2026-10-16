@@ -31,6 +31,7 @@ import {
 import { createServiceContainer } from "../services/internal-agent/service-container.js";
 import { buildOutputRefs } from "../services/internal-agent/output-refs.js";
 import { conversationService } from "../services/internal-agent/conversation.js";
+import { recoverConversationMessages } from "../services/internal-agent/submission-recovery.js";
 import { loadOwnedConversation, resolveActorRole } from "./conversation-authz.js";
 import { runtimeApprovalService } from "../services/internal-agent/runtime-approvals.js";
 import type { CommanderRuntimeApprovalDecision, CommanderToolPermissions, UserRole } from "@armyofagents/shared";
@@ -838,7 +839,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
           createdAt: conversation.createdAt,
           updatedAt: conversation.updatedAt,
         },
-        messages,
+        messages: await recoverConversationMessages(db, conversation, actor.actorId, messages),
         summarizedContext: conversation.summarizedContext,
         total: conversation.messageCount,
         limit,
@@ -1417,7 +1418,7 @@ export function internalAgentRoutes(db: Db, storageService?: RuntimeAttachmentSt
         .limit(limit)
         .offset(offset);
 
-      res.json({ messages, conversationId: convId });
+      res.json({ messages: await recoverConversationMessages(db, conv, getActorInfo(req).actorId, messages), conversationId: convId });
     },
   );
 

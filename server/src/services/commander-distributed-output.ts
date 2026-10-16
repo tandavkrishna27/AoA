@@ -1,4 +1,5 @@
 import { showRefSchema } from "@armyofagents/shared";
+import { parseOptionsOutput } from "./internal-agent/options-output.js";
 import type { AgentStreamChunk } from "./internal-agent/agent-loop.js";
 import { StreamJsonParser } from "./internal-agent/parse-stream-json.js";
 import { computeCostCents, isKnownRateModel } from "./internal-agent/cost-model.js";
@@ -15,7 +16,7 @@ export async function parseCommanderDistributedOutput(input: {
     if (!parsed.summary && !(parsed.chunks?.length)) throw new Error("Commander CLI produced no result");
     chunks = (parsed.chunks ?? []).map((chunk) => chunk.type === "tool_result" ? { ...chunk,
       refs: (Array.isArray(chunk.refs) ? chunk.refs : []).flatMap((ref) => { const checked = showRefSchema.safeParse(ref); return checked.success ? [checked.data] : []; }) } : chunk);
-    if (parsed.summary) chunks.push({ type: "text", delta: parsed.summary });
+    if (parsed.summary) chunks.push(...parseOptionsOutput(parsed.summary));
     chunks.push({ type: "done", summary: { runId: input.turnId, toolsCalled: [], durationMs: input.result.durationMs, costCents: 0,
       tokenUsage: { inputTokens: parsed.usage?.inputTokens ?? 0, outputTokens: parsed.usage?.outputTokens ?? 0,
         cachedInputTokens: parsed.usage?.cachedInputTokens ?? 0 } } });

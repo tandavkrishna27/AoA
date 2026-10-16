@@ -6,7 +6,8 @@ import { platform, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@armyofagents/db";
-import { normalizeCommanderOptions, showRefSchema } from "@armyofagents/shared";
+import { showRefSchema } from "@armyofagents/shared";
+import { parseOptionsOutput } from "./options-output.js";
 import type { HumanQuestionRuntimeCapabilities } from "@armyofagents/adapter-utils";
 import { mergeChildEnv } from "@armyofagents/adapter-utils/server-utils";
 import {
@@ -434,26 +435,11 @@ export function toolToMcpFormat(tool: AgentTool) {
 // ── Output Parsing ────────────────────────────────────────────────────────────
 
 const CONFIRM_RE = /⚡CONFIRM:(.*?)⚡/;
-const OPTIONS_RE = /⚡OPTIONS:(.*?)⚡/;
 
 export function parseCliOutput(line: string): AgentStreamChunk[] {
   // OPTIONS marker — structured multiple-choice question
-  const optMatch = line.match(OPTIONS_RE);
-  if (optMatch) {
-    try {
-      const normalized = normalizeCommanderOptions(JSON.parse(optMatch[1]));
-      if (!normalized) throw new Error("invalid OPTIONS payload");
-      return [
-        {
-          type: "options_prompt",
-          ...normalized,
-          promptId: crypto.randomUUID(),
-        },
-      ];
-    } catch {
-      // Malformed JSON or invalid payload — fall through to plain text
-    }
-  }
+  const optionChunks = parseOptionsOutput(line);
+  if (optionChunks.some((chunk) => chunk.type === "options_prompt")) return optionChunks;
 
   // CONFIRM marker — action approval gate
   const confirmMatch = line.match(CONFIRM_RE);
@@ -2067,7 +2053,7 @@ async function* runCodexTurn(
   // (token-by-token codex streaming is a deferred polish). NEVER the raw
   // JSONL — that was the rendered-nothing bug.
   if (parsed.summary) {
-    yield { type: "text", delta: parsed.summary };
+    yield* parseOptionsOutput(parsed.summary);
   }
 
   // Real-usage done (cost left 0 — codex subscription has no per-run billing;

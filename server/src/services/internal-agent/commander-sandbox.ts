@@ -1,4 +1,5 @@
 import { tmpdir } from "node:os";
+import { parseOptionsOutput } from "./options-output.js";
 import { join } from "node:path";
 import { writeFile, unlink } from "node:fs/promises";
 import type { Db } from "@armyofagents/db";
@@ -361,7 +362,7 @@ async function parseCodexBufferedChunks(stdout: string): Promise<AgentStreamChun
     }
   }
 
-  if (parsed.summary) out.push({ type: "text", delta: parsed.summary });
+  if (parsed.summary) out.push(...parseOptionsOutput(parsed.summary));
 
   out.push({
     type: "done",

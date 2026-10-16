@@ -110,6 +110,7 @@ const streamState = vi.hoisted(() => ({
   calls: [] as unknown[][],
 }));
 const confirmActionMock = vi.hoisted(() => vi.fn());
+const historyState = vi.hoisted(() => ({ messages: [] as unknown[], activeMessages: [] as unknown[] }));
 
 vi.mock("../api/internal-agent", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/internal-agent")>();
@@ -124,7 +125,7 @@ vi.mock("../api/internal-agent", async (importOriginal) => {
     internalAgentApi: {
       ...actual.internalAgentApi,
       confirmAction: confirmActionMock,
-      getConversation: vi.fn().mockResolvedValue({ conversation: null, messages: [] }),
+      getConversation: vi.fn(async () => ({ conversation: historyState.activeMessages.length ? { id: "active-chat" } : null, messages: historyState.activeMessages })),
       getGreeting: vi.fn().mockResolvedValue(null),
       getRuntimeSettings: vi.fn().mockResolvedValue({ runtimeAllowAlwaysEnabled: true }),
       listSkills: vi.fn().mockResolvedValue({ skills: [] }),
@@ -135,7 +136,7 @@ vi.mock("../api/internal-agent", async (importOriginal) => {
     },
     conversationMessagesApi: {
       ...actual.conversationMessagesApi,
-      list: vi.fn().mockResolvedValue(null),
+      list: vi.fn(async () => ({ messages: historyState.messages })),
     },
   };
 });
@@ -213,6 +214,10 @@ function sendViaEnter(box: HTMLElement) {
 }
 
 beforeEach(() => {
+  historyState.messages = [];
+  historyState.activeMessages = [];
+  stableHooks.company.selectedCompanyId = "co-1";
+  stableHooks.location.pathname = "/";
   liveState.connectionState = "open";
   streamState.impl = failingStream;
   streamState.calls = [];
@@ -224,6 +229,163 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Commander composer — B-states (mock §5)", () => {
+  it("restores docked failure recovery bound to the persisted conversation rather than the current active-chat default", async () => {
+    historyState.activeMessages = [
+      {
+        id: "saved-active-user",
+        role: "user",
+        content: "Saved intent",
+        createdAt: "2026-10-16T00:00:00Z",
+        turnStatus: "failed",
+        failure: {
+          message: "Check company settings",
+          retryUnavailableReason: null,
+          retry: {
+            message: "Saved intent",
+            clientSubmissionId: "active-original",
+            attachmentAssetIds: [],
+            pageContext: null,
+            contextScope: null,
+            departmentContext: null,
+          },
+        },
+      },
+    ];
+    renderPanel();
+    const banner = await screen.findByTestId("composer-send-failed-banner");
+    streamState.impl = completingStream;
+    fireEvent.click(within(banner).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(streamState.calls).toHaveLength(1));
+    expect(streamState.calls[0][4]).toBe("active-chat");
+    expect(streamState.calls[0][2]).toBeNull();
+    expect(streamState.calls[0][5]).toBeNull();
+    expect(streamState.calls[0][7]).toBe("active-original");
+  });
+
+  it("clears a docked failed submission when switching companies", async () => {
+    historyState.activeMessages = [
+      {
+        id: "saved-user",
+        role: "user",
+        content: "Old company intent",
+        failure: {
+          message: "Old company failed",
+          retry: null,
+          retryUnavailableReason: "Review references",
+        },
+      },
+    ];
+    const panel = renderPanel();
+    await screen.findByTestId("composer-send-failed-banner");
+    historyState.activeMessages = [];
+    stableHooks.company.selectedCompanyId = "co-2";
+    panel.rerenderPanel({});
+    await waitFor(() =>
+      expect(screen.queryByTestId("composer-send-failed-banner")).not.toBeInTheDocument(),
+    );
+    expect(streamState.calls).toHaveLength(0);
+  });
+  it("rehydrates failed user-only saved history and retries its original payload after reopening", async () => {
+    const retry = {
+      message: "Review notes\n\nReferenced context: asset=saved-file",
+      clientSubmissionId: "original-send",
+      pageContext: "Original page",
+      contextScope: { surface: "memory", route: "/original" },
+      departmentContext: null,
+      attachmentAssetIds: ["saved-file"],
+    };
+    historyState.messages = [
+      {
+        id: "saved-user",
+        role: "user",
+        content: retry.message,
+        createdAt: "2026-10-16T00:00:00Z",
+        turnStatus: "failed",
+        failure: {
+          message: "Company provider setup is missing. Open Settings and retry.",
+          retry,
+          retryUnavailableReason: null,
+        },
+      },
+    ];
+    const first = renderPanel({ conversationId: "saved-chat" });
+    let banner = await screen.findByTestId("composer-send-failed-banner");
+    expect(banner).toHaveTextContent("Company provider setup is missing");
+    first.unmount();
+    const reopened = renderPanel({ conversationId: "saved-chat" });
+    banner = await screen.findByTestId("composer-send-failed-banner");
+    stableHooks.location.pathname = "/settings";
+    reopened.rerenderPanel({ conversationId: "saved-chat" });
+    streamState.impl = completingStream;
+    fireEvent.click(within(banner).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(streamState.calls).toHaveLength(1));
+    const call = streamState.calls[0];
+    expect(call[1]).toBe(retry.message);
+    expect(call[2]).toBe("Original page");
+    expect(call[4]).toBe("saved-chat");
+    expect(call[5]).toEqual(retry.contextScope);
+    expect(call[6]).toEqual(["saved-file"]);
+    expect(call[7]).toBe("original-send");
+    expect(call[8]).toBeNull();
+  });
+
+  it("explains unsafe legacy retry and keeps Edit and Discard actionable", async () => {
+    historyState.messages = [
+      {
+        id: "legacy",
+        role: "user",
+        content: "Original intent",
+        turnStatus: "failed",
+        createdAt: "2026-10-16T00:00:00Z",
+        failure: {
+          message: "Commander failed. Check Settings.",
+          retry: null,
+          retryUnavailableReason:
+            "The original attachments and context were not saved. Edit and review before sending again.",
+        },
+      },
+    ];
+    renderPanel({ conversationId: "legacy-chat" });
+    const banner = await screen.findByTestId("composer-send-failed-banner");
+    expect(banner).toHaveTextContent("original attachments and context were not saved");
+    expect(within(banner).getByRole("button", { name: "Retry" })).toBeDisabled();
+    fireEvent.click(within(banner).getByRole("button", { name: "Edit" }));
+    await waitFor(() => expect(composerInput().textContent).toBe("Original intent"));
+    expect(streamState.calls).toHaveLength(0);
+  });
+
+  it("dismisses answered saved choices on explicit hydration while leaving the latest unanswered choice available", async () => {
+    const marker = (question: string) =>
+      `⚡OPTIONS:${JSON.stringify({ question, options: ["Proceed", "Cancel"] })}⚡`;
+    historyState.messages = [
+      {
+        id: "old-choice",
+        role: "assistant",
+        content: marker("Old question"),
+        createdAt: "2026-10-16T00:00:00Z",
+      },
+      { id: "answer", role: "user", content: "Proceed", createdAt: "2026-10-16T00:00:01Z" },
+      {
+        id: "new-choice",
+        role: "assistant",
+        content: marker("Unanswered question"),
+        createdAt: "2026-10-16T00:00:02Z",
+      },
+    ];
+    const first = renderPanel({ conversationId: "choices" });
+    await screen.findByText("Unanswered question");
+    expect(screen.queryByText("Old question")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Proceed.*recommended/ })).toHaveLength(1);
+    first.unmount();
+    renderPanel({ conversationId: "choices" });
+    const proceed = await screen.findByRole("button", { name: /Proceed.*recommended/ });
+    streamState.impl = completingStream;
+    fireEvent.click(proceed);
+    await waitFor(() => expect(streamState.calls).toHaveLength(1));
+    expect(streamState.calls[0][1]).toBe("Proceed");
+    expect(confirmActionMock).not.toHaveBeenCalled();
+  });
+
   it("renders choices and sends selected intent without approving a governed action", async () => {
     streamState.impl = () => (async function* () {
       yield { event: "options_prompt", data: { promptId: "choice-1", question: "Proceed with this action?", options: ["Proceed", "Cancel"] } };

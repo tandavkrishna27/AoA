@@ -187,10 +187,11 @@ export function conversationService(db: Db) {
      * gates heartbeatTurn/finishTurn so a reclaimed original owner can neither
      * bump the new owner's lease nor overwrite its status.
      */
-    async claimTurn(userMessageId: string): Promise<string | null> {
+    async claimTurn(userMessageId: string, runId?: string): Promise<string | null> {
       const result = await db.execute(sql`
         UPDATE internal_agent_messages
-        SET turn_status = 'running', turn_claimed_at = now(), turn_claim_token = gen_random_uuid()
+        SET turn_status = 'running', turn_claimed_at = now(), turn_claim_token = gen_random_uuid(),
+            run_id = COALESCE(${runId ?? null}::uuid, run_id)
         WHERE id = ${userMessageId}
           AND (
             turn_status IS NULL
