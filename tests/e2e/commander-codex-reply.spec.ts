@@ -1,6 +1,7 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 import { cleanupTestCompanies, seedCompany } from "./helpers/seed-company";
 import {
+  FAKE_CODEX_ACCOUNT_DEFAULT_MODEL,
   writeFakeCodexControl,
   clearFakeCodexInvocations,
   readFakeCodexInvocations,
@@ -24,10 +25,10 @@ import {
  * files are race-free (plan-review fix #1/#5).
  *
  * Key assertion (plan-review fix #2/#3): the recorded invocation proves the
- * REAL cli-mode codex contract — exec --json, bypass flag, --model (NOT a
- * claude string), -c model_reasoning_effort=high, -c model_reasoning_summary=
- * detailed, ends with "-" (stdin sentinel), CODEX_HOME set, config.toml
- * written by cli-mode.
+ * REAL cli-mode codex contract — exec --json, bypass flag, the synthetic
+ * account-catalog default model, -c model_reasoning_effort=high,
+ * -c model_reasoning_summary=detailed, ends with "-" (stdin sentinel),
+ * CODEX_HOME set, config.toml written by cli-mode.
  */
 
 const REASONING_TEXT = "Planning the launch sequence…";
@@ -56,7 +57,7 @@ async function setCodexCliTool(
 ): Promise<void> {
   const res = await request.patch(
     `/api/companies/${companyId}/internal-agent/config`,
-    { data: { cliTool: "codex" } },
+    { data: { cliTool: "codex", model: null } },
   );
   if (!res.ok()) {
     const body = await res.text().catch(() => "(no body)");
@@ -144,15 +145,12 @@ test.describe("Commander codex reply + invocation contract", () => {
     expect(inv.argv[0]).toBe("exec");
     expect(inv.argv).toContain("--json");
 
-    // Must include "--model" followed by a non-claude codex-compatible model.
+    // Must include the active fake account catalog's default model. The
+    // catalog control probe and user turn use the same synthetic account.
     const modelIdx = inv.argv.indexOf("--model");
     expect(modelIdx).toBeGreaterThan(-1);
     const resolvedModel = inv.argv[modelIdx + 1];
-    expect(resolvedModel).toBeTruthy();
-    // Must NOT be a claude string (the bug the model-pin fix addressed).
-    expect(resolvedModel).not.toMatch(/claude/i);
-    // Must be a GPT/O-series model (codex-compatible).
-    expect(resolvedModel).toMatch(/^(gpt-|o\d|chatgpt)/i);
+    expect(resolvedModel).toBe(FAKE_CODEX_ACCOUNT_DEFAULT_MODEL);
 
     // Must include reasoning effort + summary flags.
     expect(inv.argv).toContain("-c");

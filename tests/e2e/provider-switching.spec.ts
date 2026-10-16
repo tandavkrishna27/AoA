@@ -29,10 +29,8 @@ import {
  * Seed a codex_local agent via the API. In local_trusted mode the synthetic
  * local-board actor is auto-authorised, so no Bearer token is needed.
  *
- * Pass `model` to pin an explicit adapterConfig.model; omit it and the server
- * injects the codex default (DEFAULT_CODEX_CHAT_MODEL = "gpt-5.5") via
- * applyCreateDefaultsByAdapterType, so the stored config still carries a
- * concrete model.
+ * Pass `model` only for the explicit-selection cases. Omitting it persists a
+ * blank inherited model so execution resolves the selected account's catalog.
  */
 async function seedCodexAgent(
   request: APIRequestContext,
@@ -118,17 +116,19 @@ test.describe("provider-switching: agent config save-side", () => {
     await cleanupTestCompanies(request, /^E2E-PS-/);
   });
 
-  test("codex model picker defaults to gpt-5.5 and lists it", async ({
+  test("codex model picker inherits the account default and requests the agent-scoped catalog", async ({
     page,
     request,
   }) => {
     const { companyId, issuePrefix } = await seedConfiguredCompany(request, {
       companyName: `E2E-PS-${Date.now()}`,
     });
-    // No explicit model on create -> the server injects the codex default
-    // (DEFAULT_CODEX_CHAT_MODEL = "gpt-5.5") via applyCreateDefaultsByAdapterType,
-    // so the stored config persists model="gpt-5.5" and the picker reflects it.
     const agentId = await seedCodexAgent(request, companyId);
+    const modelRequest = page.waitForRequest((req) => {
+      const url = new URL(req.url());
+      return url.pathname === `/api/companies/${companyId}/adapters/codex_local/models`
+        && url.searchParams.get("agentId") === agentId;
+    });
 
     await page.goto(`/${issuePrefix}/agents/${agentId}/configure`);
 
@@ -139,68 +139,62 @@ test.describe("provider-switching: agent config save-side", () => {
       .getByRole("button", { name: "Permissions & config" })
       .click();
 
-    // Default reflected: the trigger shows the server-pinned gpt-5.5, not a
-    // placeholder (a created codex agent always persists a concrete model).
-    const trigger = page.getByRole("button", { name: "gpt-5.5", exact: true });
+    // This isolated agent has no per-agent auth.json, so its picker has no
+    // listed models. The form still makes account-default inheritance clear.
+    const trigger = page.getByRole("button", { name: "Account default (Codex CLI)", exact: true });
     await expect(trigger).toBeVisible({ timeout: 10_000 });
+    await modelRequest;
 
-    // ...and gpt-5.5 is offered in the list: opening the picker surfaces a
-    // second exact "gpt-5.5" button (the option) alongside the trigger.
     await trigger.click();
     await expect(
-      page.getByRole("button", { name: "gpt-5.5", exact: true }),
+      page.getByRole("button", { name: "Account default (Codex CLI)", exact: true }),
     ).toHaveCount(2);
+    await expect(page.getByRole("button", { name: /^gpt-5\.5$/i })).toHaveCount(0);
   });
 
-  test("saving codex gpt-5.3-codex surfaces a 'using gpt-5.5' warning", async ({
+  test("saving an explicit Codex choice preserves it and an unavailable catalog fails with guidance", async ({
     page,
     request,
   }) => {
     const { companyId, issuePrefix } = await seedConfiguredCompany(request, {
       companyName: `E2E-PS-${Date.now()}`,
     });
-    const agentId = await seedCodexAgent(request, companyId, "gpt-5.5");
+    const explicitModel = "gpt-fixture-unavailable";
+    const agentId = await seedCodexAgent(request, companyId, explicitModel);
 
     await page.goto(`/${issuePrefix}/agents/${agentId}/configure`);
 
-    // Select the "Permissions & config" rail section (holds the model picker;
-    // its content is expanded by default).
+    // Change an unrelated field to save the existing explicit model as-is.
     await page
-      .getByRole("button", { name: "Permissions & config" })
+      .getByTestId("config-nav")
+      .getByRole("button", { name: "Identity" })
       .click();
-
-    // Open the model picker. The trigger shows the current model value
-    // ("gpt-5.5"). Gate each interaction on the target being actionable: the
-    // trigger only renders once the "permissions" section is active, so this also
-    // confirms the section switch took effect. Without the gate a bare .click()
-    // auto-waits against the whole 60s test budget if a stray re-render strands
-    // the form on the default section (mirrors the sibling "defaults to gpt-5.5"
-    // test). The underlying mount-time churn is fixed in AgentConfigForm, but the
-    // gate keeps the test legible + fast-failing if any future re-render appears.
-    const trigger = page.getByRole("button", { name: "gpt-5.5", exact: true });
-    await expect(trigger).toBeVisible({ timeout: 10_000 });
-    await trigger.click();
-
-    await page.getByPlaceholder("Search models...").fill("gpt-5.3-codex");
-    const codexOption = page.getByRole("button", {
-      name: "gpt-5.3-codex",
-      exact: true,
-    });
-    await expect(codexOption).toBeVisible({ timeout: 10_000 });
-    await codexOption.click();
+    const name = page.getByTestId("agent-config-name-input");
+    await expect(name).toBeVisible({ timeout: 10_000 });
+    await name.fill("Preserved Codex Choice");
 
     // Save (the floating action bar appears once the config is dirty).
     const saveButton = page.getByRole("button", { name: "Save" });
     await expect(saveButton).toBeVisible({ timeout: 10_000 });
     await saveButton.click();
 
-    // Server-generated warning: model swapped to the codex-compatible default.
-    // Assumes the CI runner has no shared Codex login configured, so the
-    // detected auth mode resolves "unknown" (not "apikey") and resolveModel
-    // takes the ChatGPT-compat branch, falling back to gpt-5.5.
-    await expect(page.getByRole("alert")).toContainText(/using gpt-5\.5/i, {
-      timeout: 15_000,
-    });
+    const savedRes = await request.get(`/api/agents/${agentId}`);
+    expect(savedRes.ok()).toBe(true);
+    const saved = await savedRes.json() as { adapterConfig?: { model?: string } };
+    expect(saved.adapterConfig?.model).toBe(explicitModel);
+
+    // The fake Codex account advertises only its synthetic account default.
+    // The readiness probe must refuse the unlisted explicit choice instead of
+    // silently replacing it or switching billing modes.
+    await page.getByRole("button", { name: "Adapter & model" }).click();
+    const testEnvironmentButton = page.getByRole("button", { name: "Test environment" });
+    await expect(testEnvironmentButton).toBeVisible({ timeout: 10_000 });
+    await testEnvironmentButton.click();
+    const result = page.getByTestId("adapter-env-result");
+    await expect(result).toBeVisible({ timeout: 15_000 });
+    await expect(result).toContainText(/gpt-fixture-unavailable.*not available.*current CLI catalog/i);
+    await expect(result).toContainText(/Select a listed model or clear the model override/i);
+    await expect(result).toContainText(/No API-key billing fallback was attempted/i);
   });
 
   test("cross-family (claude adapter + gpt model) is rejected", async ({
@@ -209,11 +203,11 @@ test.describe("provider-switching: agent config save-side", () => {
     const { companyId } = await seedConfiguredCompany(request, {
       companyName: `E2E-PS-${Date.now()}`,
     });
-    const agentId = await seedCodexAgent(request, companyId, "gpt-5.5");
+    const agentId = await seedCodexAgent(request, companyId, "gpt-fixture-listed");
 
     const res = await request.patch(
       `/api/agents/${agentId}?companyId=${companyId}`,
-      { data: { adapterType: "claude_local", adapterConfig: { model: "gpt-5.5" } } },
+      { data: { adapterType: "claude_local", adapterConfig: { model: "gpt-fixture-listed" } } },
     );
     expect(res.status()).toBe(400);
   });
@@ -222,7 +216,7 @@ test.describe("provider-switching: agent config save-side", () => {
     const { companyId } = await seedConfiguredCompany(request, {
       companyName: `E2E-PS-${Date.now()}`,
     });
-    const agentId = await seedCodexAgent(request, companyId, "gpt-5.5");
+    const agentId = await seedCodexAgent(request, companyId);
 
     // Include adapterType so the shared schema's shell-safety refinement runs
     // (refineAdapterModel early-returns when adapterType is absent). This keeps
@@ -243,7 +237,7 @@ test.describe("provider-switching: agent config save-side", () => {
     const { companyId, issuePrefix } = await seedConfiguredCompany(request, {
       companyName: `E2E-PS-${Date.now()}`,
     });
-    const agentId = await seedCodexAgent(request, companyId, "gpt-5.5");
+    const agentId = await seedCodexAgent(request, companyId);
 
     await page.goto(`/${issuePrefix}/agents/${agentId}/configure`);
 

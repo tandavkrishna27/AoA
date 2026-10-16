@@ -27,7 +27,7 @@ async function setCodexCliTool(
 ): Promise<void> {
   const res = await request.patch(
     `/api/companies/${companyId}/internal-agent/config`,
-    { data: { cliTool: "codex" } },
+    { data: { cliTool: "codex", model: null } },
   );
   if (!res.ok()) {
     const body = await res.text().catch(() => "(no body)");
