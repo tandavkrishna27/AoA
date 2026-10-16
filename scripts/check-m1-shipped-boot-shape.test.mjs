@@ -25,7 +25,7 @@ import {
 import { parseYaml } from "./lib/yaml-lite.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8");
+const real = () => readFileSync(path.join(repoRoot, SHIPPED_BOOT_WORKFLOW), "utf8").replace(/\r\n/g, "\n");
 const violationsOf = (text) => evaluateShippedBootWorkflowShape(text).violations;
 const anyMatch = (violations, re) => violations.some((x) => re.test(x));
 
@@ -43,7 +43,7 @@ test("M1b is opt-in, keyed-only, runs after the existing checks and always stops
 });
 
 function reclaimFixture(t, { freeKb = 12 * 1024 * 1024, afterCleanupKb = freeKb, missingImage = false, runnerEnvironment = "github-hosted", d1Occurrence = null } = {}) {
-  const text = d1Occurrence === null ? real() : readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8");
+  const text = d1Occurrence === null ? real() : readFileSync(path.join(repoRoot, ".github/workflows/d1-merge-train.yml"), "utf8").replace(/\r\n/g, "\n");
   const markers = [...text.matchAll(/      - name: Reclaim build cache before D1 bring-up/g)];
   const start = d1Occurrence === null
     ? text.indexOf("      - name: Reclaim build cache before the object-store build")

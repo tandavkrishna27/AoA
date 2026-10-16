@@ -49,6 +49,7 @@ import {
 import { ENV_PROBE_EXPECTED_CLASSES } from "../m1-shipped-boot.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const readText = (file) => readFileSync(file, "utf8").replace(/\r\n/g, "\n");
 const [A, B] = M1_SPINE_TENANTS.enabled;
 const C = M1_SPINE_TENANTS.control;
 
@@ -70,19 +71,19 @@ test("the tenant set is three DISTINCT Organizations: two enabled, one control (
 // ── the committed override file ─────────────────────────────────────────────
 
 test("the committed m1-spine override has zero violations (anchor)", () => {
-  const text = readFileSync(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"), "utf8");
+  const text = readText(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"));
   assert.deepEqual(evaluateSpineOverrideText(text), []);
 });
 
 test("an override that sets the rollout on only ONE replica is refused", () => {
-  const text = readFileSync(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"), "utf8");
+  const text = readText(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"));
   const firstAt = text.indexOf(M1_SPINE_ROLLOUT_ENV_VALUE);
   const oneReplica = text.slice(0, firstAt) + "{}" + text.slice(firstAt + M1_SPINE_ROLLOUT_ENV_VALUE.length);
   assert.ok(codes(evaluateSpineOverrideText(oneReplica)).includes("override:rollout_not_on_every_replica"));
 });
 
 test("BOTH assignments under ONE replica is refused — the count is per block (Codex P2)", () => {
-  const text = readFileSync(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"), "utf8");
+  const text = readText(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"));
   const assignment = `      AOA_DISTRIBUTED_EXECUTION_ROLLOUT: '${M1_SPINE_ROLLOUT_ENV_VALUE}'`;
   // Move control-plane-b's assignment into control-plane's block: the file still contains two
   // matching assignments and both service headers, which a file-wide count would accept.
@@ -92,14 +93,14 @@ test("BOTH assignments under ONE replica is refused — the count is per block (
 });
 
 test("an override that arms the crew switch is refused", () => {
-  const text = readFileSync(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"), "utf8");
+  const text = readText(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"));
   const armed = text.replace("  control-plane:\n    environment:\n", "  control-plane:\n    environment:\n      AOA_DISTRIBUTED_CREW_ROLLOUT_ENABLED: \"true\"\n");
   assert.notEqual(armed, text, "fixture must actually inject the flag");
   assert.ok(codes(evaluateSpineOverrideText(armed)).includes("override:crew_switch_present"));
 });
 
 test("an override that keeps worker-a in the default profile is refused (one-worker topology)", () => {
-  const text = readFileSync(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"), "utf8");
+  const text = readText(path.join(repoRoot, "docker", "d1", "m1-spine.override.yml"));
   const twoWorker = text.replace(/  worker-a:\n    profiles: \[[^\]]*\]\n/, "");
   assert.notEqual(twoWorker, text, "fixture must actually remove the profile");
   assert.ok(codes(evaluateSpineOverrideText(twoWorker)).includes("override:worker_a_not_excluded"));
@@ -1094,7 +1095,7 @@ test("env probe: an unreadable summary reds", () => {
 // ── the override's worker-driven posture ────────────────────────────────────
 
 const OVERRIDE_PATH = new URL("../../../docker/d1/m1-spine.override.yml", import.meta.url);
-const overrideText = () => readFileSync(OVERRIDE_PATH, "utf8");
+const overrideText = () => readText(OVERRIDE_PATH);
 
 test("override: the COMMITTED file has zero violations (the anchor)", () => {
   assert.deepEqual(evaluateSpineOverrideText(overrideText()), []);
@@ -1354,7 +1355,7 @@ test("worker marker: a MALFORMED declaration fails closed — it reds, and witho
 });
 
 test("worker marker: the PROFILE declares it exactly once, inside the EXECUTOR === \"worker\" block", () => {
-  const profile = readFileSync(path.join(repoRoot, "tests", "d1", "m1-spine.test.mjs"), "utf8");
+  const profile = readText(path.join(repoRoot, "tests", "d1", "m1-spine.test.mjs"));
   const declarations = [...profile.matchAll(/workerDriven:\s*true/g)];
   assert.equal(declarations.length, 1, `the profile carries ${declarations.length} \`workerDriven: true\` declarations, expected exactly 1`);
   const at = declarations[0].index;
@@ -1368,7 +1369,7 @@ test("worker marker: the PROFILE declares it exactly once, inside the EXECUTOR =
 });
 
 test("worker marker: the d1 lane's usage-suppressed control greps BOTH literals", () => {
-  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"), "utf8");
+  const workflow = readText(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"));
   const start = workflow.indexOf("POSITIVE CONTROL — with usage suppressed, the profile MUST go red");
   assert.ok(start !== -1, "the usage-suppressed control step is gone");
   const end = workflow.indexOf("- name:", start);
@@ -1380,7 +1381,7 @@ test("worker marker: the d1 lane's usage-suppressed control greps BOTH literals"
 });
 
 test("D1 host jobs install the lockfile-pinned AST compiler before their Node preflights", () => {
-  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"), "utf8");
+  const workflow = readText(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"));
   const jobStarts = ["  d1-merge-train:", "  m1-spine:", "  m1-fault-matrix:"];
   for (const marker of jobStarts) {
     const start = workflow.indexOf(marker);
@@ -1400,7 +1401,7 @@ test("D1 host jobs install the lockfile-pinned AST compiler before their Node pr
 });
 
 test("the fault-matrix job reserves time for action post-step cleanup", () => {
-  const workflow = readFileSync(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"), "utf8");
+  const workflow = readText(path.join(repoRoot, ".github", "workflows", "d1-merge-train.yml"));
   const start = workflow.indexOf("  m1-fault-matrix:");
   const job = workflow.slice(start);
   assert.match(job, /timeout-minutes:\s*50\b/);
