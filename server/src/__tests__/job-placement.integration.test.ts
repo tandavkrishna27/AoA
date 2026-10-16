@@ -13,6 +13,8 @@ import { buildCommanderDistributedInvocation } from "../services/commander-distr
 import { createCommanderAcceptedStreamReader } from "../services/commander-accepted-stream.js";
 import { persistCommanderDistributedReply, persistCommanderDistributedFailure } from "../services/commander-distributed-reply.js";
 import { rejoinCommanderRun } from "../services/commander-rejoin-run.js";
+import { conversationService } from "../services/internal-agent/conversation.js";
+import { createCommanderDistributedPort } from "../services/commander-distributed-port.js";
 import { createCommanderSourcePreparer, createCommanderExistingTurnReader, createCommanderDistributedResultReader } from "../services/commander-distributed-store.js";
 import { resolveCliAuthTopology } from "../services/cli-auth-topology.js";
 import { buildOneShotDistributedInvocation } from "../services/one-shot-distributed-invocation.js";
@@ -1064,6 +1066,60 @@ integration("JOB-009 slice A schema and role boundaries", () => {
     await admin`INSERT INTO internal_agent_runs (id, company_id, user_id, trigger_type, trigger_source, status)
       VALUES (${placeholder}, ${COMPANY_A}, ${OWNER_A}, 'conversation', 'user_message', 'running')`;
     expect(await existing({ ...replay, turnId: placeholder })).toEqual({ organizationId: ORG_A, jobId, attemptId, operationId: newer });
+    if (terminal === "failed" && membership === "deleted") {
+      // Cross the real CAS and source-reader/preparer boundary using the paid
+      // job and its committed original input; a retry must never place again.
+      await admin`UPDATE internal_agent_messages SET client_submission_id = ${`retry-${messageId}`},
+            tool_results = ${{
+              kind: "commander_submission",
+              v: 1,
+              payload: {
+                message: "prompt",
+                pageContext: null,
+                departmentContext: null,
+                contextScope: null,
+                attachmentAssetIds: [],
+              },
+            }}
+            WHERE id = ${messageId}`;
+      for (const status of ["failed", "running"]) {
+        await admin`UPDATE internal_agent_runs SET status = ${status} WHERE id = ${newer}`;
+        await admin`UPDATE internal_agent_messages SET turn_status = ${status},
+              turn_claimed_at = now() - interval '40 minutes' WHERE id = ${messageId}`;
+        expect(await conversationService(ownerDb).claimTurn(messageId, placeholder)).not.toBeNull();
+        expect(
+          (await admin`SELECT run_id FROM internal_agent_messages WHERE id = ${messageId}`)[0].run_id,
+        ).toBe(newer);
+        expect(await prepare({ ...request, turnId: placeholder })).toBe(false);
+        const place = vi.fn();
+        const port = createCommanderDistributedPort({
+          existing,
+          prepare,
+          toolsAuthorized: () => true,
+          preflight: vi.fn(),
+          rollout: { resolveExecutionOwner: place },
+          cancel: vi.fn(),
+          read: async () => ({
+            state: "result",
+            result: {
+              version: 1,
+              operationId: newer,
+              stdout: "Original accepted reply",
+              stderr: "",
+              exitCode: 0,
+              timedOut: false,
+              durationMs: 1,
+              captureError: null,
+            },
+          }),
+        } as never);
+        expect(await port.execute({ ...request, turnId: placeholder })).toMatchObject({
+          operationId: newer,
+        });
+        expect(place).not.toHaveBeenCalled();
+      }
+      await admin`UPDATE internal_agent_runs SET status = 'running' WHERE id = ${newer}`;
+    }
     await admin`INSERT INTO internal_agent_config (company_id, provider, model) VALUES (${COMPANY_A}, 'anthropic', 'claude-sonnet-4-6')
       ON CONFLICT (company_id) DO UPDATE SET provider = 'anthropic', model = 'claude-sonnet-4-6'`;
     const rate = await resolveAuthoritativeRate(ownerDb, { companyId: COMPANY_A,

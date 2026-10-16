@@ -20,6 +20,12 @@ export async function persistCommanderDistributedReply(db: Db, input: OneShotRes
   for (const chunk of input.chunks) {
     if (chunk.type === "error") throw new Error(chunk.message);
     if (chunk.type === "text") content += chunk.delta;
+    if (chunk.type === "options_prompt") {
+      // Match the agent-loop representation so saved history can restore choices.
+      // This marker carries conversational intent only, never approval authority.
+      const marker = `⚡OPTIONS:${JSON.stringify({ question: chunk.question, options: chunk.options })}⚡`;
+      content += `${content ? "\n" : ""}${marker}`;
+    }
     if (chunk.type === "reasoning") reasoning = (reasoning + chunk.delta).slice(0, 16000);
     if (chunk.type === "tool_call") tools.push({ id: chunk.id, name: chunk.name, input: chunk.input });
     if (chunk.type === "tool_result") tools.push({ id: chunk.id, name: chunk.name, result: chunk.result });

@@ -3,6 +3,47 @@ import { act, render, screen, fireEvent, waitFor, within } from "@testing-librar
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AgentPanelContent } from "./InternalAgentPanel";
 import { composerDraftStorageKey, deserializeComposerDraft, serializeComposerDraft } from "../lib/composerDraft";
+import { parseCommanderDistributedOutput } from "../../../server/src/services/commander-distributed-output";
+import { persistCommanderDistributedReply } from "../../../server/src/services/commander-distributed-reply";
+import { createCommanderDistributedPort } from "../../../server/src/services/commander-distributed-port";
+import { createCommanderResultRecovery } from "../../../server/src/services/commander-result-recovery";
+import type { CapturedOneShotResult } from "../../../server/src/services/one-shot-distributed-result";
+
+// Exercise accepted worker output through the production parser, writer and
+// delivery/recovery orchestration. Only database and authority I/O are replaced.
+vi.mock("../../../packages/db/src/index.ts", () =>
+  Object.fromEntries(
+    [
+      "companies",
+      "internalAgentConversations",
+      "internalAgentMessages",
+      "internalAgentRuns",
+      "jobAttempts",
+    ].map((name) => [
+      name,
+      new Proxy(
+        { _table: name },
+        {
+          get: (target, key) => (key === "_table" ? target._table : `${name}.${String(key)}`),
+        },
+      ),
+    ]),
+  ),
+);
+vi.mock("../../../server/src/db/tenant-context", () => ({
+  runInTenant: async (
+    db: unknown,
+    _organizationId: string,
+    callback: (...args: unknown[]) => unknown,
+  ) => callback({}, db),
+}));
+vi.mock("../../../server/src/services/commander-job-authority", () => ({
+  loadCommanderJobAuthority: async (db: { authority: unknown }) => db.authority,
+}));
+const completionAuditMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("../../../server/src/services/activity-log", () => ({
+  insertActivityLog: completionAuditMock,
+}));
 
 /**
  * Commander composer B-states (mock §5): send-failed banner with idempotent
@@ -244,6 +285,147 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Commander composer — B-states (mock §5)", () => {
+  it.each([false, true])(
+    "hydrates accepted distributed choices after delivery and repeated recovery (surrounding text: %s)",
+    async (surrounding) => {
+      const operationId = "22222222-2222-4222-8222-222222222222";
+      const candidate = {
+        organizationId: "org",
+        companyId: "11111111-1111-4111-8111-111111111111",
+        operationId,
+        jobId: "job",
+        attemptId: "attempt",
+        userId: "user-1",
+        conversationId: "saved-chat",
+        messageId: "saved-user",
+        model: "gpt-4.1",
+        cliTool: "codex",
+      };
+      const marker = '⚡OPTIONS:{"question":"Choose a direction","options":["Proceed","Cancel"]}⚡';
+      const summary = surrounding ? `Before ${marker} After` : marker;
+      const result = {
+        version: 1 as const,
+        operationId,
+        stdout: [
+          JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: summary } }),
+          JSON.stringify({ type: "turn.completed", usage: { input_tokens: 4, output_tokens: 2 } }),
+        ].join("\n"),
+        stderr: "",
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 20,
+        captureError: null,
+        usageAccepted: true,
+      };
+      const user = {
+        id: candidate.messageId,
+        conversationId: candidate.conversationId,
+        role: "user",
+        content: "Choose",
+        runId: operationId,
+      };
+      const replies: Record<string, unknown>[] = [];
+      let conversationIncrements = 0;
+      const db = {
+        authority: {
+          ...candidate,
+          turnId: operationId,
+          executionOwner: "distributed",
+          distributedJobId: candidate.jobId,
+          distributedAttemptId: candidate.attemptId,
+        },
+        select: () => {
+          const query: any = {
+            from: () => query,
+            where: () => query,
+            for: async () => [user],
+            limit: async () => replies,
+          };
+          return query;
+        },
+        insert: () => ({
+          values: async (values: Record<string, unknown>) => {
+            replies.push({ ...values, id: "persisted-reply", createdAt: "2026-10-16T00:00:00Z" });
+          },
+        }),
+        update: (table: { _table: string }) => ({
+          set: (values: Record<string, unknown>) => ({
+            where: async () => {
+              if (table._table === "internalAgentConversations") conversationIncrements += 1;
+              if (table._table === "internalAgentMessages") Object.assign(user, values);
+            },
+          }),
+        }),
+      };
+      completionAuditMock.mockClear();
+      const project = async (_candidate: unknown, accepted: CapturedOneShotResult) => {
+        const chunks = await parseCommanderDistributedOutput({
+          result: accepted,
+          cliTool: "codex",
+          turnId: operationId,
+          model: "gpt-4.1",
+        });
+        expect(chunks.filter((chunk) => chunk.type === "options_prompt")).toHaveLength(1);
+        expect(chunks.some((chunk) => chunk.type === "action_confirmation")).toBe(false);
+        await persistCommanderDistributedReply(db as never, { ...candidate, chunks });
+      };
+      const placement = vi.fn();
+      const port = createCommanderDistributedPort({
+        existing: async () => candidate,
+        prepare: vi.fn(),
+        preflight: vi.fn(),
+        toolsAuthorized: () => true,
+        rollout: { resolveExecutionOwner: placement },
+        read: async () => ({ state: "result", result }),
+        cancel: async () => undefined,
+        persistReply: async (_input: unknown, _scope: unknown, accepted: CapturedOneShotResult) =>
+          project(candidate, accepted),
+      } as never);
+      const delivered = await port.execute({
+        companyId: candidate.companyId,
+        turnId: operationId,
+        userId: candidate.userId,
+        userRole: "founder",
+        conversationId: candidate.conversationId,
+        messageId: candidate.messageId,
+        cliTool: "codex",
+        content: "Choose",
+        model: "gpt-4.1",
+        apiBaseUrl: "https://aoa.example/api",
+        timeoutMs: 1000,
+      });
+      expect(delivered).toMatchObject({ replyPersisted: true });
+      const onError = vi.fn();
+      const recovery = createCommanderResultRecovery({
+        list: async () => [candidate],
+        read: async () => ({ state: "result", result }),
+        project,
+        onError,
+      });
+      await recovery.tick();
+      await recovery.tick();
+      expect(onError).not.toHaveBeenCalled();
+      expect(placement).not.toHaveBeenCalled();
+      expect(replies).toHaveLength(1);
+      expect(conversationIncrements).toBe(1);
+      expect(completionAuditMock).toHaveBeenCalledTimes(1);
+      expect(user).toMatchObject({ runId: operationId, turnStatus: "done", turnClaimToken: null });
+      expect(replies[0].content).toContain(marker);
+      historyState.messages = [user, ...replies];
+      stableHooks.company.selectedCompanyId = candidate.companyId;
+      renderPanel({ conversationId: candidate.conversationId });
+      expect(await screen.findByRole("button", { name: /^Proceed/ })).toBeVisible();
+      expect(screen.getAllByRole("button", { name: /^Proceed/ })).toHaveLength(1);
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+      if (surrounding) {
+        expect(screen.getByText(/Before/)).toHaveTextContent("After");
+      }
+      expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+      expect(confirmActionMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("keeps current live approval in its original row when delayed history contains identical older answered choices", async () => {
     const question = "Proceed?";
     const options = ["Proceed", "Cancel"];
