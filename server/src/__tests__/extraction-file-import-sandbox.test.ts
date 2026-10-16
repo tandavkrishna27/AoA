@@ -263,7 +263,8 @@ describe("extractFromRawText — file-import sandbox staging (U13.5)", () => {
 
     const [sandboxInput] = mockRunOneShotCliInSandbox.mock.calls[0];
     const args: string[] = sandboxInput.args;
-    expect(args[0]).toBe("exec");
+    expect(args.slice(0, 3)).toEqual(["--ask-for-approval", "never", "exec"]);
+    expect(args[args.indexOf("--sandbox") + 1]).toBe("read-only");
     expect(args).toContain("--model");
     expect(args[args.indexOf("--model") + 1]).toBe("gpt-5-codex");
 
