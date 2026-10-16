@@ -539,9 +539,6 @@ jobs:
           node --test scripts/check-test-inventory.test.mjs
           node scripts/check-test-inventory.mjs
 
-      - name: Vitest native output capture
-        run: node --test scripts/lib/__tests__/vitest-capture.test.mjs
-
       - name: Execution census (a test file that nothing runs is not coverage)
         run: |
           # TRACK-002. The inventory step above asks whether the suite SHRANK. It never
@@ -1158,6 +1155,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Vitest native output capture
+        if: matrix.shard == 1
+        run: node --test scripts/lib/__tests__/vitest-capture.test.mjs
 
       - name: M1 mobility route AST inventory
         if: matrix.shard == 1
