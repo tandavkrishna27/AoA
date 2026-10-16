@@ -445,6 +445,8 @@ describe("extractViaCli — codex", () => {
       expect(approvalIdx).toBeGreaterThanOrEqual(0);
       expect(approvalIdx).toBeLessThan(execIdx);
       expect(call!.args[approvalIdx + 1]).toBe("never");
+      // Extraction runs in an empty temporary directory, outside a Git repo.
+      expect(call!.args.indexOf("--skip-git-repo-check")).toBeGreaterThan(execIdx);
       expect(call!.args).toContain("--sandbox");
       expect(call!.args[call!.args.indexOf("--sandbox") + 1]).toBe("read-only");
       expect(call!.args).toContain("--model");
@@ -591,6 +593,8 @@ describe("extractViaCli — cloud_auth routes through the sandbox (U13.2)", () =
     expect(approvalIdx).toBeGreaterThanOrEqual(0);
     expect(approvalIdx).toBeLessThan(execIdx);
     expect(request.args[approvalIdx + 1]).toBe("never");
+    // The sandbox working directory need not contain a Git repository either.
+    expect(request.args.indexOf("--skip-git-repo-check")).toBeGreaterThan(execIdx);
     expect(request.args).toContain("--sandbox");
     expect(request.args[request.args.indexOf("--sandbox") + 1]).toBe("read-only");
     expect(request.args).not.toContain("--model");

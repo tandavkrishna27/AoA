@@ -144,6 +144,7 @@ export async function runCodexExecJson(
     "never",
     "exec",
     "--json",
+    "--skip-git-repo-check",
     "--sandbox",
     "read-only",
     "--model",

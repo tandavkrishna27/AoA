@@ -359,6 +359,7 @@ async function extractViaCliSandbox(
           "never",
           "exec",
           "--json",
+          "--skip-git-repo-check",
           "--sandbox",
           "read-only",
           ...(opts.credential.model.trim()
@@ -374,6 +375,7 @@ async function extractViaCliSandbox(
           "never",
           "exec",
           "--json",
+          "--skip-git-repo-check",
           "--sandbox",
           "read-only",
           ...(opts.credential.model.trim()
