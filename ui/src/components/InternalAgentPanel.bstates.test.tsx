@@ -244,6 +244,94 @@ beforeEach(() => {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("Commander composer — B-states (mock §5)", () => {
+  it("keeps current live approval in its original row when delayed history contains identical older answered choices", async () => {
+    const question = "Proceed?";
+    const options = ["Proceed", "Cancel"];
+    const marker = `⚡OPTIONS:${JSON.stringify({ question, options })}⚡`;
+    let resolveHistory!: (value: { messages: unknown[] }) => void;
+    historyState.pending = new Promise((resolve) => {
+      resolveHistory = resolve;
+    });
+    streamState.impl = () =>
+      (async function* () {
+        yield { event: "content", data: { text: "Current live turn" } };
+        yield {
+          event: "options_prompt",
+          data: { promptId: "current-live-choice", question, options },
+        };
+        yield {
+          event: "action_confirm",
+          data: {
+            confirmId: "22222222-2222-4222-8222-222222222222",
+            action: "create_task",
+            description: "Create current task",
+          },
+        };
+      })();
+    let sideEffects = 0;
+    confirmActionMock.mockImplementation(async () => {
+      sideEffects += 1;
+      return { result: "executed" };
+    });
+    const { client } = renderPanel({ conversationId: "saved-chat" });
+    await waitFor(() => expect(historyState.listCalls).toBe(1));
+    sendViaEnter(typeInComposer("Current task request"));
+    await screen.findByRole("button", { name: "Allow once" });
+    await screen.findByRole("button", { name: "Send message" });
+    streamState.impl = completingStream;
+    fireEvent.click(screen.getByRole("button", { name: /Proceed.*recommended/ }));
+    await waitFor(() => expect(streamState.calls).toHaveLength(2));
+    await screen.findByRole("button", { name: "Send message" });
+    const saved = [
+      {
+        id: "older-question",
+        role: "assistant",
+        content: `Older saved turn\n${marker}`,
+        createdAt: "2026-10-16T00:00:00Z",
+      },
+      { id: "older-answer", role: "user", content: "Proceed", createdAt: "2026-10-16T00:00:01Z" },
+      {
+        id: "current-question",
+        role: "assistant",
+        content: `Current live turn\n${marker}`,
+        createdAt: "2026-10-16T00:00:02Z",
+      },
+      { id: "current-answer", role: "user", content: "Proceed", createdAt: "2026-10-16T00:00:03Z" },
+    ];
+    await act(async () => {
+      historyState.pending = null;
+      historyState.messages = saved;
+      resolveHistory({ messages: saved });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const olderTurn = screen.getByText("Older saved turn").parentElement!;
+    expect(within(olderTurn).queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+    const liveRows = screen.getAllByText("Current live turn").map((text) => text.parentElement!);
+    expect(liveRows.some((row) => within(row).queryByRole("button", { name: "Allow once" }))).toBe(
+      true,
+    );
+    expect(screen.getAllByRole("button", { name: "Allow once" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Deny" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Proceed.*recommended/ })).not.toBeInTheDocument();
+    expect(confirmActionMock).not.toHaveBeenCalled();
+    expect(sideEffects).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
+    await screen.findByText("Confirmed");
+    expect(confirmActionMock).toHaveBeenCalledTimes(1);
+    expect(confirmActionMock).toHaveBeenCalledWith("co-1", {
+      confirmId: "22222222-2222-4222-8222-222222222222",
+      decision: "allow_once",
+    });
+    expect(sideEffects).toBe(1);
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ["conversation-messages", "co-1", "saved-chat"] });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(screen.queryByRole("button", { name: "Allow once" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Proceed.*recommended/ })).not.toBeInTheDocument();
+    expect(confirmActionMock).toHaveBeenCalledTimes(1);
+  });
+
   function persistedApprovalNotice() {
     return [
       {

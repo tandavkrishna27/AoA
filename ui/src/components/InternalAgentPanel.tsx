@@ -491,9 +491,10 @@ export function mergeServerMessagesWithTransientLocal(
     const answered = serverMessages.slice(index + 1).some((next) => next.role === "user");
     // A streamed choice has a temporary message/prompt ID. Reconcile its
     // presentation state with the saved marker instead of showing two cards.
-    // Approval IDs are copied only from this trusted, same-chat live message.
+    // Text matching can reconcile choices, but cannot establish approval ownership.
+    const localByMessageId = localById.get(m.id);
     const savedPrompt = base.optionsPrompt;
-    const local = localById.get(m.id) ?? (savedPrompt && localMessages.find((candidate) => {
+    const local = localByMessageId ?? (savedPrompt && localMessages.find((candidate) => {
       const prompt = candidate.optionsPrompt;
       return (
         !serverIds.has(candidate.id) &&
@@ -512,7 +513,7 @@ export function mergeServerMessagesWithTransientLocal(
     return {
       ...base,
       ...(carriedDuration !== undefined ? { durationMs: carriedDuration } : {}),
-      actionConfirm: local?.actionConfirm,
+      actionConfirm: localByMessageId?.actionConfirm,
       optionsPrompt: optionsPrompt ? {
         ...optionsPrompt,
         dismissed: optionsPrompt.dismissed || Boolean(base.optionsPrompt?.dismissed) || answered,
@@ -523,7 +524,7 @@ export function mergeServerMessagesWithTransientLocal(
   const transientMessages = localMessages.filter(
     (m) =>
       !serverIds.has(m.id) &&
-      !reconciledLocalIds.has(m.id) &&
+      (!reconciledLocalIds.has(m.id) || m.actionConfirm !== undefined) &&
       (
         m.actionConfirm !== undefined ||
         m.optionsPrompt !== undefined ||
@@ -537,7 +538,11 @@ export function mergeServerMessagesWithTransientLocal(
           )
         )
       ),
-  );
+  ).map((m) => (
+    // A text-matched choice must not consume or relocate its live approval.
+    // Keep that original message and remove only its duplicated choice card.
+    reconciledLocalIds.has(m.id) ? { ...m, optionsPrompt: undefined } : m
+  ));
 
   return [...merged, ...transientMessages];
 }
