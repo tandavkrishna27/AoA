@@ -56,6 +56,10 @@ externals.delete("postgres");
 // Shared validators are bundled workspace code. Bundle their pure-JS runtime too
 // so the built entrypoint does not depend on an undeclared CLI-level zod link.
 externals.delete("zod");
+// Built workspace launch uses the existing workspace dev dependency only when
+// importing source-exported workspace packages. Preserve tsx's own loader URLs;
+// installed CLI/server packages never load this optional workspace-only path.
+externals.add("tsx/esm/api");
 
 /** @type {import('esbuild').BuildOptions} */
 export default {
