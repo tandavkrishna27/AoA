@@ -2453,6 +2453,114 @@ const PLUGIN_EFFECTFUL_CONSTRUCTORS = [
   "pluginLoader(",
 ];
 
+/** Mask comments and string contents while preserving offsets and line endings. */
+function maskJavaScriptNonCode(src) {
+  const masked = src.split("");
+  const mask = (index) => {
+    if (src[index] !== "\n" && src[index] !== "\r") masked[index] = " ";
+  };
+  const templates = [];
+  let mode = "code";
+
+  for (let i = 0; i < src.length; i += 1) {
+    const ch = src[i];
+    const next = src[i + 1];
+
+    if (mode === "line-comment") {
+      if (ch === "\n" || ch === "\r") mode = "code";
+      else mask(i);
+      continue;
+    }
+    if (mode === "block-comment") {
+      if (ch === "*" && next === "/") {
+        mask(i);
+        mask(i + 1);
+        i += 1;
+        mode = "code";
+      } else {
+        mask(i);
+      }
+      continue;
+    }
+    if (mode === "template") {
+      if (ch === "\\") {
+        mask(i);
+        if (next !== undefined) mask(i + 1);
+        i += 1;
+      } else if (ch === "`") {
+        mask(i);
+        templates.pop();
+        mode = "code";
+      } else if (ch === "$" && next === "{") {
+        mask(i);
+        templates.at(-1).expressionDepth = 0;
+        mode = "code";
+        i += 1; // Preserve the opening brace so balanced scans remain correct.
+      } else {
+        mask(i);
+      }
+      continue;
+    }
+
+    // Code mode, including `${...}` expressions inside a template. Keep their
+    // braces visible so guard-body matching remains balanced across expressions.
+    const template = templates.at(-1);
+    if (ch === "}" && template?.expressionDepth === 0) {
+      template.expressionDepth = null;
+      mode = "template";
+      continue;
+    }
+    if (ch === "{" && template?.expressionDepth !== null && template?.expressionDepth !== undefined) {
+      template.expressionDepth += 1;
+    } else if (ch === "}" && template?.expressionDepth > 0) {
+      template.expressionDepth -= 1;
+    }
+
+    if (ch === "/" && next === "/") {
+      mask(i);
+      mask(i + 1);
+      i += 1;
+      mode = "line-comment";
+    } else if (ch === "/" && next === "*") {
+      mask(i);
+      mask(i + 1);
+      i += 1;
+      mode = "block-comment";
+    } else if (ch === "'" || ch === '"') {
+      const quote = ch;
+      mask(i);
+      for (i += 1; i < src.length; i += 1) {
+        mask(i);
+        if (src[i] === "\\") {
+          if (i + 1 < src.length) mask(i + 1);
+          i += 1;
+        } else if (src[i] === quote) {
+          break;
+        }
+      }
+    } else if (ch === "`") {
+      mask(i);
+      templates.push({ expressionDepth: null });
+      mode = "template";
+    }
+  }
+
+  return masked.join("");
+}
+
+function findMatchingBrace(src, openIndex) {
+  if (src[openIndex] !== "{") return null;
+  let depth = 0;
+  for (let i = openIndex; i < src.length; i += 1) {
+    if (src[i] === "{") depth += 1;
+    else if (src[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return null;
+}
+
 /** Extract the brace-matched body of `function <name>(...) { ... }`. */
 function extractFunctionBody(src, name) {
   const sigRe = new RegExp(`function\\s+${name}\\s*\\(`);
@@ -2532,27 +2640,40 @@ async function validateCloudPluginProcessBoundary(root, errors) {
   // behind the cloud process-disable check.
   const appSrc = await readOrError(root, APP_TS, errors);
   if (appSrc != null) {
+    const appCode = maskJavaScriptNonCode(appSrc);
     const guardDef =
       /const\s+hostedPluginProcessDisabled\s*=\s*tenantIsolationEnforced\s*\(\s*\)/;
-    if (!guardDef.test(appSrc)) {
+    if (!guardDef.test(appCode)) {
       errors.push(
         `${APP_TS}: missing the cloud plugin process-disable guard (const hostedPluginProcessDisabled = tenantIsolationEnforced())`,
       );
     }
-    const guardOpen = /if\s*\(\s*!\s*hostedPluginProcessDisabled\b/;
-    const guardMatch = guardOpen.exec(appSrc);
-    if (!guardMatch) {
+    const guardOpen = /\bif\s*\(\s*!\s*hostedPluginProcessDisabled\s*\)\s*\{/gu;
+    const guardedBodies = [];
+    for (const match of appCode.matchAll(guardOpen)) {
+      const openIndex = match.index + match[0].lastIndexOf("{");
+      const closeIndex = findMatchingBrace(appCode, openIndex);
+      if (closeIndex === null) {
+        errors.push(`${APP_TS}: cloud plugin process-disable guard has an unbalanced body`);
+      } else {
+        guardedBodies.push({ start: openIndex + 1, end: closeIndex });
+      }
+    }
+    if (guardedBodies.length === 0) {
       errors.push(
         `${APP_TS}: plugin worker/lifecycle/loader composition is not guarded by "if (!hostedPluginProcessDisabled)"`,
       );
     }
-    const guardIdx = guardMatch ? guardMatch.index : Infinity;
-    for (const ctor of PLUGIN_EFFECTFUL_CONSTRUCTORS) {
-      const idx = appSrc.indexOf(ctor);
-      if (idx !== -1 && idx < guardIdx) {
-        errors.push(
-          `${APP_TS}: unguarded plugin ${ctor.slice(0, -1)} construction — must be inside the !hostedPluginProcessDisabled guard (FND-006)`,
-        );
+    for (const constructor of PLUGIN_EFFECTFUL_CONSTRUCTORS) {
+      const name = constructor.slice(0, -1);
+      const calls = new RegExp(`(?<![\\w.$])${name}\\s*\\(`, "gu");
+      for (const match of appCode.matchAll(calls)) {
+        const callIndex = match.index;
+        if (!guardedBodies.some(({ start, end }) => callIndex >= start && callIndex < end)) {
+          errors.push(
+            `${APP_TS}: unguarded plugin ${name} construction — every call must be inside the !hostedPluginProcessDisabled guard (FND-006)`,
+          );
+        }
       }
     }
   }
