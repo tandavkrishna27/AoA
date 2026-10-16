@@ -499,6 +499,12 @@ inherits a record attesting M5's own candidate. **Which milestone takes it is a 
 decision**; the files do not settle it, and inventing one here would repeat the mistake this note
 exists to catch.
 
+**W00 program-owner decision — 2026-10-16:** TK assigned the full D2 campaign to
+M4 in this implementation session. M4 provides the same-candidate D5 integration context before M5/D6 entry, and can consume the
+stable coding/provider/credential cohort produced by W08 without confusing W08's bounded real
+coding journey or either M1 partial gate with full D2. This assigns ownership; it does not approve provider spending or launch a campaign. M5
+still reruns D2 whenever D6-01's current-same-candidate condition is not met.
+
 ### `M5` — private beta
 
 ★★★ **M5 IS WHERE THE PROGRAM BRANCH REACHES `main`, and this is a LOCKED decision, not a new one.**

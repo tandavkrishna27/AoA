@@ -109,8 +109,7 @@ does not close D5-L03 or substitute for actual daemon/fleet load evidence.
    promote M4 until all explicit D5 requirements and its dependency are proven.
 
 M1b/Anthropic live verification remains deferred by user direction. Full D2's
-M3/M4 ownership remains unresolved in scope-triage; this audit does not silently
-assign it or add a campaign. Desktop-local coding remains a separate execution
+ownership was assigned to M4 by TK on 2026-10-16 (W00 in scope-triage); this adds no campaign execution or provider-spend approval. Desktop-local coding remains a separate execution
 backend; a networked desktop slot currently delegates through the remote provider.
 
 
