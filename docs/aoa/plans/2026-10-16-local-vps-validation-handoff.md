@@ -1,5 +1,7 @@
 # Local + VPS Validation Pickup Checklist
 
+**Remaining-gap engineering follow-up:** The [repair plan](2026-10-16-f01-f05-followup-repairs.md) addresses F01's non-Git extraction preflight, F02's saved failed-user/retry recovery, both F04 stream/history paths and F05's raw built workspace launch contract. The [next-candidate live checklist](2026-10-16-f01-f05-live-retest.md#next-candidate-remaining-gap-acceptance) specifies fresh evidence required after these repairs. The unchecked live requirements and the immutable retest below remain open until that separate attempt is executed; F03's earlier bounded pass stands.
+
 - **Branch:** `codex/replatform-baseline-w00-w04`
 - **Original tested baseline:** `05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd`
 - **Latest live retest candidate:** `fe3db70fea7fd4413429bc92d81b56ea67ccd386`; [retest report](../reports/2026-10-16-f01-f05-live-retest-report.md) and [portable retest evidence](../evidence/2026-10-16-f01-f05-live-retest-summary.json).
