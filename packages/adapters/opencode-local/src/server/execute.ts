@@ -274,8 +274,13 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
   // `keep` list from Object.keys(env); otherwise AOA_API_KEY is kept + spread
   // back onto the spawn env. opencode has no runtime hook token.
   stripConnectorRunBearers(env, { connectorsPresent: hasStdioConnector, secretValues: [authToken] });
+  const preparedEnvKeys = Object.keys(preparedRuntimeEnv);
+  stripConnectorRunBearers(preparedRuntimeEnv, { connectorsPresent: hasStdioConnector, secretValues: [authToken] });
   const connectorScrubKeys = hasStdioConnector
-    ? aoaAmbientSecretEnvKeys(preparedRuntimeEnv, { keep: Object.keys(env) })
+    ? [
+        ...aoaAmbientSecretEnvKeys(preparedRuntimeEnv, { keep: Object.keys(env) }),
+        ...preparedEnvKeys.filter((key) => !Object.hasOwn(preparedRuntimeEnv, key)),
+      ]
     : [];
   const spawnEnv =
     connectorScrubKeys.length > 0
@@ -453,6 +458,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         signal: attempt.proc.signal,
         timedOut: true,
         errorMessage: `Timed out after ${timeoutSec}s`,
+        usage: attempt.parsed.usage,
+        provider: resolvedModelProvider,
+        model: model || null,
+        billingType: "unknown",
+        costUsd: attempt.parsed.costUsd,
         clearSession: clearSessionOnMissingSession,
         executionCwd: sessionCwd,
       };

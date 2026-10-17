@@ -77,10 +77,12 @@ function accumulateUsage(
 
 export function parseGeminiJsonl(stdout: string) {
   let sessionId: string | null = null;
+  let model = "";
   const messages: string[] = [];
   let errorMessage: string | null = null;
   let costUsd: number | null = null;
   let resultEvent: Record<string, unknown> | null = null;
+  let failed = false;
   let question: { prompt: string; choices: Array<{ key: string; label: string; description?: string }> } | null = null;
   const usage = {
     inputTokens: 0,
@@ -99,6 +101,11 @@ export function parseGeminiJsonl(stdout: string) {
     if (foundSessionId) sessionId = foundSessionId;
 
     const type = asString(event.type, "").trim();
+
+    if (type === "init" || (type === "system" && event.subtype === "init")) {
+      model = asString(event.model, model).trim() || model;
+      continue;
+    }
 
     if (type === "assistant") {
       messages.push(...collectMessageText(event.message));
@@ -147,6 +154,7 @@ export function parseGeminiJsonl(stdout: string) {
       const isError = event.is_error === true ||
         asString(event.subtype, "").toLowerCase() === "error" ||
         eventStatus === "error" || eventStatus === "failed";
+      failed = isError;
       if (isError) {
         const text = asErrorText(event.error ?? event.message ?? event.result).trim();
         if (text) errorMessage = text;
@@ -155,6 +163,7 @@ export function parseGeminiJsonl(stdout: string) {
     }
 
     if (type === "error") {
+      if (event.severity !== "warning") failed = true;
       const text = asErrorText(event.error ?? event.message ?? event.detail).trim();
       if (text) errorMessage = text;
       continue;
@@ -163,6 +172,7 @@ export function parseGeminiJsonl(stdout: string) {
     if (type === "system") {
       const subtype = asString(event.subtype, "").trim().toLowerCase();
       if (subtype === "error") {
+        failed = true;
         const text = asErrorText(event.error ?? event.message ?? event.detail).trim();
         if (text) errorMessage = text;
       }
@@ -185,6 +195,8 @@ export function parseGeminiJsonl(stdout: string) {
 
   return {
     sessionId,
+    model,
+    failed,
     summary: messages.join("\n\n").trim(),
     usage,
     costUsd,

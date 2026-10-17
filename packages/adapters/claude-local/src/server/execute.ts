@@ -931,6 +931,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
           errorMessage: `Timed out after ${timeoutSec}s`,
           errorCode: "timeout",
           errorMeta,
+          usage: parsedStream.usage ?? undefined,
+          provider: isBedrockAuth(env) ? "aws_bedrock" : "anthropic",
+          model: parsedStream.model || asString(parsed?.model, model),
+          billingType,
+          costUsd: parsedStream.costUsd,
           clearSession: Boolean(opts.clearSessionOnMissingSession),
           executionCwd,
         };
@@ -986,7 +991,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         signal: proc.signal,
         timedOut: false,
         errorMessage:
-          (proc.exitCode ?? 0) === 0
+          (proc.exitCode ?? 0) === 0 && parsed.is_error !== true
             ? null
             : describeClaudeFailure(parsed) ?? `Claude exited with code ${proc.exitCode ?? -1}`,
         errorCode: clearSessionForMaxTurns
