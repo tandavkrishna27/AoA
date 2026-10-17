@@ -43,11 +43,13 @@ const TARGET_A = "72000000-0000-4000-8000-000000000001";
 const TARGET_B = "72000000-0000-4000-8000-000000000002";
 const TARGET_PLATFORM = "72000000-0000-4000-8000-000000000003";
 const TARGET_OWNER = "72000000-0000-4000-8000-000000000004";
+const TARGET_REPLACEMENT = "72000000-0000-4000-8000-000000000005";
 const WORKER_A = "73000000-0000-4000-8000-000000000001";
 const WORKER_REPLAY = "73000000-0000-4000-8000-000000000002";
 const WORKER_UNIFORM = "73000000-0000-4000-8000-000000000003";
 const WORKER_PLATFORM = "73000000-0000-4000-8000-000000000004";
 const WORKER_OWNER = "73000000-0000-4000-8000-000000000006";
+const WORKER_REPLACEMENT = "73000000-0000-4000-8000-000000000007";
 const OWNER_USER = "job-002-owner-user";
 const COMPANY_A = "76000000-0000-4000-8000-000000000001";
 const COMPANY_B = "76000000-0000-4000-8000-000000000002";
@@ -274,6 +276,7 @@ beforeEach(async () => {
   await admin`DELETE FROM worker_enrollment_codes`;
   await admin`DELETE FROM worker_enrollment_code_routes`;
   await admin`DELETE FROM workers`;
+  await admin`DELETE FROM execution_targets WHERE id = ${TARGET_REPLACEMENT}`;
   await admin`UPDATE execution_targets
     SET device_generation = 1, status = 'active', last_seen_at = NULL,
         registered_profile = NULL, registered_profile_hash = NULL,
@@ -1365,6 +1368,117 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       const [revokedWorker] = await admin`SELECT status, revoked_at FROM workers WHERE id = ${WORKER_A}`;
       expect(revokedWorker.status).toBe("revoked");
       expect(revokedWorker.revoked_at).not.toBeNull();
+    });
+
+    it("retires a drained worker and enrolls an independent replacement without reviving its receipt or session", async () => {
+      const { admin, appDb, operatorDb, mod } = guard();
+      if (!sessionModule) throw new Error("worker-session-auth module unavailable");
+      const signingKey = "test-signing-key-at-least-32-bytes";
+      const service = mod.createWorkerEnrollmentService({
+        appDb, operatorDb, sessionSigningKey: signingKey, now: () => NOW,
+      });
+      const authenticator = sessionModule.createWorkerSessionAuthenticator({
+        appDb, operatorDb, sessionSigningKey: signingKey, now: () => NOW,
+      });
+      const issue = (executionTargetId: string) => service.issueTenantCode({
+        organizationId: ORG_A, executionTargetId, scope: "organization",
+        ownerUserId: null, createdByPrincipalKind: "user", createdByPrincipalId: "founder-a",
+      });
+      const oldKeys = generateKeyPairSync("ed25519");
+      const oldCode = (await issue(TARGET_A)).code;
+      const oldBody = enrollmentBody(WORKER_A);
+      const old = await service.enroll({
+        code: oldCode, request: oldBody,
+        ...deviceProof(oldBody, oldKeys.privateKey, oldKeys.publicKey, "proof-retire-enroll"),
+        method: "POST", path: "/api/worker-control/enroll",
+      });
+
+      const heartbeatPath = "/api/execution-targets/heartbeat";
+      const correlationId = "74000000-0000-4000-8000-000000000401";
+      const drainBytes = rawBody({ status: "draining" });
+      const drainPrincipal = await authenticator.authenticate({
+        authorization: `Bearer ${old.session}`, rawBody: drainBytes,
+        proof: deviceProofFor(drainBytes, correlationId, oldKeys.privateKey,
+          oldKeys.publicKey, "proof-retire-drain", heartbeatPath),
+        method: "POST", path: heartbeatPath, correlationId,
+      });
+      await expect(sessionModule.registerProofBoundHeartbeat({
+        appDb, operatorDb, principal: drainPrincipal, status: "draining", now: NOW,
+      })).resolves.toBe(true);
+      const [draining] = await admin`SELECT status FROM execution_targets WHERE id = ${TARGET_A}`;
+      expect(draining.status).toBe("draining");
+
+      await expect(sessionModule.revokeTenantWorkerAuthority({
+        appDb, organizationId: ORG_A, executionTargetId: TARGET_A, now: NOW,
+      })).resolves.toBe(2);
+      const [retired] = await admin`SELECT status, device_generation FROM execution_targets WHERE id = ${TARGET_A}`;
+      const [retiredWorker] = await admin`SELECT status, revoked_at FROM workers WHERE id = ${WORKER_A}`;
+      expect(retired).toMatchObject({ status: "disabled", device_generation: 2 });
+      expect(retiredWorker.status).toBe("revoked");
+      expect(retiredWorker.revoked_at).not.toBeNull();
+
+      const oldSessionBytes = rawBody({ status: "active" });
+      await expect(authenticator.authenticate({
+        authorization: `Bearer ${old.session}`, rawBody: oldSessionBytes,
+        proof: deviceProofFor(oldSessionBytes, correlationId, oldKeys.privateKey,
+          oldKeys.publicKey, "proof-retire-old-session", heartbeatPath),
+        method: "POST", path: heartbeatPath, correlationId,
+      })).rejects.toMatchObject({ code: "target_revoked" });
+      const oldRetry = {
+        ...oldBody,
+        correlationId: "74000000-0000-4000-8000-000000000402",
+        nonce: "retired-worker-restart",
+      };
+      await expect(service.enroll({
+        code: oldCode, request: oldRetry,
+        ...deviceProof(oldRetry, oldKeys.privateKey, oldKeys.publicKey, "proof-retire-old-receipt"),
+        method: "POST", path: "/api/worker-control/enroll",
+      })).rejects.toMatchObject({ code: "target_revoked" });
+
+      await admin`INSERT INTO execution_targets
+        (id, organization_id, slug, kind, trust_class, status, capabilities, config, scope, target_authority_key)
+        VALUES (${TARGET_REPLACEMENT}, ${ORG_A}, 'target-replacement', 'dedicated_worker',
+          'dedicated_tenant', 'active',
+          ${{ providerConstraints: { profileId: "desktop-v1", version: 1, digest: "b".repeat(64) } }},
+          '{}', 'organization', ${`organization:${ORG_A}`})`;
+      const replacementCode = (await issue(TARGET_REPLACEMENT)).code;
+      const replacementKeys = generateKeyPairSync("ed25519");
+      const copiedIdentity = {
+        ...enrollmentBody(WORKER_A, TARGET_REPLACEMENT),
+        correlationId: "74000000-0000-4000-8000-000000000403",
+      };
+      await expect(service.enroll({
+        code: replacementCode, request: copiedIdentity,
+        ...deviceProof(copiedIdentity, replacementKeys.privateKey, replacementKeys.publicKey,
+          "proof-retire-copy-old-id"),
+        method: "POST", path: "/api/worker-control/enroll",
+      })).rejects.toMatchObject({ code: "unauthorized", auditReasonCode: "worker_transfer_denied" });
+
+      const replacementBody = {
+        ...enrollmentBody(WORKER_REPLACEMENT, TARGET_REPLACEMENT),
+        correlationId: "74000000-0000-4000-8000-000000000404",
+      };
+      const replacement = await service.enroll({
+        code: replacementCode, request: replacementBody,
+        ...deviceProof(replacementBody, replacementKeys.privateKey, replacementKeys.publicKey,
+          "proof-retire-replacement"),
+        method: "POST", path: "/api/worker-control/enroll",
+      });
+      expect(replacement.response).toMatchObject({
+        outcome: "enrolled", workerId: WORKER_REPLACEMENT,
+        targetId: TARGET_REPLACEMENT, deviceGeneration: 1,
+      });
+      const replacementBytes = rawBody({ status: "active" });
+      await expect(authenticator.authenticate({
+        authorization: `Bearer ${replacement.session}`, rawBody: replacementBytes,
+        proof: deviceProofFor(replacementBytes, correlationId, replacementKeys.privateKey,
+          replacementKeys.publicKey, "proof-retire-new-session", heartbeatPath),
+        method: "POST", path: heartbeatPath, correlationId,
+      })).resolves.toMatchObject({
+        workerId: WORKER_REPLACEMENT, targetId: TARGET_REPLACEMENT, targetGeneration: 1,
+      });
+      const [oldTarget] = await admin`SELECT status FROM execution_targets WHERE id = ${TARGET_A}`;
+      expect(oldTarget.status).toBe("disabled");
     });
 
     it("uses one operator transaction for platform identity and allows the same key as distinct tenant profiles", async () => {
