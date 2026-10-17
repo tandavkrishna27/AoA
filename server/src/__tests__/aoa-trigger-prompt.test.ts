@@ -783,6 +783,73 @@ describe("buildTriggerPrompt (WS6) — braindump.ingest", () => {
   });
 });
 
+describe("Steward sweep curation context", () => {
+  const companyId = "aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa";
+  const hubItemId = "bbbbbbbb-0000-4000-8000-bbbbbbbbbbbb";
+  const groupKey = `auto:${companyId}:approval_request:global:approval:owner:unassigned`;
+  const buildStewardPrompt = (payload: Record<string, unknown> = {}) => buildTriggerPrompt({
+    instruction: BASE_INSTRUCTION,
+    agentName: "Steward",
+    agentRoleKey: "general",
+    payload: { companyId, source: "sweep.steward", role: "steward", ...payload },
+  });
+
+  it("delivers the sweep's company, group, revision and evidence item IDs to the actual model prompt", () => {
+    const output = buildStewardPrompt({
+      targetType: "group", groupKey, expectedCurationRevision: 3,
+      evidence: [{ hubItemId, semanticType: "approval_request", sourceType: "approval", sourceId: "approval-fixture" }],
+      unrelatedSecret: "UNRELATED_FIELD_MUST_NOT_APPEAR",
+    });
+
+    expect(output).toContain(`"companyId":"${companyId}"`);
+    expect(output).toContain('"targetType":"group"');
+    expect(output).toContain(`"groupKey":"${groupKey}"`);
+    expect(output).toContain('"expectedCurationRevision":3');
+    expect(output).toContain(`"hubItemId":"${hubItemId}"`);
+    expect(output).toContain("hub.readCurationContext");
+    expect(output).toContain("hub.updateCurationSummary");
+    expect(output).toMatch(/untrusted context/i);
+    expect(output).toMatch(/never.*approv/i);
+    expect(output).not.toContain("UNRELATED_FIELD_MUST_NOT_APPEAR");
+  });
+
+  it("supports a concrete item target and the valid zero curation revision", () => {
+    const output = buildStewardPrompt({ targetType: "item", hubItemId, expectedCurationRevision: 0 });
+
+    expect(output).toContain('"targetType":"item"');
+    expect(output).toContain(`"hubItemId":"${hubItemId}"`);
+    expect(output).toContain('"expectedCurationRevision":0');
+  });
+
+  it("bounds evidence to five item pointers and omits arbitrary evidence content", () => {
+    const output = buildStewardPrompt({
+      targetType: "group", groupKey, expectedCurationRevision: 3,
+      evidence: Array.from({ length: 6 }, (_, index) => ({ hubItemId: `hub-${index}`, rawContent: "UNTRUSTED_RAW_BODY" })),
+    });
+
+    expect(output).toContain('"hubItemId":"hub-4"');
+    expect(output).not.toContain('"hubItemId":"hub-5"');
+    expect(output).not.toContain("UNTRUSTED_RAW_BODY");
+  });
+
+  it("does not invent a target or revision for malformed or missing wakeup context", () => {
+    const output = buildStewardPrompt({ targetType: "invalid", groupKey: 7, hubItemId: null, expectedCurationRevision: -1, evidence: [null, {}, "invalid"] });
+
+    expect(output).not.toContain('"targetType":');
+    expect(output).not.toContain('"groupKey":');
+    expect(output).not.toContain('"hubItemId":');
+    expect(output).not.toContain('"expectedCurationRevision":');
+    expect(output).toMatch(/missing.*stale.*do not.*write/i);
+  });
+
+  it("keeps curation payload out of unrelated trigger prompts", () => {
+    const output = buildStewardPrompt({ source: "thread.participation", targetType: "group", groupKey, expectedCurationRevision: 3 });
+
+    expect(output).not.toContain(groupKey);
+    expect(output).not.toContain('"expectedCurationRevision":');
+  });
+});
+
 // Task 0.4 — ensure-adjutant stale-framing guard
 describe("ensure-adjutant instruction (Task 0.4)", () => {
   it("does NOT contain stale 'Dispatcher and Engineer take over' framing", () => {
