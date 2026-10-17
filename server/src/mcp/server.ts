@@ -58,6 +58,7 @@ import {
 } from "../services/internal-agent/mcp-bridge.js";
 import { executeTool } from "../services/internal-agent/tool-registry.js";
 import { resolveBrokerToolContext, resolveCommanderBrokerToolContext } from "./broker-tool-context.js";
+import { resolveCrewRunAuthority } from "../services/internal-agent/crew-tool-authority.js";
 // U2c: the array construction lives in a standalone module (not inlined here)
 // so it can be imported without pulling in server.ts's `../services/index.js`
 // → plugin-worker-manager.ts → `@armyofagents/plugin-sdk` chain (that
@@ -746,6 +747,15 @@ export function mcpServerRoutes(db: Db, deps: McpRouteDeps = {}) {
         const params = callToolSchema.parse(requestBody.params);
         if (browserSurface && params.name !== "request_browser_session") { res.json(jsonRpcError(requestBody.id ?? null, -32601, "Tool not found")); return; }
         const args = params.arguments ?? {};
+        if (
+          req.actor.type === "agent" && req.actor.source === "agent_jwt" && req.actor.signedRunId
+          && !brokerRegistry.some((tool) => tool.name === params.name)
+        ) {
+          const authority = await resolveCrewRunAuthority(db, {
+            companyId, agentId: req.actor.agentId ?? "", runId: req.actor.signedRunId,
+          });
+          if (authority && !authority.toolAllowlist.includes(params.name)) throw forbidden("Tool is not authorized");
+        }
 
         // U10: plugin tools (host-resident worker, dispatched via the
         // company-scoped registry) are checked FIRST — before the U2c

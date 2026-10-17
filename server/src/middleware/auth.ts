@@ -10,6 +10,7 @@ import type { BetterAuthSessionResult } from "../auth/better-auth.js";
 import { logger } from "./logger.js";
 import { isBrowserSessionCredentialPath } from "./http-log-policy.js";
 import { hasActiveCloudMembership } from "../services/upgrade-socket-authorization.js";
+import { resolveCrewRunAuthority } from "../services/internal-agent/crew-tool-authority.js";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -195,6 +196,7 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
       return;
     }
 
+    req.actor = { type: "none", source: "none" };
     const token = authHeader.slice("bearer ".length).trim();
     if (!token) {
       next();
@@ -360,12 +362,24 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
         return;
       }
 
+      if (agentRecord.kind === "aoa") {
+        try {
+          const authority = await resolveCrewRunAuthority(db, {
+            companyId: claims.company_id, agentId: claims.sub, runId: claims.run_id,
+          });
+          if (!authority) { next(); return; }
+        } catch {
+          next();
+          return;
+        }
+      }
+
       req.actor = {
         type: "agent",
         agentId: claims.sub,
         companyId: claims.company_id,
         keyId: undefined,
-        runId: runIdHeader || claims.run_id || undefined,
+        runId: agentRecord.kind === "aoa" ? claims.run_id : runIdHeader || claims.run_id || undefined,
         // DAT-007 item #1: the SIGNED run id, immune to the x-aoa-run-id header override
         // above. The distributed /mcp currency gate keys on this, never req.actor.runId.
         signedRunId: claims.run_id,
