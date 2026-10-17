@@ -1,0 +1,669 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-10-18",
+  "timezone": "Asia/Calcutta",
+  "branch": "codex/replatform-w02-w05",
+  "baseCommit": "f17e0df54fc694b042c50b412f055f687ce2ce3e",
+  "applicationCandidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+  "documentationPublication": "Separate later commit; no application rebuild required for documentation-only bytes",
+  "scope": {
+    "targetedOnly": true,
+    "wholeSuiteRun": false,
+    "paidProviderCallsInitiated": 0,
+    "vendorCliCallsInitiated": 0,
+    "vendorCliInstalledByThisFollowup": false,
+    "personalAuthTransferred": false,
+    "databaseReset": false,
+    "rolloutChanged": false,
+    "crewAppServerEnabled": false
+  },
+  "selectedTests": [
+    "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+    "packages/adapters/claude-local/src/server/parse.test.ts",
+    "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+    "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+    "server/src/__tests__/claude-local-adapter.test.ts",
+    "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+    "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+    "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+    "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+    "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+    "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+    "packages/adapters/opencode-local/src/server/parse.test.ts",
+    "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+    "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+    "server/src/__tests__/opencode-local-adapter.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+    "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+    "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+    "server/src/__tests__/aoa-runner.test.ts",
+    "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+    "server/src/__tests__/codex-crew-tool-capture.test.ts",
+    "server/src/__tests__/crew-tool-authority.test.ts",
+    "server/src/__tests__/crew-cancellation.test.ts",
+    "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+    "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts"
+  ],
+  "affectedPackageChecks": [
+    "@armyofagents/adapter-utils",
+    "@armyofagents/adapter-claude-local",
+    "@armyofagents/adapter-gemini-local",
+    "@armyofagents/adapter-opencode-local",
+    "@armyofagents/adapter-codex-local",
+    "@armyofagents/server"
+  ],
+  "local": {
+    "stages": {
+      "build": {
+        "selectedFiles": 30,
+        "dirtyFiles": [],
+        "startedAt": "2026-10-17T19:36:11.5658270Z",
+        "finishedAt": "2026-10-17T19:36:59.9210494Z",
+        "exitCode": 0,
+        "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+        "stage": "build"
+      },
+      "typecheck": {
+        "selectedFiles": 30,
+        "dirtyFiles": [],
+        "startedAt": "2026-10-17T19:36:59.9371821Z",
+        "finishedAt": "2026-10-17T19:37:43.0455577Z",
+        "exitCode": 0,
+        "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+        "stage": "typecheck"
+      },
+      "targeted": {
+        "selectedFiles": 30,
+        "dirtyFiles": [],
+        "startedAt": "2026-10-17T19:37:43.0484230Z",
+        "finishedAt": "2026-10-17T19:37:55.1466280Z",
+        "exitCode": 0,
+        "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+        "stage": "targeted"
+      }
+    },
+    "platform": "win32",
+    "architecture": "x64",
+    "node": "v24.19.0",
+    "printedCounts": {
+      "filesPassed": 30,
+      "filesFailed": 0,
+      "testsPassed": 243,
+      "testsFailed": 0,
+      "testsSkipped": 2,
+      "source": "Printed final native stdout lines, separate from unknown structured capture counters"
+    },
+    "nativeCapture": {
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "captureError": null,
+      "summary": {
+        "testFiles": "unknown",
+        "tests": "unknown",
+        "passed": "unknown",
+        "failed": "unknown",
+        "skipped": "unknown"
+      },
+      "unhandledErrors": "unknown"
+    }
+  },
+  "vps": {
+    "stages": {
+      "build": {
+        "stage": "build",
+        "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+        "exitCode": 0,
+        "selectedFiles": 30,
+        "startedAt": "2026-10-17T19:36:23Z",
+        "finishedAt": "2026-10-17T19:38:08Z"
+      },
+      "typecheck": {
+        "stage": "typecheck",
+        "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+        "exitCode": 0,
+        "selectedFiles": 30,
+        "startedAt": "2026-10-17T19:38:08Z",
+        "finishedAt": "2026-10-17T19:39:45Z"
+      },
+      "targeted": {
+        "stage": "targeted",
+        "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+        "exitCode": 0,
+        "selectedFiles": 30,
+        "startedAt": "2026-10-17T19:39:45Z",
+        "finishedAt": "2026-10-17T19:40:14Z"
+      }
+    },
+    "platform": "linux",
+    "architecture": "arm64",
+    "node": "v24.19.0",
+    "printedCounts": {
+      "filesPassed": 30,
+      "filesFailed": 0,
+      "testsPassed": 245,
+      "testsFailed": 0,
+      "testsSkipped": 0,
+      "source": "Printed final native stdout lines, separate from unknown structured capture counters"
+    },
+    "nativeCapture": {
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null,
+      "captureError": null,
+      "summary": {
+        "testFiles": "unknown",
+        "tests": "unknown",
+        "passed": "unknown",
+        "failed": "unknown",
+        "skipped": "unknown"
+      },
+      "unhandledErrors": "unknown"
+    },
+    "install": {
+      "stage": "install",
+      "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+      "exitCode": 0,
+      "selectedFiles": 30,
+      "startedAt": "2026-10-17T19:36:14Z",
+      "finishedAt": "2026-10-17T19:36:23Z"
+    }
+  },
+  "developmentReproductions": {
+    "scope": "Uncommitted feature states based on f17e0df54; captured gitSha is HEAD, not a claim of a pristine before-fix application tree",
+    "receipts": [
+      "claude-gemini/red-native/result.json",
+      "claude-gemini/red-review/result.json",
+      "opencode/red/result.json",
+      "codex-server/red-turn-teardown/result.json"
+    ],
+    "initialRootCheck": "local-final passed on the frozen dirty tree; local-published is the accepted clean exact-commit repeat"
+  },
+  "verifiedRepairs": [
+    {
+      "adapter": "claude_local",
+      "behavior": "Explicit terminal is_error=true is not hidden by exit zero; retain already parsed reported usage/model/provider/billing/cost on timeout",
+      "regression": "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts"
+    },
+    {
+      "adapter": "gemini_local",
+      "behavior": "Retain native and legacy init model; fail exit-zero structured terminal/standalone fatal errors, preserve warning-only and terminal-authoritative behavior; retain parsed metadata on timeout",
+      "regression": "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts"
+    },
+    {
+      "adapter": "opencode_local",
+      "behavior": "Retain parsed usage/cost and configured provider/model on timeout; scrub run bearer value aliases from prepared environment and inherited merge only for stdio connector runs",
+      "regression": "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts"
+    },
+    {
+      "adapter": "codex_local",
+      "behavior": "Supervised heartbeat app-server requests tracked child termination on successful turn and handshake failure; real fixture regressions observe close and registry removal",
+      "regression": "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts"
+    }
+  ],
+  "protocolEvidence": "Actual no-auth Node subprocesses drive real adapter execute/parsers with deterministic protocol records. No vendor CLI, authentication, model entitlement, inference, real remote sandbox or useful model tool effect is established by these fixtures.",
+  "terminationLimit": "Production app-server finally requests termination; it does not synchronously await OS close. Tests separately observe real child close. Shared graceful shutdown and abrupt-crash custody remain distinct.",
+  "metadataLimit": "Retains metadata already parsed, not complete partial-turn accounting. Claude timeout fixture emits a reported result then hangs. OpenCode provider/model remain configured identity; unknown billing is not inferred as subscription.",
+  "deployment": {
+    "candidate": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+    "startedAt": "2026-10-17T19:40:34.472784+00:00",
+    "databaseBefore": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "result": "pass",
+    "liveModelCalls": 0,
+    "health": {
+      "status": "ok",
+      "revision": "5a2ed274ca644dcc9ca0614d11890fe9d129ab7c",
+      "deploymentMode": "cloud_auth",
+      "deploymentExposure": "public",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": false
+      }
+    },
+    "uiHttpStatus": 200,
+    "databaseAfter": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "serviceActive": "active",
+    "distributedRolloutEnabled": false,
+    "oauthConfigurationRetained": true,
+    "finishedAt": "2026-10-17T19:40:54.943484+00:00"
+  },
+  "cleanup": {
+    "originalReviewApp": {
+      "origin": "http://127.0.0.1:3210",
+      "revision": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "rebuiltByThisFollowup": false,
+      "status": "ok"
+    },
+    "capturedAt": "2026-10-17T19:38:48.5857200Z",
+    "knownFixtureScriptProcessesRemaining": [],
+    "result": "pass",
+    "scope": "Post-check of named fixture scripts; app-server regression independently awaits its own real close. Not an all-descendant/process-custody certificate.",
+    "localCredentialsCopied": false
+  },
+  "reviews": [
+    "Independent component reviews and final nine-file increment review found no actionable issues; no merge or release approval implied"
+  ],
+  "warnings": [
+    "Existing Windows Node DEP0190 shell:true wrapper warning; unknown native capture summary/unhandled-error counters remain unknown"
+  ],
+  "pending": [
+    "User-requested skip: real Claude/Gemini/OpenCode/vendor app-server and provider-specific authentication, entitlement, model, useful tool effect and cancellation qualification",
+    "Non-Codex successful AoA tool-name capture remains absent in shared runner; qualify actual namespace/result schemas before adding it",
+    "Native crew Codex remains exec; app-server is existing opt-in heartbeat/org path, not newly enabled for crew",
+    "Previously deferred durable abrupt-crash/host-restart custody with host/start identity, PID reuse and spawn/persistence window",
+    "W05 real VPS-to-PC output/export/UI-download cohort and baseline/follow-up integration remain unchanged"
+  ],
+  "protocolReferences": [
+    "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/output/types.ts",
+    "https://geminicli.com/docs/cli/headless/",
+    "https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls"
+  ],
+  "rawEvidence": {
+    "localDirectory": "C:/Users/Dell/Desktop/aoa/validation-w02-adapters-2026-10-18",
+    "vpsDirectory": "/opt/aoa-w02-adapters-20261018/evidence",
+    "availability": "Private retained raw receipts outside Git, not clone-accessible attachments; this JSON publishes hashes and selected safe facts only",
+    "receipts": [
+      {
+        "path": "claude-gemini/green-review/result.json",
+        "bytes": 1440,
+        "sha256": "94c3232975313370cf6d1974e2c5b44c78ff043a9af17e45e17b094e34dfb35a"
+      },
+      {
+        "path": "claude-gemini/green-review/stderr.txt",
+        "bytes": 528,
+        "sha256": "95f0a10b1b28b9816e42e212a3ff4c9a141dc76fd2fc96141c2f2e31a88fb599"
+      },
+      {
+        "path": "claude-gemini/green-review/stdout.txt",
+        "bytes": 659,
+        "sha256": "669e89ef1dec67717b9d0d90442eb27275ed663cd7af9a75b24a334c7a4228cb"
+      },
+      {
+        "path": "claude-gemini/green/result.json",
+        "bytes": 1426,
+        "sha256": "305c1bfd65fef76468169ed0284483ec4189a84289f28f04c7f376911a116ab3"
+      },
+      {
+        "path": "claude-gemini/green/stderr.txt",
+        "bytes": 528,
+        "sha256": "737a6f4089709a5a85e0f54dfb826690ff0a2500ebc7058677767eccc9d2e9a4"
+      },
+      {
+        "path": "claude-gemini/green/stdout.txt",
+        "bytes": 442,
+        "sha256": "ecd92f261e35eacd7fe820308c8555ec6928091e4ebbafba31aa73ac7f420e06"
+      },
+      {
+        "path": "claude-gemini/opencode-review/result.json",
+        "bytes": 1437,
+        "sha256": "d0ba206666d22ecb943353be08cf38bdf37f28888a361842557bb64b3d046b67"
+      },
+      {
+        "path": "claude-gemini/opencode-review/stderr.txt",
+        "bytes": 528,
+        "sha256": "6613cd2d0d13de10285b32aa15985a64ad23320864e251e0e9167367476d0e6e"
+      },
+      {
+        "path": "claude-gemini/opencode-review/stdout.txt",
+        "bytes": 566,
+        "sha256": "b3e3e5f61f418f361abf6b48a38e4d465f94fdfee501646236fecab32d1bc0a2"
+      },
+      {
+        "path": "claude-gemini/red-native/result.json",
+        "bytes": 1436,
+        "sha256": "d3eea418fc4db7c341d6e82bed9929a54b98797c81b8d10aac69cc2f482b1653"
+      },
+      {
+        "path": "claude-gemini/red-native/stderr.txt",
+        "bytes": 5286,
+        "sha256": "fa567d37246af1f19127cce64e3636c597f4c58d858cbb2e69da8371f2ecf94b"
+      },
+      {
+        "path": "claude-gemini/red-native/stdout.txt",
+        "bytes": 2115,
+        "sha256": "a315ee178bd71ea7be13a211fcd834a6752ae030b8725038dd8877d50d25c757"
+      },
+      {
+        "path": "claude-gemini/red-review/result.json",
+        "bytes": 1436,
+        "sha256": "416eb5b0d3e50e75b7eee013f66f23df74ed133b39d43dcc7a60a8764e51b4b0"
+      },
+      {
+        "path": "claude-gemini/red-review/stderr.txt",
+        "bytes": 4052,
+        "sha256": "81b0d44f6d31f884ae3735be4283683b865dcca0b9fc20fc8cbbbd55eca0bfdc"
+      },
+      {
+        "path": "claude-gemini/red-review/stdout.txt",
+        "bytes": 2527,
+        "sha256": "2330a04f7243e9875b5347aa87e2e3c84f4e8d421ce9fb5c05fdd9a255ec626d"
+      },
+      {
+        "path": "claude-gemini/red/result.json",
+        "bytes": 1422,
+        "sha256": "a5506dc1087e9fc35942e30a1ca2d5ae05cadf1d3fd05c849ba072cf5455bfea"
+      },
+      {
+        "path": "claude-gemini/red/stderr.txt",
+        "bytes": 3761,
+        "sha256": "d6b207339e90c566a77df31f038fe07b7875593d96ffe0fff0f159ad2ac22918"
+      },
+      {
+        "path": "claude-gemini/red/stdout.txt",
+        "bytes": 1646,
+        "sha256": "3cdbae99d9aef5a8f6714ae657f9ce98255378b7bebcaaab67481bf55463c1db"
+      },
+      {
+        "path": "claude-gemini/summary.json",
+        "bytes": 2659,
+        "sha256": "049aef82fa92abfe0e3b88acc4e37d6ccaefa83774a01185e0ac320285a61e19"
+      },
+      {
+        "path": "claude-gemini/targeted/result.json",
+        "bytes": 1896,
+        "sha256": "80d66d94cc241c51d4ab0363fd0ec17c88eb7fb03d15ce4e41dc6217ea5119d8"
+      },
+      {
+        "path": "claude-gemini/targeted/stderr.txt",
+        "bytes": 1319,
+        "sha256": "8238711adf0d22c2c06f90e3d75e14ccad7777664dffde8d77530ec59e1ba559"
+      },
+      {
+        "path": "claude-gemini/targeted/stdout.txt",
+        "bytes": 1012,
+        "sha256": "68259e948fa1b50eac4830ffbc03352b597323babcddc2a57e4adc48e2adf875"
+      },
+      {
+        "path": "codex-server/green-turn-teardown/result.json",
+        "bytes": 1366,
+        "sha256": "4ccd87c73d65234e22092618c448438a10526cf232c3c2e6439ce0b6b690520a"
+      },
+      {
+        "path": "codex-server/green-turn-teardown/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "codex-server/green-turn-teardown/stdout.txt",
+        "bytes": 339,
+        "sha256": "e5e80d465ffc622acfa9e4c6e790fcf2852a53ef8b8ea6ba6d28d743794eeb45"
+      },
+      {
+        "path": "codex-server/red-turn-teardown/result.json",
+        "bytes": 1363,
+        "sha256": "a59f3b7159cf5574ebdc93ad272f3475c17d5fa65ce75e1e6c2bf325f308c361"
+      },
+      {
+        "path": "codex-server/red-turn-teardown/stderr.txt",
+        "bytes": 973,
+        "sha256": "f8a215299aac54ad6db5b92b85ebfe019f37abf74f4fb0c064dd9cc3e76cbe00"
+      },
+      {
+        "path": "codex-server/red-turn-teardown/stdout.txt",
+        "bytes": 698,
+        "sha256": "e1e2b5f42d98437d10d2b81d27af0a8df097c46823b27dd22edc02d63928c55e"
+      },
+      {
+        "path": "codex-server/targeted-appserver/result.json",
+        "bytes": 2291,
+        "sha256": "7aca0f7c17be1e84ef4b6d549514de71bcf62e07296394b22d4e43637b44e959"
+      },
+      {
+        "path": "codex-server/targeted-appserver/stderr.txt",
+        "bytes": 264,
+        "sha256": "8bea8e01d3aef03dd3a9bfabf5149d7cc397d78b13c8657673f53b9cb1a0698c"
+      },
+      {
+        "path": "codex-server/targeted-appserver/stdout.txt",
+        "bytes": 1449,
+        "sha256": "22a6ea084bca5a1dc6834bb9bedfa080e3d3d8ea4ed621830b8ba9a4f4a97ee1"
+      },
+      {
+        "path": "deploy-vps.py",
+        "bytes": 4706,
+        "sha256": "867d85b5689fb25abda6958505c47573f96013ac269512753986f9269ff2da58"
+      },
+      {
+        "path": "local-final-build.log",
+        "bytes": 746,
+        "sha256": "d931d38097e390745b3041345e3fd6aabbf7c77b32cc0b4141e5c0633da86190"
+      },
+      {
+        "path": "local-final-build.result.json",
+        "bytes": 941,
+        "sha256": "a1b642ce4d18ff3be1b04f67e7470fab5f259bb2dd4ffe85e8614faa8aa9333d"
+      },
+      {
+        "path": "local-final-targeted.log",
+        "bytes": 5995,
+        "sha256": "47a811b182b1d0f25e3a7a103b0516f07889b9935c5d99713480a8f7949d5a3b"
+      },
+      {
+        "path": "local-final-targeted.result.json",
+        "bytes": 944,
+        "sha256": "64fe63005fbde8898a589fb0c28cc2b1268ab240b596bf62926579d30b997925"
+      },
+      {
+        "path": "local-final-typecheck.log",
+        "bytes": 597,
+        "sha256": "39d6ad3f9527ade3ea14f8f54b665883e2b87afb84bbf3c5391f8e7f49a0d91a"
+      },
+      {
+        "path": "local-final-typecheck.result.json",
+        "bytes": 945,
+        "sha256": "3605ab97c4acef7c1ad1a205b2cc96f203f81d91a66e8dc50025f20c6d2b8e0f"
+      },
+      {
+        "path": "local-final/result.json",
+        "bytes": 3604,
+        "sha256": "02f3be68ca78ab125670246b5ec9902bdf4fb438a841d01736bd9fb30ada3d24"
+      },
+      {
+        "path": "local-final/stderr.txt",
+        "bytes": 2111,
+        "sha256": "276b25230d9819cc3c9e1914665242e9e9465e43921d9fe13ca6e69adb89f05b"
+      },
+      {
+        "path": "local-final/stdout.txt",
+        "bytes": 3824,
+        "sha256": "b8411ed4d340f4ef6bc2a6327ae83f8ff59a03b971650407d97d1a40943c42aa"
+      },
+      {
+        "path": "local-published-build.log",
+        "bytes": 746,
+        "sha256": "448aca4a6eb63f9886785fd803a2953208d16e784b3e74d8ecad3cd166ed31ed"
+      },
+      {
+        "path": "local-published-build.result.json",
+        "bytes": 246,
+        "sha256": "694decebbe4d75decbcc6e4cb4eb352182c421401f7e1ce082d74dc36c389385"
+      },
+      {
+        "path": "local-published-targeted.log",
+        "bytes": 6107,
+        "sha256": "de70e842a8456b5faf7536486b73c6a8a6333ed44c75a7c5874bf541de034aeb"
+      },
+      {
+        "path": "local-published-targeted.result.json",
+        "bytes": 249,
+        "sha256": "7014eeab5413142f00e2c5b7f1749d4c037141f98d98e91a7cd67c1ce7c7f96e"
+      },
+      {
+        "path": "local-published-typecheck.log",
+        "bytes": 597,
+        "sha256": "9d135bb01adaa7686b17407cb5121f26173f842fa1cde9a66fcfe43b851e1292"
+      },
+      {
+        "path": "local-published-typecheck.result.json",
+        "bytes": 250,
+        "sha256": "aea2b7f8a417f91e7acba67b8a769d5aa302abcde51382d1d75854995876e56f"
+      },
+      {
+        "path": "local-published/result.json",
+        "bytes": 3612,
+        "sha256": "86bfd40fb06b98e0e9e84d1c1464eee81ac1ac011347fb6b7c7a477913180e0b"
+      },
+      {
+        "path": "local-published/stderr.txt",
+        "bytes": 2110,
+        "sha256": "cb500576dd6b22914ebed2d2f745af3319bbe65f70fade794f1707c1baf97ace"
+      },
+      {
+        "path": "local-published/stdout.txt",
+        "bytes": 3936,
+        "sha256": "1cff9bcdec7eab4299582e20edf0815396ffe9336511662ba10f29c3f846ffb1"
+      },
+      {
+        "path": "opencode/final/result.json",
+        "bytes": 1324,
+        "sha256": "c63a941356afcd0ec51efebf7073f2a4aead199de8c35bba85df54cbcf9f6100"
+      },
+      {
+        "path": "opencode/final/stderr.txt",
+        "bytes": 264,
+        "sha256": "c32d8e03238071cced4997f64e97795c1275a50208faff0a0a75d4628d6b7631"
+      },
+      {
+        "path": "opencode/final/stdout.txt",
+        "bytes": 464,
+        "sha256": "b56329bce30303f1bf3d82eaecf4201e2ea3c800752a16afad117cddfffda9cc"
+      },
+      {
+        "path": "opencode/green/result.json",
+        "bytes": 1324,
+        "sha256": "92193bb5705753eb0d079c16b9d5b897a919cb144b0de5c9e534bd56238aa840"
+      },
+      {
+        "path": "opencode/green/stderr.txt",
+        "bytes": 264,
+        "sha256": "0d6e46ab672e6c94851e00f9b682bd975936173f90ed7b7a4933515c59b5f936"
+      },
+      {
+        "path": "opencode/green/stdout.txt",
+        "bytes": 464,
+        "sha256": "5988969ab96c41c26d38fafa5c6ba7297701fdfa7c35baf278b8f99d2639cf17"
+      },
+      {
+        "path": "opencode/red/result.json",
+        "bytes": 1320,
+        "sha256": "400e5cb3695175f25f6e21c5a165954d77152c9f37648b47df9c94e537ceef5a"
+      },
+      {
+        "path": "opencode/red/stderr.txt",
+        "bytes": 2240,
+        "sha256": "b1c6115122a7137c420f351e13101a4df10381c849ee4f7aec7049e8e2510f44"
+      },
+      {
+        "path": "opencode/red/stdout.txt",
+        "bytes": 807,
+        "sha256": "287de91d57fcf1f1914eb0baea738183a32d34a90d0accb454e2f55858986d42"
+      },
+      {
+        "path": "opencode/targeted/result.json",
+        "bytes": 1804,
+        "sha256": "70c0b03651a69796089fbeaefcb01d90ef98458a833ad9bb47977b4d42a1f5c7"
+      },
+      {
+        "path": "opencode/targeted/stderr.txt",
+        "bytes": 792,
+        "sha256": "8928e2baf7814f8718103ec7f51d7a54dfa2d5fd2c8d88691e5dd9b817d04af9"
+      },
+      {
+        "path": "opencode/targeted/stdout.txt",
+        "bytes": 1161,
+        "sha256": "b44d3715698a791a7dd44bdb92544bf6df42cae5db78e25a2b9427c28d8585f4"
+      },
+      {
+        "path": "post-test-cleanup.json",
+        "bytes": 514,
+        "sha256": "de25dce408adcbc2a8a63e24dcf964f1ef738f7db28590df8c5f0650e3472e4c"
+      },
+      {
+        "path": "prepare-run-vps.sh",
+        "bytes": 2135,
+        "sha256": "bec61e89891d04f6f2169e52784f2f00b4bf77a05ca3b51d1a27f4d6e3c8ada1"
+      },
+      {
+        "path": "publish-evidence.mjs",
+        "bytes": 8983,
+        "sha256": "edcc41765feca7780869de102115fd1e4b420017aa26b3fb59afc22e15a1ecd4"
+      },
+      {
+        "path": "run-local.ps1",
+        "bytes": 2080,
+        "sha256": "82d5771069993c3dfd836a079f10982f5ba9b3f2d3711c3bf38daafdabd04be2"
+      },
+      {
+        "path": "selected-tests.txt",
+        "bytes": 2102,
+        "sha256": "8268f1a181cd7b6f1c995667af49af5ece729f88c96da6fe5cd18e05eb3095dc"
+      },
+      {
+        "path": "vps-evidence/deployment-published.json",
+        "bytes": 809,
+        "sha256": "34f28adada2e643aba987f1ffc800b68186434a70f6cf59b5196e6d6dd7b8679"
+      },
+      {
+        "path": "vps-evidence/published-build.log",
+        "bytes": 733,
+        "sha256": "bb032b1f49efa422e6af3b252bda038d85bcac338405fd92a8917af7dc98d902"
+      },
+      {
+        "path": "vps-evidence/published-build.result.json",
+        "bytes": 176,
+        "sha256": "77bb5a0250b06442c1982df7544e91683abe502b9504ea9e5408889aeb3c94c0"
+      },
+      {
+        "path": "vps-evidence/published-install.log",
+        "bytes": 117,
+        "sha256": "bb64db653f5e8e82140010ff2e3f4d65749418d073f4e03b45d4af1451432aff"
+      },
+      {
+        "path": "vps-evidence/published-install.result.json",
+        "bytes": 178,
+        "sha256": "0a64269dedf28affb841209946fdb504cc47f83e54915703b54a500d0596b6fe"
+      },
+      {
+        "path": "vps-evidence/published-targeted.log",
+        "bytes": 6763,
+        "sha256": "c7189bd1333332ac45882fd012b3b6b09c523ed2a93c2665e8fbc6bb3177aa78"
+      },
+      {
+        "path": "vps-evidence/published-targeted.result.json",
+        "bytes": 179,
+        "sha256": "1ad434b51156a965ed0edbd4563956bcdf2cae628e76d93204a15bd5fa9f08e0"
+      },
+      {
+        "path": "vps-evidence/published-typecheck.log",
+        "bytes": 584,
+        "sha256": "62a5f164d9854dcee6e07a45da5829abc64d9fa3110d54c1720218fecdd00d09"
+      },
+      {
+        "path": "vps-evidence/published-typecheck.result.json",
+        "bytes": 180,
+        "sha256": "fd2bba735a68740f0a4c07e5817251a43e52b99f59ca58a7a08c59964d0ea970"
+      },
+      {
+        "path": "vps-evidence/published/result.json",
+        "bytes": 3526,
+        "sha256": "966bfd793965dff879e05202c1b017d9b2df36d5d3eb70f27290c27099517d20"
+      },
+      {
+        "path": "vps-evidence/published/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/published/stdout.txt",
+        "bytes": 6763,
+        "sha256": "c7189bd1333332ac45882fd012b3b6b09c523ed2a93c2665e8fbc6bb3177aa78"
+      }
+    ]
+  }
+}
