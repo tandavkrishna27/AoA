@@ -40,6 +40,7 @@ import { maybeExecuteFakeCrewTurn } from "./fake-crew-llm.js";
 import { getRunLogStore } from "../../run-log-store.js";
 import type { RunLogHandle } from "../../run-log-store.js";
 import { createCrewRunLogSink } from "./crew-run-log.js";
+import { createCodexCrewToolCapture } from "./codex-crew-tool-capture.js";
 import type { CrewRunLogSink } from "./crew-run-log.js";
 import { getProviderStatus } from "../../../adapters/provider-status.js";
 import type { ProviderStatus } from "../../../adapters/provider-status.js";
@@ -179,6 +180,7 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
   // on exactly one finalize without a per-exit call site.
   let runLogHandle: RunLogHandle | null = null;
   let crewLogSink: CrewRunLogSink | null = null;
+  let codexToolCapture: ReturnType<typeof createCodexCrewToolCapture> | null = null;
   // W3a (P1 fix): `const agent` is scoped INSIDE the try, so the catch block
   // cannot read `agent.name`/`agent.runtimeConfig` (TS2304). Capture the two
   // fields the FAILURE loopback needs into function-scope locals right after the
@@ -359,6 +361,9 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     const toolAllowlistFromConfig = Array.isArray(aoaCfg.toolAllowlist)
       ? (aoaCfg.toolAllowlist as string[])
       : [];
+    if (agent.adapterType === "codex_local") {
+      codexToolCapture = createCodexCrewToolCapture(toolAllowlistFromConfig);
+    }
 
     // T1.3 (eng-review D4): derive enabledCapabilities PER-AGENT from the
     // agent's toolAllowlist. Pre-T1.3 every crew run got the blanket
@@ -1279,12 +1284,16 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
         // T1: stream the CLI transcript + one redacted adapter.invoke event into
         // the run log (was: two literal no-ops that discarded everything). Both
         // sink callbacks swallow store failures internally.
-        onLog: crewLogSink ? crewLogSink.onLog : async () => {},
+        onLog: async (stream, chunk) => {
+          if (stream === "stdout") codexToolCapture?.push(chunk);
+          if (crewLogSink) await crewLogSink.onLog(stream, chunk);
+        },
         onMeta: crewLogSink ? crewLogSink.onMeta : async () => {},
         authToken: crewAuthToken ?? undefined, onSpawn: () => {},
       });
     }
 
+    codexToolCapture?.flush();
     reportedProvider = adapterResult.provider ?? null;
     reportedModel = adapterResult.model ?? null;
 
@@ -1530,6 +1539,7 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
           status: runResult.status === "failed" ? "failed" : "completed",
           provider: reportedProvider,
           model: reportedModel,
+          ...(codexToolCapture ? { toolsCalled: codexToolCapture.names() } : {}),
           errorMessage: runResult.errorMessage ?? null,
           tokenUsage: adapterUsage ? {
             inputTokens: adapterUsage.inputTokens,
@@ -1726,6 +1736,7 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     });
     const surfaced = mappedKeyError ?? err;
     const errMessage = surfaced instanceof Error ? surfaced.message : String(surfaced);
+    codexToolCapture?.flush();
     if (runId) {
       try {
         const activeExecutionMs = Date.now() - startedAt;
@@ -1734,6 +1745,7 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
             status: "failed",
             provider: reportedProvider,
             model: reportedModel,
+            ...(codexToolCapture ? { toolsCalled: codexToolCapture.names() } : {}),
             // False-green fix (U12): this used to re-materialize the message
             // from the RAW `err` (String((err as Error)?.message ?? err)),
             // bypassing the mapper above — the DB failure row carried the raw

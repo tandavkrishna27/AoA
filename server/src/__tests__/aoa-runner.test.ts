@@ -88,6 +88,9 @@ vi.mock("../services/mcp-connectors-loader.js", () => ({
   loadConnectorEgressHosts: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("../services/run-log-store.js", () => ({ getRunLogStore: () => runLogStoreMock }));
+vi.mock("../adapters/provider-status.js", () => ({
+  getProviderStatus: vi.fn().mockResolvedValue({ installed: true, authenticated: true, authMode: "subscription", defaultModelResolved: null }),
+}));
 vi.mock("../middleware/logger.js", () => ({ logger:{ child:()=>({info:vi.fn(),warn:vi.fn(),error:vi.fn()}) } }));
 // T5: crew workspace resolution reads the instance experimental flags. Without
 // this stub the access THROWS and the resolver's tolerant catch absorbs it —
@@ -404,10 +407,10 @@ it("NON-connector-capable crew (process): the connector DB read is skipped entir
   expect(execMock.mock.calls[0][0].mcpServers).toBeUndefined();
 });
 
-function createAttributedRunDb() {
+function createAttributedRunDb(adapterType = "process", toolAllowlist: string[] = []) {
   const patches: Record<string, unknown>[] = [];
   const db: any = {
-    select: () => ch([{ id: "billing-agent", companyId: "co-1", name: "Steward", adapterType: "process", adapterConfig: {}, runtimeConfig: {} }]),
+    select: () => ch([{ id: "billing-agent", companyId: "co-1", name: "Steward", adapterType, adapterConfig: {}, runtimeConfig: { aoa: { toolAllowlist } } }]),
     insert: () => ch([{ id: "billing-run" }]),
     update: (table: unknown) => {
       const chain = ch([{ id: "billing-run", status: "completed" }]);
@@ -468,4 +471,33 @@ it.each([
     inputTokens: 73937, outputTokens: 298, cachedInputTokens: 65280,
     costCents: expectedCents, sourceIdempotencyKey: "crew_run:billing-run",
   }));
+});
+
+it.each([false, true])("persists actual successful Codex callback tool names when later execution throws=%s", async (throwsAfterTool) => {
+  runLogStoreMock.append.mockClear();
+  const toolName = "hub.updateCurationSummary";
+  const event = JSON.stringify({
+    type: "item.completed",
+    item: {
+      id: "actual-callback", type: "mcp_tool_call", server: "aoa", tool: toolName, status: "completed", error: null,
+      arguments: { private: "fixture-only" },
+      result: { content: [{ type: "text", text: '{"success":true,"data":"fixture-only"}' }] },
+    },
+  });
+  const chunks = [event.slice(0, 81), `${event.slice(81)}\n`];
+  execMock.mockImplementationOnce(async (context: any) => {
+    for (const chunk of chunks) await context.onLog("stdout", chunk);
+    await context.onLog("stderr", `${event}\n`);
+    if (throwsAfterTool) throw new Error("failure after observed tool completion");
+    return { exitCode: 0 };
+  });
+  const { db, patches } = createAttributedRunDb("codex_local", [toolName]);
+
+  const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(result.status).toBe(throwsAfterTool ? "failed" : "succeeded");
+  expect(patches.find((patch) => patch.status === (throwsAfterTool ? "failed" : "completed"))).toMatchObject({ toolsCalled: [toolName] });
+  const forwarded = runLogStoreMock.append.mock.calls.map((call) => call[1]);
+  for (const chunk of chunks) expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stdout", chunk }));
+  expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stderr", chunk: `${event}\n` }));
 });
