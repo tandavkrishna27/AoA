@@ -3,12 +3,17 @@ import { inspect } from "node:util";
 import type { ToolContext } from "../services/internal-agent/types.js";
 
 const updateSummaryMock = vi.hoisted(() => vi.fn());
+const auditHelpers = vi.hoisted(() => ({
+  insertActivityLog: vi.fn(),
+  publishActivityLogged: vi.fn(),
+}));
 
 vi.mock("../services/hub-curation.js", () => ({
   hubCurationService: vi.fn(() => ({
     updateSummary: updateSummaryMock,
   })),
 }));
+vi.mock("../services/activity-log.js", () => auditHelpers);
 
 import {
   hubReadCurationContextTool,
@@ -21,17 +26,20 @@ const COMPANY_ID = "aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa";
 const HUB_ITEM_ID = "bbbbbbbb-0000-4000-8000-bbbbbbbbbbbb";
 const AGENT_ID = "cccccccc-0000-4000-8000-cccccccccccc";
 
-function makeCtx(): ToolContext {
+function makeCtx(overrides: Partial<ToolContext> = {}): ToolContext {
   return {
     companyId: COMPANY_ID,
     userId: "user-1",
     userRole: "team_member",
     enabledCapabilities: [],
     agentKind: "aoa",
+    actorType: "agent",
     agentId: AGENT_ID,
+    runId: "eeeeeeee-0000-4000-8000-eeeeeeeeeeee",
     toolAllowlist: STEWARD_TOOL_ALLOWLIST,
     db: {} as any,
     services: {} as any,
+    ...overrides,
   } as ToolContext;
 }
 
@@ -102,6 +110,7 @@ describe("hub.updateCurationSummary tool", () => {
         expectedCurationRevision: 2,
         curationGroupSummary: "Explained.",
         action: "resolve",
+        internalAgentRunId: "ffffffff-0000-4000-8000-ffffffffffff",
       },
       makeCtx(),
     );
@@ -110,6 +119,23 @@ describe("hub.updateCurationSummary tool", () => {
       success: false,
       error: "INVALID_PARAMS",
     });
+    expect(updateSummaryMock).not.toHaveBeenCalled();
+  });
+
+  it("does not accept model-supplied audit attribution", async () => {
+    const result = await hubUpdateCurationSummaryTool.execute(
+      {
+        companyId: COMPANY_ID,
+        hubItemId: HUB_ITEM_ID,
+        expectedCurationRevision: 2,
+        curationGroupSummary: "Explained.",
+        internalAgentRunId: "ffffffff-0000-4000-8000-ffffffffffff",
+        auditActor: { actorType: "user", actorId: "founder", source: "commander_tool" },
+      },
+      makeCtx(),
+    );
+
+    expect(result).toMatchObject({ success: false, error: "INVALID_PARAMS" });
     expect(updateSummaryMock).not.toHaveBeenCalled();
   });
 
@@ -138,6 +164,7 @@ describe("hub.updateCurationSummary tool", () => {
       curationGroupSummary: "Three failures need review.",
       curationReason: "SLA is due in 20 minutes.",
       curatedByAgentId: AGENT_ID,
+      internalAgentRunId: "eeeeeeee-0000-4000-8000-eeeeeeeeeeee",
     });
   });
 
@@ -158,6 +185,45 @@ describe("hub.updateCurationSummary tool", () => {
       success: false,
       error: "CURATION_CONFLICT",
     });
+  });
+
+  it("attributes Commander writes to the user without treating its turn id as a crew run", async () => {
+    const ctx = makeCtx({ actorType: "commander", agentKind: undefined, agentId: undefined, runId: "commander-turn" });
+    const result = await hubUpdateCurationSummaryTool.execute(
+      {
+        companyId: COMPANY_ID,
+        hubItemId: HUB_ITEM_ID,
+        expectedCurationRevision: 2,
+        curationGroupSummary: "Commander-authored curation.",
+      },
+      ctx,
+    );
+
+    expect(result).toMatchObject({ success: true });
+    expect(updateSummaryMock).toHaveBeenCalledWith(expect.objectContaining({
+      companyId: COMPANY_ID,
+      auditActor: { actorType: "user", actorId: "user-1", source: "commander_tool" },
+    }));
+    expect(updateSummaryMock.mock.calls[0][0]).not.toHaveProperty("curatedByAgentId");
+    expect(updateSummaryMock.mock.calls[0][0]).not.toHaveProperty("internalAgentRunId");
+  });
+
+  it("does not bind organization heartbeat ids as internal agent run attribution", async () => {
+    const result = await hubUpdateCurationSummaryTool.execute(
+      {
+        companyId: COMPANY_ID,
+        hubItemId: HUB_ITEM_ID,
+        expectedCurationRevision: 2,
+        curationGroupSummary: "Organization-agent curation.",
+      },
+      makeCtx({ agentKind: "org", runId: "heartbeat-run" }),
+    );
+
+    expect(result).toMatchObject({ success: true });
+    expect(updateSummaryMock).toHaveBeenCalledWith(expect.objectContaining({
+      curatedByAgentId: AGENT_ID,
+    }));
+    expect(updateSummaryMock.mock.calls[0][0]).not.toHaveProperty("internalAgentRunId");
   });
 });
 

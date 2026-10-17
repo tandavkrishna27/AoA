@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
-import { hubItems } from "@armyofagents/db";
+import { agents, hubItems, internalAgentRuns } from "@armyofagents/db";
 import {
   HUB_SEMANTIC_TYPES,
   hubCurationMetadataSchema,
@@ -13,6 +13,7 @@ import {
 } from "@armyofagents/shared";
 import { conflict, unprocessable } from "../errors.js";
 import { redactSecretsInString } from "../redaction.js";
+import { insertActivityLog, publishActivityLogged } from "./activity-log.js";
 import { publishLiveEvent } from "./live-events.js";
 
 export interface HubCurationSourceItem {
@@ -49,6 +50,12 @@ export interface UpdateHubCurationSummaryInput {
   curationReason?: string | null;
   curationPriorityReason?: string | null;
   curatedByAgentId?: string | null;
+  internalAgentRunId?: string | null;
+  auditActor?: {
+    actorType: "user";
+    actorId: string;
+    source: "commander_tool" | "user_tool";
+  };
 }
 
 function ownershipScope(item: HubCurationSourceItem): string {
@@ -173,28 +180,86 @@ export function hubCurationService(
         setValues.curationPriorityReason = parsed.data.curationPriorityReason;
       }
 
-      const [row] = await db
-        .update(hubItems)
-        .set(setValues)
-        .where(
-          and(
-            eq(hubItems.id, args.hubItemId),
-            eq(hubItems.companyId, args.companyId),
-            eq(hubItems.curationRevision, args.expectedCurationRevision),
-          ),
-        )
-        .returning({
-          id: hubItems.id,
-          companyId: hubItems.companyId,
-          semanticType: hubItems.semanticType,
-          status: hubItems.status,
-          version: hubItems.version,
-          curationRevision: hubItems.curationRevision,
+      const { row, activity } = await db.transaction(async (txRaw) => {
+        const tx = txRaw as unknown as Db;
+        if (args.auditActor && args.curatedByAgentId) {
+          throw unprocessable("Invalid hub curation attribution");
+        }
+        if (args.curatedByAgentId) {
+          const [agent] = await tx
+            .select({ id: agents.id })
+            .from(agents)
+            .where(and(eq(agents.id, args.curatedByAgentId), eq(agents.companyId, args.companyId)))
+            .limit(1);
+          if (!agent) throw unprocessable("Invalid hub curation attribution");
+        }
+        if (args.internalAgentRunId) {
+          if (!args.curatedByAgentId) throw unprocessable("Invalid hub curation attribution");
+          const [run] = await tx
+            .select({ id: internalAgentRuns.id })
+            .from(internalAgentRuns)
+            .where(
+              and(
+                eq(internalAgentRuns.id, args.internalAgentRunId),
+                eq(internalAgentRuns.companyId, args.companyId),
+                eq(internalAgentRuns.agentId, args.curatedByAgentId),
+              ),
+            )
+            .limit(1);
+          if (!run) throw unprocessable("Invalid hub curation attribution");
+        }
+
+        const [updated] = await tx
+          .update(hubItems)
+          .set(setValues)
+          .where(
+            and(
+              eq(hubItems.id, args.hubItemId),
+              eq(hubItems.companyId, args.companyId),
+              eq(hubItems.curationRevision, args.expectedCurationRevision),
+            ),
+          )
+          .returning({
+            id: hubItems.id,
+            companyId: hubItems.companyId,
+            semanticType: hubItems.semanticType,
+            status: hubItems.status,
+            version: hubItems.version,
+            curationRevision: hubItems.curationRevision,
+          });
+
+        if (!updated) {
+          throw conflict("Hub curation metadata changed. Recompute and retry.");
+        }
+
+        const isAgentWrite = !!args.curatedByAgentId;
+        const changedFields = [
+          "curationGroupLabel",
+          "curationGroupSummary",
+          "curationReason",
+          "curationPriorityReason",
+        ].filter((field) => field in parsed.data);
+        const activity = await insertActivityLog(tx, {
+          companyId: updated.companyId,
+          actorType: args.auditActor?.actorType ?? (isAgentWrite ? "agent" : "system"),
+          actorId: args.auditActor?.actorId ?? (isAgentWrite ? args.curatedByAgentId! : "steward_sweep"),
+          action: "hub_item.curation_updated",
+          entityType: "hub_item",
+          entityId: updated.id,
+          agentId: isAgentWrite ? args.curatedByAgentId : null,
+          details: {
+            source: args.auditActor?.source ?? (isAgentWrite ? "agent_tool" : "system_sweep"),
+            previousRevision: args.expectedCurationRevision,
+            curationRevision: updated.curationRevision,
+            changedFields,
+            ...(args.internalAgentRunId ? { internalAgentRunId: args.internalAgentRunId } : {}),
+          },
         });
 
-      if (!row) {
-        throw conflict("Hub curation metadata changed. Recompute and retry.");
-      }
+        return { row: updated, activity };
+      });
+
+      publishActivityLogged(activity);
 
       if (isHubSemanticType(row.semanticType)) {
         publishLiveEvent({

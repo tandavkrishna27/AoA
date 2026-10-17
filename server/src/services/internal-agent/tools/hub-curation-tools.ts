@@ -234,8 +234,27 @@ export const hubUpdateCurationSummaryTool: AgentTool = {
         companyId: parsed.data.companyId,
         hubItemId: parsed.data.hubItemId,
         expectedCurationRevision: parsed.data.expectedCurationRevision,
-        curatedByAgentId: ctx.agentId ?? null,
       };
+      if (ctx.actorType === "agent") {
+        if (!ctx.agentId) {
+          return {
+            success: false,
+            data: null,
+            summary: "Curation agent identity is unavailable",
+            error: "INVALID_ACTOR",
+          };
+        }
+        updateInput.curatedByAgentId = ctx.agentId;
+        if (ctx.agentKind === "aoa" && ctx.runId) {
+          updateInput.internalAgentRunId = ctx.runId;
+        }
+      } else {
+        updateInput.auditActor = {
+          actorType: "user",
+          actorId: ctx.userId,
+          source: ctx.actorType === "commander" ? "commander_tool" : "user_tool",
+        };
+      }
       if (parsed.data.curationGroupLabel !== undefined) {
         updateInput.curationGroupLabel = parsed.data.curationGroupLabel;
       }
