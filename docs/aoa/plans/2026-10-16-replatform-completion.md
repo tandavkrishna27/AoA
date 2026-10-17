@@ -207,6 +207,8 @@ Record the chosen route, exact topology and executed case IDs in each new attemp
 
 ### W02 — Diagnose and repair native background crew operation
 
+**17 October bounded follow-up:** [targeted repair report](../reports/2026-10-17-w02-w05-targeted-report.md) and [completed/pending checklist](2026-10-17-w02-w05-handoff.md), branch `codex/replatform-w02-w05`. Native Steward now performs a durable authenticated curation effect with observed tool names and one subscription cost event. Prompt context, accounting/provenance and same-process child cancellation defects are repaired. Existing signing setup works; no second secret store was needed. Full live revocation/negative-boundary/crash-restart/adapter coverage and global mutation-audit reconciliation remain pending, so the broader exit below is not marked complete.
+
 **Type / owner:** Investigation, then only demonstrated code/config fixes / native app + crew engineering. **Finding:** TST-009. **Dependency:** W01 for live model acceptance.
 
 **Files:** `server/src/agent-auth-jwt.ts`, `cli/src/config/env.ts`, `cli/src/checks/agent-jwt-secret-check.ts`, `cli/src/commands/onboard.ts`, `server/src/services/internal-agent/aoa-agents/crew-codex-auth.ts`, and the existing crew/sweep tests. Read the originating sweep run and failure before selecting additional files.
@@ -251,13 +253,15 @@ Split implementation into separately reviewable commits: output capture; ACL/sta
 
 ### W05 — Settle artifact export/deadline/destroy ordering
 
+**17 October bounded follow-up:** [targeted repair report](../reports/2026-10-17-w02-w05-targeted-report.md) and [completed/pending checklist](2026-10-17-w02-w05-handoff.md). Controlled artifact fixtures and explicit fail-closed executable/staging upload-origin configuration are repaired and tested locally/on VPS. Original historical production-leak attribution remains unproven. The real VPS-authority → PC-worker generated-file/export/UI-download acceptance and broader lane remain pending; no rollout was enabled and no whole suite was rerun.
+
 **Type / owner:** Reproduced failures plus unproven root causes / adapter-manager + worker output engineering. **Findings:** TST-012, TST-013; I17's `producer_failed` output is an additional integration symptom.
 
 **Files:** `packages/adapter-manager/src/server.ts`, `packages/adapter-manager/src/__tests__/server-artifact-export.test.ts`, `packages/worker-daemon/src/lease/artifact-export.ts`, their sequencer/capability tests, and `server/src/services/job-output-bridge.ts` if the source journey demonstrates an integration defect.
 
 **Interface:** Preserve `createProviderServer(options): Server` and the existing typed wire errors/ownership contract. Define whether an export was admitted before destruction using deterministic barriers; tests must assert that ordering, not a race-dependent error class.
 
-- [ ] Add controlled schedules for queued deadline before handler attachment, admitted stalled upload then destroy, destroy before admission, fence replacement and late upload completion. Observe every rejection immediately and assert no `unhandledRejection` is emitted.
+- [x] Add controlled schedules for queued deadline before handler attachment, admitted stalled upload then destroy, destroy before admission, fence replacement and late upload completion. Observe every rejection immediately and assert no `unhandledRejection` is emitted. Verified in the bounded follow-up linked above; this does not reclassify original historical production causes.
 - [ ] Determine separately whether TST-012 is a test-observation problem or a production rejection leak, and whether TST-013 violates the intended wire error contract. Fix only the demonstrated layer; do not broaden accepted error classes without a contract decision.
 - [ ] Repeat the VPS-authority → PC-worker reference journey with a real generated output file and normal artifact export. Require a committed digest/size, authorized UI download, exact bytes and denied stale/foreign reads. A terminal job with `producer_failed` does not pass this output acceptance.
 - [ ] Run artifact/export focused suites and cancellation, destroy and integrity regressions, followed by the whole required lane. **Exit:** zero unhandled errors, deterministic wire outcomes, usable governed output and no orphan upload.
