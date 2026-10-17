@@ -1904,6 +1904,21 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     // exception — masking every crew failure as a successful wakeup.
     return { status: "failed", errorMessage: errMessage, runId };
   } finally {
+    codexToolCapture?.flush();
+    const observedToolNames = codexToolCapture?.names() ?? [];
+    if (runId && observedToolNames.length > 0) {
+      try {
+        await db.update(internalAgentRuns)
+          .set({ toolsCalled: observedToolNames })
+          .where(and(
+            eq(internalAgentRuns.companyId, payload.companyId),
+            eq(internalAgentRuns.id, runId),
+            eq(internalAgentRuns.status, "cancelled"),
+          ));
+      } catch (auditErr) {
+        log.warn({ err: auditErr, runId }, "aoa-runner: cancelled run tool audit update failed (best-effort, ignored)");
+      }
+    }
     // T1 (crew observability): seal the run transcript on EVERY exit — success,
     // adapter-reported failure, thrown failure, and the benign early returns
     // (entry not claimable / task checkout conflict) that return before the

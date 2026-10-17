@@ -501,3 +501,57 @@ it.each([false, true])("persists actual successful Codex callback tool names whe
   for (const chunk of chunks) expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stdout", chunk }));
   expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stderr", chunk: `${event}\n` }));
 });
+
+it.each([false, true])("retains observed tools when cancellation wins before execute settles, throws=%s", async (throwsAfterCancel) => {
+  const toolName = "hub.updateCurationSummary";
+  const cancelledAt = new Date("2026-10-17T18:30:00Z");
+  const state: Record<string, unknown> = {
+    id: "cancelled-run", companyId: "co-1", agentId: "billing-agent", status: "running", toolsCalled: [],
+  };
+  const auditPatches: Record<string, unknown>[] = [];
+  const agent = { id: "billing-agent", companyId: "co-1", name: "Steward", adapterType: "codex_local", adapterConfig: {}, runtimeConfig: { aoa: { toolAllowlist: [toolName] } } };
+  const matches = (condition: any): boolean => {
+    if (condition?.and) return condition.and.every(matches);
+    const [column, value] = condition.eq as [symbol, unknown];
+    return state[column.description!.split(".").at(-1)!] === value;
+  };
+  const db: any = {
+    select: () => {
+      const chain = ch([agent]);
+      chain.from = (table: unknown) => table === internalAgentRuns ? ch([state]) : chain;
+      return chain;
+    },
+    insert: () => ch([{ id: "cancelled-run" }]),
+    update: (table: unknown) => {
+      let patch: Record<string, unknown> = {};
+      let predicate: unknown;
+      const apply = () => {
+        if (table !== internalAgentRuns || !matches(predicate)) return [];
+        Object.assign(state, patch);
+        if (patch.toolsCalled && !patch.status) auditPatches.push(patch);
+        return [state];
+      };
+      const chain: any = {
+        set: (values: Record<string, unknown>) => { patch = values; return chain; },
+        where: (condition: unknown) => { predicate = condition; return chain; },
+        returning: () => Promise.resolve(apply()),
+        then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve(apply()).then(resolve),
+      };
+      return chain;
+    },
+  };
+  execMock.mockImplementationOnce(async (context: any) => {
+    await context.onLog("stdout", `${JSON.stringify({ type: "item.completed", item: {
+      type: "mcp_tool_call", server: "aoa", tool: toolName, status: "completed", error: null,
+      result: { content: [{ type: "text", text: '{"success":true}' }] },
+    } })}\n`);
+    Object.assign(state, { status: "cancelled", completedAt: cancelledAt, errorMessage: "Cancelled due to agent pause" });
+    if (throwsAfterCancel) throw new Error("execution ended after cancellation");
+    return { exitCode: 0 };
+  });
+
+  await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(state).toMatchObject({ status: "cancelled", completedAt: cancelledAt, errorMessage: "Cancelled due to agent pause", toolsCalled: [toolName] });
+  expect(auditPatches).toEqual([{ toolsCalled: [toolName] }]);
+});
