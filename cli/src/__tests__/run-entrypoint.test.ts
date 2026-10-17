@@ -129,6 +129,22 @@ it("built onboarding resolves source-exported workspace dependencies with relati
   } finally { await test.cleanup(); }
 });
 
+it("built onboarding loads the real PDF parser and its native canvas dependency", async () => {
+  const test = await fixture();
+  try {
+    const serverDependencies = join(test.directory, "server", "node_modules");
+    await mkdir(serverDependencies, { recursive: true });
+    await symlink(resolve(cliDir, "../server/node_modules/pdf-parse"), join(serverDependencies, "pdf-parse"), "junction");
+    await put(join(test.directory, "server", "dist", "index.js"),
+      'import { PDFParse } from "pdf-parse"; if (typeof PDFParse !== "function") throw new Error("PDF parser export missing");' + marker("built"));
+    const result = await test.run();
+    expect(result, result.stderr).toMatchObject({ code: 0 });
+    expect(result.stdout).toContain('{"entry":"built","uiDev":null}');
+    expect(result.stderr).not.toContain("Cannot load");
+    expect(result.stderr).not.toContain("Cannot polyfill");
+  } finally { await test.cleanup(); }
+});
+
 it("missing workspace development dependencies report install/build guidance with the original cause", async () => {
   const test = await fixture({ withoutTsx: true });
   try {

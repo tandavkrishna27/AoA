@@ -113,7 +113,7 @@ function maybeEnableUiDevMiddleware(entrypoint: string): void {
 async function importServerEntry(): Promise<void> {
   // Source commands live in cli/src/commands; esbuild bundles them into
   // cli/dist/index.js. Source execution inherits tsx; built workspace execution
-  // opts into the scoped workspace loader below.
+  // opts into the workspace loader below.
   const cliModulePath = fileURLToPath(import.meta.url);
   const sourceCli = cliModulePath.endsWith(".ts");
   const projectRoot = path.resolve(path.dirname(cliModulePath), sourceCli ? "../../.." : "../..");
@@ -135,12 +135,9 @@ async function importServerEntry(): Promise<void> {
     if (sourceCli) {
       await import(pathToFileURL(workspaceEntry).href);
     } else {
-      // Workspace packages export their source in development, even after a
-      // build. Scope tsx to this graph so their relative .js imports resolve
-      // without requiring a loader flag on the user's plain Node invocation.
-      let tsImport: typeof import("tsx/esm/api").tsImport;
+      let register: typeof import("tsx/esm/api").register;
       try {
-        ({ tsImport } = await import("tsx/esm/api"));
+        ({ register } = await import("tsx/esm/api"));
       } catch (err) {
         const missingSpecifier = getMissingModuleSpecifier(err);
         if (isModuleNotFoundError(err) && (missingSpecifier === "tsx" || missingSpecifier === "tsx/esm/api")) {
@@ -152,7 +149,8 @@ async function importServerEntry(): Promise<void> {
         }
         throw err;
       }
-      await tsImport(pathToFileURL(workspaceEntry).href, { parentURL: import.meta.url, tsconfig: false });
+      register({ tsconfig: false });
+      await import(pathToFileURL(workspaceEntry).href);
     }
     return;
   }
