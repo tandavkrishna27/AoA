@@ -1,18 +1,31 @@
 # Local + VPS Validation Pickup Checklist
 
-**Remaining-gap engineering follow-up:** The [repair plan](2026-10-16-f01-f05-followup-repairs.md) addresses F01's non-Git extraction preflight, F02's saved failed-user/retry recovery, both F04 stream/history paths and F05's raw built workspace launch contract. The [next-candidate live checklist](2026-10-16-f01-f05-live-retest.md#next-candidate-remaining-gap-acceptance) specifies fresh evidence required after these repairs. The unchecked live requirements and the immutable retest below remain open until that separate attempt is executed; F03's earlier bounded pass stands.
+**Latest pickup (17 October):** [new exact-candidate retest](../reports/2026-10-17-f01-f05-live-retest-report.md) and [portable evidence](../evidence/2026-10-17-f01-f05-live-retest-summary.json) for `6ebc400d2`. Useful extraction, native choices/Planning and bounded VPS denial recovery/retry now have fresh passes. **F05 raw built onboarding still fails** in the real PDF/canvas dependency graph. Strict F01 subprocess provenance, separately prerequisite-bound distributed/other-owner live cases, broader native acceptance and UI reconciliation observations remain open.
 
 - **Branch:** `codex/replatform-baseline-w00-w04`
 - **Original tested baseline:** `05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd`
-- **Latest live retest candidate:** `fe3db70fea7fd4413429bc92d81b56ea67ccd386`; [retest report](../reports/2026-10-16-f01-f05-live-retest-report.md) and [portable retest evidence](../evidence/2026-10-16-f01-f05-live-retest-summary.json).
+- **Latest live retest candidate:** `6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9`; report/evidence linked above.
+- **Prior live retest:** `fe3db70fe`; [immutable 16 October report](../reports/2026-10-16-f01-f05-live-retest-report.md) and [evidence](../evidence/2026-10-16-f01-f05-live-retest-summary.json).
 - **Source of truth for this attempt:** [validation report](../reports/2026-10-16-local-vps-validation-report.md) and [portable evidence summary](../evidence/2026-10-16-local-vps-validation-summary.json).
 **Status:** Mutable coordination checklist; no application fixes were implemented by the validation/documentation work.
 
-**Current pickup:** F01–F05 engineering fixes and their full Windows/CI checks are recorded in the [engineering verification record](../reports/2026-10-16-f01-f05-engineering-verification.md). The subsequent exact-candidate live retest now establishes **F03's bounded Planning case passed**, but **F01 extraction, F02 saved-chat failure guidance, F04 streaming/answered-choice hydration and F05 full built onboarding remain open**. F06–F09 are qualified investigations, not established production defects. The original validation report is unchanged; checked history below does not replace current-candidate evidence.
+**Current pickup:** Code repairs after the prior retest were independently exercised on the new candidate. This checklist distinguishes bounded functional passes from full acceptance. F03 passes again; F01/F02/F04 retain only their named evidence/prerequisite gaps and observations; F05 needs another startup fix. F06–F09 remain qualified investigations. Original reports and failures are not rewritten.
 
 Checked items mean the stated implementation observation or verification happened, **not** that an entire W package or release gate passed. F01–F09 are handoff labels, not newly filed repository tickets or assigned owners. Priorities are triage suggestions. Recheck current HEAD and superseding fixes before starting; keep each fix focused and attach its regression test and new-candidate evidence. This checklist is not fresh authority for infrastructure changes, credential transfer, paid calls or rollout flags.
 
-## Latest retest completed / verified
+## Latest retest completed / verified — 17 October
+
+- [x] Matched origin and both rebuilt review-app revisions at `6ebc400d2`, preserving DB/history and QAN-1/QAN-2; no full reset, rollout change or auth transfer.
+- [x] Targeted **13 changed files only**: Windows 203 pass / 47 skip, exit 0. VPS initial 249 pass / 1 timeout, exit 1, retained; isolated CLI and same-selection serial reruns pass, latter 250/250. Timeouts/assertions unchanged; initial cause unproven.
+- [x] Frozen installs, authoritative builds and four affected-package typechecks passed on both hosts. No whole-suite or all-package typecheck repeat.
+- [x] Native real verify and one extraction produced two useful persisted review items; no approval/Git-preflight error. Strict raw child exit/model capture remains unavailable, not invented.
+- [x] New native canonical choice appears immediately, unanswered survives reload, answered stays dismissed after reload/switch/back; old legacy behavior distinguished correctly.
+- [x] One separately approved QAN-3 is Planning/Backlog/Unassigned/Not started with no execution-run link. Consumed confirmation replay returned 404 with identical task arrays.
+- [x] VPS attachment-bearing denial/reload/retry retained one user row/submission and frozen attachment/context, with two legitimate failed-attempt receipts and null model/provider. Run History agrees; old missing metadata has explicit unavailable-Retry guidance. Edit/Discard/keyboard-draft behavior observed.
+- [x] F05 nine doctor checks pass, but actual raw built startup exits 1 at scoped-loader PDF/canvas initialization. Reduced direct import passes / scoped import fails. Owned diagnostic teardown leaves no app/DB processes/listeners.
+- [x] Incidental automatic native thread.controller run and live duplicate-text observations are recorded rather than hidden. No claim of zero background agent activity, W02 closure or duplicate execution.
+
+## Prior retest completed / verified — 16 October (historical)
 
 - [x] Matched origin at `fe3db70fe`, rebuilt/upgraded both owned review apps while preserving databases/history, and retained exact-candidate health/artifact receipts.
 - [x] Pinned frozen installs, authoritative builds, **16 targeted files / 236 tests on each host**, and shared/server/UI/CLI typechecks passed. This was not another full-suite or all-package typecheck run.
@@ -43,53 +56,55 @@ Checked items mean the stated implementation observation or verification happene
 
 The [live retest report](../reports/2026-10-16-f01-f05-live-retest-report.md) supplies reproduction steps, source-path investigation pointers, QA entity IDs and evidence limits. All statuses below are for the named candidate, not an inference about later commits.
 
-### F01: Native extraction trusted-directory preflight
+### F01: Useful extraction works; strict provenance/native journey still pending
 
-**Priority:** P1. **Related work:** W01 native acceptance / TST-008.
+**Priority:** P1 acceptance evidence. **Related work:** W01 / TST-008.
 
-- [x] Engineering corrected the root approval-option placement; real verification passed and the actual extraction no longer failed on the original unsupported argv.
-- [ ] Correct the next demonstrated blocker: isolated temporary-directory extraction exits 1 with `Not inside a trusted directory and --skip-git-repo-check was not specified.` Preserve read-only sandbox, scoped auth and inherited model; no API fallback.
-- [ ] Add a regression reaching the supported CLI's real preflight, then repeat one actual extraction and verify useful persisted items. Failed QA entry `6eea9934-6818-4df8-b0c7-d58f77a9a526` is retained.
-- [ ] Complete native TST-008 only after extraction and the remaining journey evidence pass; new Scout/crew acceptance was not executed in this retest.
+- [x] Real pinned-CLI verify and actual non-Git temporary-directory extraction passed the prior approval/Git refusal points on `6ebc400d2`.
+- [x] Discussion `cf032493-3779-4271-8635-e62f2f59bacd`, entry `883aac26-6db2-4677-8cf1-20ab0e210094`: completed, useful task and decision persisted and visible in saved UI; left pending review.
+- [ ] Retain an actual raw child exit/resolved-model receipt on a separately scoped attempt before claiming strict provenance closure. The completed entry is not a fabricated numeric exit or model receipt.
+- [ ] Complete the broader native TST-008/crew journey. One incidental automatic `thread.controller` run completed despite saved `crewPaused=true`; preserve its audit and investigate pause/event-controller semantics before drawing a defect or W02-acceptance conclusion.
 
-### F02: Cloud failure guidance lost on saved-chat reload
+### F02: Bounded VPS failure recovery/retry passed; extended live cases pending
 
-**Priority:** P1. **Related work:** Commander failure handling / W01 provenance.
+**Priority:** P1 remaining acceptance/scope. **Related work:** Commander failure handling / W01 provenance.
 
-- [x] Initial no-provider send visibly refused unsupported cloud execution. Durable run `aa97d1f9-e793-4abc-acb1-7ceae2f94be7` is failed with error text and null model/provider/summary; no false completion or shared-host execution.
-- [ ] Restore actionable refusal/error and retry controls after reload/reopening saved chat. The new chat currently shows only the failed user's message, despite the correct failed run.
-- [ ] Cover failed-user-turn/run hydration, not just failed assistant messages or transient failed-send state. Investigate `InternalAgentPanel.tsx` saved-conversation loading.
-- [ ] Retest retry/rejoin using the original submission identity and prove no duplicated run/side effect or host fallback. UI retry was unavailable after reload; this requirement is **not passed**.
-- [ ] Keep this negative boundary independent of positive cloud inference. Do not enable unsandboxed multi-tenancy or introduce a personal-host credential fallback to evade the refusal.
+- [x] New attachment-bearing request fails honestly; after reload/reopen, actionable refusal and Retry/Edit/Discard appear. Run History agrees and unobserved model/provider stay null.
+- [x] Retried original submission `e9741e23-e20f-4cbc-bb76-3e47fb6f59a5` once: same user row/content/context/asset ID, two legitimate failed attempt receipts, no duplicate durable user turn, active execution or provider/host fallback.
+- [x] Old failed chat explains missing exact-retry metadata; no guessed attachments/context. Edit restores original draft/reference, Discard stays dismissed across chat switch/back, and real keyboard typing dismisses stale recovery without sending a new request.
+- [ ] Independently exercise accepted distributed failed-attempt retry and stale-running rejoin with original message/run/job/attempt authority. No disposable accepted distributed setup was available; do not provision/spend/enable rollout merely to green this case.
+- [ ] Complete live other-owner/company scope and precisely controlled refetch/race cases if full acceptance is required. Passing deterministic tests are not equivalent to those live cases.
+- [ ] Investigate repeated user text during live Retry reconciliation if retained as a UI defect: saved reload collapses it and DB always contains one user row. Do not describe this as duplicate paid execution or hide it with an extra retry.
 
-### F03: Planning creation — bounded live case passed
+### F03: Planning creation — fresh bounded pass
 
 **Priority:** P2. **Related work:** task-tool contract / native useful-tool journey.
 
-- [x] Explicit `workMode=planning` survived governed approval and persisted on exactly one new QAN-2 (`c63290a6-16ee-4d95-8af4-7c2473f4b37f`).
-- [x] Reloaded UI showed Planning, Backlog, Unassigned and Not started; no execution-run link or task dispatch was observed.
-- [x] Conversational choice alone created nothing; Allow once was separate. Replaying that consumed confirmation returned 404 with identical before/after task arrays.
-- [x] Existing Standard-mode QAN-1 was not converted or duplicated. **F03 is closed for this bounded retest**, not whole native TST-008 or W02 acceptance.
+- [x] On `6ebc400d2`, QAN-3 (`b45f4166-226b-4d2a-84b6-f13be85a182e`) persists explicit Planning/Backlog/Unassigned/Not started with no execution-run link after separate Allow once.
+- [x] Before approval only QAN-1/QAN-2 existed. Consumed confirmation replay returns 404 with identical task arrays. Old QA tasks remain unchanged.
+- [x] **Bounded case passes on this candidate**, not whole native TST-008/W02 or release acceptance.
 
-### F04: Codex streaming choices and answered-choice hydration
+### F04: Native choices/approval/reload passed; distributed delivery pending
 
-**Priority:** P2. **Related work:** Commander UI/protocol; two demonstrated remaining gaps.
+**Priority:** P2. **Related work:** Commander UI/protocol.
 
-- [x] Historical legacy and new canonical payloads render as choices when loaded from persistence. Selecting a choice sends intent; a distinct durable runtime approval gates the single task creation.
-- [ ] Parse canonical OPTIONS on the actual Codex summary stream: the original response displayed literal markup, with buttons only after reload. Investigate `cli-mode.ts:2069` (`parsed.summary` yielded directly as text).
-- [ ] Keep answered choices dismissed after reload/reopening an explicit saved conversation. The Create button reappears above the recorded user answer and successful creation. Investigate `InternalAgentPanel.tsx:979` history mapping versus its separate merge/dismissal path.
-- [ ] Add regressions for both actual paths and repeat stream → reload → answer → governed approval → reload/replay. Do not click the resurrected choice, auto-approve, disable gates or create duplicate tasks as a workaround.
-- [x] Consumed-approval replay itself was safe in this retest. The original upstream 503 remains historical, not a proven deterministic defect.
+- [x] Actual Codex summary stream renders canonical buttons immediately, retaining surrounding text; no reload workaround.
+- [x] Unanswered choice survives reload; answered choice stays dismissed after reload and chat switch/back. Historical answered/unanswered legacy cases remain distinguishable.
+- [x] Choice sends intent only; a distinct Allow once card gates one Planning task. Card survives the completed turn's history fetch; consumed replay cannot duplicate its effect.
+- [ ] Exercise OPTIONS-only and text-plus-OPTIONS accepted distributed delivery/result recovery under separately authorized prerequisites. Native/parser/UI tests do not close this persistence case.
+- [ ] Complete pending-card cross-company live switching/malformed-marker cases if full acceptance requires them; deterministic coverage is not mislabeled as live inference.
+- [ ] Record/reproduce repeated assistant narration during live pending-card reconciliation separately from authority: one card and one side effect were observed; reload removes repeated transient text.
 
-### F05: Full built onboarding — workspace loader versus installed artifact
+### F05: Raw built startup still fails in scoped PDF/canvas loading
 
-**Priority:** P2. **Related work:** native onboarding packaging; artifact acceptance remains incomplete.
+**Priority:** P2 implementation + actual onboard acceptance.
 
-- [x] Original zod module-load failure no longer reproduced; raw built onboard created fresh configuration and passed all nine doctor checks.
-- [ ] Resolve/test the intended built-command contract: plain `node cli/dist/index.js onboard --yes` in this workspace fails importing `server/src/env-compat.js` from `server/src/index.ts`. Workspace server exports source; publishConfig exports dist.
-- [x] A separate fresh-home `--import tsx` diagnostic reached healthy exact candidate, supporting a workspace-loader distinction. Its later PowerShell UI check threw a null-reference; retained diagnostic verdict remains **fail**, not full onboarding success.
-- [ ] Demonstrate usable UI and owned cleanup with the intended installed/packed artifact or repaired supported workspace command. **Published installation was not tested; a published packaging defect is not established.**
-- [x] Both diagnostic attempts were cleaned with no owned app/DB process/listener remaining. Private generated config/auth homes must not be committed.
+- [x] Original zod/source-export errors no longer block the raw command; fresh configuration and all nine doctor checks succeed.
+- [ ] Add a real-dependency-graph executable regression: plain `node cli/dist/index.js onboard --yes` exits 1 before healthy UI with `DOMMatrix is not defined`; preceding canvas warning resolves `node:os?tsx-namespace=<dynamic>` as a filesystem path.
+- [x] Reduced fresh-process diagnostic imports the same PDF ESM dependency successfully via ordinary import (exit 0), but fails through scoped `tsImport` (exit 1). This narrows investigation, not a completed repair.
+- [ ] Repair supported workspace launch without an external loader workaround, preserving source development and installed resolution boundaries.
+- [ ] Repeat raw-command doctor/startup/healthy candidate/usable UI/owned cleanup. This attempt did not reach UI; installed/packed onboarding remains separately untested.
+- [x] F05-owned processes/listeners are gone; generated private home/config/secrets are excluded from publication.
 
 ### F06: Long custom Windows auth home — investigation, default paths unproven
 
