@@ -1,7 +1,12 @@
 import express from "express";
 import request from "supertest";
+import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { drizzleOperatorStubs, makeTableProxy } from "./helpers/drizzle-mock.js";
+import { createLocalDiskStorageProvider } from "../storage/local-disk-provider.js";
 
 const { mockService, mockBackfillService, mockLogActivity } = vi.hoisted(() => ({
   mockService: {
@@ -109,6 +114,66 @@ describe("taskOutputRoutes", () => {
     expect(mockLogActivity).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       companyId, actorType: "user", actorId: "board-user", action: "task_output.content_read",
     }));
+  });
+
+  it("downloads exact UTF-8 and binary bytes from local disk through the verified HTTP route", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aoa-task-output-download-"));
+    const bytes = Buffer.from([0x66, 0x69, 0x6c, 0x65, 0x3a, 0x20, 0xe2, 0x9c, 0x93, 0x00, 0xff, 0x80]);
+    const expectedSha256 = createHash("sha256").update(bytes).digest("hex");
+    const objectKey = "attempts/result.bin";
+    const provider = createLocalDiskStorageProvider(root);
+    try {
+      await provider.putObject({ objectKey, body: bytes, contentType: "application/octet-stream", contentLength: bytes.length });
+      const openContent = vi.fn(async () => {
+        const object = await provider.getObject({ objectKey });
+        return { stream: object.stream, sizeBytes: bytes.length, sha256: expectedSha256,
+          contentType: "application/octet-stream", filename: "result.bin", artifactId: "artifact-row", jobId: "job-row", attempt: 1 };
+      });
+      const res = await request(makeApp(makeDb([[{ companyId }]]), undefined, { openContent }))
+        .get(`/api/task-outputs/${outputId}/content`)
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks: Buffer[] = [];
+          response.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+          response.on("end", () => callback(null, Buffer.concat(chunks)));
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(bytes);
+      expect(res.headers["content-length"]).toBe(String(bytes.length));
+      expect(createHash("sha256").update(res.body).digest("hex")).toBe(expectedSha256);
+      expect(openContent).toHaveBeenCalledWith(outputId, companyId);
+    } finally {
+      const resolvedRoot = resolve(root);
+      const resolvedTemp = resolve(tmpdir());
+      if (!resolvedRoot.startsWith(`${resolvedTemp}${sep}`)) throw new Error("Refusing to remove a path outside the temporary directory");
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a corrupt local-disk artifact instead of completing the HTTP download", async () => {
+    const root = await mkdtemp(join(tmpdir(), "aoa-task-output-download-"));
+    const expectedBytes = Buffer.from("trusted artifact bytes");
+    const corruptBytes = Buffer.from("corrupt artifact bytes");
+    const objectKey = "attempts/result.txt";
+    const provider = createLocalDiskStorageProvider(root);
+    try {
+      await provider.putObject({ objectKey, body: corruptBytes, contentType: "text/plain", contentLength: corruptBytes.length });
+      const openContent = vi.fn(async () => {
+        const object = await provider.getObject({ objectKey });
+        return { stream: object.stream, sizeBytes: expectedBytes.length, sha256: createHash("sha256").update(expectedBytes).digest("hex"),
+          contentType: "text/plain", filename: "result.txt", artifactId: "artifact-row", jobId: "job-row", attempt: 1 };
+      });
+
+      await expect(request(makeApp(makeDb([[{ companyId }]]), undefined, { openContent }))
+        .get(`/api/task-outputs/${outputId}/content`)).rejects.toThrow(/aborted|socket hang up/);
+      expect(openContent).toHaveBeenCalledWith(outputId, companyId);
+    } finally {
+      const resolvedRoot = resolve(root);
+      const resolvedTemp = resolve(tmpdir());
+      if (!resolvedRoot.startsWith(`${resolvedTemp}${sep}`)) throw new Error("Refusing to remove a path outside the temporary directory");
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it.each(["none", "agent", "mcp", "commander"])("denies %s content access before artifact lookup", async (type) => {

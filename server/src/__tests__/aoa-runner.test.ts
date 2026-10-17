@@ -104,6 +104,7 @@ vi.mock("../services/instance-settings.js", () => ({
 
 import { discussionEntries, internalAgentRuns } from "@armyofagents/db";
 import { runAoaAgent } from "../services/internal-agent/aoa-agents/runner.js";
+import { nativeCrewAdapterTypes, successfulCrewToolEvents } from "./helpers/native-crew-tool-fixtures.js";
 function ch(ret:unknown[]){const c:any={};c.values=()=>c;c.set=()=>c;c.where=()=>c;c.from=()=>c;c.returning=()=>Promise.resolve(ret);c.then=(r:(v:unknown[])=>unknown)=>Promise.resolve(ret).then(r);return c;}
 it("happy: bridge attached via adapterConfig.args, run completed, cost emitted, agentId stamped", async () => {
   const insertedRuns:any[]=[];
@@ -473,17 +474,10 @@ it.each([
   }));
 });
 
-it.each([false, true])("persists actual successful Codex callback tool names when later execution throws=%s", async (throwsAfterTool) => {
+it.each(nativeCrewAdapterTypes.flatMap((adapterType) => [false, true].map((throwsAfterTool) => ({ adapterType, throwsAfterTool }))))("persists successful $adapterType callback tool names when later execution throws=$throwsAfterTool", async ({ adapterType, throwsAfterTool }) => {
   runLogStoreMock.append.mockClear();
   const toolName = "hub.updateCurationSummary";
-  const event = JSON.stringify({
-    type: "item.completed",
-    item: {
-      id: "actual-callback", type: "mcp_tool_call", server: "aoa", tool: toolName, status: "completed", error: null,
-      arguments: { private: "fixture-only" },
-      result: { content: [{ type: "text", text: '{"success":true,"data":"fixture-only"}' }] },
-    },
-  });
+  const event = successfulCrewToolEvents(adapterType, toolName).map((value) => JSON.stringify(value)).join("\n");
   const chunks = [event.slice(0, 81), `${event.slice(81)}\n`];
   execMock.mockImplementationOnce(async (context: any) => {
     for (const chunk of chunks) await context.onLog("stdout", chunk);
@@ -491,7 +485,7 @@ it.each([false, true])("persists actual successful Codex callback tool names whe
     if (throwsAfterTool) throw new Error("failure after observed tool completion");
     return { exitCode: 0 };
   });
-  const { db, patches } = createAttributedRunDb("codex_local", [toolName]);
+  const { db, patches } = createAttributedRunDb(adapterType, [toolName]);
 
   const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
 
@@ -502,14 +496,14 @@ it.each([false, true])("persists actual successful Codex callback tool names whe
   expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stderr", chunk: `${event}\n` }));
 });
 
-it.each([false, true])("retains observed tools when cancellation wins before execute settles, throws=%s", async (throwsAfterCancel) => {
+it.each(nativeCrewAdapterTypes.flatMap((adapterType) => [false, true].map((throwsAfterCancel) => ({ adapterType, throwsAfterCancel }))))("retains $adapterType tools when cancellation wins before execute settles, throws=$throwsAfterCancel", async ({ adapterType, throwsAfterCancel }) => {
   const toolName = "hub.updateCurationSummary";
   const cancelledAt = new Date("2026-10-17T18:30:00Z");
   const state: Record<string, unknown> = {
     id: "cancelled-run", companyId: "co-1", agentId: "billing-agent", status: "running", toolsCalled: [],
   };
   const auditPatches: Record<string, unknown>[] = [];
-  const agent = { id: "billing-agent", companyId: "co-1", name: "Steward", adapterType: "codex_local", adapterConfig: {}, runtimeConfig: { aoa: { toolAllowlist: [toolName] } } };
+  const agent = { id: "billing-agent", companyId: "co-1", name: "Steward", adapterType, adapterConfig: {}, runtimeConfig: { aoa: { toolAllowlist: [toolName] } } };
   const matches = (condition: any): boolean => {
     if (condition?.and) return condition.and.every(matches);
     const [column, value] = condition.eq as [symbol, unknown];
@@ -541,10 +535,7 @@ it.each([false, true])("retains observed tools when cancellation wins before exe
     },
   };
   execMock.mockImplementationOnce(async (context: any) => {
-    await context.onLog("stdout", `${JSON.stringify({ type: "item.completed", item: {
-      type: "mcp_tool_call", server: "aoa", tool: toolName, status: "completed", error: null,
-      result: { content: [{ type: "text", text: '{"success":true}' }] },
-    } })}\n`);
+    await context.onLog("stdout", successfulCrewToolEvents(adapterType, toolName).map((value) => JSON.stringify(value)).join("\n"));
     Object.assign(state, { status: "cancelled", completedAt: cancelledAt, errorMessage: "Cancelled due to agent pause" });
     if (throwsAfterCancel) throw new Error("execution ended after cancellation");
     return { exitCode: 0 };

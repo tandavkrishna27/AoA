@@ -16,6 +16,7 @@
 // -----------------------------------------------------------------------------
 
 import type { AddressInfo } from "node:net";
+import { request as httpRequest } from "node:http";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -171,6 +172,8 @@ let stallUploads = false;
 /** Or: stall only the next N uploads, so a LATER upload can still prove a point. */
 let stallUploadCalls = 0;
 let onStalledUpload: (() => void) | undefined;
+let uploadSignal: AbortSignal | undefined;
+let exportRequestSignal: AbortSignal | undefined;
 let exportCtxDeadlines: number[];
 let digestCtxDeadlines: number[];
 let server: ReturnType<typeof createProviderServer>;
@@ -206,6 +209,7 @@ async function startServer(
   exportCtxDeadlines = [];
   digestCtxDeadlines = [];
   const performUploadGrant = async (g: ArtifactUploadGrantV1, bytes: Uint8Array, signal?: AbortSignal): Promise<void> => {
+    uploadSignal = signal;
     if (stallUploads || stallUploadCalls > 0) {
       if (stallUploadCalls > 0) stallUploadCalls -= 1;
       onStalledUpload?.();
@@ -237,6 +241,7 @@ async function startServer(
       }
       if (prop === "exportArtifact") {
         return (sandboxId: string, path: string, g: ArtifactUploadGrantV1, c: ProviderOpContext) => {
+          exportRequestSignal = c.signal;
           exportCtxDeadlines.push(c.deadlineMs);
           return target.exportArtifact(sandboxId, path, g, c);
         };
@@ -266,6 +271,8 @@ async function stopServer(): Promise<void> {
 }
 
 beforeEach(() => {
+  uploadSignal = undefined;
+  exportRequestSignal = undefined;
   unhandledRejections = [];
   process.on("unhandledRejection", onUnhandledRejection);
   clockNow = NOW;
@@ -312,6 +319,29 @@ async function rawOp(op: string, body: unknown): Promise<string> {
 }
 
 describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)", () => {
+  it("aborts the provider upload signal when the HTTP caller disconnects", async () => {
+    const sandboxId = await sandboxWithOutput(ORG_A);
+    const uploadStarted = deferred();
+    onStalledUpload = uploadStarted.resolve;
+    stallUploads = true;
+    const request = httpRequest(`${baseUrl}/op/export_artifact`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    }, (response) => response.resume());
+    request.on("error", () => undefined);
+    const requestClosed = new Promise<void>((resolve) => request.once("close", () => resolve()));
+    request.end(JSON.stringify({ args: { sandboxId, path: OUT_PATH, grant: grant(ORG_A) }, ctx: ctx("disconnect-export"), capability: mint(ORG_A) }));
+    await uploadStarted.promise;
+    expect(exportRequestSignal).toBeInstanceOf(AbortSignal);
+    const disconnected = new Promise<void>((resolve) => exportRequestSignal!.addEventListener("abort", () => resolve(), { once: true }));
+    request.destroy();
+    await disconnected;
+    await requestClosed;
+    expect(uploadSignal?.aborted).toBe(true);
+    expect(uploads).toEqual([]);
+    await driverFor(ORG_A).destroy(sandboxId, ctx("destroy-after-disconnect"));
+  });
+
   it("SAME-TENANT POSITIVE CONTROL: Organization A digests + exports its OWN sandbox's output", async () => {
     const sandboxId = await sandboxWithOutput(ORG_A);
     const driver = driverFor(ORG_A);
