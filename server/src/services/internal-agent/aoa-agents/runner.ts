@@ -191,6 +191,8 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
   // inside the try and out of scope in the catch — same pattern as
   // outcomeAgentName/outcomeAgentRuntimeConfig above (the P1 fix).
   let outcomeProviderId: string | null = null;
+  let reportedProvider: string | null = null;
+  let reportedModel: string | null = null;
   // FIX 1 (Wave 2 adversarial review, HIGH — cloud VM/lease leak): the U4
   // sandbox-lease acquire result, captured at FUNCTION scope so the `finally`
   // below can see it and release the lease on every exit. The `acquired` const
@@ -1283,6 +1285,9 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
       });
     }
 
+    reportedProvider = adapterResult.provider ?? null;
+    reportedModel = adapterResult.model ?? null;
+
     // Silent-failure guard: a CLI agent can finish its run WITHOUT calling
     // submit_extracted_items (codex/opencode have no MCP-bridge wiring yet — see
     // buildMcpConfig/--mcp-config above, claude-only; the claude CLI submit
@@ -1523,6 +1528,8 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
       const terminalRows = await db.update(internalAgentRuns)
         .set({
           status: runResult.status === "failed" ? "failed" : "completed",
+          provider: reportedProvider,
+          model: reportedModel,
           errorMessage: runResult.errorMessage ?? null,
           tokenUsage: adapterUsage ? {
             inputTokens: adapterUsage.inputTokens,
@@ -1674,23 +1681,29 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     // Plan 3 Task 6 + T1.1: real cost accounting from adapter result.
     // Previously hardcoded to 0 tokens / $0 even when the adapter reported
     // real usage. Now uses the values returned in AdapterExecutionResult.
-    // Providers without per-run billing (CLI subscriptions) still report
-    // zero — that's correct and intentional.
+    // Included subscription usage has no per-run budget charge, even when
+    // the CLI reports a list-price cost estimate.
     await costService(db).createEvent(payload.companyId, {
       agentId,
       provider: adapterResult.provider ?? "anthropic",
       model: adapterResult.model ?? process.env.EXTRACTION_MODEL ?? "claude-sonnet-4-20250514",
+      billingType: adapterResult.billingType ?? undefined,
       inputTokens: adapterUsage?.inputTokens ?? 0,
+      cachedInputTokens: adapterUsage?.cachedInputTokens ?? 0,
       outputTokens: adapterUsage?.outputTokens ?? 0,
-      // Prefer the adapter's authoritative cost. Fall back to model-based
+      // For billable usage prefer reported cost. Fall back to model-based
       // computation only when the adapter doesn't report cost (e.g. legacy
       // adapter returning UsageSummary without costUsd).
-      costCents: costCents ?? computeCostCents(
-        adapterResult.provider ?? "anthropic",
-        adapterResult.model ?? process.env.EXTRACTION_MODEL ?? "claude-sonnet-4-20250514",
-        adapterUsage?.inputTokens ?? 0,
-        adapterUsage?.outputTokens ?? 0,
-      ),
+      costCents:
+        adapterResult.billingType === "subscription" || adapterResult.billingType === "subscription_included"
+          ? 0
+          : costCents ?? computeCostCents(
+              adapterResult.provider ?? "anthropic",
+              adapterResult.model ?? process.env.EXTRACTION_MODEL ?? "claude-sonnet-4-20250514",
+              adapterUsage?.inputTokens ?? 0,
+              adapterUsage?.outputTokens ?? 0,
+            ),
+      sourceIdempotencyKey: runId ? `crew_run:${runId}` : null,
       occurredAt: new Date(),
     });
 
@@ -1719,6 +1732,8 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
         await db.update(internalAgentRuns)
           .set({
             status: "failed",
+            provider: reportedProvider,
+            model: reportedModel,
             // False-green fix (U12): this used to re-materialize the message
             // from the RAW `err` (String((err as Error)?.message ?? err)),
             // bypassing the mapper above — the DB failure row carried the raw

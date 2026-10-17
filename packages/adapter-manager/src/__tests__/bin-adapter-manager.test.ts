@@ -22,6 +22,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SandboxProvider } from "@armyofagents/worker-daemon";
 import {
   bootAdapterManager,
+  ARTIFACT_UPLOAD_ORIGINS_ENV,
   CONTROL_PLANE_PUBLIC_KEY_FILE_ENV,
   IDEMPOTENCY_LEDGER_DIR_ENV,
   PROVIDER_ENV,
@@ -103,6 +104,38 @@ function makeDeps(over: Partial<AdapterManagerDeps> & { keyBytes?: Buffer | (() 
 }
 
 describe("bootAdapterManager — the happy path", () => {
+  it("forwards canonical configured artifact upload origins", async () => {
+    const { deps, createProviderServer } = makeDeps({
+      env: {
+        [PROVIDER_ENV]: "e2b",
+        [TEMPLATE_ENV]: "base",
+        [CONTROL_PLANE_PUBLIC_KEY_FILE_ENV]: KEY_PATH,
+        [ARTIFACT_UPLOAD_ORIGINS_ENV]: " https://STORE.example:443/ , https://uploads.example:9443 ",
+      },
+    });
+
+    expect((await bootAdapterManager(deps)).kind).toBe("listening");
+    expect(createProviderServer.mock.calls[0][0].artifactUploadOrigins).toEqual([
+      "https://store.example",
+      "https://uploads.example:9443",
+    ]);
+  });
+
+  it.each([undefined, "", "   "])("keeps artifact exports restrictive when the origin config is %s", async (configured) => {
+    const { deps, createProviderServer } = makeDeps({
+      env: {
+        [PROVIDER_ENV]: "e2b",
+        [TEMPLATE_ENV]: "base",
+        [CONTROL_PLANE_PUBLIC_KEY_FILE_ENV]: KEY_PATH,
+        [CONTROL_PLANE_URL_ENV]: "https://control.example/api",
+        [ARTIFACT_UPLOAD_ORIGINS_ENV]: configured,
+      },
+    });
+
+    expect((await bootAdapterManager(deps)).kind).toBe("listening");
+    expect(createProviderServer.mock.calls[0][0].artifactUploadOrigins).toEqual([]);
+  });
+
   it("pins credential redemption to the native configured control-plane origin", async () => {
     const { deps, record } = makeDeps();
     expect((await bootAdapterManager({ ...deps, env: { ...deps.env, [CONTROL_PLANE_URL_ENV]: "https://control.example/api" } })).kind).toBe("listening");
@@ -146,6 +179,38 @@ describe("bootAdapterManager — the happy path", () => {
     // Gated server listens on the configured PORT.
     expect(listen).toHaveBeenCalledTimes(1);
     expect(listen).toHaveBeenCalledWith("8090");
+  });
+});
+
+describe("bootAdapterManager — artifact upload origin configuration", () => {
+  it.each([
+    "http://store.example",
+    "https://store.example/path",
+    "https://store.example?token=unsafe-value",
+    "https://store.example#fragment",
+    "https://user:unsafe-value@store.example",
+    "https://@store.example",
+    "https://*.store.example",
+    "https://store.example,,https://other.example",
+    "https:store.example",
+    "https://store.example/path/..",
+    "https://store.example/%2e",
+    "https:///store.example",
+    "not a url",
+  ])("refuses malformed artifact upload origins without echoing %s", async (configured) => {
+    const { deps, createProviderServer } = makeDeps({
+      env: {
+        [PROVIDER_ENV]: "e2b",
+        [TEMPLATE_ENV]: "base",
+        [CONTROL_PLANE_PUBLIC_KEY_FILE_ENV]: KEY_PATH,
+        [ARTIFACT_UPLOAD_ORIGINS_ENV]: configured,
+      },
+    });
+
+    const result = await bootAdapterManager(deps);
+    expect(result.kind).toBe("refused");
+    expect(result.kind === "refused" && result.reason).not.toContain("unsafe-value");
+    expect(createProviderServer).not.toHaveBeenCalled();
   });
 });
 

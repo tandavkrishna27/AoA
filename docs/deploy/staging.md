@@ -102,6 +102,20 @@ The provider-control credential `E2B_API_KEY` is:
   reusing DEP-008's egress-bypass posture and DEP-005 redaction — from protocol, metadata,
   logs, and support bundles.
 
+## Artifact upload origins
+
+The adapter-manager accepts artifact upload grants only for the HTTPS origins explicitly
+listed in `AOA_STAGING_ARTIFACT_UPLOAD_ORIGINS`. Set it to a comma-separated list of origins
+used by the object store's presigned upload URLs, such as
+`https://objects.example.com,https://s3.example.net:9443`. Each entry is an origin only: omit
+paths, userinfo, query strings, fragments, and wildcards.
+
+The staging compose passes this optional value to
+`AOA_ADAPTER_MANAGER_ARTIFACT_UPLOAD_ORIGINS`; when it is unset or empty, ordinary host
+operations remain available and networked artifact exports stay refused. The value is an
+explicit operator allowlist and is not inferred from a control-plane URL, storage endpoint,
+or upload request.
+
 Real-provider **rotation overlap/cutoff, old-key denial, revocation, and post-rotation
 cleanup reconciliation** are **not** rehearsed here. They are contracted against DEP-008's
 `runSandboxIsolationConformance` hostile reference and **deferred to CLI-001/D2** (which

@@ -379,6 +379,7 @@ services:
       AOA_ADAPTER_MANAGER_SANDBOX_PROVIDER: "e2b"
       AOA_ADAPTER_MANAGER_E2B_TEMPLATE: "${AOA_STAGING_E2B_TEMPLATE}"
       AOA_ADAPTER_MANAGER_CONTROL_PLANE_PUBLIC_KEY_FILE: "/run/secrets/adapter-manager-cp-pubkey"
+      AOA_ADAPTER_MANAGER_ARTIFACT_UPLOAD_ORIGINS: "${AOA_STAGING_ARTIFACT_UPLOAD_ORIGINS:-}"
       # The AM↔CP shared-secret bearer (P3). Sent on the lease-truth POST; the CP truth
       # route checks it (fail-closed). Injected (rotatable), never baked. Real mTLS is a
       # filed production follow-up — staging uses DISPOSABLE provider keys until then.

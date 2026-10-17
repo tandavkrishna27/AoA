@@ -99,7 +99,7 @@ vi.mock("../services/instance-settings.js", () => ({
   })),
 }));
 
-import { discussionEntries } from "@armyofagents/db";
+import { discussionEntries, internalAgentRuns } from "@armyofagents/db";
 import { runAoaAgent } from "../services/internal-agent/aoa-agents/runner.js";
 function ch(ret:unknown[]){const c:any={};c.values=()=>c;c.set=()=>c;c.where=()=>c;c.from=()=>c;c.returning=()=>Promise.resolve(ret);c.then=(r:(v:unknown[])=>unknown)=>Promise.resolve(ret).then(r);return c;}
 it("happy: bridge attached via adapterConfig.args, run completed, cost emitted, agentId stamped", async () => {
@@ -402,4 +402,70 @@ it("NON-connector-capable crew (process): the connector DB read is skipped entir
   // for a connector lookup (wasted I/O + a needless per-run failure surface).
   expect(resolveConnectorsMock).not.toHaveBeenCalled();
   expect(execMock.mock.calls[0][0].mcpServers).toBeUndefined();
+});
+
+function createAttributedRunDb() {
+  const patches: Record<string, unknown>[] = [];
+  const db: any = {
+    select: () => ch([{ id: "billing-agent", companyId: "co-1", name: "Steward", adapterType: "process", adapterConfig: {}, runtimeConfig: {} }]),
+    insert: () => ch([{ id: "billing-run" }]),
+    update: (table: unknown) => {
+      const chain = ch([{ id: "billing-run", status: "completed" }]);
+      chain.set = (patch: Record<string, unknown>) => {
+        if (table === internalAgentRuns) patches.push(patch);
+        return chain;
+      };
+      return chain;
+    },
+  };
+  return { db, patches };
+}
+
+it.each([0, 1])("persists adapter-reported crew provider and model for exit %s", async (exitCode) => {
+  execMock.mockResolvedValueOnce({ exitCode, provider: "openai", model: "fixture-model", costUsd: 0 });
+  const { db, patches } = createAttributedRunDb();
+
+  const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(result.status).toBe(exitCode === 0 ? "succeeded" : "failed");
+  expect(patches.find((patch) => patch.status === (exitCode === 0 ? "completed" : "failed"))).toMatchObject({
+    provider: "openai", model: "fixture-model",
+  });
+});
+
+it("keeps crew provider and model unknown when setup fails before execution", async () => {
+  execMock.mockClear();
+  buildBridgeSpecMock.mockImplementationOnce(() => { throw new Error("fixture bridge setup failed"); });
+  const { db, patches } = createAttributedRunDb();
+
+  const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(result.status).toBe("failed");
+  expect(execMock).not.toHaveBeenCalled();
+  expect(patches.find((patch) => patch.status === "failed")).toMatchObject({ provider: null, model: null });
+});
+
+it.each([
+  { billingType: "subscription", costUsd: null, expectedCents: 0 },
+  { billingType: "subscription_included", costUsd: null, expectedCents: 0 },
+  { billingType: "subscription", costUsd: 1.25, expectedCents: 0 },
+  { billingType: "subscription_included", costUsd: 0.75, expectedCents: 0 },
+  { billingType: "api", costUsd: 1.25, expectedCents: 125 },
+  { billingType: "metered_api", costUsd: 0.75, expectedCents: 75 },
+  { billingType: "api", costUsd: null, expectedCents: 23 },
+])("attributes crew $billingType cost with reported cost $costUsd", async ({ billingType, costUsd, expectedCents }) => {
+  createEventMock.mockClear();
+  execMock.mockResolvedValueOnce({
+    exitCode: 0, provider: "openai", model: "fixture-model", billingType, costUsd,
+    usage: { inputTokens: 73937, outputTokens: 298, cachedInputTokens: 65280 },
+  });
+  const { db } = createAttributedRunDb();
+
+  await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(createEventMock).toHaveBeenCalledExactlyOnceWith("co-1", expect.objectContaining({
+    agentId: "billing-agent", provider: "openai", model: "fixture-model", billingType,
+    inputTokens: 73937, outputTokens: 298, cachedInputTokens: 65280,
+    costCents: expectedCents, sourceIdempotencyKey: "crew_run:billing-run",
+  }));
 });

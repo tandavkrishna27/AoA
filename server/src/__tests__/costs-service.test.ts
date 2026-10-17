@@ -58,6 +58,7 @@ vi.mock("../middleware/logger.js", () => ({
 }));
 
 import { costService, inferBillingType } from "../services/costs.js";
+import { agents, costEvents } from "@armyofagents/db";
 import type { AdapterBillingType } from "@armyofagents/adapter-utils";
 
 // ── Mock DB helpers ──────────────────────────────────────────────────────────
@@ -290,6 +291,102 @@ describe("costService — createEvent biller / billingType defaults", () => {
       expect(captured.inserts[0]?.billingType).toBe("unknown");
       expect(captured.inserts[0]?.biller).toBe(provider);
     }
+  });
+});
+
+describe("costService — idempotent crew attribution", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function createIdempotentDb(existingEvent?: MockRow) {
+    const storedEvents: MockRow[] = existingEvent ? [existingEvent] : [];
+    const mutations = vi.fn();
+    const conflictTargets = vi.fn();
+    const matches = (row: MockRow, condition: any): boolean => {
+      if (condition?.and) return condition.and.every((part: unknown) => matches(row, part));
+      if (condition?.eq) {
+        const [column, value] = condition.eq as [symbol, unknown];
+        return row[column.description!.split(".").at(-1)!] === value;
+      }
+      return true;
+    };
+    const chainFor = (result: (condition?: unknown) => MockRow[]) => {
+      const chain: any = {};
+      let predicate: unknown;
+      for (const method of ["limit", "returning"]) chain[method] = () => chain;
+      chain.where = (condition: unknown) => { predicate = condition; return chain; };
+      chain.then = (resolve: (rows: MockRow[]) => unknown) => Promise.resolve(result(predicate)).then(resolve);
+      return chain;
+    };
+    const select = () => ({
+      from: (table: unknown) => {
+        if (table === agents) return chainFor(() => [baseAgent]);
+        expect(table).toBe(costEvents);
+        return chainFor((condition) => storedEvents.filter((event) => matches(event, condition)));
+      },
+    });
+    const db: any = {
+      select,
+      insert: (table: unknown) => ({
+        values: (values: MockRow) => {
+          expect(table).toBe(costEvents);
+          let ignoresConflict = false;
+          const chain = chainFor(() => {
+            if (storedEvents.some((event) => event.companyId === values.companyId && event.sourceIdempotencyKey === values.sourceIdempotencyKey)) {
+              if (ignoresConflict) return [];
+              throw new Error("fixture unique cost identity conflict");
+            }
+            const event = { ...values, id: "cost-fixture" };
+            storedEvents.push(event);
+            return [event];
+          });
+          chain.onConflictDoNothing = (options: unknown) => {
+            ignoresConflict = true;
+            conflictTargets(options);
+            return chain;
+          };
+          return chain;
+        },
+      }),
+      update: (table: unknown) => ({ set: (patch: unknown) => {
+        mutations(table, patch);
+        return chainFor(() => []);
+      } }),
+      transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(db),
+    };
+    return { db, mutations, conflictTargets };
+  }
+
+  it("reuses the company and agent bound event without repeating spend or budget evaluation", async () => {
+    const { db, mutations, conflictTargets } = createIdempotentDb();
+    const service = costService(db);
+    const input = { ...baseEventData, sourceIdempotencyKey: "crew_run:fixture" };
+
+    const first = await service.createEvent(companyId, input);
+    const repeated = await service.createEvent(companyId, input);
+
+    expect(repeated).toEqual(first);
+    expect(conflictTargets).toHaveBeenCalledWith(expect.objectContaining({ target: [costEvents.companyId, costEvents.sourceIdempotencyKey] }));
+    expect(mutations).toHaveBeenCalledTimes(2);
+    expect(mockEvaluateCostEvent).toHaveBeenCalledExactlyOnceWith(agentId, companyId);
+  });
+
+  it("refuses a cost identity already attributed to another agent in the same company", async () => {
+    const { db, mutations } = createIdempotentDb({ ...baseEventData, companyId, agentId: "different-agent", sourceIdempotencyKey: "crew_run:collision", id: "other-cost" });
+
+    await expect(costService(db).createEvent(companyId, { ...baseEventData, sourceIdempotencyKey: "crew_run:collision" })).rejects.toThrow(/identity|belong|match/i);
+
+    expect(mutations).not.toHaveBeenCalled();
+    expect(mockEvaluateCostEvent).not.toHaveBeenCalled();
+  });
+
+  it("allows the same cost key in another company as an independent event", async () => {
+    const { db, mutations } = createIdempotentDb({ ...baseEventData, companyId: "other-company", sourceIdempotencyKey: "crew_run:fixture", id: "other-cost" });
+
+    const event = await costService(db).createEvent(companyId, { ...baseEventData, sourceIdempotencyKey: "crew_run:fixture" });
+
+    expect(event).toMatchObject({ id: "cost-fixture", companyId, agentId });
+    expect(mutations).toHaveBeenCalledTimes(2);
+    expect(mockEvaluateCostEvent).toHaveBeenCalledExactlyOnceWith(agentId, companyId);
   });
 });
 
