@@ -1,19 +1,27 @@
 # Local + VPS Validation Pickup Checklist
 
-**Latest pickup (17 October):** [new exact-candidate retest](../reports/2026-10-17-f01-f05-live-retest-report.md) and [portable evidence](../evidence/2026-10-17-f01-f05-live-retest-summary.json) for `6ebc400d2`. Useful extraction, native choices/Planning and bounded VPS denial recovery/retry now have fresh passes. **F05 raw built onboarding still fails** in the real PDF/canvas dependency graph. Strict F01 subprocess provenance, separately prerequisite-bound distributed/other-owner live cases, broader native acceptance and UI reconciliation observations remain open.
+**Latest pickup (17 October, F05 repair):** [startup fix and actual onboarding report](../reports/2026-10-17-f05-startup-fix-report.md), [portable evidence](../evidence/2026-10-17-f05-startup-fix-summary.json), tested code `64fbe0471`. **F05 bounded Windows built-workspace startup now passes**, with 13 focused CLI tests, fresh-home doctor/server/UI, persisted onboarding through environment setup and owned cleanup. No whole suite or VPS rebuild. The [preceding local/VPS report](../reports/2026-10-17-f01-f05-live-retest-report.md) retains F01–F04 observations on `6ebc400d2`; its historical F05 failure is preserved. Strict F01 subprocess provenance, separately prerequisite-bound live cases, broader native acceptance and UI reconciliation observations remain open.
 
 - **Branch:** `codex/replatform-baseline-w00-w04`
 - **Original tested baseline:** `05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd`
-- **Latest live retest candidate:** `6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9`; report/evidence linked above.
+- **Latest F05 local code candidate:** `64fbe0471579535c776df769ce471c46f2482f42`; report/evidence linked above. Latest broader local/VPS candidate remains `6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9`.
 - **Prior live retest:** `fe3db70fe`; [immutable 16 October report](../reports/2026-10-16-f01-f05-live-retest-report.md) and [evidence](../evidence/2026-10-16-f01-f05-live-retest-summary.json).
 - **Source of truth for this attempt:** [validation report](../reports/2026-10-16-local-vps-validation-report.md) and [portable evidence summary](../evidence/2026-10-16-local-vps-validation-summary.json).
-**Status:** Mutable coordination checklist; no application fixes were implemented by the validation/documentation work.
+**Status:** Mutable coordination checklist. The latest F05 application fix is committed separately from its documentation publication; earlier validation-only work did not implement application fixes.
 
-**Current pickup:** Code repairs after the prior retest were independently exercised on the new candidate. This checklist distinguishes bounded functional passes from full acceptance. F03 passes again; F01/F02/F04 retain only their named evidence/prerequisite gaps and observations; F05 needs another startup fix. F06–F09 remain qualified investigations. Original reports and failures are not rewritten.
+**Current pickup:** F05 startup is repaired and verified within the local built-workspace boundary. F03 retains its bounded pass; F01/F02/F04 retain named evidence/prerequisite gaps and observations. F06–F09 remain qualified investigations. Full engine/crew/packed-install acceptance is not inferred from usable onboarding. Original reports and failures are not rewritten.
 
 Checked items mean the stated implementation observation or verification happened, **not** that an entire W package or release gate passed. F01–F09 are handoff labels, not newly filed repository tickets or assigned owners. Priorities are triage suggestions. Recheck current HEAD and superseding fixes before starting; keep each fix focused and attach its regression test and new-candidate evidence. This checklist is not fresh authority for infrastructure changes, credential transfer, paid calls or rollout flags.
 
-## Latest retest completed / verified — 17 October
+## Latest F05 repair completed / verified — 17 October
+
+- [x] Real PDF/native canvas regression fails before the change with the original `DOMMatrix`/namespaced built-in error, then passes after replacing scoped import with workspace-only unscoped registration and ordinary built-server import.
+- [x] Exact code candidate `64fbe0471`: only two CLI files / 13 tests pass, no skips; CLI typecheck/build pass. Source/installed resolution, missing-build/dependency guidance and no-fallback boundaries remain covered. No whole-suite run.
+- [x] Actual plain Node onboarding in a fresh owned home: nine doctor checks, fresh embedded PostgreSQL/migrations, healthy exact-candidate server/static UI, dummy profile/organization/company and owned environment verification. Reload retains Step 5 of 8.
+- [x] Owned PostgreSQL and process-tree termination exit 0; no observed owned processes/listeners remain. Retained native review app stays healthy. Private home/config/secrets excluded; VPS untouched.
+- [ ] Separately verify packed/installed onboarding, a pristine reinstall/root-build repeat or all eight engine-authenticated wizard/crew steps if that broader acceptance is requested. This bounded repair reused unchanged frozen server/UI artifacts and rebuilt the CLI only.
+
+## Prior broader retest completed / verified — 17 October
 
 - [x] Matched origin and both rebuilt review-app revisions at `6ebc400d2`, preserving DB/history and QAN-1/QAN-2; no full reset, rollout change or auth transfer.
 - [x] Targeted **13 changed files only**: Windows 203 pass / 47 skip, exit 0. VPS initial 249 pass / 1 timeout, exit 1, retained; isolated CLI and same-selection serial reruns pass, latter 250/250. Timeouts/assertions unchanged; initial cause unproven.
@@ -95,16 +103,17 @@ The [live retest report](../reports/2026-10-16-f01-f05-live-retest-report.md) su
 - [ ] Complete pending-card cross-company live switching/malformed-marker cases if full acceptance requires them; deterministic coverage is not mislabeled as live inference.
 - [ ] Record/reproduce repeated assistant narration during live pending-card reconciliation separately from authority: one card and one side effect were observed; reload removes repeated transient text.
 
-### F05: Raw built startup still fails in scoped PDF/canvas loading
+### F05: Bounded Windows raw built startup repaired and verified
 
-**Priority:** P2 implementation + actual onboard acceptance.
+**Status:** Complete for the bounded startup finding on `64fbe0471`; [fresh report](../reports/2026-10-17-f05-startup-fix-report.md) and [evidence](../evidence/2026-10-17-f05-startup-fix-summary.json). Not full installed-distribution or engine/crew acceptance.
 
 - [x] Original zod/source-export errors no longer block the raw command; fresh configuration and all nine doctor checks succeed.
-- [ ] Add a real-dependency-graph executable regression: plain `node cli/dist/index.js onboard --yes` exits 1 before healthy UI with `DOMMatrix is not defined`; preceding canvas warning resolves `node:os?tsx-namespace=<dynamic>` as a filesystem path.
-- [x] Reduced fresh-process diagnostic imports the same PDF ESM dependency successfully via ordinary import (exit 0), but fails through scoped `tsImport` (exit 1). This narrows investigation, not a completed repair.
-- [ ] Repair supported workspace launch without an external loader workaround, preserving source development and installed resolution boundaries.
-- [ ] Repeat raw-command doctor/startup/healthy candidate/usable UI/owned cleanup. This attempt did not reach UI; installed/packed onboarding remains separately untested.
+- [x] Real-dependency-graph executable regression reproduces the original DOMMatrix/namespaced `node:os` failure before the repair; passes after it. The prior actual-startup failure remains in the immutable earlier report.
+- [x] Fresh-process ordinary PDF import exits 0, scoped `tsImport` exits 1, unscoped registration plus ordinary import exits 0.
+- [x] Repair workspace launch without an external loader workaround; focused regressions preserve source development and installed resolution boundaries.
+- [x] Repeat actual raw-command doctor/startup/exact-candidate health/usable onboarding UI/owned cleanup. Dummy setup through environment verification persists after reload at Step 5 of 8. No engine inference was requested.
 - [x] F05-owned processes/listeners are gone; generated private home/config/secrets are excluded from publication.
+- [ ] Real packed/installed onboarding, pristine reinstall/full-root-build repeat and complete engine/crew journey remain separate unexecuted acceptance. Transient post-company wizard-step reset and non-blocking startup warnings are retained observations, not declared fixed.
 
 ### F06: Long custom Windows auth home — investigation, default paths unproven
 
