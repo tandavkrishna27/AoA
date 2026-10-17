@@ -141,6 +141,8 @@ type ChildProcessWithEvents = ChildProcess & {
 };
 
 export const runningProcesses = new Map<string, RunningProcess>();
+let trackedProcessAdmissionClosed = false;
+let trackedProcessDrain: Promise<void> | null = null;
 const pendingProcessTerminations = new Map<string, number>();
 const PROCESS_TERMINATION_TOMBSTONE_MS = 60 * 60 * 1000;
 export const MAX_CAPTURE_BYTES = 4 * 1024 * 1024;
@@ -189,6 +191,36 @@ export async function waitForTrackedProcessExit(runId: string): Promise<boolean>
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   return !runningProcesses.has(runId);
+}
+
+export function closeTrackedProcessAdmission(): void {
+  trackedProcessAdmissionClosed = true;
+}
+
+export function drainTrackedProcesses(): Promise<void> {
+  closeTrackedProcessAdmission();
+  if (trackedProcessDrain) return trackedProcessDrain;
+  const tracked = [...runningProcesses.entries()];
+  trackedProcessDrain = (async () => {
+    const outcomes = await Promise.all(tracked.map(([runId, running]) => new Promise<{ runId: string; closed: boolean }>((resolve) => {
+      const finish = (closed: boolean) => {
+        clearTimeout(timer);
+        running.child.off("close", onClose);
+        resolve({ runId, closed });
+      };
+      const onClose = () => finish(true);
+      const timer = setTimeout(() => finish(false), Math.max(1, running.graceSec) * 1000 + 2_000);
+      running.child.once("close", onClose);
+      try {
+        requestTrackedProcessTermination(runId);
+      } catch {
+        finish(false);
+      }
+    })));
+    const unclosed = outcomes.filter((outcome) => !outcome.closed);
+    if (unclosed.length > 0) throw new Error(`Tracked local processes did not close: ${unclosed.map((outcome) => outcome.runId).join(", ")}`);
+  })();
+  return trackedProcessDrain;
 }
 
 export function parseObject(value: unknown): Record<string, unknown> {
@@ -513,6 +545,7 @@ export function spawnTrackedChild(
   args: string[],
   opts: SpawnTrackedChildOptions,
 ): TrackedChildHandle {
+  if (trackedProcessAdmissionClosed) throw new Error("Tracked process admission is closed: server is shutting down");
   const mergedEnv = ensurePathInEnv(
     mergeChildEnv(process.env, opts.env, opts.unsetEnvKeys, opts.unsetEnvPrefixes),
   );

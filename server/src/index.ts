@@ -101,6 +101,7 @@ import { getBoardClaimWarningUrl, initializeBoardClaimChallenge } from "./board-
 import { tryRecoverOrphanPostgres } from "./postgres/embedded-orphan-recovery.js";
 import { assertTestSupportFlagSafe } from "./services/test-support-safety.js";
 import { createProcessShutdownHandler } from "./services/server-shutdown.js";
+import { closeTrackedProcessAdmission, drainTrackedProcesses } from "@armyofagents/adapter-utils/server-utils";
 // NOTE: JobReadyScheduler / JobControlMetrics are referenced ONLY as types below
 // (see the `import(...)`-type annotations at their `let` sites). They are kept out
 // of the static import list on purpose: a top-level `import`/`import type` here is
@@ -2584,6 +2585,12 @@ server.listen(listenPort, config.host, () => {
 
 const shutdown = createProcessShutdownHandler({
   getPluginSubsystem: () => (app as any).__pluginSubsystem,
+  stopAcceptingWork: () => {
+    server.close();
+    threadEventListener.shutdown();
+    clearInterval(reconcileTimer);
+  },
+  localProcesses: { closeAdmission: closeTrackedProcessAdmission, drain: drainTrackedProcesses },
   jobControlRuntime: jobControlRuntime
     ? { stop: () => jobControlRuntime.stop() }
     : null,
