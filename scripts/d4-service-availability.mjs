@@ -8,15 +8,21 @@ import { freezeAvailabilitySchedule, evaluateAvailability, scheduleHash } from '
 
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
 const exclusiveJson = (path, data) => writeFile(path, JSON.stringify(data, null, 2) + '\n', { flag: 'wx' });
-export async function runProbe(probePath, expected, timeoutMs = 60_000) {
-  const submittedAt = new Date().toISOString();
+export async function runProbe(probePath, expected, timeoutMs = 60_000, { now = Date.now } = {}) {
+  const driverStartedAt = new Date(now()).toISOString();
   return new Promise(resolveProbe => {
     const child = spawn(process.execPath, [resolve(probePath)], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     let output = '', overflow = false, completed = false;
     const timer = setTimeout(() => { child.kill(); finish({ success: false, telemetryComplete: false, reason: 'probe_timeout' }); }, timeoutMs);
     function finish(result) {
       if (completed) return; completed = true; clearTimeout(timer);
-      resolveProbe({ ...result, ...expected, submittedAt, observedAt: new Date().toISOString() });
+      const observedAt = new Date(now()).toISOString();
+      const submitted = typeof result.submittedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(result.submittedAt) ? Date.parse(result.submittedAt) : NaN;
+      const validSubmission = Number.isFinite(submitted) && submitted >= Date.parse(driverStartedAt) && submitted <= Date.parse(observedAt);
+      if ((result.success === true || result.telemetryComplete === true) && !validSubmission) {
+        result = { ...result, success: false, telemetryComplete: false, reason: 'probe_invalid_actual_submission' };
+      }
+      resolveProbe({ ...result, ...expected, driverStartedAt, observedAt });
     }
     child.stdout.on('data', chunk => { if (output.length + chunk.length > 1024 * 1024) { overflow = true; child.kill(); } else output += chunk; });
     // Drain stderr without persisting credentials or unbounded adapter diagnostics.
@@ -28,7 +34,7 @@ export async function runProbe(probePath, expected, timeoutMs = 60_000) {
       catch { finish({ success: false, telemetryComplete: false, reason: 'probe_invalid_json' }); }
     });
     child.stdin.on('error', () => {});
-    child.stdin.end(JSON.stringify({ ...expected, submittedAt }) + '\n');
+    child.stdin.end(JSON.stringify({ ...expected, driverStartedAt }) + '\n');
   });
 }
 export async function main(argv = process.argv.slice(2)) {

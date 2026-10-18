@@ -19,6 +19,10 @@ const require = createRequire(new URL('../../server/package.json', import.meta.u
 const { WebSocket } = require('ws');
 const { default: EmbeddedPostgres } = await import(pathToFileURL(require.resolve('embedded-postgres')).href);
 const full = process.env.AOA_W13_REALTIME_FULL === '1';
+const FULL_OUTAGE_MS = 900_000;
+const MAX_CATCHUP_MS = 300_000;
+const FULL_SETUP_AND_WORKLOAD_ALLOWANCE_MS = 600_000;
+const TEST_BUDGET_MS = full ? FULL_OUTAGE_MS + MAX_CATCHUP_MS + FULL_SETUP_AND_WORKLOAD_ALLOWANCE_MS : 240_000;
 const pause = ms => new Promise(r => setTimeout(r, ms));
 async function until(predicate, label, timeout = 20_000) {
   const deadline = Date.now() + timeout;
@@ -70,7 +74,7 @@ async function denied(port, company, token) {
 const durableFrames = client => client.frames.filter(f => Number.isFinite(f.seq));
 const record = (companyId, index, payload = {}) => ({ companyId, eventId: randomUUID(), type: 'issue.status_changed', payload: { index, ...payload } });
 
-test('W13 actual authenticated cross-process socket composition (bounded smoke unless FULL=1)', { skip: process.env.AOA_W13_REALTIME !== '1', timeout: full ? 1_300_000 : 240_000 }, async () => {
+test('W13 actual authenticated cross-process socket composition (bounded smoke unless FULL=1)', { skip: process.env.AOA_W13_REALTIME !== '1', timeout: TEST_BUDGET_MS }, async () => {
   let pg, db; const replicas = [], clients = []; const root = await mkdtemp(join(tmpdir(), 'aoa-w13-realtime-'));
   const started = Date.now();
   try {
@@ -126,13 +130,13 @@ test('W13 actual authenticated cross-process socket composition (bounded smoke u
     await a.command('brokerStop'); await b.command('brokerStop');
     const outageStart = Date.now(); const outageWrites = [];
     for (const t of tenants) outageWrites.push(...await a.command('append', { records: Array.from({ length: 10 }, (_, i) => record(t.company, 'outage-' + i)), notify: false }));
-    const outageMs = full ? 900_000 : 250;
+    const outageMs = full ? FULL_OUTAGE_MS : 250;
     while (Date.now() - outageStart < outageMs) await pause(Math.min(1000, outageMs - (Date.now() - outageStart)));
     const measuredOutageMs = Date.now() - outageStart;
     const recoveryStart = Date.now(); await a.command('brokerStart'); await b.command('brokerStart');
-    for (const t of tenants) await until(() => outageWrites.filter(w => w.companyId === t.company).every(w => durableFrames(t.client).some(f => f.eventId === w.eventId)), 'broker recovery catchup', 300_000);
+    for (const t of tenants) await until(() => outageWrites.filter(w => w.companyId === t.company).every(w => durableFrames(t.client).some(f => f.eventId === w.eventId)), 'broker recovery catchup', MAX_CATCHUP_MS);
     const recoveryMs = Date.now() - recoveryStart;
-    assert.ok(recoveryMs <= 300_000);
+    assert.ok(recoveryMs <= MAX_CATCHUP_MS);
     // A real same-company private thread and a real foreign thread both refuse
     // subscription and live/replay payload visibility for the tenant-A agent.
     const privateThread = randomUUID(), foreignThread = randomUUID(), publicThread = randomUUID();
@@ -144,6 +148,8 @@ test('W13 actual authenticated cross-process socket composition (bounded smoke u
     tenants[0].client.socket.send(JSON.stringify({ subscribe: privateThread }));
     tenants[0].client.socket.send(JSON.stringify({ subscribe: foreignThread }));
     tenants[0].client.socket.send(JSON.stringify({ subscribe: publicThread }));
+    const subscriptionAuthorization = await (tenants[0].client.socket.url.includes(`:${portA}/`) ? a : b).command('subscriptionBarrier', { privateThread, foreignThread, publicThread });
+    assert.equal(subscriptionAuthorization.resolved, true, 'authorization must settle before hidden events are published');
     const hidden = [privateThread, foreignThread].map(threadId => ({ ...record(tenants[0].company, 'hidden', { threadId, canary }), type: 'thread.entry.created' }));
     await a.command('append', { records: hidden });
     const [publicEvent] = await a.command('append', { records: [{ ...record(tenants[0].company, 'authorized-thread', { threadId: publicThread }), type: 'thread.entry.created' }] });
@@ -178,14 +184,14 @@ test('W13 actual authenticated cross-process socket composition (bounded smoke u
     for (const tenant of tenants) assert.ok(!evidenceText.includes(tenant.token));
     assert.ok(!evidenceText.includes('invalid-canary-token'));
     const report = { scope: full ? 'W13 quantitative realtime composition lane' : 'W13 bounded realtime composition smoke', fullD4Acceptance: false,
-      candidate: process.env.AOA_W13_CANDIDATE ?? 'unattested_worktree', startedAt: new Date(started).toISOString(), endedAt: new Date().toISOString(),
+      candidate: process.env.AOA_W13_CANDIDATE ?? 'unattested_worktree', startedAt: new Date(started).toISOString(), endedAt: new Date().toISOString(), testBudgetMs: TEST_BUDGET_MS,
       organizations: 2, replicas: 2, authenticated: true, durableEvents: eventCount, reconnectGaps, duplicateInjections,
       outageAcceptedWrites: outageWrites.length, brokerOutageMs: measuredOutageMs, catchupMs: recoveryMs,
       actualNativeBackpressure: true, snapshotRequired: true, credentialCanaryRedaction: true, privateAndForeignThreadDenials: true, durationMs: Date.now() - started,
       limits: ['isolated owner boot pool; no production RLS certification', 'no provider service_reconcile journey', 'no D4 72-hour continuity or D5 topology'] };
     const reportPath = process.env.AOA_W13_REALTIME_EVIDENCE ?? process.env.AOA_W13_REPORT;
     if (reportPath) {
-      await writeFile(reportPath + '.raw.json', JSON.stringify({ accepted, outageWrites, nativeBufferObservations: pressure,
+      await writeFile(reportPath + '.raw.json', JSON.stringify({ accepted, outageWrites, subscriptionAuthorization, nativeBufferObservations: pressure,
         connections: clients.map((c, index) => ({ index, frames: c.frames.map(f => ({ type: f.type, companyId: f.companyId, seq: f.seq, eventId: f.eventId,
           payloadSha256: createHash('sha256').update(JSON.stringify(f.payload)).digest('hex') })) })) }, null, 2) + '\n', { flag: 'wx' });
       await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });

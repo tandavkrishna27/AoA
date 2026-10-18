@@ -7,7 +7,37 @@ import { createLiveEventLogStore } from '../../../server/src/services/live-event
 import { setLiveEventLogStore, wasLocallyPublished } from '../../../server/src/services/live-events.ts';
 import { createBrokerDrainer, attachLiveEventBrokerListener } from '../../../server/src/services/live-event-broker-listener.ts';
 
-const db = createDb(process.env.AOA_W13_DATABASE_URL);
+const actualDb = createDb(process.env.AOA_W13_DATABASE_URL);
+const authorizationReads = [];
+// Test-only observation of genuine completed authorization queries. The proxy
+// delegates every query/result unchanged; it does not replace the authorizer.
+function observeSelect(builder) {
+  return new Proxy(builder, {
+    get(target, key) {
+      const value = Reflect.get(target, key);
+      if (key === 'then') return (fulfilled, rejected) => {
+        const query = target.toSQL();
+        return value.call(target, rows => {
+          const table = query.sql.includes('from "thread_participants"') ? 'participants'
+            : query.sql.includes('from "discussions"') ? 'discussion' : null;
+          if (table) authorizationReads.push({ table, parameters: query.params, rows: rows.length, completedAt: new Date().toISOString() });
+          return fulfilled ? fulfilled(rows) : rows;
+        }, rejected);
+      };
+      if (typeof value === 'function') return (...args) => {
+        const next = value.apply(target, args);
+        return next && typeof next.toSQL === 'function' ? observeSelect(next) : next;
+      };
+      return value;
+    },
+  });
+}
+const db = new Proxy(actualDb, {
+  get(target, key, receiver) {
+    if (key === 'select') return (...args) => observeSelect(target.select(...args));
+    return Reflect.get(target, key, receiver);
+  },
+});
 const store = createLiveEventLogStore(db);
 setLiveEventLogStore(store);
 const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
@@ -40,6 +70,19 @@ process.on('message', message => {
       result = rows.length;
     } else if (message.action === 'status') {
       result = { sockets: wss.clients.size, bufferedBytes: [...wss.clients].map(s => s.bufferedAmount) };
+    } else if (message.action === 'subscriptionBarrier') {
+      const seen = (thread, table, rows) => authorizationReads.some(r => r.table === table && r.parameters.includes(thread) && r.rows === rows);
+      const complete = () => seen(message.privateThread, 'discussion', 1) && seen(message.privateThread, 'participants', 0)
+        && seen(message.foreignThread, 'discussion', 0) && seen(message.publicThread, 'discussion', 1) && seen(message.publicThread, 'participants', 0);
+      const deadline = Date.now() + 20_000;
+      while (!complete()) {
+        if (Date.now() >= deadline) throw Error('Subscription authorizer query barrier timed out');
+        await new Promise(resolve => setImmediate(resolve));
+      }
+      // Genuine query fulfillment schedules the remaining authorizer/registry
+      // Promise continuations. One event-loop turn drains those microtasks.
+      await new Promise(resolve => setImmediate(resolve));
+      result = { resolved: true, reads: authorizationReads.filter(r => [message.privateThread, message.foreignThread, message.publicThread].some(t => r.parameters.includes(t))) };
     } else if (message.action === 'trim') { result = await store.trimRetention(message.window, message.companies); }
     else if (message.action === 'stop') {
       await listener?.stop();
