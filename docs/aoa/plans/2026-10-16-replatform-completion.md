@@ -1,5 +1,7 @@
 # Replatform Completion Implementation Plan
 
+**Windows fixture follow-up — 18 October:** Approved shared-fixture-only teardown repair `41f2c2a68dd89e62f68e85246d38878488650b40` now has targeted local/VPS verification: [report](../reports/2026-10-18-windows-postgres-fixture-report.md), [current checklist](2026-10-18-program-integration-handoff.md). This closes the bounded shared-helper stop/error contract, not original F09 attribution, other fixtures or deferred production crash custody. No full W-package exit, live campaign or main merge is inferred.
+
 **Program integration — 18 October:** The user authorized baseline → W02/W05 → W12 merges into `docs/replatform-program`, producing combined application `0896c43961d2e19e2c7fd163f32c51c6e69d0889` without conflicts. See the [combined report](../reports/2026-10-18-program-integration-report.md) and [completed/pending checklist](2026-10-18-program-integration-handoff.md) for exact-candidate targeted local/VPS verification, cleanup qualifications and remaining acceptance. Source integration does not close full W-package exits or authorize a main merge, whole-suite run, credential-dependent campaign or distributed rollout.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This request authorizes the plan, not implementation or new deployments.

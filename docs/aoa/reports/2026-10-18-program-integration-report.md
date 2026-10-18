@@ -1,5 +1,7 @@
 # Baseline, W02/W05 and W12 program integration — 18 October 2026
 
+**Superseding fixture follow-up — 18 October:** The current shared Windows migrated-fixture stop/error contract is repaired at `41f2c2a68dd89e62f68e85246d38878488650b40`: [report](2026-10-18-windows-postgres-fixture-report.md), [evidence](../evidence/2026-10-18-windows-postgres-fixture-summary.json). Targeted Windows/VPS checks each pass 4 files / 27 cases with no selected residue. The original `0896c4396` manual-cleanup observation below remains historical and accurate; original F09 attribution, other fixtures and production crash custody are not retroactively closed.
+
 **Target branch:** `docs/replatform-program`. **Combined application candidate:** `0896c43961d2e19e2c7fd163f32c51c6e69d0889`. **Source tree:** `518e81d8abfd64d6d1d3d89884e9cd62e752e25e`. Documentation publication follows this frozen candidate. Dates use India time; raw receipts retain UTC timestamps.
 
 **Verdict:** ordered program integration and exact-candidate targeted local/VPS assertions, scoped builds, native recovery checks and review deployment pass. **Windows DB-fixture automatic teardown left a child/listener requiring guarded manual cleanup**; resources are now cleared, but its root-cause/regression work remains open. Do not infer an automatic-cleanup pass from assertion results. This integration does not mark the full W packages, live journeys, release CI or production rollout complete.

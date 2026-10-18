@@ -1,0 +1,929 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-10-18",
+  "timezone": "Asia/Calcutta",
+  "branch": "docs/replatform-program",
+  "base": "eed114e7c25fef2f7a34fb57a1d6df3150b90c69",
+  "fixtureCandidate": "41f2c2a68dd89e62f68e85246d38878488650b40",
+  "documentationPublication": "Separate later docs-only commit",
+  "scope": {
+    "fixtureOnly": true,
+    "productionStartupChanged": false,
+    "otherFixturesChanged": false,
+    "wholeSuiteRun": false,
+    "productionBuildRun": false,
+    "sharedReviewDeploymentChanged": false,
+    "mainMergedOrPushed": false,
+    "providerModelCalls": false,
+    "realWindowsX64": true,
+    "linuxArm64Compatibility": true
+  },
+  "mechanism": {
+    "dependency": "embedded-postgres@18.1.0-beta.16",
+    "confirmed": [
+      "Windows dependency stop spawns unawaited taskkill /F /T and resolves on postmaster exit, not awaited normal PostgreSQL cluster shutdown",
+      "Shared fixture suppressed close/stop/removal failures and let dependency persistent:false delete before cleanup outcome was known"
+    ],
+    "notProven": [
+      "Exact scheduler/kernel interleaving of earlier orphan io_worker",
+      "Attribution/root cause of original historical F09",
+      "Production startup or durable host-crash custody defect"
+    ]
+  },
+  "development": {
+    "unitRed": {
+      "baseHelper": "eed114e7c",
+      "cases": 14,
+      "passed": 1,
+      "failed": 13,
+      "skipped": 0
+    },
+    "nativeRed": {
+      "baseHelper": "eed114e7c",
+      "passed": 0,
+      "failed": 1,
+      "filterSkipped": 2,
+      "residueObserved": false,
+      "failure": "No normal fast-shutdown request/completion on forced-stop path"
+    },
+    "correctedDevelopmentFailures": [
+      "Vitest SSR import.meta.resolve unsupported; use createRequire(import.meta.url) then resolve from owning dependency",
+      "Per-cycle console spy replaced a callback cached by dependency defaults; keep one logger across native cycles",
+      "Initial scoped typecheck config implicitly included unrelated ambient @types/diff; explicitly select node types"
+    ]
+  },
+  "local": {
+    "candidate": "41f2c2a68dd89e62f68e85246d38878488650b40",
+    "sourceTree": "725233b0cb66277e9a5cb6289704f6d0c8dd0a02",
+    "counts": {
+      "files": 4,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    "selectedFiles": [
+      "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+      "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+      "server/src/__tests__/hub-curation.integration.test.ts",
+      "server/src/__tests__/costs-idempotency.integration.test.ts"
+    ],
+    "command": {
+      "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+      "args": [
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+        "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+        "server/src/__tests__/hub-curation.integration.test.ts",
+        "server/src/__tests__/costs-idempotency.integration.test.ts",
+        "--no-file-parallelism",
+        "--maxWorkers=1",
+        "--minWorkers=1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-windows-pg-fixture-2026-10-18\\final-local\\vitest.json"
+      ]
+    },
+    "runtime": {
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+      "pid": 29952,
+      "gitSha": "41f2c2a68dd89e62f68e85246d38878488650b40"
+    },
+    "startedAt": "2026-10-18T01:45:36.746Z",
+    "finishedAt": "2026-10-18T01:46:40.139Z",
+    "exitCode": 0,
+    "finalDirtyFiles": [],
+    "cycles": [
+      {
+        "cycle": 1,
+        "platform": "win32",
+        "pid": 3448,
+        "port": 58414,
+        "postmasterIdentity": [
+          "3448",
+          "C:/Users/Dell/Desktop/aoa/validation-windows-pg-fixture-2026-10-18/final-local/tmp/aoa-fixture-teardown-9JSQkU/db",
+          "1792287944",
+          "58414"
+        ],
+        "before": {
+          "processes": [
+            {
+              "ProcessId": 3448,
+              "ParentProcessId": 31612,
+              "CreationDate": "/Date(1792287944709)/",
+              "CommandLine": "C:\\Users\\Dell\\Desktop\\aoa\\AoA\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\postgres.exe -D C:\\Users\\Dell\\Desktop\\aoa\\validation-windows-pg-fixture-2026-10-18\\final-local\\tmp\\aoa-fixture-teardown-9JSQkU\\db -p 58414"
+            },
+            {
+              "ProcessId": 20180,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944883)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 6028"
+            },
+            {
+              "ProcessId": 30520,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944884)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 5940"
+            },
+            {
+              "ProcessId": 31440,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944886)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 5908"
+            },
+            {
+              "ProcessId": 13596,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944888)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"checkpointer\" 5896"
+            },
+            {
+              "ProcessId": 26172,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944890)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"bgwriter\" 5888"
+            },
+            {
+              "ProcessId": 13768,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944925)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"wal_writer\" 5876"
+            },
+            {
+              "ProcessId": 25828,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944927)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"autovacuum launcher\" 6036"
+            },
+            {
+              "ProcessId": 17720,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287944929)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"bgworker\" 6048"
+            },
+            {
+              "ProcessId": 30536,
+              "ParentProcessId": 3448,
+              "CreationDate": "/Date(1792287947801)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"backend\" 6060"
+            }
+          ],
+          "listeners": [
+            {
+              "LocalAddress": "::1",
+              "LocalPort": 58414,
+              "OwningProcess": 3448
+            },
+            {
+              "LocalAddress": "127.0.0.1",
+              "LocalPort": 58414,
+              "OwningProcess": 3448
+            }
+          ]
+        },
+        "after": {
+          "processes": [],
+          "listeners": []
+        },
+        "shutdownRequested": true,
+        "shutdownCompleted": true,
+        "directoryAbsent": true
+      },
+      {
+        "cycle": 2,
+        "platform": "win32",
+        "pid": 5448,
+        "port": 58861,
+        "postmasterIdentity": [
+          "5448",
+          "C:/Users/Dell/Desktop/aoa/validation-windows-pg-fixture-2026-10-18/final-local/tmp/aoa-fixture-teardown-QyILUr/db",
+          "1792287956",
+          "58861"
+        ],
+        "before": {
+          "processes": [
+            {
+              "ProcessId": 5448,
+              "ParentProcessId": 31612,
+              "CreationDate": "/Date(1792287956496)/",
+              "CommandLine": "C:\\Users\\Dell\\Desktop\\aoa\\AoA\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\postgres.exe -D C:\\Users\\Dell\\Desktop\\aoa\\validation-windows-pg-fixture-2026-10-18\\final-local\\tmp\\aoa-fixture-teardown-QyILUr\\db -p 58861"
+            },
+            {
+              "ProcessId": 22608,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956566)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 6040"
+            },
+            {
+              "ProcessId": 28492,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956567)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 416"
+            },
+            {
+              "ProcessId": 22236,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956568)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 5936"
+            },
+            {
+              "ProcessId": 30200,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956570)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"checkpointer\" 5924"
+            },
+            {
+              "ProcessId": 30692,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956572)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"bgwriter\" 6044"
+            },
+            {
+              "ProcessId": 2276,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956605)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"wal_writer\" 5912"
+            },
+            {
+              "ProcessId": 29996,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956607)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"autovacuum launcher\" 5904"
+            },
+            {
+              "ProcessId": 27692,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287956608)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"bgworker\" 5892"
+            },
+            {
+              "ProcessId": 18012,
+              "ParentProcessId": 5448,
+              "CreationDate": "/Date(1792287959456)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"backend\" 6076"
+            }
+          ],
+          "listeners": [
+            {
+              "LocalAddress": "::1",
+              "LocalPort": 58861,
+              "OwningProcess": 5448
+            },
+            {
+              "LocalAddress": "127.0.0.1",
+              "LocalPort": 58861,
+              "OwningProcess": 5448
+            }
+          ]
+        },
+        "after": {
+          "processes": [],
+          "listeners": []
+        },
+        "shutdownRequested": true,
+        "shutdownCompleted": true,
+        "directoryAbsent": true
+      },
+      {
+        "cycle": 3,
+        "platform": "win32",
+        "pid": 22408,
+        "port": 62276,
+        "postmasterIdentity": [
+          "22408",
+          "C:/Users/Dell/Desktop/aoa/validation-windows-pg-fixture-2026-10-18/final-local/tmp/aoa-fixture-teardown-Hgg4gC/db",
+          "1792287968",
+          "62276"
+        ],
+        "before": {
+          "processes": [
+            {
+              "ProcessId": 22408,
+              "ParentProcessId": 31612,
+              "CreationDate": "/Date(1792287968186)/",
+              "CommandLine": "C:\\Users\\Dell\\Desktop\\aoa\\AoA\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\postgres.exe -D C:\\Users\\Dell\\Desktop\\aoa\\validation-windows-pg-fixture-2026-10-18\\final-local\\tmp\\aoa-fixture-teardown-Hgg4gC\\db -p 62276"
+            },
+            {
+              "ProcessId": 31704,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968251)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 5928"
+            },
+            {
+              "ProcessId": 2800,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968253)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 5924"
+            },
+            {
+              "ProcessId": 28252,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968254)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"io_worker\" 5892"
+            },
+            {
+              "ProcessId": 27740,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968256)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"checkpointer\" 5880"
+            },
+            {
+              "ProcessId": 19060,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968258)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"bgwriter\" 5872"
+            },
+            {
+              "ProcessId": 30240,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968294)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"wal_writer\" 5832"
+            },
+            {
+              "ProcessId": 30676,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968295)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"autovacuum launcher\" 5856"
+            },
+            {
+              "ProcessId": 24520,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287968297)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"bgworker\" 5812"
+            },
+            {
+              "ProcessId": 27252,
+              "ParentProcessId": 22408,
+              "CreationDate": "/Date(1792287971214)/",
+              "CommandLine": "\"C:/Users/Dell/Desktop/aoa/AoA/node_modules/.pnpm/@embedded-postgres+windows-x64@18.1.0-beta.16/node_modules/@embedded-postgres/windows-x64/native/bin/postgres.exe\" --forkchild=\"backend\" 5800"
+            }
+          ],
+          "listeners": [
+            {
+              "LocalAddress": "::1",
+              "LocalPort": 62276,
+              "OwningProcess": 22408
+            },
+            {
+              "LocalAddress": "127.0.0.1",
+              "LocalPort": 62276,
+              "OwningProcess": 22408
+            }
+          ]
+        },
+        "after": {
+          "processes": [],
+          "listeners": []
+        },
+        "shutdownRequested": true,
+        "shutdownCompleted": true,
+        "directoryAbsent": true
+      }
+    ],
+    "cleanup": {
+      "recordedAt": "2026-10-18T01:47:25.2704128Z",
+      "candidate": "41f2c2a68dd89e62f68e85246d38878488650b40",
+      "ownedPostmasters": [
+        3448,
+        5448,
+        11624,
+        22408,
+        30320
+      ],
+      "ownedPorts": [
+        58414,
+        58861,
+        62276,
+        63618,
+        64317
+      ],
+      "remainingOwnedProcesses": [],
+      "remainingOwnedListeners": [],
+      "protectedReviewIdentitiesUnchanged": true,
+      "manualCleanupRequired": false,
+      "scope": "Five selected migrated fixtures only; no global process custody claim"
+    },
+    "genericUnhandledErrors": "unknown"
+  },
+  "vps": {
+    "candidate": "41f2c2a68dd89e62f68e85246d38878488650b40",
+    "sourceTree": "725233b0cb66277e9a5cb6289704f6d0c8dd0a02",
+    "counts": {
+      "files": 4,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0
+    },
+    "selectedFiles": [
+      "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+      "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+      "server/src/__tests__/hub-curation.integration.test.ts",
+      "server/src/__tests__/costs-idempotency.integration.test.ts"
+    ],
+    "command": {
+      "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+      "args": [
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+        "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+        "server/src/__tests__/hub-curation.integration.test.ts",
+        "server/src/__tests__/costs-idempotency.integration.test.ts",
+        "--no-file-parallelism",
+        "--maxWorkers=1",
+        "--minWorkers=1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=/opt/aoa-windows-pg-fixture-20261018/final-vps/vitest.json"
+      ]
+    },
+    "runtime": {
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "cwd": "/opt/aoa-windows-pg-fixture-20261018/source",
+      "pid": 306063,
+      "gitSha": "41f2c2a68dd89e62f68e85246d38878488650b40"
+    },
+    "startedAt": "2026-10-18T01:46:13.819Z",
+    "finishedAt": "2026-10-18T01:46:52.978Z",
+    "exitCode": 0,
+    "finalDirtyFiles": [],
+    "cycles": [
+      {
+        "cycle": 1,
+        "platform": "linux",
+        "pid": 306583,
+        "port": 60584,
+        "postmasterIdentity": [
+          "306583",
+          "/opt/aoa-windows-pg-fixture-20261018/final-vps/tmp/aoa-fixture-teardown-pZYz0c/db",
+          "1792287997",
+          "60584"
+        ],
+        "before": null,
+        "after": null,
+        "shutdownRequested": true,
+        "shutdownCompleted": true,
+        "directoryAbsent": true
+      },
+      {
+        "cycle": 2,
+        "platform": "linux",
+        "pid": 306673,
+        "port": 61781,
+        "postmasterIdentity": [
+          "306673",
+          "/opt/aoa-windows-pg-fixture-20261018/final-vps/tmp/aoa-fixture-teardown-XxbfLf/db",
+          "1792288002",
+          "61781"
+        ],
+        "before": null,
+        "after": null,
+        "shutdownRequested": true,
+        "shutdownCompleted": true,
+        "directoryAbsent": true
+      },
+      {
+        "cycle": 3,
+        "platform": "linux",
+        "pid": 306880,
+        "port": 58752,
+        "postmasterIdentity": [
+          "306880",
+          "/opt/aoa-windows-pg-fixture-20261018/final-vps/tmp/aoa-fixture-teardown-7TT128/db",
+          "1792288007",
+          "58752"
+        ],
+        "before": null,
+        "after": null,
+        "shutdownRequested": true,
+        "shutdownCompleted": true,
+        "directoryAbsent": true
+      }
+    ],
+    "cleanup": {
+      "recordedAt": "2026-10-18T01:48:56.142610+00:00",
+      "candidate": "41f2c2a68dd89e62f68e85246d38878488650b40",
+      "remainingOwnedPostgres": [],
+      "serviceActive": "active",
+      "servicePid": "301667",
+      "workingDirectory": "/opt/aoa-program-integration-20261018/source",
+      "databaseIdentity": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+      "sourceDirty": "",
+      "scope": "Owned fixture namespace only; W12 live namespace/shared review untouched; no deployment"
+    },
+    "genericUnhandledErrors": "unknown",
+    "isolatedSource": "/opt/aoa-windows-pg-fixture-20261018/source",
+    "frozenOfflineInstall": true,
+    "unchangedDependencyDistReused": [
+      "packages/provider-wire/dist",
+      "packages/db/dist",
+      "packages/worker-protocol/dist",
+      "packages/worker-daemon/dist",
+      "packages/adapter-utils/dist",
+      "packages/plugins/sdk/dist",
+      "packages/sandbox-provider-contract/dist",
+      "packages/sandbox-fake-provider/dist",
+      "packages/browser-runtime/dist",
+      "packages/shared/dist",
+      "packages/sandbox-e2b-provider/dist",
+      "packages/adapters/acpx-local/dist",
+      "packages/adapters/openclaw/dist",
+      "packages/adapters/codex-local/dist",
+      "packages/adapters/opencode-local/dist",
+      "packages/adapters/claude-local/dist",
+      "packages/adapters/openclaw-gateway/dist",
+      "packages/adapters/cursor-cloud/dist",
+      "packages/adapters/grok-local/dist",
+      "packages/adapters/gemini-local/dist",
+      "packages/adapters/cursor-local/dist",
+      "packages/adapters/pi-local/dist",
+      "packages/provider-capability/dist",
+      "packages/adapter-manager/dist"
+    ],
+    "noPackageOrImageBuild": true,
+    "posixStopImplementationUnchanged": true
+  },
+  "targetedTypecheck": {
+    "candidate": "41f2c2a68dd89e62f68e85246d38878488650b40",
+    "command": {
+      "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+      "args": [
+        "node_modules/typescript/bin/tsc",
+        "-p",
+        "../validation-windows-pg-fixture-2026-10-18/tsconfig.fixture.json"
+      ]
+    },
+    "exitCode": 0,
+    "scope": "Only helper and two regression files through the saved scoped tsconfig; not recursive repository typecheck"
+  },
+  "sourceVerification": {
+    "normalization": "UTF-8 LF",
+    "files": [
+      {
+        "path": "server/src/__tests__/helpers/migrated-database.ts",
+        "utf8LfSha256": "7643d3f5c019b7202a702f6b8f124ee4bdcec6fd630d67a5aaa073bf9679d8e9"
+      },
+      {
+        "path": "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+        "utf8LfSha256": "e201e341bbd5565673c7ef6e65b41880d3f4772bf609e2096086f9686508ed15"
+      },
+      {
+        "path": "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+        "utf8LfSha256": "2b9f87aa88ed7109353982206227b816dd178232a661712c80ee98bfd8152f76"
+      },
+      {
+        "path": "server/src/__tests__/hub-curation.integration.test.ts",
+        "utf8LfSha256": "e8da07b5ca4156b05ec20823a6748f31000d8da93417962f39d8377a67305075"
+      },
+      {
+        "path": "server/src/__tests__/costs-idempotency.integration.test.ts",
+        "utf8LfSha256": "50e2fcb720fa5e4482620017f3615c4955d95764f867c3c80686403cd6a16cee"
+      }
+    ],
+    "localAndVpsMatchCommittedCandidate": true
+  },
+  "limits": [
+    "Startup failure before qualified Windows PID receipt refuses blind signaling and retains directory/error for operator inspection",
+    "Controller failure/timeout preserves directory and fails teardown; no taskkill fallback",
+    "Native cycle JSON is emitted after successful shutdown/log checkpoints; earlier failures retain raw capture. Directory retention applies to fixture cleanup failures before deletion, not later log/snapshot/assertion failures",
+    "Three normal real migrated clusters plus original hub/cost consumers per host are targeted evidence, not every helper consumer or Windows CI distribution",
+    "Inherited original F09, other fixtures and production crash custody remain separately scoped"
+  ],
+  "rawEvidence": [
+    {
+      "path": "final-local/capture/result.json",
+      "bytes": 1567,
+      "sha256": "02649dbc22e5d0d90a7ea72288ba49148c4ce10674f6c4ded30e1ce1a3a1f411"
+    },
+    {
+      "path": "final-local/capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "final-local/capture/stdout.txt",
+      "bytes": 152387,
+      "sha256": "1ee95460dacf394bc624dff243b38dc0b7756b662c52ed3672e482b77621051b"
+    },
+    {
+      "path": "final-local/cleanup.json",
+      "bytes": 521,
+      "sha256": "1c2be6955c7cfa9832a093eb0d12240bc405ec24e556960b96f4477ed712ea87"
+    },
+    {
+      "path": "final-local/cycles/cycle-1.json",
+      "bytes": 11515,
+      "sha256": "6e19bbc97b45d67be8fa9698b45ac3e02ef12ec3bb490ee14f8bbc4fc5d7a555"
+    },
+    {
+      "path": "final-local/cycles/cycle-2.json",
+      "bytes": 11519,
+      "sha256": "26ad7af516b45f0420824420c8b4408cf822711dbaa3ec05f568ff9555234dae"
+    },
+    {
+      "path": "final-local/cycles/cycle-3.json",
+      "bytes": 11544,
+      "sha256": "19edcd654a256da257605e1264579e7e017004df13d15fe13870570d0dc09a09"
+    },
+    {
+      "path": "final-local/summary.json",
+      "bytes": 41463,
+      "sha256": "a01c184d7ea7c87afaa23a08d0b4f20f39e0813d4129f65cf90f38dd45586245"
+    },
+    {
+      "path": "final-local/vitest.json",
+      "bytes": 8865,
+      "sha256": "933b3b57f3c0f2ab728bdd231c4340fbccd74d7d094edca41ecc32ff7e8a00a3"
+    },
+    {
+      "path": "inspect-vps.py",
+      "bytes": 2316,
+      "sha256": "e5addb45b4373626fa0312a6fc4de5c8405c4c7b029a18005dc9ba3f2982348b"
+    },
+    {
+      "path": "native-green-receipts/cycle-1.json",
+      "bytes": 11329,
+      "sha256": "3f3e9876f9ea3e9d468637cba935fd59c0b6f7e79bc4b0f830c552aca95e6f56"
+    },
+    {
+      "path": "native-green-receipts/cycle-2.json",
+      "bytes": 8377,
+      "sha256": "00d7e5553ac7f66914161b4958a5c04ea77677fcc520e796db22f06446996bdf"
+    },
+    {
+      "path": "native-green-receipts/cycle-3.json",
+      "bytes": 8377,
+      "sha256": "5d1dda26185efe3980cd8508e213a7030b2fca788c7721a79485e46937603fce"
+    },
+    {
+      "path": "native-green.json",
+      "bytes": 2342,
+      "sha256": "e0b4bbe128c310d8d2a3c78c996226ce2a2643ccb5ca13966406d225b56a26fe"
+    },
+    {
+      "path": "native-green/result.json",
+      "bytes": 1460,
+      "sha256": "dc0759f42324bb0cb7341960235acf18b2bb8f5e3aa1577b5a508ee76bbd7e07"
+    },
+    {
+      "path": "native-green/stderr.txt",
+      "bytes": 1185,
+      "sha256": "d22e7052f36a50d71b867d12787cf8436166425791b56ba169da6ae60cd40616"
+    },
+    {
+      "path": "native-green/stdout.txt",
+      "bytes": 15360,
+      "sha256": "fc40e228f8af39e368e232c5c029a43a4976013de0fcb95a94ef0da754cdb22c"
+    },
+    {
+      "path": "native-red-receipts/cycle-1.json",
+      "bytes": 10454,
+      "sha256": "06bc1a30909daca98162d33749bf7f83b206bce89ab4b8515f258b651befa8d8"
+    },
+    {
+      "path": "native-red.json",
+      "bytes": 1887,
+      "sha256": "8f9135970d15f63cbe265041d8cb189029358e616d14047e1abfdaf6a4c538b6"
+    },
+    {
+      "path": "native-red/result.json",
+      "bytes": 1498,
+      "sha256": "070164bca3de511bd205983671e36fa88e843260f4cdf268e89faeb3a0f59d33"
+    },
+    {
+      "path": "native-red/stderr.txt",
+      "bytes": 1011,
+      "sha256": "1d293f85ea75fecefafe9ae39afc21c493fe2146182fdd7493d5210630a9d456"
+    },
+    {
+      "path": "native-red/stdout.txt",
+      "bytes": 874,
+      "sha256": "bf105de5cd8a85bce694feb3db5befeb860bcdbe396a5cba5ec98d8cbd346cb8"
+    },
+    {
+      "path": "prepare-vps.sh",
+      "bytes": 1458,
+      "sha256": "b53d260602c3e44ea6f57b172a01fdf6a3f4946a0e68f04dd32f1b15e1a794b9"
+    },
+    {
+      "path": "protected-review-listeners.json",
+      "bytes": 312,
+      "sha256": "b7b64f820f51c70247c4049eee647ad0498b24285906dede23f1db6182cd829e"
+    },
+    {
+      "path": "run-final.mjs",
+      "bytes": 4125,
+      "sha256": "74a815d26409b284de22a91997e293d111f2591d8ae6f48a993e4720a1ac9d50"
+    },
+    {
+      "path": "targeted-green-receipts/cycle-1.json",
+      "bytes": 11340,
+      "sha256": "e2f34af1e98e821cefca4613ccd52f53600b822da4c6f62c76a795c1a0c9ad37"
+    },
+    {
+      "path": "targeted-green-receipts/cycle-2.json",
+      "bytes": 11332,
+      "sha256": "d18fb9776bcf8b3d7178e4c8307f0e22ce14ac9b097e9fba27088be3e82e241b"
+    },
+    {
+      "path": "targeted-green-receipts/cycle-3.json",
+      "bytes": 11340,
+      "sha256": "3954f756efbeb9aa43e11544d5030741e085a7a40090ab5a7e5d10aa33083ed4"
+    },
+    {
+      "path": "targeted-green.json",
+      "bytes": 8878,
+      "sha256": "8447b8199eb916cb07790046f10ba937c0ddb451670c6af7518e19f4824987b7"
+    },
+    {
+      "path": "targeted-green/result.json",
+      "bytes": 1671,
+      "sha256": "7c3d51d13b8750a472263891922bf1073e98b29116d12e8405ce44a943dd47df"
+    },
+    {
+      "path": "targeted-green/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "targeted-green/stdout.txt",
+      "bytes": 151930,
+      "sha256": "3a99991dba5419ad5e1abb883106b2f29e9c6baab527dad8c9bb62cf3e4cad47"
+    },
+    {
+      "path": "tsconfig.fixture.json",
+      "bytes": 617,
+      "sha256": "ccf57ca70e59d6f669b10ceab570a7dc150afcbcecb2c695b327a5ae31ff9b06"
+    },
+    {
+      "path": "typecheck-final/result.json",
+      "bytes": 1096,
+      "sha256": "5837731f71aad05e4d4e2cdf77e13414770766a798769035c05dd94be84383c0"
+    },
+    {
+      "path": "typecheck-final/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "typecheck-final/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "typecheck.log",
+      "bytes": 149,
+      "sha256": "295ae68440dcebdef7924db847e8cd8d577fb5f62f85218c6e26c2bba70f13f5"
+    },
+    {
+      "path": "typecheck2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "unit-green.json",
+      "bytes": 4617,
+      "sha256": "7ba73a1c613fd3d8b427af581d39eecb00575ac30fc4261b2a2d5b7b16ce344c"
+    },
+    {
+      "path": "unit-green/result.json",
+      "bytes": 1450,
+      "sha256": "cda41cfadccf14ca69de7337899f08a4ef78466e94a37a0515c1e276ac8a9886"
+    },
+    {
+      "path": "unit-green/stderr.txt",
+      "bytes": 2602,
+      "sha256": "bdc2936a06a87946583b6c1e459c1426804bcde686a36ff629e9e1a623e2bd40"
+    },
+    {
+      "path": "unit-green/stdout.txt",
+      "bytes": 1517,
+      "sha256": "93f5e49a6cdfbfe2b8f6cf7343c77ee9d4cc5eee4683b15dfaa59a831c957302"
+    },
+    {
+      "path": "unit-green2.json",
+      "bytes": 4070,
+      "sha256": "5e09a2b0b8d133607f96f4d29d37c3f3841d2fd892fe6fcd74e3879eea44a5ba"
+    },
+    {
+      "path": "unit-green2/result.json",
+      "bytes": 1453,
+      "sha256": "0b6dff1640774c4019036d436f16f5ab56ad71e56aefb83cd5c7366b9b3e9332"
+    },
+    {
+      "path": "unit-green2/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "unit-green2/stdout.txt",
+      "bytes": 437,
+      "sha256": "1198f3f9a28f99ec2fedee02683f8e5f8e132a1bfdf1dea79c5daad8621969e7"
+    },
+    {
+      "path": "unit-red.json",
+      "bytes": 15664,
+      "sha256": "c9e3906789ef018cb72ff496b6314ecc2c2cd046f028b1849ad536a72de78ffb"
+    },
+    {
+      "path": "unit-red/result.json",
+      "bytes": 1444,
+      "sha256": "0dff898644b7f1a1270e5499ef7d5a656701a9804cd257f65250ed26f954be11"
+    },
+    {
+      "path": "unit-red/stderr.txt",
+      "bytes": 8500,
+      "sha256": "41cbb8080c41d072839da591f89fafc20d4f97693d7c1652e6b8451136ae90cd"
+    },
+    {
+      "path": "unit-red/stdout.txt",
+      "bytes": 2714,
+      "sha256": "678c6792912d8764a02b41321827aa8b96b9b02455cbbdd63b8365ac7ea3f165"
+    },
+    {
+      "path": "vps-evidence.tar.gz",
+      "bytes": 21292,
+      "sha256": "18a01431c5a34d928abaf8478e239714143950e2ffa5f9fc9759f638bd91cccf"
+    },
+    {
+      "path": "vps-evidence/final-vps/capture/result.json",
+      "bytes": 1439,
+      "sha256": "e4c96c9c84d6c3ce0b458e5731dc55641588a3b37b6945b628acf34d8d097804"
+    },
+    {
+      "path": "vps-evidence/final-vps/capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps-evidence/final-vps/capture/stdout.txt",
+      "bytes": 187185,
+      "sha256": "b7b2fd9f7bb141512553584d27b1b7c97c80e744da5cfcbe7e9dd6dbe04291ed"
+    },
+    {
+      "path": "vps-evidence/final-vps/cleanup.json",
+      "bytes": 489,
+      "sha256": "c6c0b8c24ffa0158d7773a9bb69627b89153038df7b41c89d348dd5150bef383"
+    },
+    {
+      "path": "vps-evidence/final-vps/cycles/cycle-1.json",
+      "bytes": 7485,
+      "sha256": "f1fb1b15363a5e7c59f147030cfd8c51ff3fd5daa67f182ab5ec3145ff1108bf"
+    },
+    {
+      "path": "vps-evidence/final-vps/cycles/cycle-2.json",
+      "bytes": 7485,
+      "sha256": "717e2644442f04d9a7920d81100dd748ee24ae3081002fbb9e5d7e8da71b6f9c"
+    },
+    {
+      "path": "vps-evidence/final-vps/cycles/cycle-3.json",
+      "bytes": 7461,
+      "sha256": "2b372a5c9c562477cf3344d4b84ca33bd6666c57c38713e0eaa40e7197fba4a4"
+    },
+    {
+      "path": "vps-evidence/final-vps/summary.json",
+      "bytes": 28196,
+      "sha256": "17242ed51d1a5c31b99c600ba1399673d2dedff1df53a192e47e803cdf141d1d"
+    },
+    {
+      "path": "vps-evidence/final-vps/vitest.json",
+      "bytes": 8913,
+      "sha256": "fe6d44a623b0dfdbf67ca134989501354da0df0e8bedbecb00daee8648cdee1e"
+    },
+    {
+      "path": "vps-evidence/inspect-vps.py",
+      "bytes": 2316,
+      "sha256": "e5addb45b4373626fa0312a6fc4de5c8405c4c7b029a18005dc9ba3f2982348b"
+    },
+    {
+      "path": "vps-evidence/install.log",
+      "bytes": 8713,
+      "sha256": "2b8a45e3cab7c8143824033417d4a991ab83975993071046573cfbd792881dbf"
+    },
+    {
+      "path": "vps-evidence/prepare-vps.sh",
+      "bytes": 1458,
+      "sha256": "b53d260602c3e44ea6f57b172a01fdf6a3f4946a0e68f04dd32f1b15e1a794b9"
+    },
+    {
+      "path": "vps-evidence/reused-dist.txt",
+      "bytes": 772,
+      "sha256": "54f4d9001f572c1bfa58543bdd760c494159e2d24a6ec34a2e5f8bfb96efae15"
+    },
+    {
+      "path": "vps-evidence/run-final.mjs",
+      "bytes": 4125,
+      "sha256": "74a815d26409b284de22a91997e293d111f2591d8ae6f48a993e4720a1ac9d50"
+    },
+    {
+      "path": "vps-prepare.log",
+      "bytes": 367,
+      "sha256": "af107117c05d7ed6c00ae84a4adcf8bddc03e09cba9dd475c37dd491bd15c226"
+    }
+  ]
+}
