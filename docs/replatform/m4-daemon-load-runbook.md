@@ -33,7 +33,8 @@ Supply `AOA_D1_CONTROL_PLANE_IMAGE`, `AOA_D1_WORKER_IMAGE` and
 `AOA_D1_FAKE_PROVIDER_IMAGE` with those images. The base D1 compose supplies the
 PostgreSQL, MinIO, toxiproxy and test-runner dependencies.
 
-From this checkout, with Node 24.19.0 and a unique absolute evidence directory:
+From this checkout, with Node 24.19.0, an existing private parent directory and a
+new, canonical absolute fixture path (the fixture directory must not yet exist):
 
 ```sh
 node scripts/m4-daemon-load.mjs prepare /absolute/private/w11-fixture
@@ -53,6 +54,12 @@ PowerShell uses `$env:AOA_D1_LIVE='1'` and
 argument list. No host port is required: the driver executes submission and
 observation inside the isolated control-plane service.
 
+Preparation refuses existing paths, symlink/junction ancestors and relative
+paths. Before writing any credential, it creates an owner-verified private
+directory: mode 0700 on POSIX, or an inheritance-disabled Windows DACL granting
+only the current user SID and SYSTEM full access, with ACL readback. Any identity
+or ACL command failure aborts before private files are written.
+
 Private input files are created exclusively with mode 0600. On Linux, arrange
 ownership of the generated bind files for the containers' node UID 1000 before
 bring-up (for example a scoped `chown -R 1000:1000` of the **verified exact new
@@ -60,6 +67,10 @@ fixture directory**). Keep the directory private. Do not upload
 `manifest.private.json`, `fixture.env`, private signing key or enrollment tickets.
 The provider receives only the public key; the control plane alone receives the
 private key. Fresh worker named volumes keep identities and slot state separate.
+Every generated service has the same fresh fixture UUID label. Before executing
+source, the driver inspects the requested project's containers, requires their
+fixture labels to match, and verifies the control-plane's exact read-only private
+manifest bind. Reusing a different project's name fails closed.
 
 Exit 1 with retained reports is an ordinary diagnostic failure. Before loaded,
 wait for the baseline's scoped jobs to become terminal through the normal
@@ -106,6 +117,12 @@ The original thresholds remain: quiet throughput ≥90% isolated baseline,
 queue-to-ACK p95 ≤2× baseline, 5xx ≤0.1%, submit/poll/event-ACK p95
 ≤750/1000/500 ms, and no failed/censored/timed-out/unresolved required work.
 The output always sets `fullD5Satisfied:false`.
+
+Inventory comes from the durable control-plane journal and must contain valid,
+distinct quiet/noisy worker, target, provider-profile and enrolled hello snapshots.
+The captured stdout inventory must agree. Comparison refuses missing inventory,
+changed snapshots or mismatched fixture UUIDs; absent values cannot compare as a
+passing match.
 
 Before selecting a product fix, add candidate-scoped timing evidence for pool
 acquisition, SQL execution, authority locks, event ingestion and daemon

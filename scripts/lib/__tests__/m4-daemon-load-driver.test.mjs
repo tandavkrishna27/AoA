@@ -1,12 +1,20 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,readFileSync,rmSync,mkdirSync,symlinkSync,existsSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 
+const validInventory=()=>['quiet','noisy'].map((tenantKey,index)=>({tenantKey,
+  workerId:`00000000-0000-4000-8000-00000000000${index+1}`,profileHash:'a'.repeat(64),
+  providerProfile:{profileId:'d1-m1-spine',version:1,digest:'b'.repeat(64),maxConcurrentOperations:8,
+    resourceCeiling:{cpuMillis:2000,memoryMiB:4096,diskMiB:8192}},
+  hello:{protocolVersion:1,workerId:`00000000-0000-4000-8000-00000000000${index+1}`,
+    targetId:`00000000-0000-4000-8000-00000000000${index+3}`,policyHash:'c'.repeat(64),capacity:{batchSlots:1}}}));
+const inventoryRecord=()=>({type:'inventory',inventory:validInventory()});
+
 test('fresh fixture renders separate identities, unchanged ceilings and real daemon boot roots',async()=>{
   const {prepareDaemonFixture}=await import('../m4-daemon-load-fixture.mjs');
-  const dir=mkdtempSync(path.join(tmpdir(),'m4-fixture-'));
+  const parent=mkdtempSync(path.join(tmpdir(),'m4-fixture-')),dir=path.join(parent,'fresh');
   try {
     const manifest=prepareDaemonFixture(dir);
     const overlay=JSON.parse(readFileSync(path.join(dir,'compose.json'),'utf8'));
@@ -25,7 +33,34 @@ test('fresh fixture renders separate identities, unchanged ceilings and real dae
     assert.ok(!/INSERT INTO (jobs|job_attempts|leases)\b/.test(seed));
     assert.ok(!seed.includes('maxConcurrentOperations:'));
     assert.notEqual(manifest.tenants[0].token,manifest.tenants[1].token);
-  } finally {rmSync(dir,{recursive:true,force:true});}
+    assert.match(manifest.fixtureId,/^[a-f0-9-]{36}$/);
+    for(const service of ['postgres','minio','toxiproxy','migrate','control-plane','worker-a','worker-b','fake-provider','test-runner']) {
+      assert.equal(overlay.services[service].labels['com.aoa.m4.fixture-id'],manifest.fixtureId);
+    }
+    assert.ok(overlay.services['control-plane'].volumes.some(v=>v.target==='/load/manifest.private.json'&&v.read_only));
+  } finally {rmSync(parent,{recursive:true,force:true});}
+});
+
+test('prepare refuses relative, existing, populated and junction-ancestor paths before credentials',async()=>{
+  const {prepareDaemonFixture}=await import('../m4-daemon-load-fixture.mjs');
+  const parent=mkdtempSync(path.join(tmpdir(),'m4-refusal-'));
+  try {
+    assert.throws(()=>prepareDaemonFixture('relative-private-fixture'),/absolute/i);
+    assert.throws(()=>prepareDaemonFixture(parent),/fresh|exist/i);
+    mkdirSync(path.join(parent,'real'));
+    symlinkSync(path.join(parent,'real'),path.join(parent,'alias'),process.platform==='win32'?'junction':'dir');
+    assert.throws(()=>prepareDaemonFixture(path.join(parent,'alias','fresh')),/link|junction/i);
+    assert.equal(existsSync(path.join(parent,'real','fresh','manifest.private.json')),false);
+  }finally{rmSync(parent,{recursive:true,force:true});}
+});
+
+test('Windows ACL command failure refuses an empty directory before any private file write',async()=>{
+  const {createPrivateFixtureDirectory}=await import('../m4-daemon-load-private-directory.mjs');
+  const parent=mkdtempSync(path.join(tmpdir(),'m4-acl-refusal-')),dir=path.join(parent,'fresh');
+  try {
+    assert.throws(()=>createPrivateFixtureDirectory(dir,{platform:'win32',run:()=>({status:1})}),/private|ACL|identity/i);
+    assert.deepEqual(readdirSync(dir),[]);
+  }finally{rmSync(parent,{recursive:true,force:true});}
 });
 
 test('runtime source parses and uses actual HTTP submit plus production placement instead of SQL placement',async()=>{
@@ -40,7 +75,7 @@ test('runtime source parses and uses actual HTTP submit plus production placemen
 
 test('assembler joins lost worker starts and refuses a missing daemon journal',async()=>{
   const {assembleDaemonPhase}=await import('../../m4-daemon-load.mjs');
-  const records=[{type:'phase',originMs:10000,durationMs:15000,tenantKeys:['quiet'],jobs:[]},
+  const records=[inventoryRecord(),{type:'phase',originMs:10000,durationMs:15000,tenantKeys:['quiet'],jobs:[]},
     {type:'result',jobs:[],failures:[],observedUntilMs:45000}];
   const samples=[{type:'boot',tenantKey:'quiet',atMs:9999},{type:'start',requestId:'lost',tenantKey:'quiet',kind:'poll',startedAtMs:10001,deadlineAtMs:20001}];
   const {summary}=assembleDaemonPhase(records,{quiet:samples});
@@ -55,8 +90,42 @@ test('assembler freezes job schedule/deadlines and refuses missing or duplicated
   const result={type:'result',jobs:[{...job}],failures:[],observedUntilMs:45000};
   const workers={quiet:[{type:'boot',tenantKey:'quiet',atMs:9999}]};
   for(const jobs of [[],[{...job,deadlineAtMs:60000}],[{...job},{...job}]]) {
-    assert.throws(()=>assembleDaemonPhase([phase,{...result,jobs}],workers),/job/i);
+    assert.throws(()=>assembleDaemonPhase([inventoryRecord(),phase,{...result,jobs}],workers),/job/i);
   }
+});
+
+test('durable inventory is mandatory, validated and compared against stream inventory',async()=>{
+  const {assembleDaemonPhase,assertMatchingDaemonInventory}=await import('../../m4-daemon-load.mjs');
+  const tail=[{type:'phase',originMs:10000,durationMs:15000,tenantKeys:['quiet'],jobs:[]},
+    {type:'result',jobs:[],failures:[],observedUntilMs:45000}];
+  const workers={quiet:[{type:'boot',tenantKey:'quiet',atMs:9999}]};
+  for(const inventory of [undefined,[],[{}],validInventory().map(r=>({...r,profileHash:null}))]) {
+    assert.throws(()=>assembleDaemonPhase(inventory?[{type:'inventory',inventory},...tail]:tail,workers),/inventory/i);
+  }
+  const records=[inventoryRecord(),...tail];
+  const {raw}=assembleDaemonPhase(records,workers,{streamRecords:records});
+  assert.deepEqual(raw.inventory,validInventory());
+  assert.throws(()=>assembleDaemonPhase(records,workers,{streamRecords:tail}),/inventory/i);
+  const changed=inventoryRecord();changed.inventory[0].providerProfile.maxConcurrentOperations=9;
+  assert.throws(()=>assembleDaemonPhase(records,workers,{streamRecords:[changed,...tail]}),/inventory/i);
+  assert.throws(()=>assertMatchingDaemonInventory(undefined,undefined),/inventory/i);
+  assert.throws(()=>assertMatchingDaemonInventory(validInventory(),changed.inventory),/inventory/i);
+  assert.doesNotThrow(()=>assertMatchingDaemonInventory(validInventory(),validInventory()));
+});
+
+test('project identity refuses foreign fixture labels or a different manifest bind before executing',async()=>{
+  const {verifyDaemonProjectIdentity}=await import('../../m4-daemon-load.mjs');
+  const fixtureId='00000000-0000-4000-8000-000000000009',project='aoa-m4-daemon-check',directory=path.resolve(tmpdir(),'m4-test-fixture');
+  const manifest={fixtureId,tenants:[{service:'worker-a'},{service:'worker-b'}]};
+  const containers=['control-plane','worker-a','worker-b'].map(service=>({Config:{Labels:{'com.docker.compose.project':project,
+    'com.docker.compose.service':service,'com.aoa.m4.fixture-id':fixtureId}},State:{Running:true},
+    Mounts:service==='control-plane'?[{Type:'bind',Source:path.join(directory,'manifest.private.json'),Destination:'/load/manifest.private.json',RW:false}]:[]}));
+  assert.doesNotThrow(()=>verifyDaemonProjectIdentity(containers,manifest,directory,project));
+  const foreign=structuredClone(containers);foreign[0].Config.Labels['com.aoa.m4.fixture-id']='another';
+  assert.throws(()=>verifyDaemonProjectIdentity(foreign,manifest,directory,project),/fixture|project/i);
+  const otherBind=structuredClone(containers);otherBind[0].Mounts[0].Source=path.join(directory,'other.private.json');
+  assert.throws(()=>verifyDaemonProjectIdentity(otherBind,manifest,directory,project),/manifest|bind/i);
+  assert.throws(()=>verifyDaemonProjectIdentity([],manifest,directory,project),/project|container/i);
 });
 
 test('a job timeout fails the bounded verdict even with successful request histograms',async()=>{

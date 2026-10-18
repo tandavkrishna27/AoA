@@ -1,17 +1,74 @@
 // Opt-in bounded engineering diagnostic. See docs/replatform/m4-daemon-load-runbook.md.
-import {readFileSync,writeFileSync,mkdirSync,openSync,writeSync,fsyncSync} from 'node:fs';
+import {readFileSync,writeFileSync,openSync,writeSync,fsyncSync} from 'node:fs';
 import {spawn,spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {prepareDaemonFixture} from './lib/m4-daemon-load-fixture.mjs';
 import {buildDaemonCampaignSource} from './lib/m4-daemon-load-runtime.mjs';
 import {summarizeLoadPhase,compareQuietTenants} from './lib/m4-load-measurements.mjs';
+import {assertUnaliasedAbsoluteDirectory} from './lib/m4-daemon-load-private-directory.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const parseLines=text=>text.trim()?text.trim().split(/\r?\n/).map(JSON.parse):[];
 const writeJson=(file,value)=>writeFileSync(file,JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
 
-export function assembleDaemonPhase(records,workerRecords) {
+const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+const digest=value=>typeof value==='string'&&/^[0-9a-f]{64}$/i.test(value);
+export function validateDaemonInventory(inventory) {
+  if(!Array.isArray(inventory)||inventory.length!==2)throw Error('Missing or incomplete daemon inventory');
+  const tenants=new Set(),workers=new Set(),targets=new Set();
+  for(const row of inventory) {
+    const provider=row?.providerProfile,hello=row?.hello;
+    if(!['quiet','noisy'].includes(row?.tenantKey)||tenants.has(row.tenantKey)||!uuid(row.workerId)||workers.has(row.workerId)
+      ||!digest(row.profileHash)||!provider||typeof provider.profileId!=='string'||!provider.profileId
+      ||!Number.isSafeInteger(provider.version)||provider.version<1||!digest(provider.digest)
+      ||!Number.isSafeInteger(provider.maxConcurrentOperations)||provider.maxConcurrentOperations<1
+      ||!['cpuMillis','memoryMiB','diskMiB'].every(key=>Number.isSafeInteger(provider.resourceCeiling?.[key])&&provider.resourceCeiling[key]>0)
+      ||hello?.protocolVersion!==1||hello.workerId!==row.workerId||!uuid(hello.targetId)||targets.has(hello.targetId)
+      ||!digest(hello.policyHash)||!Number.isSafeInteger(hello.capacity?.batchSlots)||hello.capacity.batchSlots<0)throw Error('Invalid daemon inventory snapshot');
+    tenants.add(row.tenantKey);workers.add(row.workerId);targets.add(hello.targetId);
+  }
+  return inventory;
+}
+export function assertMatchingDaemonInventory(baseline,loaded) {
+  validateDaemonInventory(baseline);validateDaemonInventory(loaded);
+  const sorted=rows=>[...rows].sort((a,b)=>a.tenantKey.localeCompare(b.tenantKey));
+  if(JSON.stringify(sorted(baseline))!==JSON.stringify(sorted(loaded)))throw Error('Profile/worker inventory changed between phases');
+}
+
+// Docker inspect only: no source executes until project ownership and the exact
+// private manifest bind agree with the newly generated fixture identity.
+export function verifyDaemonProjectIdentity(containers,manifest,directory,project) {
+  if(!uuid(manifest.fixtureId)||!Array.isArray(containers)||!containers.length)throw Error('Missing fixture project identity');
+  const services=new Map();
+  for(const container of containers) {
+    const labels=container.Config?.Labels;
+    if(labels?.['com.docker.compose.project']!==project||labels?.['com.aoa.m4.fixture-id']!==manifest.fixtureId)throw Error('Foreign fixture container in requested project');
+    const service=labels['com.docker.compose.service'];
+    if(!service||services.has(service))throw Error('Duplicate or missing project service identity');
+    services.set(service,container);
+  }
+  for(const service of ['control-plane',...manifest.tenants.map(t=>t.service)]) {
+    if(!services.get(service)?.State?.Running)throw Error('Required fixture project container is not running');
+  }
+  const normalized=value=>{
+    let result=value.replaceAll('\\','/');
+    result=result.replace(/^\/(?:run\/desktop\/mnt\/host|host_mnt)\/([a-z])\//i,'$1:/');
+    return /^[a-z]:\//i.test(result)?result.toLowerCase():result;
+  };
+  const mount=services.get('control-plane').Mounts?.find(m=>m.Destination==='/load/manifest.private.json');
+  if(mount?.Type!=='bind'||mount.RW!==false||normalized(mount.Source)!==normalized(path.join(directory,'manifest.private.json')))throw Error('Fixture private manifest bind identity mismatch');
+}
+
+export function assembleDaemonPhase(records,workerRecords,{streamRecords}={}) {
+  const inventories=records.filter(r=>r.type==='inventory');
+  if(inventories.length!==1)throw Error('Missing or duplicate durable daemon inventory');
+  const inventory=validateDaemonInventory(inventories[0].inventory);
+  if(streamRecords) {
+    const streamed=streamRecords.filter(r=>r.type==='inventory');
+    if(streamed.length!==1)throw Error('Missing or duplicate stream daemon inventory');
+    assertMatchingDaemonInventory(inventory,streamed[0].inventory);
+  }
   const phase=records.find(r=>r.type==='phase'),result=records.find(r=>r.type==='result');
   if(!phase||!result||records.some(r=>r.type==='fatal'))throw Error('Campaign incomplete; raw journals retained');
   const schedule=new Map(phase.jobs.map(j=>[j.intentId,j]));
@@ -35,7 +92,7 @@ export function assembleDaemonPhase(records,workerRecords) {
       telemetryWriteMs:(overhead.get(r.requestId)?.telemetryWriteMs??0)+r.startWriteMs,completedAtMs:r.completedAtMs-phase.originMs})));
     coverage.push({tenantKey,boots:samples.filter(r=>r.type==='boot').length,starts:selected.length});
   }
-  const raw={...phase,...result,requests,requestStarts,completions:[],coverage};
+  const raw={...phase,...result,inventory,requests,requestStarts,completions:[],coverage};
   return {raw,summary:summarizeLoadPhase(raw)};
 }
 
@@ -48,13 +105,15 @@ export function boundedDaemonVerdict(raw,summary) {
 }
 
 async function main() {
-  const [mode,directoryArg,phaseArg]=process.argv.slice(2),directory=path.resolve(directoryArg||'');
+  const [mode,directoryArg,phaseArg]=process.argv.slice(2),directory=directoryArg;
   if(!directoryArg||!['prepare','run','compare'].includes(mode))throw Error('Usage: node scripts/m4-daemon-load.mjs prepare|run|compare ABSOLUTE_FIXTURE_DIR [baseline|loaded]');
+  assertUnaliasedAbsoluteDirectory(directory);
   if(mode==='prepare'){prepareDaemonFixture(directory);console.log(JSON.stringify({prepared:true,directory,privateManifest:'manifest.private.json',fullD5Satisfied:false}));return;}
   if(mode==='compare') {
     const baseline=JSON.parse(readFileSync(path.join(directory,'baseline.report.json'),'utf8'));
     const loaded=JSON.parse(readFileSync(path.join(directory,'loaded.report.json'),'utf8'));
-    if(JSON.stringify(baseline.inventory)!==JSON.stringify(loaded.inventory))throw Error('Profile/worker inventory changed between phases');
+    assertMatchingDaemonInventory(baseline.inventory,loaded.inventory);
+    if(!uuid(baseline.fixtureId)||baseline.fixtureId!==loaded.fixtureId)throw Error('Comparison fixture identity mismatch');
     const fairness=compareQuietTenants(baseline.summary,loaded.summary,['quiet']);
     const report={result:baseline.result==='PASS'&&loaded.result==='PASS'&&fairness.every(f=>f.passed)?'PASS':'FAIL',fairness,
       baseline:baseline.summary,loaded:loaded.summary,fullD5Satisfied:false,scope:loaded.scope,limits:loaded.limits};
@@ -65,6 +124,12 @@ async function main() {
   const manifest=JSON.parse(readFileSync(path.join(directory,'manifest.private.json'),'utf8'));
   if(manifest.durationMs!==15000||manifest.drainMs!==30000||manifest.tenants.length!==2||manifest.tenants[0].rate!==2||manifest.tenants[1].rate!==20)throw Error('Unchanged fixed 2/s, 20/s and deadlines required');
   const args=['compose','--project-name',process.env.AOA_E6F_COMPOSE_PROJECT,'--env-file',path.join(directory,'fixture.env'),'-f',path.join(repo,'docker-compose.d1.yml'),'-f',path.join(directory,'compose.json')];
+  const found=spawnSync('docker',['ps','-a','--filter','label=com.docker.compose.project='+process.env.AOA_E6F_COMPOSE_PROJECT,'--format','{{.ID}}'],{encoding:'utf8',timeout:15000});
+  if(found.error||found.status!==0||!found.stdout.trim())throw Error('Fixture project containers unavailable');
+  const ids=found.stdout.trim().split(/\s+/);
+  const inspected=spawnSync('docker',['inspect',...ids],{encoding:'utf8',timeout:15000,maxBuffer:16*1024*1024});
+  if(inspected.error||inspected.status!==0)throw Error('Fixture project inspection failed');
+  verifyDaemonProjectIdentity(JSON.parse(inspected.stdout),manifest,directory,process.env.AOA_E6F_COMPOSE_PROJECT);
   const records=[],fd=openSync(path.join(directory,phaseArg+'.stream.ndjson'),'ax',0o600);
   const child=spawn('docker',[...args,'exec','-T','control-plane','node','--input-type=module'],{cwd:repo,stdio:['pipe','pipe','pipe']});
   let pending='',stderr='';
@@ -85,9 +150,9 @@ async function main() {
   const journal=spawnSync('docker',[...args,'exec','-T','control-plane','cat','/aoa/m4-'+phaseArg+'.ndjson'],{encoding:'utf8',timeout:15000,maxBuffer:32*1024*1024});
   if(journal.status!==0)throw Error('Control-plane journal unavailable; cannot reconstruct complete cohort');
   writeFileSync(path.join(directory,phaseArg+'.durable.ndjson'),journal.stdout,{flag:'wx',mode:0o600});
-  const {raw,summary}=assembleDaemonPhase(parseLines(journal.stdout),workers);
-  const report={result:status===0&&boundedDaemonVerdict(raw,summary)?'PASS':'FAIL',scope:manifest.scope,summary,
-    inventory:records.find(r=>r.type==='inventory')?.inventory,fullD5Satisfied:false,
+  const {raw,summary}=assembleDaemonPhase(parseLines(journal.stdout),workers,{streamRecords:records});
+  const report={result:status===0&&boundedDaemonVerdict(raw,summary)?'PASS':'FAIL',scope:manifest.scope,summary,fixtureId:manifest.fixtureId,
+    inventory:raw.inventory,fullD5Satisfied:false,
     limits:['15s load + 30s immutable drain; two organizations, one control plane, same host',
       'Deterministic provider fixture, no paid provider; fixture-only company secret handle',
       'Direct production placement service after authenticated API submit; no SQL job/attempt/placement writes',
