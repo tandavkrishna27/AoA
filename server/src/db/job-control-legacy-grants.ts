@@ -376,6 +376,8 @@ export const OPERATOR_JOB_PLACEMENT_TARGET_SELECT_COLUMNS = Object.freeze([
 export const APP_JOB_PLACEMENT_TARGET_UPDATE_COLUMNS = Object.freeze([
   "registered_profile", "registered_profile_hash", "provider_constraint_profile", "updated_at",
 ] as const);
+/** C14 narrow canary successor route: no other registry field is mutable here. */
+export const APP_CANARY_SUCCESSOR_TARGET_UPDATE_COLUMNS = Object.freeze(["slug"] as const);
 export const OPERATOR_JOB_PLACEMENT_TARGET_UPDATE_COLUMNS = APP_JOB_PLACEMENT_TARGET_UPDATE_COLUMNS;
 
 function sortedUnion(...collections: readonly (readonly string[])[]): readonly string[] {
@@ -679,7 +681,7 @@ const PLAN_DERIVED_ACL_MATRIX = deepFreeze({
       id: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       organization_id: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       owner_user_id: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
-      slug: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
+      slug: { aoa_app: ["SELECT", "UPDATE"], aoa_operator: ["SELECT"] },
       kind: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       trust_class: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       status: { aoa_app: ["SELECT", "UPDATE"], aoa_operator: ["SELECT", "UPDATE"] },

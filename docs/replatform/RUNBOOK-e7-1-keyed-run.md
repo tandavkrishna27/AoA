@@ -360,6 +360,30 @@ denies `worker_transfer_denied` **permanently**, with no container reset route. 
 **fresh org** — a legacy `environment_leases` row can never satisfy the preflight's
 closure clause.
 
+**Replacing a retired canary target.** A disabled target retains the canonical
+slug, so creating another target with `aoa-canary-e2b` returns a conflict. First
+complete the durable `revokeExecutionTarget` cutoff and its offline fanout for
+the old target. Create and ratify a **distinct** organization `dedicated_worker`
+with a staging slug and the same exact profile requirements above. Then call,
+as an organization admin with `execution_target:manage`:
+
+```
+POST /api/organizations/<ORG_UUID>/execution-targets/<RETIRED_TARGET_ID>/successor
+{ "successorTargetId": "<NEW_TARGET_ID>" }
+```
+
+The operation requires the old target to be disabled at a generation beyond its
+**completed** durable revocation receipt and the new target to be active with a
+valid ratified profile. It atomically changes only the two routing slugs: the
+old row becomes `retired-to-<NEW_TARGET_ID>` and the successor becomes
+`aoa-canary-e2b`. The response reports `handed_off`, or `already_current` on
+an exact repeat while the successor remains current. Existing target IDs,
+generations, worker identities, attempts, leases, and fences stay attached to
+their original targets. Enroll a new worker on `<NEW_TARGET_ID>` using the
+existing one-time ticket flow, then submit a **new governed task** to test the
+successor. Previously decided attempts and automatic retries retain their
+original placement snapshot; this operation does not re-place them.
+
 ---
 
 ## 8. Set a Company E2B provider key; raise the agent concurrency cap

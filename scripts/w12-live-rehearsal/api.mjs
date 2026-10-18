@@ -14,7 +14,8 @@
 //   POST /companies/:id/secrets and /runtime-provider-keys/with-secret.
 // provision-target: POST /organizations/:id/execution-targets, PUT placement-profile,
 //   POST enrollment-codes. W12_TARGET_SLUG defaults to aoa-canary-e2b; set a fresh
-//   slug for a replacement, and separately resolve the canary's fixed-slug routing.
+//   slug for a replacement. handoff-target: W12_RETIRED_TARGET_ID and
+//   W12_SUCCESSOR_TARGET_ID -> explicit POST /execution-targets/:old/successor.
 // submit: W12_TASK_DESCRIPTION_FILE and optional W12_TASK_TITLE -> POST /issues.
 // observe: GET /heartbeat-runs, /jobs/:id, /issues/:id/outputs; optional W12_ISSUE_ID
 //   and W12_JOB_ID disambiguate. download: W12_OUTPUT_ID and
@@ -36,7 +37,7 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const protocol = await import(pathToFileURL(path.resolve(here, "../../packages/worker-protocol/dist/index.js")).href);
 const { canonicalProviderConstraintProfileDigestInputV1 } = protocol;
-const phases = new Set(["seed-identity", "refresh-session", "seed", "provision-target", "submit", "observe", "download"]);
+const phases = new Set(["seed-identity", "refresh-session", "seed", "provision-target", "handoff-target", "submit", "observe", "download"]);
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const isUuid = (value) => typeof value === "string" && uuid.test(value);
@@ -292,6 +293,34 @@ async function provisionTarget(dir, origin, state) {
     registeredProfileHash: ratified.registeredProfileHash, ticketFile: path.join(dir, filename) };
 }
 
+async function handoffTarget(dir, origin, state) {
+  if (!isUuid(state.organizationId)) throw new Error("run seed first");
+  const retiredTargetId = requireEnv("W12_RETIRED_TARGET_ID").toLowerCase();
+  const successorTargetId = requireEnv("W12_SUCCESSOR_TARGET_ID").toLowerCase();
+  if (!isUuid(retiredTargetId) || !isUuid(successorTargetId) || retiredTargetId === successorTargetId) {
+    throw new Error("invalid W12 handoff target IDs");
+  }
+  const retired = state.targets?.find((target) => target.id === retiredTargetId);
+  const successor = state.targets?.find((target) => target.id === successorTargetId);
+  if (!retired || !successor) throw new Error("target IDs must be provisioned in private state");
+  const cookie = await boardCookie(dir);
+  const result = await request(origin, "POST",
+    `/organizations/${state.organizationId}/execution-targets/${retiredTargetId}/successor`,
+    { cookie, body: { successorTargetId } });
+  const retiredSlug = `retired-to-${successorTargetId}`;
+  if (!["handed_off", "already_current"].includes(result.result) ||
+      result.organizationId !== state.organizationId ||
+      result.retiredTargetId !== retiredTargetId || result.successorTargetId !== successorTargetId ||
+      result.retiredSlug !== retiredSlug || result.executionTargetSlug !== CANARY_EXECUTION_TARGET_SLUG) {
+    throw new Error("target handoff response does not match requested transition");
+  }
+  retired.slug = retiredSlug;
+  successor.slug = CANARY_EXECUTION_TARGET_SLUG;
+  await saveState(dir, state);
+  return { phase: "handoff-target", result: result.result, retiredTargetId,
+    successorTargetId, retiredSlug, executionTargetSlug: CANARY_EXECUTION_TARGET_SLUG };
+}
+
 async function submit(dir, origin, state) {
   if (!isUuid(state.companyId) || !isUuid(state.agentId)) throw new Error("run seed first");
   const cookie = await boardCookie(dir);
@@ -371,7 +400,7 @@ async function download(dir, origin, state) {
 
 async function main() {
   const phase = process.argv[2];
-  if (!phases.has(phase)) throw new Error("phase must be seed-identity, refresh-session, seed, provision-target, submit, observe, or download");
+  if (!phases.has(phase)) throw new Error("phase must be seed-identity, refresh-session, seed, provision-target, handoff-target, submit, observe, or download");
   const dir = await privateDir();
   const origin = baseUrl();
   const state = await loadState(dir);
@@ -379,6 +408,7 @@ async function main() {
     : phase === "refresh-session" ? await refreshSession(dir, origin, state)
     : phase === "seed" ? await seed(dir, origin, state)
     : phase === "provision-target" ? await provisionTarget(dir, origin, state)
+    : phase === "handoff-target" ? await handoffTarget(dir, origin, state)
     : phase === "submit" ? await submit(dir, origin, state)
     : phase === "observe" ? await observe(dir, origin, state)
     : await download(dir, origin, state);

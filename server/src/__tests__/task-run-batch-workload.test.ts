@@ -164,7 +164,10 @@ describe("the command", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const script = result.workload.args[1]!;
-    expect(script).not.toContain("rm -rf");
+    // Codex now removes its private auth home with rm -rf; the hostile root target must
+    // still never enter either fixed script.
+    expect(script).not.toContain("rm -rf /");
+    if (adapterType === "claude_local") expect(script).not.toContain("rm -rf");
     expect(script).not.toContain(hostile);
     expect(result.workload.args[SANDBOX_INVOCATION_BINARY_ARG_INDEX]).toBe(hostile);
   });
@@ -237,7 +240,7 @@ describe("the per-adapter argv shapes (CLI-008 Unit D)", () => {
     expect(result.ok && result.workload.args).toEqual([
       "-c",
       expect.stringContaining(
-        'exec "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"',
+        '"$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"',
       ),
       "codex",
       STAGED_PROMPT_PATH,
@@ -366,7 +369,7 @@ describe("the instructions bundle (CLI-008 Unit D)", () => {
   function stdinFromScript(script: string, bundle: string, prompt: string): string {
     if (script.includes('{ cat "$2"; echo; cat "$1"; } | "$0"')) return `${bundle}\n${prompt}`;
     if (script.includes('cat "$2" "$1" | "$0"')) return `${bundle}${prompt}`;
-    if (script.includes('exec "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"'))
+    if (script.includes('"$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"'))
       return prompt;
     throw new Error(`stdinFromScript does not understand this script: ${script}`);
   }

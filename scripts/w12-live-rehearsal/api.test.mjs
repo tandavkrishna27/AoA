@@ -19,7 +19,40 @@ const ids = {
   e2bKey: "77777777-7777-4777-8777-777777777777",
   job: "88888888-8888-4888-8888-888888888888",
   output: "99999999-9999-4999-8999-999999999999",
+  retiredTarget: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  successorTarget: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
 };
+
+test("explicit handoff phase sends only exact target IDs and preserves private target history", async () => {
+  await privateFixture(async (dir) => {
+    await writeFile(path.join(dir, "state.json"), JSON.stringify({ organizationId: ids.organization,
+      targets: [{ id: ids.retiredTarget, slug: "aoa-canary-e2b" },
+        { id: ids.successorTarget, slug: "w12-staging" }] }));
+    await writeFile(path.join(dir, "session.cookie"), "better-auth.session_token=signed.mock\n");
+    await mockApi(({ method, url, body }) => {
+      assert.equal(method, "POST");
+      assert.equal(url, `/api/organizations/${ids.organization}/execution-targets/${ids.retiredTarget}/successor`);
+      assert.deepEqual(body, { successorTargetId: ids.successorTarget });
+      return { body: { result: "handed_off", organizationId: ids.organization,
+        retiredTargetId: ids.retiredTarget, successorTargetId: ids.successorTarget,
+        retiredSlug: `retired-to-${ids.successorTarget}`, executionTargetSlug: "aoa-canary-e2b" } };
+    }, async (origin, calls) => {
+      const env = { W12_RETIRED_TARGET_ID: ids.retiredTarget, W12_SUCCESSOR_TARGET_ID: ids.successorTarget };
+      const first = await runApi("handoff-target", dir, origin, env);
+      assert.equal(first.code, 0, first.stderr);
+      assert.equal(calls.length, 1);
+      assert.deepEqual(JSON.parse(first.stdout), { phase: "handoff-target", result: "handed_off",
+        retiredTargetId: ids.retiredTarget, successorTargetId: ids.successorTarget,
+        retiredSlug: `retired-to-${ids.successorTarget}`, executionTargetSlug: "aoa-canary-e2b" });
+      const state = JSON.parse(await readFile(path.join(dir, "state.json"), "utf8"));
+      assert.equal(state.targets[0].slug, `retired-to-${ids.successorTarget}`);
+      assert.equal(state.targets[1].slug, "aoa-canary-e2b");
+      const invalid = await runApi("handoff-target", dir, origin, { ...env, W12_SUCCESSOR_TARGET_ID: ids.retiredTarget });
+      assert.equal(invalid.code, 1);
+      assert.equal(calls.length, 1);
+    });
+  });
+});
 
 async function privateFixture(run) {
   const dir = await mkdtemp(path.join(os.tmpdir(), "w12-api-mock-"));

@@ -38,6 +38,12 @@ export const createExecutionTargetSchema = z.object({
 });
 export type CreateExecutionTargetInput = z.infer<typeof createExecutionTargetSchema>;
 
+/** The only caller choice in an explicit fixed-canary successor handoff. */
+export const canaryExecutionTargetSuccessorSchema = z.object({
+  successorTargetId: z.string().uuid(),
+}).strict();
+export type CanaryExecutionTargetSuccessorInput = z.infer<typeof canaryExecutionTargetSuccessorSchema>;
+
 export const workerExecutionTargetHeartbeatSchema = z.object({
   status: z.enum(["active", "draining", "offline"]).optional(),
   capabilities: z.record(z.unknown()).optional(),

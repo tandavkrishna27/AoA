@@ -15,6 +15,7 @@ import {
   APP_EXECUTION_TARGET_COLUMN_GRANTS,
   APP_ENROLLMENT_TARGET_SELECT_COLUMNS,
   APP_ENROLLMENT_TARGET_UPDATE_COLUMNS,
+  APP_CANARY_SUCCESSOR_TARGET_UPDATE_COLUMNS,
   APP_JOB_PLACEMENT_TARGET_SELECT_COLUMNS,
   APP_JOB_PLACEMENT_TARGET_UPDATE_COLUMNS,
   APP_MCP_API_KEY_COLUMN_GRANTS,
@@ -289,6 +290,8 @@ async function assertExactServingRoleAuthority(db: Db, role: ServingRole): Promi
               row.column_name as (typeof APP_ENROLLMENT_TARGET_UPDATE_COLUMNS)[number]
             ) || APP_JOB_PLACEMENT_TARGET_UPDATE_COLUMNS.includes(
               row.column_name as (typeof APP_JOB_PLACEMENT_TARGET_UPDATE_COLUMNS)[number]
+            ) || APP_CANARY_SUCCESSOR_TARGET_UPDATE_COLUMNS.includes(
+              row.column_name as (typeof APP_CANARY_SUCCESSOR_TARGET_UPDATE_COLUMNS)[number]
             )
           : OPERATOR_ENROLLMENT_TARGET_UPDATE_COLUMNS.includes(
               row.column_name as (typeof OPERATOR_ENROLLMENT_TARGET_UPDATE_COLUMNS)[number]

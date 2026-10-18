@@ -7,8 +7,10 @@ import type { Db } from "@armyofagents/db";
 import { executionTargets } from "@armyofagents/db";
 import {
   createExecutionTargetSchema,
+  canaryExecutionTargetSuccessorSchema,
   workerExecutionTargetHeartbeatSchema,
   type CreateExecutionTargetInput,
+  type CanaryExecutionTargetSuccessorInput,
   type WorkerExecutionTargetHeartbeatInput,
   WORKER_CONTROL_HEADERS,
 } from "@armyofagents/shared";
@@ -22,11 +24,13 @@ import {
   ratifyPlatformExecutionTargetPlacementProfile,
   ratifyTenantExecutionTargetPlacementProfile,
   rotateExecutionTargetWorkerToken,
+  handoffCanaryExecutionTargetSuccessor,
+  CanarySuccessorError,
   stripWorkerSecret,
 } from "../services/execution-targets.js";
 import { organizationAccessService } from "../services/organization-access.js";
 import { assertBoard, assertCanManageInstanceSettings } from "./authz.js";
-import { conflict, forbidden, notFound, unauthorized } from "../errors.js";
+import { badRequest, conflict, forbidden, notFound, unauthorized } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { validate } from "../middleware/validate.js";
 import { isUniqueViolation } from "../services/db-errors.js";
@@ -223,6 +227,37 @@ export function executionTargetRoutes(opts: {
       next(err);
     }
   });
+
+  router.post("/organizations/:orgId/execution-targets/:retiredTargetId/successor",
+    validate(canaryExecutionTargetSuccessorSchema), async (req, res, next) => {
+      try {
+        const organizationId = uuidParam.parse(req.params.orgId);
+        const retiredTargetId = uuidParam.parse(req.params.retiredTargetId);
+        await assertOrgAdmin(req, organizationId);
+        if (!opts.workerSession) throw forbidden("Distributed execution registry is disabled");
+        const { successorTargetId } = req.body as CanaryExecutionTargetSuccessorInput;
+        const result = await handoffCanaryExecutionTargetSuccessor({
+          appDb: opts.workerSession.appDb, operatorDb: opts.workerSession.operatorDb,
+          organizationId, retiredTargetId, successorTargetId,
+        });
+        if (result.result === "handed_off") logger.info({
+          action: "execution_target.canary_successor.handed_off",
+          operatorUserId: req.actor.type === "board" ? (req.actor.userId ?? null) : null,
+          organizationId, retiredTargetId, successorTargetId,
+          retiredSlug: result.retiredSlug, executionTargetSlug: result.executionTargetSlug,
+          outcome: result.result, scope: "org_scoped",
+        }, "canary execution target successor handoff");
+        res.json(result);
+      } catch (error) {
+        if (error instanceof CanarySuccessorError) {
+          if (error.code === "not_found") { next(notFound("Execution target not found")); return; }
+          if (error.code === "invalid_input") { next(badRequest("Invalid successor target")); return; }
+          next(conflict("Canary successor handoff prerequisites are not satisfied"));
+          return;
+        }
+        next(error);
+      }
+    });
 
   router.post("/organizations/:orgId/execution-targets/:targetId/rotate-token", async (req, res, next) => {
     try {

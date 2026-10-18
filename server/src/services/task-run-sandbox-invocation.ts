@@ -246,9 +246,22 @@ export function buildSandboxInvocation(input: {
       // run has no human to answer codex's approval prompt, and both flags are scoped to this
       // throwaway sandbox only. They are options of the `exec` subcommand, so they sit after
       // `exec --json` and before the `-` stdin positional (codex-local/src/server/execute.ts:553-566).
+      // The distributed CLI needs its own login: an ambient OPENAI_API_KEY alone does not
+      // authenticate `codex exec`. Keep its auth file in a private, per-run CODEX_HOME outside
+      // the output directory; pass the redeemed key to login only on stdin, then remove it from
+      // the exec environment. The EXIT trap also runs for nonzero CLI exits and handled signals.
+      const auth =
+        `[ -n "\${OPENAI_API_KEY:-}" ] || { echo "[cli-008] governed Codex credential unavailable" >&2; exit 77; }; ` +
+        `case "\${HOME:-/home/user}/" in /home/user/aoa-output/*) echo "[cli-008] private Codex home unavailable" >&2; exit 77;; esac; ` +
+        `CODEX_HOME=$(mktemp -d "\${HOME:-/home/user}/.aoa-codex-XXXXXX" 2>/dev/null) || { echo "[cli-008] private Codex home unavailable" >&2; exit 77; }; ` +
+        `export CODEX_HOME; ` +
+        `trap 'status=$?; trap - 0; rm -rf -- "$CODEX_HOME"; exit "$status"' 0; ` +
+        `trap 'exit 129' 1; trap 'exit 130' 2; trap 'exit 143' 15; ` +
+        `printf '%s\\n' "$OPENAI_API_KEY" | "$0" login --with-api-key >/dev/null 2>&1 || { echo "[cli-008] Codex login failed" >&2; exit 77; }; ` +
+        `unset OPENAI_API_KEY`;
       script = hasInstructions
-        ? `${guard}; { cat "$2"; echo; cat "$1"; } | "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -`
-        : `${guard}; exec "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"`;
+        ? `${guard}; ${auth}; { cat "$2"; echo; cat "$1"; } | "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -`
+        : `${guard}; ${auth}; "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"`;
       break;
     default:
       return null;

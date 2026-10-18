@@ -2010,6 +2010,13 @@
       "when": 1791461687620,
       "tag": "0286_mixed_jigsaw",
       "breakpoints": true
+    },
+    {
+      "idx": 287,
+      "version": "7",
+      "when": 1792300189239,
+      "tag": "0287_canary_successor_slug_update",
+      "breakpoints": true
     }
   ]
 }
