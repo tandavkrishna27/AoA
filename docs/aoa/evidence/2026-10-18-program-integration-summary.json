@@ -1,0 +1,3478 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-10-18",
+  "timezone": "Asia/Calcutta",
+  "branch": "docs/replatform-program",
+  "applicationCandidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+  "sourceTree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+  "priorProgramTip": "13b4e806f31a67c3c172f2216272570203132f8f",
+  "documentationPublication": "Separate later docs-only commit; tests and review deployment use the application candidate above",
+  "mergeOrder": [
+    {
+      "branch": "codex/replatform-baseline-w00-w04",
+      "source": "e3a6afaac52e6ec7df2b9cb5733591d3b2adbc41",
+      "merge": "30076d90dd64e07b8b452e17b87f7d137d531d01"
+    },
+    {
+      "branch": "codex/replatform-w02-w05",
+      "source": "74a786efc2e299c03d39e27fbf1ce3919de2eada",
+      "merge": "85075c731e5b0b933a73b4d7a2d3ec09aece0cf0"
+    },
+    {
+      "branch": "codex/w12-worker-lifecycle",
+      "source": "ba0d391642d75c3127852c7c499ba44d5b57c37d",
+      "merge": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+    }
+  ],
+  "scope": {
+    "targetedOnly": true,
+    "mainMergedOrPushed": false,
+    "newProductionEdits": false,
+    "wholeSuiteRun": false,
+    "rootBuildRun": false,
+    "recursiveWholeRepositoryTypecheckRun": false,
+    "liveJourneyRun": false,
+    "suppliedModelOrE2bKeysUsed": false,
+    "personalAuthTransferred": false,
+    "distributedRolloutEnabled": false,
+    "databaseReset": false,
+    "interactiveOnboardingRepeated": false
+  },
+  "affectedPackages": [
+    "@armyofagents/adapter-utils",
+    "@armyofagents/worker-daemon",
+    "@armyofagents/sandbox-e2b-provider",
+    "@armyofagents/adapter-manager",
+    "@armyofagents/server",
+    "@armyofagents/adapter-claude-local",
+    "@armyofagents/adapter-gemini-local",
+    "@armyofagents/adapter-opencode-local",
+    "@armyofagents/adapter-codex-local",
+    "@armyofagents/cli"
+  ],
+  "local": {
+    "lanes": {
+      "baselineW02W05": {
+        "files": 64,
+        "total": 692,
+        "passed": 690,
+        "failed": 0,
+        "skipped": 2
+      },
+      "w12": {
+        "files": 12,
+        "total": 89,
+        "passed": 88,
+        "failed": 0,
+        "skipped": 1
+      },
+      "provider": {
+        "files": 3,
+        "total": 56,
+        "passed": 56,
+        "failed": 0,
+        "skipped": 0
+      },
+      "artifactDb": {
+        "files": 1,
+        "total": 39,
+        "passed": 16,
+        "failed": 0,
+        "skipped": 23
+      }
+    },
+    "totals": {
+      "files": 80,
+      "total": 876,
+      "passed": 850,
+      "failed": 0,
+      "skipped": 26
+    },
+    "stages": [
+      {
+        "stage": "build",
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 18184,
+          "gitSha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+        },
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "--filter",
+            "@armyofagents/adapter-claude-local",
+            "--filter",
+            "@armyofagents/adapter-gemini-local",
+            "--filter",
+            "@armyofagents/adapter-opencode-local",
+            "--filter",
+            "@armyofagents/adapter-codex-local",
+            "--filter",
+            "@armyofagents/cli",
+            "build"
+          ]
+        },
+        "startedAt": "2026-10-18T01:08:03.154Z",
+        "durationMs": 65754.03,
+        "exitCode": 0,
+        "unhandledErrors": "unknown"
+      },
+      {
+        "stage": "typecheck",
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 25560,
+          "gitSha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+        },
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "--filter",
+            "@armyofagents/adapter-claude-local",
+            "--filter",
+            "@armyofagents/adapter-gemini-local",
+            "--filter",
+            "@armyofagents/adapter-opencode-local",
+            "--filter",
+            "@armyofagents/adapter-codex-local",
+            "--filter",
+            "@armyofagents/cli",
+            "typecheck"
+          ]
+        },
+        "startedAt": "2026-10-18T01:09:08.910Z",
+        "durationMs": 87327.54,
+        "exitCode": 0,
+        "unhandledErrors": "unknown"
+      },
+      {
+        "stage": "targeted",
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 1880,
+          "gitSha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+        },
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "node_modules/vitest/vitest.mjs",
+            "run",
+            "server/src/__tests__/native-crew-tool-capture.test.ts",
+            "server/src/__tests__/codex-crew-tool-capture.test.ts",
+            "server/src/__tests__/aoa-runner.test.ts",
+            "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+            "server/src/__tests__/crew-tool-authority.test.ts",
+            "server/src/__tests__/crew-cancellation.test.ts",
+            "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+            "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+            "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+            "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+            "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+            "server/src/__tests__/task-outputs-routes.test.ts",
+            "server/src/__tests__/artifact-size-ceiling.test.ts",
+            "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+            "packages/adapters/claude-local/src/server/parse.test.ts",
+            "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+            "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+            "server/src/__tests__/claude-local-adapter.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+            "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+            "packages/adapters/opencode-local/src/server/parse.test.ts",
+            "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+            "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+            "server/src/__tests__/opencode-local-adapter.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+            "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+            "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+            "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+            "server/src/__tests__/auth-crew-run-boundary.test.ts",
+            "server/src/__tests__/agent-auth-jwt.test.ts",
+            "server/src/__tests__/auth-commander-jwt.test.ts",
+            "server/src/__tests__/mcp-agent-actor.test.ts",
+            "server/src/__tests__/mcp-run-currency-gate.test.ts",
+            "server/src/__tests__/broker-tool-context.unit.test.ts",
+            "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+            "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+            "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+            "server/src/__tests__/mcp-bridge-role-check.test.ts",
+            "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+            "server/src/__tests__/authorize-tool.test.ts",
+            "server/src/__tests__/hub-curation.test.ts",
+            "server/src/__tests__/hub-curation-tools.test.ts",
+            "server/src/__tests__/hub-curation.integration.test.ts",
+            "server/src/__tests__/sweep-steward.test.ts",
+            "server/src/__tests__/server-shutdown.test.ts",
+            "server/src/__tests__/costs-service.test.ts",
+            "server/src/__tests__/costs-idempotency.integration.test.ts",
+            "server/src/__tests__/mcp-server.test.ts",
+            "server/src/__tests__/crew-run-jwt.test.ts",
+            "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+            "cli/src/__tests__/run-entrypoint.test.ts",
+            "cli/src/__tests__/bundle-runtime.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\local-core\\targeted.json"
+          ]
+        },
+        "startedAt": "2026-10-18T01:10:36.239Z",
+        "durationMs": 35257.09,
+        "exitCode": 0,
+        "unhandledErrors": "unknown"
+      },
+      {
+        "stage": "provider",
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 30148,
+          "gitSha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+        },
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "node_modules/vitest/vitest.mjs",
+            "run",
+            "src/__tests__/artifact-operation-cancellation.test.ts",
+            "src/__tests__/enumerate-and-bounded-read.test.ts",
+            "src/__tests__/artifact-export.test.ts",
+            "--config",
+            "vitest.config.ts",
+            "--root",
+            "packages/sandbox-e2b-provider",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\local-core\\provider.json"
+          ]
+        },
+        "startedAt": "2026-10-18T01:11:11.498Z",
+        "durationMs": 4166.55,
+        "exitCode": 0,
+        "unhandledErrors": "unknown"
+      },
+      {
+        "stage": "artifact-db",
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 10252,
+          "gitSha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+        },
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "node_modules/vitest/vitest.mjs",
+            "run",
+            "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+            "--testNamePattern",
+            "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\local-core\\artifact-db.json"
+          ]
+        },
+        "startedAt": "2026-10-18T01:11:15.667Z",
+        "durationMs": 14420.51,
+        "exitCode": 0,
+        "unhandledErrors": "unknown"
+      }
+    ],
+    "w12": {
+      "vitest": {
+        "success": true,
+        "selectedFiles": 12,
+        "observedFiles": 12,
+        "total": 89,
+        "passed": 88,
+        "failed": 0,
+        "skipped": 1,
+        "reportedCounters": {
+          "total": 89,
+          "passed": 88,
+          "failed": 0,
+          "pending": 1
+        },
+        "unhandledErrors": "unknown"
+      },
+      "native": {
+        "tests": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0,
+        "nestedReports": [
+          {
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\local-w12\\runtime\\aoa-m4-native-fence-3kUaDB\\vitest-result.json",
+            "passed": 1,
+            "failed": 0,
+            "pending": 4,
+            "success": true
+          },
+          {
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\local-w12\\runtime\\aoa-m4-native-fence-3kUaDB\\artifact-recovery-result.json",
+            "passed": 2,
+            "failed": 0,
+            "pending": 37,
+            "success": true
+          }
+        ],
+        "nestedCasesIncludedInOuterTests": true,
+        "unhandledErrors": "unknown"
+      },
+      "image": [
+        {
+          "id": "sha256:41f4376182e5d3fb2e20f5277e53bb826bac38f32f1be9c8e2e247edeeafeb41",
+          "architecture": "amd64",
+          "os": "linux",
+          "user": "node",
+          "labels": {
+            "aoa.work": "program-integration-20261018",
+            "org.armyofagents.image.role": "worker",
+            "org.armyofagents.image.rootfs": "read-only",
+            "org.opencontainers.image.description": "Army of Agents worker daemon — least-privilege split image (E4-D01 closure)",
+            "org.opencontainers.image.revision": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+            "org.opencontainers.image.source": "https://github.com/meteoritelabs/aoa",
+            "org.opencontainers.image.title": "AoA Worker",
+            "org.opencontainers.image.version": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+          },
+          "repoTags": [
+            "aoa-worker:program-integration-local"
+          ]
+        }
+      ],
+      "cleanup": {
+        "before": {
+          "observedAt": "2026-10-18T01:08:09.489Z",
+          "ownedLabelContainers": [],
+          "nativeFixtureContainers": []
+        },
+        "after": {
+          "observedAt": "2026-10-18T01:11:19.321Z",
+          "ownedLabelContainers": [],
+          "nativeFixtureContainers": []
+        },
+        "remainingOwnedLabelContainers": 0,
+        "remainingNewNativeContainers": [],
+        "cleanupCommandsIssuedByHarness": [],
+        "fixtureCleanup": "Test-owned docker run --rm and native wrapper finally stop only its recorded ID; no global pruning or old-resource removal",
+        "temporaryFixtureStatePreserved": true
+      }
+    },
+    "startupSmoke": {
+      "schemaVersion": 1,
+      "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+      "result": "pass",
+      "startedAt": "2026-10-18T01:13:14.9647722Z",
+      "finishedAt": "2026-10-18T01:13:36.8312383Z",
+      "nodeVersion": "v24.19.0",
+      "health": {
+        "status": "ok",
+        "revision": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "deploymentMode": "local_trusted",
+        "deploymentExposure": "private",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": true
+        }
+      },
+      "http": [
+        {
+          "status": 200,
+          "html": true,
+          "bytes": 3875,
+          "rootElement": true,
+          "route": "/"
+        },
+        {
+          "status": 200,
+          "html": true,
+          "bytes": 3875,
+          "rootElement": true,
+          "route": "/onboarding"
+        }
+      ],
+      "initialCompanyCount": 0,
+      "configCreated": true,
+      "keyCreated": true,
+      "sourceBefore": {
+        "sha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "porcelainV1": ""
+      },
+      "sourceAfter": {
+        "sha": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "porcelainV1": ""
+      },
+      "httpOnly": true,
+      "interactiveOnboarding": false,
+      "browserProof": false,
+      "companyCreated": false,
+      "modelRun": false,
+      "operatorStoppedLongRunningServer": true,
+      "databaseStopExit": 0,
+      "processStopExit": 0,
+      "remainingListeners": [],
+      "remainingOwnedProcesses": [],
+      "preexistingListenerIdentityUnchanged": true,
+      "error": null,
+      "cleanupError": null
+    },
+    "windowsFixtureCleanup": {
+      "automaticTeardownCertified": false,
+      "fixture": "server/src/__tests__/hub-curation.integration.test.ts",
+      "loggedPostmasterPid": 22976,
+      "loggedPostmasterPort": 61080,
+      "observedChildRole": "io_worker",
+      "targetPid": 21000,
+      "parentPid": 22976,
+      "expectedCreatedAt": "2026-10-18T01:10:56.561105Z",
+      "stopAttempted": true,
+      "stopSucceeded": true,
+      "rootCause": "unknown",
+      "elevation": false,
+      "alternateTermination": false,
+      "scope": "Exact attributed test orphan only; no production edits or reproduction",
+      "pendingF09": "Fresh Windows fixture ownership and shutdown evidence is required; no production custody or historical root-cause claim",
+      "identityGate": true,
+      "noNewListenerOwnerReuse": true,
+      "stopCommand": [
+        "Stop-Process",
+        "-Id",
+        "21000",
+        "-Force",
+        "-ErrorAction",
+        "Stop"
+      ],
+      "listenerAbsentAfter": true,
+      "protectedIdentityUnchanged": true,
+      "sourceCommitUnchanged": true,
+      "cleanupVerdict": "Exact attributed orphan absent and fixture port absent; no broader custody certification",
+      "startedAt": "2026-10-18T01:20:09.8711069Z",
+      "finishedAt": "2026-10-18T01:20:11.8005193Z"
+    }
+  },
+  "vps": {
+    "lanes": {
+      "baselineW02W05W12": {
+        "files": 76,
+        "total": 781,
+        "passed": 780,
+        "failed": 0,
+        "skipped": 1
+      },
+      "provider": {
+        "files": 3,
+        "total": 56,
+        "passed": 56,
+        "failed": 0,
+        "skipped": 0
+      },
+      "artifactDb": {
+        "files": 1,
+        "total": 39,
+        "passed": 16,
+        "failed": 0,
+        "skipped": 23
+      }
+    },
+    "totals": {
+      "files": 80,
+      "total": 876,
+      "passed": 852,
+      "failed": 0,
+      "skipped": 24
+    },
+    "stages": [
+      {
+        "stage": "install",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "install",
+          "--frozen-lockfile"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "dependencies2",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "-r",
+          "--filter",
+          "@armyofagents/adapter-utils^...",
+          "--filter",
+          "@armyofagents/worker-daemon^...",
+          "--filter",
+          "@armyofagents/sandbox-e2b-provider^...",
+          "--filter",
+          "@armyofagents/adapter-manager^...",
+          "--filter",
+          "@armyofagents/server^...",
+          "--filter",
+          "@armyofagents/adapter-claude-local^...",
+          "--filter",
+          "@armyofagents/adapter-gemini-local^...",
+          "--filter",
+          "@armyofagents/adapter-opencode-local^...",
+          "--filter",
+          "@armyofagents/adapter-codex-local^...",
+          "--filter",
+          "@armyofagents/cli^...",
+          "build"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "build",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "-r",
+          "--filter",
+          "@armyofagents/adapter-utils",
+          "--filter",
+          "@armyofagents/worker-daemon",
+          "--filter",
+          "@armyofagents/sandbox-e2b-provider",
+          "--filter",
+          "@armyofagents/adapter-manager",
+          "--filter",
+          "@armyofagents/server",
+          "--filter",
+          "@armyofagents/adapter-claude-local",
+          "--filter",
+          "@armyofagents/adapter-gemini-local",
+          "--filter",
+          "@armyofagents/adapter-opencode-local",
+          "--filter",
+          "@armyofagents/adapter-codex-local",
+          "--filter",
+          "@armyofagents/cli",
+          "build"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "typecheck",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "-r",
+          "--filter",
+          "@armyofagents/adapter-utils",
+          "--filter",
+          "@armyofagents/worker-daemon",
+          "--filter",
+          "@armyofagents/sandbox-e2b-provider",
+          "--filter",
+          "@armyofagents/adapter-manager",
+          "--filter",
+          "@armyofagents/server",
+          "--filter",
+          "@armyofagents/adapter-claude-local",
+          "--filter",
+          "@armyofagents/adapter-gemini-local",
+          "--filter",
+          "@armyofagents/adapter-opencode-local",
+          "--filter",
+          "@armyofagents/adapter-codex-local",
+          "--filter",
+          "@armyofagents/cli",
+          "typecheck"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "targeted",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "scripts/run-vitest-captured.mjs",
+          "--capture-dir",
+          "/opt/aoa-program-integration-20261018/evidence/targeted/vitest-capture",
+          "--",
+          "run",
+          "server/src/__tests__/native-crew-tool-capture.test.ts",
+          "server/src/__tests__/codex-crew-tool-capture.test.ts",
+          "server/src/__tests__/aoa-runner.test.ts",
+          "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+          "server/src/__tests__/crew-tool-authority.test.ts",
+          "server/src/__tests__/crew-cancellation.test.ts",
+          "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+          "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+          "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+          "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+          "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+          "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+          "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+          "server/src/__tests__/task-outputs-routes.test.ts",
+          "server/src/__tests__/artifact-size-ceiling.test.ts",
+          "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+          "packages/adapters/claude-local/src/server/parse.test.ts",
+          "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+          "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+          "server/src/__tests__/claude-local-adapter.test.ts",
+          "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+          "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+          "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+          "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+          "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+          "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+          "packages/adapters/opencode-local/src/server/parse.test.ts",
+          "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+          "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+          "server/src/__tests__/opencode-local-adapter.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+          "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+          "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+          "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+          "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+          "server/src/__tests__/auth-crew-run-boundary.test.ts",
+          "server/src/__tests__/agent-auth-jwt.test.ts",
+          "server/src/__tests__/auth-commander-jwt.test.ts",
+          "server/src/__tests__/mcp-agent-actor.test.ts",
+          "server/src/__tests__/mcp-run-currency-gate.test.ts",
+          "server/src/__tests__/broker-tool-context.unit.test.ts",
+          "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+          "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+          "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+          "server/src/__tests__/mcp-bridge-role-check.test.ts",
+          "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+          "server/src/__tests__/authorize-tool.test.ts",
+          "server/src/__tests__/hub-curation.test.ts",
+          "server/src/__tests__/hub-curation-tools.test.ts",
+          "server/src/__tests__/hub-curation.integration.test.ts",
+          "server/src/__tests__/sweep-steward.test.ts",
+          "server/src/__tests__/server-shutdown.test.ts",
+          "server/src/__tests__/costs-service.test.ts",
+          "server/src/__tests__/costs-idempotency.integration.test.ts",
+          "server/src/__tests__/mcp-server.test.ts",
+          "server/src/__tests__/crew-run-jwt.test.ts",
+          "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+          "cli/src/__tests__/run-entrypoint.test.ts",
+          "cli/src/__tests__/bundle-runtime.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+          "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+          "server/src/__tests__/worker-enrollment.integration.test.ts",
+          "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+          "server/src/__tests__/worker-revocation.integration.test.ts",
+          "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+          "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=/opt/aoa-program-integration-20261018/evidence/targeted/vitest.json"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "provider",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "scripts/run-vitest-captured.mjs",
+          "--capture-dir",
+          "/opt/aoa-program-integration-20261018/evidence/provider/vitest-capture",
+          "--",
+          "run",
+          "src/__tests__/artifact-operation-cancellation.test.ts",
+          "src/__tests__/enumerate-and-bounded-read.test.ts",
+          "src/__tests__/artifact-export.test.ts",
+          "--config",
+          "vitest.config.ts",
+          "--root",
+          "packages/sandbox-e2b-provider",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=/opt/aoa-program-integration-20261018/evidence/provider/vitest.json"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "artifactdb",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "scripts/run-vitest-captured.mjs",
+          "--capture-dir",
+          "/opt/aoa-program-integration-20261018/evidence/artifactdb/vitest-capture",
+          "--",
+          "run",
+          "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+          "--testNamePattern",
+          "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=/opt/aoa-program-integration-20261018/evidence/artifactdb/vitest.json"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "ui",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "--filter",
+          "@armyofagents/ui",
+          "build"
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "image",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "docker",
+        "args": [
+          "build",
+          "-f",
+          "docker/worker/Dockerfile",
+          "-t",
+          "aoa-worker:program-integration-vps",
+          "--label",
+          "aoa.work=program-integration-20261018",
+          "--build-arg",
+          "AOA_IMAGE_REVISION=0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "."
+        ],
+        "exitCode": 0
+      },
+      {
+        "stage": "native",
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "--test",
+          "--test-concurrency=1",
+          "tests/d1/m4-slot-ownership.test.mjs",
+          "tests/d1/m4-slot-host.test.mjs",
+          "tests/d1/m4-native-fence-restore.test.mjs"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "summary": {
+      "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+      "platform": "linux",
+      "architecture": "arm64",
+      "stages": {
+        "artifactdb": {
+          "stage": "artifactdb",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "/opt/aoa-program-integration-20261018/evidence/artifactdb/vitest-capture",
+            "--",
+            "run",
+            "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+            "--testNamePattern",
+            "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile=/opt/aoa-program-integration-20261018/evidence/artifactdb/vitest.json"
+          ],
+          "exitCode": 0
+        },
+        "build": {
+          "stage": "build",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "--filter",
+            "@armyofagents/adapter-claude-local",
+            "--filter",
+            "@armyofagents/adapter-gemini-local",
+            "--filter",
+            "@armyofagents/adapter-opencode-local",
+            "--filter",
+            "@armyofagents/adapter-codex-local",
+            "--filter",
+            "@armyofagents/cli",
+            "build"
+          ],
+          "exitCode": 0
+        },
+        "dependencies": {
+          "stage": "dependencies",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils^...",
+            "--filter",
+            "@armyofagents/worker-daemon^...",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider^...",
+            "--filter",
+            "@armyofagents/adapter-manager^...",
+            "--filter",
+            "@armyofagents/server^...",
+            "--filter",
+            "@armyofagents/adapter-claude-local^...",
+            "--filter",
+            "@armyofagents/adapter-gemini-local^...",
+            "--filter",
+            "@armyofagents/adapter-opencode-local^...",
+            "--filter",
+            "@armyofagents/adapter-codex-local^...",
+            "--filter",
+            "@armyofagents/cli^...",
+            "build"
+          ],
+          "exitCode": 1
+        },
+        "dependencies2": {
+          "stage": "dependencies2",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils^...",
+            "--filter",
+            "@armyofagents/worker-daemon^...",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider^...",
+            "--filter",
+            "@armyofagents/adapter-manager^...",
+            "--filter",
+            "@armyofagents/server^...",
+            "--filter",
+            "@armyofagents/adapter-claude-local^...",
+            "--filter",
+            "@armyofagents/adapter-gemini-local^...",
+            "--filter",
+            "@armyofagents/adapter-opencode-local^...",
+            "--filter",
+            "@armyofagents/adapter-codex-local^...",
+            "--filter",
+            "@armyofagents/cli^...",
+            "build"
+          ],
+          "exitCode": 0
+        },
+        "image": {
+          "stage": "image",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "docker",
+          "args": [
+            "build",
+            "-f",
+            "docker/worker/Dockerfile",
+            "-t",
+            "aoa-worker:program-integration-vps",
+            "--label",
+            "aoa.work=program-integration-20261018",
+            "--build-arg",
+            "AOA_IMAGE_REVISION=0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+            "."
+          ],
+          "exitCode": 0
+        },
+        "install": {
+          "stage": "install",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "install",
+            "--frozen-lockfile"
+          ],
+          "exitCode": 0
+        },
+        "native": {
+          "stage": "native",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "--test",
+            "--test-concurrency=1",
+            "tests/d1/m4-slot-ownership.test.mjs",
+            "tests/d1/m4-slot-host.test.mjs",
+            "tests/d1/m4-native-fence-restore.test.mjs"
+          ],
+          "exitCode": 0
+        },
+        "provider": {
+          "stage": "provider",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "/opt/aoa-program-integration-20261018/evidence/provider/vitest-capture",
+            "--",
+            "run",
+            "src/__tests__/artifact-operation-cancellation.test.ts",
+            "src/__tests__/enumerate-and-bounded-read.test.ts",
+            "src/__tests__/artifact-export.test.ts",
+            "--config",
+            "vitest.config.ts",
+            "--root",
+            "packages/sandbox-e2b-provider",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile=/opt/aoa-program-integration-20261018/evidence/provider/vitest.json"
+          ],
+          "exitCode": 0
+        },
+        "targeted": {
+          "stage": "targeted",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "/opt/aoa-program-integration-20261018/evidence/targeted/vitest-capture",
+            "--",
+            "run",
+            "server/src/__tests__/native-crew-tool-capture.test.ts",
+            "server/src/__tests__/codex-crew-tool-capture.test.ts",
+            "server/src/__tests__/aoa-runner.test.ts",
+            "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+            "server/src/__tests__/crew-tool-authority.test.ts",
+            "server/src/__tests__/crew-cancellation.test.ts",
+            "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+            "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+            "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+            "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+            "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+            "server/src/__tests__/task-outputs-routes.test.ts",
+            "server/src/__tests__/artifact-size-ceiling.test.ts",
+            "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+            "packages/adapters/claude-local/src/server/parse.test.ts",
+            "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+            "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+            "server/src/__tests__/claude-local-adapter.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+            "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+            "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+            "packages/adapters/opencode-local/src/server/parse.test.ts",
+            "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+            "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+            "server/src/__tests__/opencode-local-adapter.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+            "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+            "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+            "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+            "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+            "server/src/__tests__/auth-crew-run-boundary.test.ts",
+            "server/src/__tests__/agent-auth-jwt.test.ts",
+            "server/src/__tests__/auth-commander-jwt.test.ts",
+            "server/src/__tests__/mcp-agent-actor.test.ts",
+            "server/src/__tests__/mcp-run-currency-gate.test.ts",
+            "server/src/__tests__/broker-tool-context.unit.test.ts",
+            "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+            "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+            "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+            "server/src/__tests__/mcp-bridge-role-check.test.ts",
+            "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+            "server/src/__tests__/authorize-tool.test.ts",
+            "server/src/__tests__/hub-curation.test.ts",
+            "server/src/__tests__/hub-curation-tools.test.ts",
+            "server/src/__tests__/hub-curation.integration.test.ts",
+            "server/src/__tests__/sweep-steward.test.ts",
+            "server/src/__tests__/server-shutdown.test.ts",
+            "server/src/__tests__/costs-service.test.ts",
+            "server/src/__tests__/costs-idempotency.integration.test.ts",
+            "server/src/__tests__/mcp-server.test.ts",
+            "server/src/__tests__/crew-run-jwt.test.ts",
+            "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+            "cli/src/__tests__/run-entrypoint.test.ts",
+            "cli/src/__tests__/bundle-runtime.test.ts",
+            "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+            "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+            "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+            "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+            "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+            "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+            "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+            "server/src/__tests__/worker-enrollment.integration.test.ts",
+            "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+            "server/src/__tests__/worker-revocation.integration.test.ts",
+            "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+            "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1",
+            "--reporter=default",
+            "--reporter=json",
+            "--outputFile=/opt/aoa-program-integration-20261018/evidence/targeted/vitest.json"
+          ],
+          "exitCode": 0
+        },
+        "typecheck": {
+          "stage": "typecheck",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "--filter",
+            "@armyofagents/adapter-claude-local",
+            "--filter",
+            "@armyofagents/adapter-gemini-local",
+            "--filter",
+            "@armyofagents/adapter-opencode-local",
+            "--filter",
+            "@armyofagents/adapter-codex-local",
+            "--filter",
+            "@armyofagents/cli",
+            "typecheck"
+          ],
+          "exitCode": 0
+        },
+        "ui": {
+          "stage": "ui",
+          "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+          "dirtyFiles": [],
+          "command": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "--filter",
+            "@armyofagents/ui",
+            "build"
+          ],
+          "exitCode": 0
+        }
+      },
+      "tests": {
+        "artifactdb": {
+          "success": true,
+          "numTotalTests": 39,
+          "numPassedTests": 16,
+          "numFailedTests": 0,
+          "numPendingTests": 23,
+          "numTodoTests": 0,
+          "numRuntimeErrorTestSuites": null,
+          "fileCount": 1,
+          "skippedAssertions": [
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit ★ BRW-003d-5 refuses a grant whose DECLARED size exceeds the ceiling, before a byte moves",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit still grants at exactly the ceiling",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit REL-003: corrupt recovered bytes stay quarantined across downloads, upload and commit replay",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit REL-003: missing recovered bytes stay quarantined across downloads, upload and commit replay",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003a: an EXPIRED identity is REFUSED a new upload grant (Rule #7)",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003a: an EXPIRED identity is REFUSED a download grant (bytes are gone)",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003a: with NO expired rows, behaviour is unchanged — upload refused, download granted",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003a: findEverCommitted SHORT-CIRCUITS — one query on a hit, two only on a miss",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit refuses a browser download after its deadline before background purge",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit refuses legacy credential downloads until cleanup records their original deadline",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit bounds a browser download URL by the remaining retention lifetime",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003c retention deletes actual bytes and tombstones a suspended tenant's artifact once",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003c retention preserves retryable identity when deletion fails before_delete",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit BRW-003c retention preserves retryable identity when deletion fails after_delete",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit serializes competing cleanup instances and coalesces a repeated tick",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit refuses cleanup of a pointer outside the artifact's tenant and attempt",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit anchors legacy expiry to commit and resumes deletion after restart",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit stamps the server lifetime for browser_cookie_state once at commit",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit stamps the server lifetime for browser_storage_state once at commit",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit stamps the server lifetime for screenshot once at commit",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit does not recreate an expired committed artifact through commit replay",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit keeps expired artifact identities unique after retention deletes bytes",
+              "status": "skipped"
+            },
+            {
+              "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "name": "DAT-002 artifact transfer-grant + fenced commit rejects a commit whose actual object size exceeds the server artifact cap",
+              "status": "skipped"
+            }
+          ]
+        },
+        "provider": {
+          "success": true,
+          "numTotalTests": 56,
+          "numPassedTests": 56,
+          "numFailedTests": 0,
+          "numPendingTests": 0,
+          "numTodoTests": 0,
+          "numRuntimeErrorTestSuites": null,
+          "fileCount": 3,
+          "skippedAssertions": []
+        },
+        "targeted": {
+          "success": true,
+          "numTotalTests": 781,
+          "numPassedTests": 780,
+          "numFailedTests": 0,
+          "numPendingTests": 1,
+          "numTodoTests": 0,
+          "numRuntimeErrorTestSuites": null,
+          "fileCount": 76,
+          "skippedAssertions": [
+            {
+              "file": "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+              "name": "REL-003 Lane B — restored state rejects a stale fence (real guardActiveFence gate) actual native backup/restore rejects stale fence authorities and admits fresh authority",
+              "status": "skipped"
+            }
+          ]
+        }
+      },
+      "wholeSuiteRun": false,
+      "externalProviderCredentialsUsedForTests": false,
+      "vendorCliInvoked": false,
+      "personalAuthCopied": false,
+      "distributedRolloutEnabled": false,
+      "liveJourneySkipped": true,
+      "cleanup": {
+        "observedAt": "2026-10-18T01:25:46.520151+00:00",
+        "ownedContainersBefore": [],
+        "removedOwnedContainers": [],
+        "ownedEmbeddedPgProcesses": [],
+        "nativeFixtureOwnership": [
+          {
+            "ownershipFile": "tmp/aoa-m4-native-fence-7fEUvL/ownership.json",
+            "containerName": "aoa-m4-native-fence-2e5238378a7e2729bf5084dd",
+            "owner": "2e5238378a7e2729bf5084dd",
+            "containerAbsentAfterTest": true
+          }
+        ],
+        "databaseIdentity": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+        "priorW12ResourcesTouched": false,
+        "ownedContainersAfter": [],
+        "ownedWorkerImage": {
+          "Id": "sha256:611967128af53e363e33f7548352364df8b24b172907da38a19433b411d9b284",
+          "RepoTags": [
+            "aoa-worker:program-integration-vps"
+          ],
+          "Created": "2026-10-18T01:23:01.348730398Z",
+          "Architecture": "arm64",
+          "labels": {
+            "aoa.work": "program-integration-20261018",
+            "org.armyofagents.image.role": "worker",
+            "org.armyofagents.image.rootfs": "read-only",
+            "org.opencontainers.image.description": "Army of Agents worker daemon — least-privilege split image (E4-D01 closure)",
+            "org.opencontainers.image.revision": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+            "org.opencontainers.image.source": "https://github.com/meteoritelabs/aoa",
+            "org.opencontainers.image.title": "AoA Worker",
+            "org.opencontainers.image.version": "0896c43961d2e19e2c7fd163f32c51c6e69d0889"
+          },
+          "user": "node"
+        }
+      },
+      "targetedPartitions": {
+        "core": {
+          "files": 64,
+          "passed": 692,
+          "failed": 0,
+          "skipped": 0
+        },
+        "w12": {
+          "files": 12,
+          "passed": 88,
+          "failed": 0,
+          "skipped": 1
+        }
+      },
+      "source": {
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "tree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "dirtyFiles": [],
+        "finalCandidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "finalTree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+        "finalDirtyFiles": []
+      },
+      "nativeBoundary": {
+        "outerNativeTotals": {
+          "tests": 4,
+          "pass": 4,
+          "fail": 0,
+          "skipped": 0
+        },
+        "nestedReports": [
+          {
+            "file": "native-fixtures/aoa-m4-native-fence-7fEUvL/artifact-recovery-result.json",
+            "success": true,
+            "passed": 2,
+            "failed": 0,
+            "pending": 37
+          },
+          {
+            "file": "native-fixtures/aoa-m4-native-fence-7fEUvL/vitest-result.json",
+            "success": true,
+            "passed": 1,
+            "failed": 0,
+            "pending": 4
+          }
+        ]
+      },
+      "native": {
+        "outerPassed": 4,
+        "outerFailed": 0,
+        "outerSkipped": 0,
+        "nestedFencePassed": 1,
+        "nestedObjectPassed": 2
+      },
+      "fixtureLimits": [
+        "Credential-free stubbed provider transports and fake native protocol executables; no installed vendor CLI or paid inference acceptance.",
+        "Real disposable embedded PostgreSQL with non-owner roles; no application database reset.",
+        "Native restore and local-file object fault fixture uses one owned PostgreSQL container; no live fleet, external object-store or D5 timing claim.",
+        "Reviewapp deployment verifies public exact-revision health and HTTP UI only; no authenticated browser journey or live cohort."
+      ],
+      "deployment": {
+        "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "priorCandidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "startedAt": "2026-10-18T01:24:49.773797+00:00",
+        "databaseBefore": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+        "environmentFilesBefore": "/opt/aoa-validation-2026-10-16/private/cloud.env (ignore_errors=no)\n/opt/aoa-w02-w05-20261017/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-followup-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-adapters-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-w05-audit-artifacts-20261018/private/revision.env (ignore_errors=no)",
+        "result": "pass",
+        "wholeSuiteRun": false,
+        "externalCredentialsUsedForValidation": false,
+        "liveJourneySkipped": true,
+        "w12PriorResourcesTouched": false,
+        "dropin": "/etc/systemd/system/aoa-validation.service.d/zzzz-program-integration.conf",
+        "health": {
+          "status": "ok",
+          "revision": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+          "deploymentMode": "cloud_auth",
+          "deploymentExposure": "public",
+          "authReady": true,
+          "bootstrapStatus": "ready",
+          "features": {
+            "companyDeletionEnabled": false
+          }
+        },
+        "uiHttpStatus": 200,
+        "databaseAfter": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+        "environmentFilesAfter": "/opt/aoa-validation-2026-10-16/private/cloud.env (ignore_errors=no)\n/opt/aoa-w02-w05-20261017/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-followup-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-adapters-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-w05-audit-artifacts-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-program-integration-20261018/private/revision.env (ignore_errors=no)",
+        "serviceActive": "active",
+        "workingDirectory": "/opt/aoa-program-integration-20261018/source",
+        "distributedRolloutEnabled": false,
+        "cloudEnvironmentUnchanged": true,
+        "oauthConfigurationRetained": true,
+        "finishedAt": "2026-10-18T01:25:08.505868+00:00"
+      }
+    },
+    "deployment": {
+      "candidate": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+      "priorCandidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+      "startedAt": "2026-10-18T01:24:49.773797+00:00",
+      "databaseBefore": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+      "environmentFilesBefore": "/opt/aoa-validation-2026-10-16/private/cloud.env (ignore_errors=no)\n/opt/aoa-w02-w05-20261017/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-followup-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-adapters-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-w05-audit-artifacts-20261018/private/revision.env (ignore_errors=no)",
+      "result": "pass",
+      "wholeSuiteRun": false,
+      "externalCredentialsUsedForValidation": false,
+      "liveJourneySkipped": true,
+      "w12PriorResourcesTouched": false,
+      "dropin": "/etc/systemd/system/aoa-validation.service.d/zzzz-program-integration.conf",
+      "health": {
+        "status": "ok",
+        "revision": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+        "deploymentMode": "cloud_auth",
+        "deploymentExposure": "public",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": false
+        }
+      },
+      "uiHttpStatus": 200,
+      "databaseAfter": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+      "environmentFilesAfter": "/opt/aoa-validation-2026-10-16/private/cloud.env (ignore_errors=no)\n/opt/aoa-w02-w05-20261017/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-followup-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-adapters-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-w02-w05-audit-artifacts-20261018/private/revision.env (ignore_errors=no)\n/opt/aoa-program-integration-20261018/private/revision.env (ignore_errors=no)",
+      "serviceActive": "active",
+      "workingDirectory": "/opt/aoa-program-integration-20261018/source",
+      "distributedRolloutEnabled": false,
+      "cloudEnvironmentUnchanged": true,
+      "oauthConfigurationRetained": true,
+      "finishedAt": "2026-10-18T01:25:08.505868+00:00"
+    }
+  },
+  "sourceVerification": {
+    "selectedAndChangedCodeFiles": 249,
+    "rule": "VPS raw source bytes equal committed blobs; local text bytes compared after UTF-8 LF normalization. Historical documentation remains unchanged outside the new integration notices.",
+    "files": [
+      {
+        "path": "server/src/__tests__/native-crew-tool-capture.test.ts",
+        "gitBlobAndVpsSha256": "452e6cba1c7c627fdb53b50290af32d043d6f670dbb879ebd7e652c36576fef6",
+        "localUtf8LfSha256": "452e6cba1c7c627fdb53b50290af32d043d6f670dbb879ebd7e652c36576fef6"
+      },
+      {
+        "path": "server/src/__tests__/codex-crew-tool-capture.test.ts",
+        "gitBlobAndVpsSha256": "950cd98e571b23b5b21af9b1f580bc31c03841b60691a78f40b50863944e9a88",
+        "localUtf8LfSha256": "950cd98e571b23b5b21af9b1f580bc31c03841b60691a78f40b50863944e9a88"
+      },
+      {
+        "path": "server/src/__tests__/aoa-runner.test.ts",
+        "gitBlobAndVpsSha256": "9586821892ea8f20c183069fd9eb1b57180c5d7d56bd6909fd8b00d7a015be45",
+        "localUtf8LfSha256": "9586821892ea8f20c183069fd9eb1b57180c5d7d56bd6909fd8b00d7a015be45"
+      },
+      {
+        "path": "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+        "gitBlobAndVpsSha256": "3e78128a0a4bed5027ecf536c0b2b531fc33c240e8f32baa446a54e5fae73e81",
+        "localUtf8LfSha256": "3e78128a0a4bed5027ecf536c0b2b531fc33c240e8f32baa446a54e5fae73e81"
+      },
+      {
+        "path": "server/src/__tests__/crew-tool-authority.test.ts",
+        "gitBlobAndVpsSha256": "9e3bb210d3bfe6bc89872e03538e40bc0595e68d2190dc696ca849e8367c1a0d",
+        "localUtf8LfSha256": "9e3bb210d3bfe6bc89872e03538e40bc0595e68d2190dc696ca849e8367c1a0d"
+      },
+      {
+        "path": "server/src/__tests__/crew-cancellation.test.ts",
+        "gitBlobAndVpsSha256": "0801abcf406039acfe2e54ae381abf60c225eb9ce2802f73cdf7e7ae387fd9bb",
+        "localUtf8LfSha256": "0801abcf406039acfe2e54ae381abf60c225eb9ce2802f73cdf7e7ae387fd9bb"
+      },
+      {
+        "path": "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+        "gitBlobAndVpsSha256": "ee4e1ba1e2ea3b865b67fcad11667b822d378e57297c611d503b7d5822e5484b",
+        "localUtf8LfSha256": "ee4e1ba1e2ea3b865b67fcad11667b822d378e57297c611d503b7d5822e5484b"
+      },
+      {
+        "path": "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+        "gitBlobAndVpsSha256": "a3959920aa5b8dc672334a2198fa6f1a86f98c109be1879ab2d8ff11d1f9b7ed",
+        "localUtf8LfSha256": "a3959920aa5b8dc672334a2198fa6f1a86f98c109be1879ab2d8ff11d1f9b7ed"
+      },
+      {
+        "path": "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+        "gitBlobAndVpsSha256": "b544a9ea101e17c875804c5b29b0e4d2c19bd57ce02f4fa36d10c239e707af6e",
+        "localUtf8LfSha256": "b544a9ea101e17c875804c5b29b0e4d2c19bd57ce02f4fa36d10c239e707af6e"
+      },
+      {
+        "path": "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+        "gitBlobAndVpsSha256": "0ad7409ed98342ad1d1ac12332e956ccf79ad8ac85b77b76aedb88decddd2fd1",
+        "localUtf8LfSha256": "0ad7409ed98342ad1d1ac12332e956ccf79ad8ac85b77b76aedb88decddd2fd1"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+        "gitBlobAndVpsSha256": "d0d283084435fd0cfeeeca516f2e23e86bfcbf84a0c9b9595e3f23b983fa69c1",
+        "localUtf8LfSha256": "d0d283084435fd0cfeeeca516f2e23e86bfcbf84a0c9b9595e3f23b983fa69c1"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+        "gitBlobAndVpsSha256": "bfb9e5eaa3b7eea6986c45e7b308bd6bceebd0ece8acccf1ac14da6e4c12b77f",
+        "localUtf8LfSha256": "bfb9e5eaa3b7eea6986c45e7b308bd6bceebd0ece8acccf1ac14da6e4c12b77f"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+        "gitBlobAndVpsSha256": "2aadc65a53677f2abb8459c2f6cdf375066fd5ac6346e69deef0f51623c5245e",
+        "localUtf8LfSha256": "2aadc65a53677f2abb8459c2f6cdf375066fd5ac6346e69deef0f51623c5245e"
+      },
+      {
+        "path": "server/src/__tests__/task-outputs-routes.test.ts",
+        "gitBlobAndVpsSha256": "aadcc6ceb4322f4acc102a1b9abcb3e212f16c8db350fd26103c2867ebaae123",
+        "localUtf8LfSha256": "aadcc6ceb4322f4acc102a1b9abcb3e212f16c8db350fd26103c2867ebaae123"
+      },
+      {
+        "path": "server/src/__tests__/artifact-size-ceiling.test.ts",
+        "gitBlobAndVpsSha256": "024f32ce81c172e2686c76880c4353feab5925e870e3cf467ad9895b3c47f230",
+        "localUtf8LfSha256": "024f32ce81c172e2686c76880c4353feab5925e870e3cf467ad9895b3c47f230"
+      },
+      {
+        "path": "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+        "gitBlobAndVpsSha256": "66f2f037111b1e0bd0f3aeb86a87c99471761cf569d0f9f2caa3240fca21df48",
+        "localUtf8LfSha256": "66f2f037111b1e0bd0f3aeb86a87c99471761cf569d0f9f2caa3240fca21df48"
+      },
+      {
+        "path": "packages/adapters/claude-local/src/server/parse.test.ts",
+        "gitBlobAndVpsSha256": "4e64287eb903d6d98e32195855aba424f8324d772a5f9ac62a7f50de73537c09",
+        "localUtf8LfSha256": "4e64287eb903d6d98e32195855aba424f8324d772a5f9ac62a7f50de73537c09"
+      },
+      {
+        "path": "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+        "gitBlobAndVpsSha256": "209872c88b2e0b8306e043044514cb29345f6d2a3a2b307ccaf02a55ea8dbe58",
+        "localUtf8LfSha256": "209872c88b2e0b8306e043044514cb29345f6d2a3a2b307ccaf02a55ea8dbe58"
+      },
+      {
+        "path": "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+        "gitBlobAndVpsSha256": "7bd7abd0c3a23d6d250009a1ef439a058b439e0cb506b4b93ef010eff35ebfad",
+        "localUtf8LfSha256": "7bd7abd0c3a23d6d250009a1ef439a058b439e0cb506b4b93ef010eff35ebfad"
+      },
+      {
+        "path": "server/src/__tests__/claude-local-adapter.test.ts",
+        "gitBlobAndVpsSha256": "ac835d9f2e582d70384ccd324eec4c99f94c5dd3ec3bdb13819eaa1763f60d6f",
+        "localUtf8LfSha256": "ac835d9f2e582d70384ccd324eec4c99f94c5dd3ec3bdb13819eaa1763f60d6f"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+        "gitBlobAndVpsSha256": "890b04a25b466a4da72b4b65206189f61fb5f19f784a673b9669295d068cad96",
+        "localUtf8LfSha256": "890b04a25b466a4da72b4b65206189f61fb5f19f784a673b9669295d068cad96"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+        "gitBlobAndVpsSha256": "766cd10d850281ff2f3d265cc452bbaa59be9000fc287417e92d458ec03d9159",
+        "localUtf8LfSha256": "766cd10d850281ff2f3d265cc452bbaa59be9000fc287417e92d458ec03d9159"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+        "gitBlobAndVpsSha256": "e4e4eccd70794c7af94c4eab8961b518e5fd731a0b507d3ac13315cf6970dbbb",
+        "localUtf8LfSha256": "e4e4eccd70794c7af94c4eab8961b518e5fd731a0b507d3ac13315cf6970dbbb"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+        "gitBlobAndVpsSha256": "a77953fb163d78e26d42c1237fda24345809fb78fe1d64815116beb7c255ab3f",
+        "localUtf8LfSha256": "a77953fb163d78e26d42c1237fda24345809fb78fe1d64815116beb7c255ab3f"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+        "gitBlobAndVpsSha256": "5e7128a13e7fd583fb202218652caa66fa3af714d74fe1b2d7476e353ac4f60d",
+        "localUtf8LfSha256": "5e7128a13e7fd583fb202218652caa66fa3af714d74fe1b2d7476e353ac4f60d"
+      },
+      {
+        "path": "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+        "gitBlobAndVpsSha256": "6d11326fa8f9f0906e1c9be13245c4a130fbad5601eda652c04c53aba1673bab",
+        "localUtf8LfSha256": "6d11326fa8f9f0906e1c9be13245c4a130fbad5601eda652c04c53aba1673bab"
+      },
+      {
+        "path": "packages/adapters/opencode-local/src/server/parse.test.ts",
+        "gitBlobAndVpsSha256": "b443e2ea426924602104fde96e451c77ca392b1992190f9c9546923dda0393ad",
+        "localUtf8LfSha256": "b443e2ea426924602104fde96e451c77ca392b1992190f9c9546923dda0393ad"
+      },
+      {
+        "path": "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+        "gitBlobAndVpsSha256": "90f3034b35fcd029bb79c2cf293d7412b88505b3ed480442e2bd12a0f5bb03a5",
+        "localUtf8LfSha256": "90f3034b35fcd029bb79c2cf293d7412b88505b3ed480442e2bd12a0f5bb03a5"
+      },
+      {
+        "path": "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+        "gitBlobAndVpsSha256": "55c939d6e26fb7b83c97388cfa80066d9b4f12b031c33feb8803cb31563ce375",
+        "localUtf8LfSha256": "55c939d6e26fb7b83c97388cfa80066d9b4f12b031c33feb8803cb31563ce375"
+      },
+      {
+        "path": "server/src/__tests__/opencode-local-adapter.test.ts",
+        "gitBlobAndVpsSha256": "276034d0a89e8b9a83493518b26c0ce21ba609d0c5985166837a61a66d4290d8",
+        "localUtf8LfSha256": "276034d0a89e8b9a83493518b26c0ce21ba609d0c5985166837a61a66d4290d8"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+        "gitBlobAndVpsSha256": "cb03abe3ab3bc14b7f15cc9595c37cf994408ded70e913c803dc136b5fb5a24d",
+        "localUtf8LfSha256": "cb03abe3ab3bc14b7f15cc9595c37cf994408ded70e913c803dc136b5fb5a24d"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+        "gitBlobAndVpsSha256": "95e3d03dc66c20afcb58aa9bcc78102c0fbc80e0cde0226ab4fb89885f81e2f4",
+        "localUtf8LfSha256": "95e3d03dc66c20afcb58aa9bcc78102c0fbc80e0cde0226ab4fb89885f81e2f4"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+        "gitBlobAndVpsSha256": "e6789bf639aad7f6923efc35ced839558d45b7fa28cb4d1a8ccc75b07990e66e",
+        "localUtf8LfSha256": "e6789bf639aad7f6923efc35ced839558d45b7fa28cb4d1a8ccc75b07990e66e"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+        "gitBlobAndVpsSha256": "960906d37574d2e5d31312ff6ee1c1daaedc6e4d0cde757a3995115019da66e6",
+        "localUtf8LfSha256": "960906d37574d2e5d31312ff6ee1c1daaedc6e4d0cde757a3995115019da66e6"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+        "gitBlobAndVpsSha256": "7fd32e826d1b99f602888cc2b7d4c5a13d775afe429549a0082fe99078dc5371",
+        "localUtf8LfSha256": "7fd32e826d1b99f602888cc2b7d4c5a13d775afe429549a0082fe99078dc5371"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+        "gitBlobAndVpsSha256": "f58c38ec7b425636ca46db931dbd69848a9b9d4994fb6fb3f184986dc6f167dc",
+        "localUtf8LfSha256": "f58c38ec7b425636ca46db931dbd69848a9b9d4994fb6fb3f184986dc6f167dc"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+        "gitBlobAndVpsSha256": "6d38fac6e3b4e2628394b54bde3ac6a5d3d973c7ec31b2d80de3e948d4e07450",
+        "localUtf8LfSha256": "6d38fac6e3b4e2628394b54bde3ac6a5d3d973c7ec31b2d80de3e948d4e07450"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+        "gitBlobAndVpsSha256": "d61a1375c6cb37c9ec520fae45b7d88a278dc33e9bfa530fabb5d21cf0d55fbc",
+        "localUtf8LfSha256": "d61a1375c6cb37c9ec520fae45b7d88a278dc33e9bfa530fabb5d21cf0d55fbc"
+      },
+      {
+        "path": "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+        "gitBlobAndVpsSha256": "44ba6b1ca62504cb97af2d2e58cd6c0c799adddcc28c140e07467b381720a025",
+        "localUtf8LfSha256": "44ba6b1ca62504cb97af2d2e58cd6c0c799adddcc28c140e07467b381720a025"
+      },
+      {
+        "path": "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+        "gitBlobAndVpsSha256": "3d52a8da016867becf16772d413ee078e87e38bf6045696a2c7eb770b2cf3541",
+        "localUtf8LfSha256": "3d52a8da016867becf16772d413ee078e87e38bf6045696a2c7eb770b2cf3541"
+      },
+      {
+        "path": "server/src/__tests__/auth-crew-run-boundary.test.ts",
+        "gitBlobAndVpsSha256": "cd0a802832579ae2c83c5a36db7a31ae08eef3992feb150e7e6bcfde3724f9ab",
+        "localUtf8LfSha256": "cd0a802832579ae2c83c5a36db7a31ae08eef3992feb150e7e6bcfde3724f9ab"
+      },
+      {
+        "path": "server/src/__tests__/agent-auth-jwt.test.ts",
+        "gitBlobAndVpsSha256": "102dc700b9bf15c13ed2940ba6302864239eb05309afe920ac7f1ae1888a32db",
+        "localUtf8LfSha256": "102dc700b9bf15c13ed2940ba6302864239eb05309afe920ac7f1ae1888a32db"
+      },
+      {
+        "path": "server/src/__tests__/auth-commander-jwt.test.ts",
+        "gitBlobAndVpsSha256": "e90ab66c908b333a835e6a0f85f034d5106e5cec6ec9794f16a6aeaf18802b99",
+        "localUtf8LfSha256": "e90ab66c908b333a835e6a0f85f034d5106e5cec6ec9794f16a6aeaf18802b99"
+      },
+      {
+        "path": "server/src/__tests__/mcp-agent-actor.test.ts",
+        "gitBlobAndVpsSha256": "0478ccb069aae293c6bf13dd69868fdbe2ecc20d7150ea008cac7b248a716e62",
+        "localUtf8LfSha256": "0478ccb069aae293c6bf13dd69868fdbe2ecc20d7150ea008cac7b248a716e62"
+      },
+      {
+        "path": "server/src/__tests__/mcp-run-currency-gate.test.ts",
+        "gitBlobAndVpsSha256": "390388b91d2994f0b3bcb287ce46f3b9be035866201d44b2a4a033b06cad5654",
+        "localUtf8LfSha256": "390388b91d2994f0b3bcb287ce46f3b9be035866201d44b2a4a033b06cad5654"
+      },
+      {
+        "path": "server/src/__tests__/broker-tool-context.unit.test.ts",
+        "gitBlobAndVpsSha256": "3fe5f2cdf570338cf6f6aaf4ab89d7a83d33ca1d323b61b3a713c1c10c6a6d89",
+        "localUtf8LfSha256": "3fe5f2cdf570338cf6f6aaf4ab89d7a83d33ca1d323b61b3a713c1c10c6a6d89"
+      },
+      {
+        "path": "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+        "gitBlobAndVpsSha256": "433b2c18ea9a7521a7f30b526fb367b6bc1cd81662a3a62d71a3d52f4c4d7492",
+        "localUtf8LfSha256": "433b2c18ea9a7521a7f30b526fb367b6bc1cd81662a3a62d71a3d52f4c4d7492"
+      },
+      {
+        "path": "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+        "gitBlobAndVpsSha256": "83bcb825a925485c211bf60282d3918d5bf9c6841bacc948bd757e8176a34b62",
+        "localUtf8LfSha256": "83bcb825a925485c211bf60282d3918d5bf9c6841bacc948bd757e8176a34b62"
+      },
+      {
+        "path": "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+        "gitBlobAndVpsSha256": "743ffa60582f0b8a4047ed37eafaaa87f978f4d66418d7da79ed1cf5761b4598",
+        "localUtf8LfSha256": "743ffa60582f0b8a4047ed37eafaaa87f978f4d66418d7da79ed1cf5761b4598"
+      },
+      {
+        "path": "server/src/__tests__/mcp-bridge-role-check.test.ts",
+        "gitBlobAndVpsSha256": "6c4f94af9bb695789ffc18280ce2ed259294269dd20520472d4c8291d9f5f088",
+        "localUtf8LfSha256": "6c4f94af9bb695789ffc18280ce2ed259294269dd20520472d4c8291d9f5f088"
+      },
+      {
+        "path": "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+        "gitBlobAndVpsSha256": "48bc10813ed9e126690ac1eef2ed9844e6928b7ac12fb283e26e1bc5479f29a5",
+        "localUtf8LfSha256": "48bc10813ed9e126690ac1eef2ed9844e6928b7ac12fb283e26e1bc5479f29a5"
+      },
+      {
+        "path": "server/src/__tests__/authorize-tool.test.ts",
+        "gitBlobAndVpsSha256": "b8df32a5c73b4b9fb7c282d22a2a4176d70c62676078da9fd47c30c0004848b2",
+        "localUtf8LfSha256": "b8df32a5c73b4b9fb7c282d22a2a4176d70c62676078da9fd47c30c0004848b2"
+      },
+      {
+        "path": "server/src/__tests__/hub-curation.test.ts",
+        "gitBlobAndVpsSha256": "85ba5783154d730fb6f145087971db5ce6ccf03a05ccaf62336acbafb043c35b",
+        "localUtf8LfSha256": "85ba5783154d730fb6f145087971db5ce6ccf03a05ccaf62336acbafb043c35b"
+      },
+      {
+        "path": "server/src/__tests__/hub-curation-tools.test.ts",
+        "gitBlobAndVpsSha256": "f771787c7fa7eef21937f45b09b3d878f01b718e95ac9b7642e7f1968f3859f2",
+        "localUtf8LfSha256": "f771787c7fa7eef21937f45b09b3d878f01b718e95ac9b7642e7f1968f3859f2"
+      },
+      {
+        "path": "server/src/__tests__/hub-curation.integration.test.ts",
+        "gitBlobAndVpsSha256": "e8da07b5ca4156b05ec20823a6748f31000d8da93417962f39d8377a67305075",
+        "localUtf8LfSha256": "e8da07b5ca4156b05ec20823a6748f31000d8da93417962f39d8377a67305075"
+      },
+      {
+        "path": "server/src/__tests__/sweep-steward.test.ts",
+        "gitBlobAndVpsSha256": "d1d35713b3e2a5f7ae4817f537ec601a82dfdac7ef1e8200f62598763b65084f",
+        "localUtf8LfSha256": "d1d35713b3e2a5f7ae4817f537ec601a82dfdac7ef1e8200f62598763b65084f"
+      },
+      {
+        "path": "server/src/__tests__/server-shutdown.test.ts",
+        "gitBlobAndVpsSha256": "33c9a356d326088246afbea8162e52c7e98a61ced59668b2b4be83d499eb99ac",
+        "localUtf8LfSha256": "33c9a356d326088246afbea8162e52c7e98a61ced59668b2b4be83d499eb99ac"
+      },
+      {
+        "path": "server/src/__tests__/costs-service.test.ts",
+        "gitBlobAndVpsSha256": "af752fda72a5377b10cac7ea0491f56e1ffcd8fb1998fea585dda6ab4f00ef77",
+        "localUtf8LfSha256": "af752fda72a5377b10cac7ea0491f56e1ffcd8fb1998fea585dda6ab4f00ef77"
+      },
+      {
+        "path": "server/src/__tests__/costs-idempotency.integration.test.ts",
+        "gitBlobAndVpsSha256": "50e2fcb720fa5e4482620017f3615c4955d95764f867c3c80686403cd6a16cee",
+        "localUtf8LfSha256": "50e2fcb720fa5e4482620017f3615c4955d95764f867c3c80686403cd6a16cee"
+      },
+      {
+        "path": "server/src/__tests__/mcp-server.test.ts",
+        "gitBlobAndVpsSha256": "ab55ea59845bc8ccab34cf5612371551dc57e6a14b567ec0dbfcc0463d775e78",
+        "localUtf8LfSha256": "ab55ea59845bc8ccab34cf5612371551dc57e6a14b567ec0dbfcc0463d775e78"
+      },
+      {
+        "path": "server/src/__tests__/crew-run-jwt.test.ts",
+        "gitBlobAndVpsSha256": "80db75e3067924e89adf4db01d7c1372182918fd6df241d9b434ac5eef0afa22",
+        "localUtf8LfSha256": "80db75e3067924e89adf4db01d7c1372182918fd6df241d9b434ac5eef0afa22"
+      },
+      {
+        "path": "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+        "gitBlobAndVpsSha256": "cb93945e76737171c407e06ce13dddc6727943d04ff160d12562c3c88fe05364",
+        "localUtf8LfSha256": "cb93945e76737171c407e06ce13dddc6727943d04ff160d12562c3c88fe05364"
+      },
+      {
+        "path": "cli/src/__tests__/run-entrypoint.test.ts",
+        "gitBlobAndVpsSha256": "99e233f0168cd0b5e09e2572531ab1e80bdb347c78002adc1e51997c332d33bb",
+        "localUtf8LfSha256": "99e233f0168cd0b5e09e2572531ab1e80bdb347c78002adc1e51997c332d33bb"
+      },
+      {
+        "path": "cli/src/__tests__/bundle-runtime.test.ts",
+        "gitBlobAndVpsSha256": "b441a0167cb84ea0bafccd9b1930f205c7a98c4c61a3254da6cab6711967993f",
+        "localUtf8LfSha256": "b441a0167cb84ea0bafccd9b1930f205c7a98c4c61a3254da6cab6711967993f"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+        "gitBlobAndVpsSha256": "5518726f2e9185a2d0a5c53f78df59d38ac8d6c85b79e477446744e3b37ea416",
+        "localUtf8LfSha256": "5518726f2e9185a2d0a5c53f78df59d38ac8d6c85b79e477446744e3b37ea416"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+        "gitBlobAndVpsSha256": "e8af208759d26a0bf88199836a1ec5cc6b96024d74e30661efbb706ff46db864",
+        "localUtf8LfSha256": "e8af208759d26a0bf88199836a1ec5cc6b96024d74e30661efbb706ff46db864"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+        "gitBlobAndVpsSha256": "23e224e64769b27f1a746b7dcd1bb3ba5e30d0387616c3cd6bc050b985009625",
+        "localUtf8LfSha256": "23e224e64769b27f1a746b7dcd1bb3ba5e30d0387616c3cd6bc050b985009625"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+        "gitBlobAndVpsSha256": "fbcc405acfdb95f60aea4f29f9da9759fa5a56643d46fdf6c064b5d31b86cd1a",
+        "localUtf8LfSha256": "fbcc405acfdb95f60aea4f29f9da9759fa5a56643d46fdf6c064b5d31b86cd1a"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+        "gitBlobAndVpsSha256": "a2ff4ce07f60c85a87a74ddd81bac1735e62525f50031669e1c1072335d4a524",
+        "localUtf8LfSha256": "a2ff4ce07f60c85a87a74ddd81bac1735e62525f50031669e1c1072335d4a524"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+        "gitBlobAndVpsSha256": "8740e15c3e0e72dfebea2696373c8ef466b7a1c5f1a35b02ccbed2315b92c6b2",
+        "localUtf8LfSha256": "8740e15c3e0e72dfebea2696373c8ef466b7a1c5f1a35b02ccbed2315b92c6b2"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+        "gitBlobAndVpsSha256": "7b78cccb5b8c18f8c91c61407c5db469c14ece420d53463d0838d6f9f83b076a",
+        "localUtf8LfSha256": "7b78cccb5b8c18f8c91c61407c5db469c14ece420d53463d0838d6f9f83b076a"
+      },
+      {
+        "path": "server/src/__tests__/worker-enrollment.integration.test.ts",
+        "gitBlobAndVpsSha256": "02f395cadde4211d4bdb179b726dc869589c645fb67c331afb4712b46c6b3c3d",
+        "localUtf8LfSha256": "02f395cadde4211d4bdb179b726dc869589c645fb67c331afb4712b46c6b3c3d"
+      },
+      {
+        "path": "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+        "gitBlobAndVpsSha256": "7644a5d5d49941637fbea486cb4681640c7e23b6ac05c7a49694b2f714b28c70",
+        "localUtf8LfSha256": "7644a5d5d49941637fbea486cb4681640c7e23b6ac05c7a49694b2f714b28c70"
+      },
+      {
+        "path": "server/src/__tests__/worker-revocation.integration.test.ts",
+        "gitBlobAndVpsSha256": "5cb624aa5f1eeb5ff076e9ba83fef785f6dc1848db5a6e9326cbaf66956cedac",
+        "localUtf8LfSha256": "5cb624aa5f1eeb5ff076e9ba83fef785f6dc1848db5a6e9326cbaf66956cedac"
+      },
+      {
+        "path": "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+        "gitBlobAndVpsSha256": "803010e23860f49da14ba2677053962a4f7bd6c77798a71aae0852511e4e7f51",
+        "localUtf8LfSha256": "803010e23860f49da14ba2677053962a4f7bd6c77798a71aae0852511e4e7f51"
+      },
+      {
+        "path": "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+        "gitBlobAndVpsSha256": "4a2daa37f23cd297ba9e053020840786e2cf0a44a309954e2ce7829b93b89d56",
+        "localUtf8LfSha256": "4a2daa37f23cd297ba9e053020840786e2cf0a44a309954e2ce7829b93b89d56"
+      },
+      {
+        "path": "packages/sandbox-e2b-provider/src/__tests__/artifact-operation-cancellation.test.ts",
+        "gitBlobAndVpsSha256": "7d9ec0a0bfa074b251131da205dc2a0c014cd782adfee336c25e9c3d3f590107",
+        "localUtf8LfSha256": "7d9ec0a0bfa074b251131da205dc2a0c014cd782adfee336c25e9c3d3f590107"
+      },
+      {
+        "path": "packages/sandbox-e2b-provider/src/__tests__/enumerate-and-bounded-read.test.ts",
+        "gitBlobAndVpsSha256": "68616b5b602e4a45ac841b6a5465da2afd1cc1e5a89d00d372fba9101be659c2",
+        "localUtf8LfSha256": "68616b5b602e4a45ac841b6a5465da2afd1cc1e5a89d00d372fba9101be659c2"
+      },
+      {
+        "path": "packages/sandbox-e2b-provider/src/__tests__/artifact-export.test.ts",
+        "gitBlobAndVpsSha256": "87d6a229e03a8ad794bf922e8c1d5730546d919ec1e4acb4914970db792236cb",
+        "localUtf8LfSha256": "87d6a229e03a8ad794bf922e8c1d5730546d919ec1e4acb4914970db792236cb"
+      },
+      {
+        "path": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+        "gitBlobAndVpsSha256": "e9b6f1bba6b5d6930c945d27492278c0534aa83aff17f5f6d39da5073b354f41",
+        "localUtf8LfSha256": "e9b6f1bba6b5d6930c945d27492278c0534aa83aff17f5f6d39da5073b354f41"
+      },
+      {
+        "path": ".github/workflows/pr.yml",
+        "gitBlobAndVpsSha256": "3f4c1c17ed60257f9189d40c3ce30630bf1bb45215f5160b71127e48c6af393c",
+        "localUtf8LfSha256": "3f4c1c17ed60257f9189d40c3ce30630bf1bb45215f5160b71127e48c6af393c"
+      },
+      {
+        "path": "CLAUDE.md",
+        "gitBlobAndVpsSha256": "ebe4bd53f77e6a1a7f7640f5327fd99ed70eb0b6e2e88df73d1c443b4baba7d9",
+        "localUtf8LfSha256": "ebe4bd53f77e6a1a7f7640f5327fd99ed70eb0b6e2e88df73d1c443b4baba7d9"
+      },
+      {
+        "path": "cli/esbuild.config.mjs",
+        "gitBlobAndVpsSha256": "33006aa76193c775c90dc0a8199f0ff6912f97ee31bf39f646b46cbaf5d4a085",
+        "localUtf8LfSha256": "33006aa76193c775c90dc0a8199f0ff6912f97ee31bf39f646b46cbaf5d4a085"
+      },
+      {
+        "path": "cli/src/commands/run.ts",
+        "gitBlobAndVpsSha256": "32ccd424473cb2495452478647d55fcd31b30aec3ce18163ea1e2011f14eb07a",
+        "localUtf8LfSha256": "32ccd424473cb2495452478647d55fcd31b30aec3ce18163ea1e2011f14eb07a"
+      },
+      {
+        "path": "docker-compose.staging.yml",
+        "gitBlobAndVpsSha256": "530a0d6f2cfa4d133bef21c2e7edb6cff5a467b8a152d18abdb495c8a5041956",
+        "localUtf8LfSha256": "530a0d6f2cfa4d133bef21c2e7edb6cff5a467b8a152d18abdb495c8a5041956"
+      },
+      {
+        "path": "packages/adapter-manager/src/__tests__/bin-adapter-manager.test.ts",
+        "gitBlobAndVpsSha256": "e57d6e4075c1f4262d9f99e46fe64c11192838e695434b2903c17ab7168eb01b",
+        "localUtf8LfSha256": "e57d6e4075c1f4262d9f99e46fe64c11192838e695434b2903c17ab7168eb01b"
+      },
+      {
+        "path": "packages/adapter-manager/src/bin/adapter-manager.ts",
+        "gitBlobAndVpsSha256": "4a8576a332812b0916beb56d0d554a0acc18be4063ba21e829560c87e9667e33",
+        "localUtf8LfSha256": "4a8576a332812b0916beb56d0d554a0acc18be4063ba21e829560c87e9667e33"
+      },
+      {
+        "path": "packages/adapter-utils/src/server-utils.ts",
+        "gitBlobAndVpsSha256": "5ebe638b7d86699027df3c8ef8f2734e9b0bbef7f7f6cd5a70c74b2e6faacf97",
+        "localUtf8LfSha256": "5ebe638b7d86699027df3c8ef8f2734e9b0bbef7f7f6cd5a70c74b2e6faacf97"
+      },
+      {
+        "path": "packages/adapters/claude-local/src/server/execute.ts",
+        "gitBlobAndVpsSha256": "201d5439b5649126b3d2895612045bb6d887bd9b6ed2e9653aa7f63e627079f5",
+        "localUtf8LfSha256": "201d5439b5649126b3d2895612045bb6d887bd9b6ed2e9653aa7f63e627079f5"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/__tests__/codex-config-toml.test.ts",
+        "gitBlobAndVpsSha256": "8d144149ea42ebbcad7ce269d0b00a78a408d1ff7a46a7b8b9f93220b9472270",
+        "localUtf8LfSha256": "8d144149ea42ebbcad7ce269d0b00a78a408d1ff7a46a7b8b9f93220b9472270"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+        "gitBlobAndVpsSha256": "0003ca39ceba729632c56cca664909c296fcd4fbe16d60a3580758e35480d9e3",
+        "localUtf8LfSha256": "0003ca39ceba729632c56cca664909c296fcd4fbe16d60a3580758e35480d9e3"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/__tests__/execute-target.test.ts",
+        "gitBlobAndVpsSha256": "886e7fda29a9e7637b71df2717fbde591d575010b6298f9a6433b257f33b9947",
+        "localUtf8LfSha256": "886e7fda29a9e7637b71df2717fbde591d575010b6298f9a6433b257f33b9947"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/index.ts",
+        "gitBlobAndVpsSha256": "9f99ebd42b3900659f6a5aba9672e36286e6e757b0890c2dad312b151980b85a",
+        "localUtf8LfSha256": "9f99ebd42b3900659f6a5aba9672e36286e6e757b0890c2dad312b151980b85a"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/execute-appserver-model-routing.test.ts",
+        "gitBlobAndVpsSha256": "9e692f1343037dcf0cea31e7b4e53dbb7103b82ac50d83cba241c5a86c472f2a",
+        "localUtf8LfSha256": "9e692f1343037dcf0cea31e7b4e53dbb7103b82ac50d83cba241c5a86c472f2a"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/execute-remote-model-routing.test.ts",
+        "gitBlobAndVpsSha256": "c8747ed3010f2f4bd9c5fa456695fc801b610674c902947fc683320996cfb6c5",
+        "localUtf8LfSha256": "c8747ed3010f2f4bd9c5fa456695fc801b610674c902947fc683320996cfb6c5"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/model-availability.test.ts",
+        "gitBlobAndVpsSha256": "de2195a6a71030a7081c755bf72372d0103da06c3caaac187c5b511bfc80dee2",
+        "localUtf8LfSha256": "de2195a6a71030a7081c755bf72372d0103da06c3caaac187c5b511bfc80dee2"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/model-catalog-fixture.ts",
+        "gitBlobAndVpsSha256": "2cd907c416f0971b64fea469cdb47cca77fb92f8f939b8d5a1191f01d9715ffb",
+        "localUtf8LfSha256": "2cd907c416f0971b64fea469cdb47cca77fb92f8f939b8d5a1191f01d9715ffb"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/model-catalog.test.ts",
+        "gitBlobAndVpsSha256": "860c76771e849761ae6e6e314369008f2255492e83d4f7b4500a837fa7f1590a",
+        "localUtf8LfSha256": "860c76771e849761ae6e6e314369008f2255492e83d4f7b4500a837fa7f1590a"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/__tests__/resolve-chat-model.test.ts",
+        "gitBlobAndVpsSha256": "9f1ee9a1d1cc9a299992ded9a85bd1f916ae9f7621c322c3b7eb150781a9d686",
+        "localUtf8LfSha256": "9f1ee9a1d1cc9a299992ded9a85bd1f916ae9f7621c322c3b7eb150781a9d686"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/execute-app-server.ts",
+        "gitBlobAndVpsSha256": "dc5e20a50aa56a16bc88a0e535b2f80489e1453d212be4e37804279a0746ffc1",
+        "localUtf8LfSha256": "dc5e20a50aa56a16bc88a0e535b2f80489e1453d212be4e37804279a0746ffc1"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/execute.ts",
+        "gitBlobAndVpsSha256": "28e87c190b0d6986c0d5d008fdc4d2861144f583f4f329756e6b45c733dceb4c",
+        "localUtf8LfSha256": "28e87c190b0d6986c0d5d008fdc4d2861144f583f4f329756e6b45c733dceb4c"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/index.ts",
+        "gitBlobAndVpsSha256": "0fc3bf11d432967dba93c2db671a48f50c4a79e45c5fdfee9b068cd0bb633eb7",
+        "localUtf8LfSha256": "0fc3bf11d432967dba93c2db671a48f50c4a79e45c5fdfee9b068cd0bb633eb7"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/model-availability.ts",
+        "gitBlobAndVpsSha256": "6610bb50ce8d9234e073122b3f680f0bb4d57b2bce0738a6f7f2766add1789cb",
+        "localUtf8LfSha256": "6610bb50ce8d9234e073122b3f680f0bb4d57b2bce0738a6f7f2766add1789cb"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/model-catalog.ts",
+        "gitBlobAndVpsSha256": "071b16735f05c65ae07032e5b174aafab14abc09cab8008b84e045b070b91e0e",
+        "localUtf8LfSha256": "071b16735f05c65ae07032e5b174aafab14abc09cab8008b84e045b070b91e0e"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/resolve-chat-model.ts",
+        "gitBlobAndVpsSha256": "dc7178ff770185b9b117babb9499cc7243d0f5c008ea6a39bba7f461c7e5deb1",
+        "localUtf8LfSha256": "dc7178ff770185b9b117babb9499cc7243d0f5c008ea6a39bba7f461c7e5deb1"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/session-id-cap.test.ts",
+        "gitBlobAndVpsSha256": "cdf31c2b6b8875e28261c3d47b843d320d700f1290ba72e51245ece2edb37727",
+        "localUtf8LfSha256": "cdf31c2b6b8875e28261c3d47b843d320d700f1290ba72e51245ece2edb37727"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/server/test.ts",
+        "gitBlobAndVpsSha256": "ca7a91d5ae32b3796daaafbb8566f412ea565ade1b67fa546c5b49130340a37a",
+        "localUtf8LfSha256": "ca7a91d5ae32b3796daaafbb8566f412ea565ade1b67fa546c5b49130340a37a"
+      },
+      {
+        "path": "packages/adapters/codex-local/src/ui/build-config.ts",
+        "gitBlobAndVpsSha256": "b834d8c8f8308c5f49149c9852789a61a1ff4c1f70cebf44c8cfb5d9aaebe2c9",
+        "localUtf8LfSha256": "b834d8c8f8308c5f49149c9852789a61a1ff4c1f70cebf44c8cfb5d9aaebe2c9"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/execute.ts",
+        "gitBlobAndVpsSha256": "80f3cf9cb8aabd4c6070579bff877c569cc341af6183e7d06888ae09a3151a4d",
+        "localUtf8LfSha256": "80f3cf9cb8aabd4c6070579bff877c569cc341af6183e7d06888ae09a3151a4d"
+      },
+      {
+        "path": "packages/adapters/gemini-local/src/server/parse.ts",
+        "gitBlobAndVpsSha256": "d877f987010ec1662ef805e3da8fdfe5fd7757692ba847404f0f6a66ac2b048b",
+        "localUtf8LfSha256": "d877f987010ec1662ef805e3da8fdfe5fd7757692ba847404f0f6a66ac2b048b"
+      },
+      {
+        "path": "packages/adapters/opencode-local/src/server/execute.ts",
+        "gitBlobAndVpsSha256": "d1b427362043f06becd6fd6cbe20577c19209d2e352a253efc726edd1f2c607e",
+        "localUtf8LfSha256": "d1b427362043f06becd6fd6cbe20577c19209d2e352a253efc726edd1f2c607e"
+      },
+      {
+        "path": "packages/browser-runtime/src/__tests__/image-playwright-parity.test.ts",
+        "gitBlobAndVpsSha256": "613131e8861d770e37906b0ef5024f02f8454cca73309f44215691749c98c27d",
+        "localUtf8LfSha256": "613131e8861d770e37906b0ef5024f02f8454cca73309f44215691749c98c27d"
+      },
+      {
+        "path": "packages/db/src/__tests__/non-owner-connection-contract.test.ts",
+        "gitBlobAndVpsSha256": "6de20066d29f5529584bd8b1ad53914eb263096b82489751b2e60b687df1d926",
+        "localUtf8LfSha256": "6de20066d29f5529584bd8b1ad53914eb263096b82489751b2e60b687df1d926"
+      },
+      {
+        "path": "packages/db/src/__tests__/required-migration-identity.test.ts",
+        "gitBlobAndVpsSha256": "3a682fa669f502b1a287d8a39e1b3ffb0e049b934fc40b10f063b8569874b689",
+        "localUtf8LfSha256": "3a682fa669f502b1a287d8a39e1b3ffb0e049b934fc40b10f063b8569874b689"
+      },
+      {
+        "path": "packages/db/src/client.ts",
+        "gitBlobAndVpsSha256": "46f30d21d138008d27380413f179af566cff40a0152b3693b87a4622866ff20b",
+        "localUtf8LfSha256": "46f30d21d138008d27380413f179af566cff40a0152b3693b87a4622866ff20b"
+      },
+      {
+        "path": "packages/db/src/required-migration-identity.ts",
+        "gitBlobAndVpsSha256": "6a469112da7c22869d8ef126e2d7a701f46164f32be33e4a4021517d4139abdd",
+        "localUtf8LfSha256": "6a469112da7c22869d8ef126e2d7a701f46164f32be33e4a4021517d4139abdd"
+      },
+      {
+        "path": "packages/sandbox-e2b-provider/src/e2b-provider.ts",
+        "gitBlobAndVpsSha256": "313888d8364a24ce614526e03e6fd05a33deeafc4e91029e0075b85a30f388da",
+        "localUtf8LfSha256": "313888d8364a24ce614526e03e6fd05a33deeafc4e91029e0075b85a30f388da"
+      },
+      {
+        "path": "packages/shared/src/commander-options.ts",
+        "gitBlobAndVpsSha256": "12f7b06dfbdb6a7c46536a626c7400513ea343e32b9044d32bb729ee33344733",
+        "localUtf8LfSha256": "12f7b06dfbdb6a7c46536a626c7400513ea343e32b9044d32bb729ee33344733"
+      },
+      {
+        "path": "packages/shared/src/generated/tools.json",
+        "gitBlobAndVpsSha256": "7f9dfae55e89aece0c11a52039f68af17363ab5ded2eb0041f19dc10d737ccca",
+        "localUtf8LfSha256": "7f9dfae55e89aece0c11a52039f68af17363ab5ded2eb0041f19dc10d737ccca"
+      },
+      {
+        "path": "packages/shared/src/index.ts",
+        "gitBlobAndVpsSha256": "cfc905c23a6cf980ca7e62ab808409ddaef9c9e3553dbb23422e770d393b388a",
+        "localUtf8LfSha256": "cfc905c23a6cf980ca7e62ab808409ddaef9c9e3553dbb23422e770d393b388a"
+      },
+      {
+        "path": "scripts/browser-dispatch-wiring.test.mjs",
+        "gitBlobAndVpsSha256": "0b932fcae68bea0519581065d7346a4fde8d471f49aa6e00221dc24166822dac",
+        "localUtf8LfSha256": "0b932fcae68bea0519581065d7346a4fde8d471f49aa6e00221dc24166822dac"
+      },
+      {
+        "path": "scripts/check-distributed-execution-foundation.mjs",
+        "gitBlobAndVpsSha256": "606f5a828cc1c8ebd8fdde8f32d079fc75b1c4901c4471f48c61d2c5fae6dd23",
+        "localUtf8LfSha256": "606f5a828cc1c8ebd8fdde8f32d079fc75b1c4901c4471f48c61d2c5fae6dd23"
+      },
+      {
+        "path": "scripts/check-distributed-execution-foundation.test.mjs",
+        "gitBlobAndVpsSha256": "ec1c89688f508203bfcbdfffafa811cb358fa08c53e8dc9e13d0a669d7eb9c92",
+        "localUtf8LfSha256": "ec1c89688f508203bfcbdfffafa811cb358fa08c53e8dc9e13d0a669d7eb9c92"
+      },
+      {
+        "path": "scripts/check-m1-shipped-boot-shape.mjs",
+        "gitBlobAndVpsSha256": "a84cee9974cea95a66c312cf2aa12c64083f3a2596936ee658e4fe70505033b3",
+        "localUtf8LfSha256": "a84cee9974cea95a66c312cf2aa12c64083f3a2596936ee658e4fe70505033b3"
+      },
+      {
+        "path": "scripts/check-m1-shipped-boot-shape.test.mjs",
+        "gitBlobAndVpsSha256": "65b311ed478b3514d9373dd41d98ae118fe2261bbec76474f88a81c3c33a2479",
+        "localUtf8LfSha256": "65b311ed478b3514d9373dd41d98ae118fe2261bbec76474f88a81c3c33a2479"
+      },
+      {
+        "path": "scripts/check-staging-manifest.test.mjs",
+        "gitBlobAndVpsSha256": "42f1a97d36c45e50c4ec4b56c59524426b59f649d26e27424e9547f8518fecb1",
+        "localUtf8LfSha256": "42f1a97d36c45e50c4ec4b56c59524426b59f649d26e27424e9547f8518fecb1"
+      },
+      {
+        "path": "scripts/lib/__tests__/cli-011-output-probe.test.mjs",
+        "gitBlobAndVpsSha256": "c40ecb7839c85d0afe683f2961b0aa150836971ee783060c49cbe1c163cb7481",
+        "localUtf8LfSha256": "c40ecb7839c85d0afe683f2961b0aa150836971ee783060c49cbe1c163cb7481"
+      },
+      {
+        "path": "scripts/lib/__tests__/m1-spine-assertions.test.mjs",
+        "gitBlobAndVpsSha256": "f79aaf382786e7a4a86f38f026d5f50faa3bf17708d928e363c98d0cc2ffddb6",
+        "localUtf8LfSha256": "f79aaf382786e7a4a86f38f026d5f50faa3bf17708d928e363c98d0cc2ffddb6"
+      },
+      {
+        "path": "scripts/lib/__tests__/vitest-capture.test.mjs",
+        "gitBlobAndVpsSha256": "8a8d65adcd4316c01faeb3d3ea191241cfde6dac825eb397c7c3a82dd87cfd47",
+        "localUtf8LfSha256": "8a8d65adcd4316c01faeb3d3ea191241cfde6dac825eb397c7c3a82dd87cfd47"
+      },
+      {
+        "path": "scripts/run-vitest-captured.mjs",
+        "gitBlobAndVpsSha256": "b0508949af67a56e07877ad82d8396e6e8ee66aac1b4d3d9b942d1c233ae2a72",
+        "localUtf8LfSha256": "b0508949af67a56e07877ad82d8396e6e8ee66aac1b4d3d9b942d1c233ae2a72"
+      },
+      {
+        "path": "scripts/test-execution-census.json",
+        "gitBlobAndVpsSha256": "938afcc074709ec6e1ea0d45cf1de21ef97acfe4b6e49510ba0a65d41784a301",
+        "localUtf8LfSha256": "938afcc074709ec6e1ea0d45cf1de21ef97acfe4b6e49510ba0a65d41784a301"
+      },
+      {
+        "path": "scripts/test-inventory.json",
+        "gitBlobAndVpsSha256": "d11774219f1a0d99349c73999bfae61b9032005dab3e9a686916fcc39f0a5d2e",
+        "localUtf8LfSha256": "d11774219f1a0d99349c73999bfae61b9032005dab3e9a686916fcc39f0a5d2e"
+      },
+      {
+        "path": "server/src/__tests__/action-tools.test.ts",
+        "gitBlobAndVpsSha256": "195ee6e5a38caf77e0e47a005a0166b247410009ad67ba0cf05f8d53843a9399",
+        "localUtf8LfSha256": "195ee6e5a38caf77e0e47a005a0166b247410009ad67ba0cf05f8d53843a9399"
+      },
+      {
+        "path": "server/src/__tests__/adapter-models.test.ts",
+        "gitBlobAndVpsSha256": "4a46a27eb670eef74c994dbe044496e76d99b5a7ddfdc9562179af4b7b625e69",
+        "localUtf8LfSha256": "4a46a27eb670eef74c994dbe044496e76d99b5a7ddfdc9562179af4b7b625e69"
+      },
+      {
+        "path": "server/src/__tests__/agent-loop.test.ts",
+        "gitBlobAndVpsSha256": "5baaca02ad7337de64348892775feae67caad38320794ec36fcce979daed2465",
+        "localUtf8LfSha256": "5baaca02ad7337de64348892775feae67caad38320794ec36fcce979daed2465"
+      },
+      {
+        "path": "server/src/__tests__/agents-adapter-test-environment-route.test.ts",
+        "gitBlobAndVpsSha256": "14677d52dc9e985fc4c19e03e8194308a9a5fd15338ff58585e7bee29c9b40b8",
+        "localUtf8LfSha256": "14677d52dc9e985fc4c19e03e8194308a9a5fd15338ff58585e7bee29c9b40b8"
+      },
+      {
+        "path": "server/src/__tests__/agents-adapter-validation.contract.test.ts",
+        "gitBlobAndVpsSha256": "248acdc2824f685ee829304f1b74dc216854e833ec83e062a1f774ba96735f82",
+        "localUtf8LfSha256": "248acdc2824f685ee829304f1b74dc216854e833ec83e062a1f774ba96735f82"
+      },
+      {
+        "path": "server/src/__tests__/aoa-trigger-prompt.test.ts",
+        "gitBlobAndVpsSha256": "63b3c2e0a338fd4216e143168ffc811f9b3695dfdd41ea35e678d718b4543423",
+        "localUtf8LfSha256": "63b3c2e0a338fd4216e143168ffc811f9b3695dfdd41ea35e678d718b4543423"
+      },
+      {
+        "path": "server/src/__tests__/cli-008-unit-b-byte-source.integration.test.ts",
+        "gitBlobAndVpsSha256": "03c37a083ff53b2ac8c2099e8daf42dc8417e5925ad31185ed5da21655de273f",
+        "localUtf8LfSha256": "03c37a083ff53b2ac8c2099e8daf42dc8417e5925ad31185ed5da21655de273f"
+      },
+      {
+        "path": "server/src/__tests__/cli-mode-cloud-sandbox-acquire.test.ts",
+        "gitBlobAndVpsSha256": "eef607b7a35de8a29ddb99e9bdeb8f99df178080fbf40887cbcc5739dd193bc1",
+        "localUtf8LfSha256": "eef607b7a35de8a29ddb99e9bdeb8f99df178080fbf40887cbcc5739dd193bc1"
+      },
+      {
+        "path": "server/src/__tests__/cli-mode-codex-integration.test.ts",
+        "gitBlobAndVpsSha256": "76fce6bfdbfceaaf0e55518ce554f403c312610b12e31419fb8dbd3c30b0be7e",
+        "localUtf8LfSha256": "76fce6bfdbfceaaf0e55518ce554f403c312610b12e31419fb8dbd3c30b0be7e"
+      },
+      {
+        "path": "server/src/__tests__/cli-mode-done-invariant.test.ts",
+        "gitBlobAndVpsSha256": "79a13c70c88929f643db36c586bb3ab9c30893a932bb6b1d397f54060ecb68a1",
+        "localUtf8LfSha256": "79a13c70c88929f643db36c586bb3ab9c30893a932bb6b1d397f54060ecb68a1"
+      },
+      {
+        "path": "server/src/__tests__/cli-mode-no-sandbox-acquire.test.ts",
+        "gitBlobAndVpsSha256": "40d34879e3dd0c6e89e0a46bf3e18f099f47f5faafc1f565a72a4bd265dc3ca4",
+        "localUtf8LfSha256": "40d34879e3dd0c6e89e0a46bf3e18f099f47f5faafc1f565a72a4bd265dc3ca4"
+      },
+      {
+        "path": "server/src/__tests__/cli-mode.test.ts",
+        "gitBlobAndVpsSha256": "5a88a773f0feba055f315996227d2f45bd049aa207d689606d6bd3ea87b1fc52",
+        "localUtf8LfSha256": "5a88a773f0feba055f315996227d2f45bd049aa207d689606d6bd3ea87b1fc52"
+      },
+      {
+        "path": "server/src/__tests__/cli-summarizer-sandbox.test.ts",
+        "gitBlobAndVpsSha256": "0939bc37cd123c4eb1dda62501da05237d0c6d8a565421973325774c90290b3f",
+        "localUtf8LfSha256": "0939bc37cd123c4eb1dda62501da05237d0c6d8a565421973325774c90290b3f"
+      },
+      {
+        "path": "server/src/__tests__/cloud-plugin-process-composition.test.ts",
+        "gitBlobAndVpsSha256": "0da41230a1b3de85c094ee438c0b92cb9fc238a90f8679260884cf031cb6edca",
+        "localUtf8LfSha256": "0da41230a1b3de85c094ee438c0b92cb9fc238a90f8679260884cf031cb6edca"
+      },
+      {
+        "path": "server/src/__tests__/codex-model.test.ts",
+        "gitBlobAndVpsSha256": "cdd130b9eb5d37dd81d4cf7b138fdad20ec0fa7a2f4bd1ecfd9f155219de4b9b",
+        "localUtf8LfSha256": "cdd130b9eb5d37dd81d4cf7b138fdad20ec0fa7a2f4bd1ecfd9f155219de4b9b"
+      },
+      {
+        "path": "server/src/__tests__/commander-adapter-turn.test.ts",
+        "gitBlobAndVpsSha256": "4d2ce9ecf4d7a965f6cc4eb17e04cdb248c18ef8849d27f14cc7462edafcb1e2",
+        "localUtf8LfSha256": "4d2ce9ecf4d7a965f6cc4eb17e04cdb248c18ef8849d27f14cc7462edafcb1e2"
+      },
+      {
+        "path": "server/src/__tests__/commander-claimed-rejoin.test.ts",
+        "gitBlobAndVpsSha256": "d73672d7b26d95f46b8e20055001dc914e152a9ff2484bdc69b1dd0d14b6cc86",
+        "localUtf8LfSha256": "d73672d7b26d95f46b8e20055001dc914e152a9ff2484bdc69b1dd0d14b6cc86"
+      },
+      {
+        "path": "server/src/__tests__/commander-distributed-output.test.ts",
+        "gitBlobAndVpsSha256": "b9643ca05821e58be1f069d0f85f76d178a4761d38b8491a2848d21b2f774b11",
+        "localUtf8LfSha256": "b9643ca05821e58be1f069d0f85f76d178a4761d38b8491a2848d21b2f774b11"
+      },
+      {
+        "path": "server/src/__tests__/commander-history-recovery.test.ts",
+        "gitBlobAndVpsSha256": "44b404e9a88a6bebaecb41df54daef48cfe4926210d6729cf44c2c3a0938e273",
+        "localUtf8LfSha256": "44b404e9a88a6bebaecb41df54daef48cfe4926210d6729cf44c2c3a0938e273"
+      },
+      {
+        "path": "server/src/__tests__/commander-options-prompt.test.ts",
+        "gitBlobAndVpsSha256": "a30ad0a459da6e215b2cbc465e0a2343d2a3b7194186a0854b36ea57e8f21eee",
+        "localUtf8LfSha256": "a30ad0a459da6e215b2cbc465e0a2343d2a3b7194186a0854b36ea57e8f21eee"
+      },
+      {
+        "path": "server/src/__tests__/commander-runtime-approvals-routes.test.ts",
+        "gitBlobAndVpsSha256": "6373bae694809159e8658dcdb622054e6c1ce88b9038428baf5821bc8db27bcb",
+        "localUtf8LfSha256": "6373bae694809159e8658dcdb622054e6c1ce88b9038428baf5821bc8db27bcb"
+      },
+      {
+        "path": "server/src/__tests__/commander-turn-claim.integration.test.ts",
+        "gitBlobAndVpsSha256": "95a984962dd2ad6d3594ddaff272b055bc0218e083edad4514e41a747b704397",
+        "localUtf8LfSha256": "95a984962dd2ad6d3594ddaff272b055bc0218e083edad4514e41a747b704397"
+      },
+      {
+        "path": "server/src/__tests__/distributed-execution-db-startup.integration.test.ts",
+        "gitBlobAndVpsSha256": "dd9836079f4c72d22a3dec4c6b12f94fc6e139121936f0fe4a07411637bfd19a",
+        "localUtf8LfSha256": "dd9836079f4c72d22a3dec4c6b12f94fc6e139121936f0fe4a07411637bfd19a"
+      },
+      {
+        "path": "server/src/__tests__/distributed-tool-surface-per-organization.test.ts",
+        "gitBlobAndVpsSha256": "4d244dd7fe4c6717cea5ae40c8f6eb36295b30c152a300ba7f3eae5a0d55b556",
+        "localUtf8LfSha256": "4d244dd7fe4c6717cea5ae40c8f6eb36295b30c152a300ba7f3eae5a0d55b556"
+      },
+      {
+        "path": "server/src/__tests__/extraction-cli.test.ts",
+        "gitBlobAndVpsSha256": "aea4ae707c7776abfdeef8642a41e7fce4ee1fccda95b5703307b3f69aef26d2",
+        "localUtf8LfSha256": "aea4ae707c7776abfdeef8642a41e7fce4ee1fccda95b5703307b3f69aef26d2"
+      },
+      {
+        "path": "server/src/__tests__/extraction-file-import-sandbox.test.ts",
+        "gitBlobAndVpsSha256": "5c63867eeaf49fa8046cc7196149eff13de77b3e44e0f9e4e69abf03d1ab1470",
+        "localUtf8LfSha256": "5c63867eeaf49fa8046cc7196149eff13de77b3e44e0f9e4e69abf03d1ab1470"
+      },
+      {
+        "path": "server/src/__tests__/extraction-sandbox-failure.test.ts",
+        "gitBlobAndVpsSha256": "18e55f14edd1f1c3d897ae759e109ba1ffe7a3870a62b64db398503a78fe75aa",
+        "localUtf8LfSha256": "18e55f14edd1f1c3d897ae759e109ba1ffe7a3870a62b64db398503a78fe75aa"
+      },
+      {
+        "path": "server/src/__tests__/fixtures/job-control-module-load-sentinel.mjs",
+        "gitBlobAndVpsSha256": "ab896ce03280009f2d485a31c501f8e4c47a28b67e4a6ec2f56b6421baa93bda",
+        "localUtf8LfSha256": "ab896ce03280009f2d485a31c501f8e4c47a28b67e4a6ec2f56b6421baa93bda"
+      },
+      {
+        "path": "server/src/__tests__/heartbeat-provider-resolution.test.ts",
+        "gitBlobAndVpsSha256": "fd2cafcfedd11c1d4d3ba3e27b18978449dc92fed0f4963028ba802cc7222d1f",
+        "localUtf8LfSha256": "fd2cafcfedd11c1d4d3ba3e27b18978449dc92fed0f4963028ba802cc7222d1f"
+      },
+      {
+        "path": "server/src/__tests__/helpers/acl-mutation-sweep.ts",
+        "gitBlobAndVpsSha256": "530131a5f7d5f78878ceb9bd6dcbcb99b77aa7c0e437f02a9fee7146eedbfd4d",
+        "localUtf8LfSha256": "530131a5f7d5f78878ceb9bd6dcbcb99b77aa7c0e437f02a9fee7146eedbfd4d"
+      },
+      {
+        "path": "server/src/__tests__/helpers/native-crew-tool-fixtures.ts",
+        "gitBlobAndVpsSha256": "09849462f3be6a4d31d563b4f2b8f29174261b09868b7d7f7e27dcda10ab42a8",
+        "localUtf8LfSha256": "09849462f3be6a4d31d563b4f2b8f29174261b09868b7d7f7e27dcda10ab42a8"
+      },
+      {
+        "path": "server/src/__tests__/internal-agent-chat-route-sse.test.ts",
+        "gitBlobAndVpsSha256": "f19a6b7414187a5c18876ea22a900277fc32f26715fde860e671cd97d71b3aef",
+        "localUtf8LfSha256": "f19a6b7414187a5c18876ea22a900277fc32f26715fde860e671cd97d71b3aef"
+      },
+      {
+        "path": "server/src/__tests__/internal-agent-run-persist.test.ts",
+        "gitBlobAndVpsSha256": "418a9923c0f572372e4b8e99402478757bf30b3d6741f9e6468ff969c2083071",
+        "localUtf8LfSha256": "418a9923c0f572372e4b8e99402478757bf30b3d6741f9e6468ff969c2083071"
+      },
+      {
+        "path": "server/src/__tests__/job-placement.integration.test.ts",
+        "gitBlobAndVpsSha256": "1f5f67eb3cea1f2d41437cee5a025be46456d35a059facf6ea8bf80776211ce1",
+        "localUtf8LfSha256": "1f5f67eb3cea1f2d41437cee5a025be46456d35a059facf6ea8bf80776211ce1"
+      },
+      {
+        "path": "server/src/__tests__/job-submission.integration.test.ts",
+        "gitBlobAndVpsSha256": "0a46b2cdb84ec6546bdb2efddcccc0aebe57d120c6aac3193af92080d621718f",
+        "localUtf8LfSha256": "0a46b2cdb84ec6546bdb2efddcccc0aebe57d120c6aac3193af92080d621718f"
+      },
+      {
+        "path": "server/src/__tests__/one-shot-provider-credential.test.ts",
+        "gitBlobAndVpsSha256": "e9d116cc57e453a33033b7fced30a3ef5800148b31a8b437c5cc55f0422d2b3f",
+        "localUtf8LfSha256": "e9d116cc57e453a33033b7fced30a3ef5800148b31a8b437c5cc55f0422d2b3f"
+      },
+      {
+        "path": "server/src/__tests__/provider-key-callers.test.ts",
+        "gitBlobAndVpsSha256": "145461c11239761ec4ada14b6368d07598d42e4fa1dbf592419c07f632dbe3e4",
+        "localUtf8LfSha256": "145461c11239761ec4ada14b6368d07598d42e4fa1dbf592419c07f632dbe3e4"
+      },
+      {
+        "path": "server/src/__tests__/provider-switching-parity.test.ts",
+        "gitBlobAndVpsSha256": "1b4181cef973244e3fbd5c9183e040579382aa6d0a6ad31aaef12cc3984a9aaa",
+        "localUtf8LfSha256": "1b4181cef973244e3fbd5c9183e040579382aa6d0a6ad31aaef12cc3984a9aaa"
+      },
+      {
+        "path": "server/src/__tests__/provider-switching.integration.test.ts",
+        "gitBlobAndVpsSha256": "7f4ad03f81dcd983c13b58d576e5ac86245dd9d0520defde1be96fe49e441d49",
+        "localUtf8LfSha256": "7f4ad03f81dcd983c13b58d576e5ac86245dd9d0520defde1be96fe49e441d49"
+      },
+      {
+        "path": "server/src/__tests__/resolve-commander-adapter.test.ts",
+        "gitBlobAndVpsSha256": "a2825876095e08e3e52f07088711dc09fa8e05941222c071fb1a9b92dacbec12",
+        "localUtf8LfSha256": "a2825876095e08e3e52f07088711dc09fa8e05941222c071fb1a9b92dacbec12"
+      },
+      {
+        "path": "server/src/__tests__/resolve-crew-adapter-model-override.test.ts",
+        "gitBlobAndVpsSha256": "195c31ecd548e0d46a661dad6806bdca7dd3ffcf92fe50a5914d2210ae03d79f",
+        "localUtf8LfSha256": "195c31ecd548e0d46a661dad6806bdca7dd3ffcf92fe50a5914d2210ae03d79f"
+      },
+      {
+        "path": "server/src/__tests__/resolve-crew-adapter.test.ts",
+        "gitBlobAndVpsSha256": "e879e894de84de9254a0c7f4e7410594a60c543f5caba32012f1341a98bbefaa",
+        "localUtf8LfSha256": "e879e894de84de9254a0c7f4e7410594a60c543f5caba32012f1341a98bbefaa"
+      },
+      {
+        "path": "server/src/__tests__/sandbox-readiness-probe.test.ts",
+        "gitBlobAndVpsSha256": "5fabd334be0c860bc6249645e2db664945bbf413936916262c25bab0b7e5ae70",
+        "localUtf8LfSha256": "5fabd334be0c860bc6249645e2db664945bbf413936916262c25bab0b7e5ae70"
+      },
+      {
+        "path": "server/src/__tests__/workspace-runtime.test.ts",
+        "gitBlobAndVpsSha256": "0e4a69e9df6f386bb8d75a8d6ba618469867abaf8666f729a7b468b2b4b352d5",
+        "localUtf8LfSha256": "0e4a69e9df6f386bb8d75a8d6ba618469867abaf8666f729a7b468b2b4b352d5"
+      },
+      {
+        "path": "server/src/adapters/codex-models.ts",
+        "gitBlobAndVpsSha256": "b9cbb56d9f6ef7b8e9c12c7b7c9384fe44e7420f677fe31eddf0c2d92e7e38fe",
+        "localUtf8LfSha256": "b9cbb56d9f6ef7b8e9c12c7b7c9384fe44e7420f677fe31eddf0c2d92e7e38fe"
+      },
+      {
+        "path": "server/src/agent-auth-jwt.ts",
+        "gitBlobAndVpsSha256": "c10b7ca4db1f458efe41bce74e5587d46f139c432c84d681af6bef305819a998",
+        "localUtf8LfSha256": "c10b7ca4db1f458efe41bce74e5587d46f139c432c84d681af6bef305819a998"
+      },
+      {
+        "path": "server/src/index.ts",
+        "gitBlobAndVpsSha256": "d4442a4a492bcda44be5bb45389670e064689ac81f17e0629be6abbc848205c1",
+        "localUtf8LfSha256": "d4442a4a492bcda44be5bb45389670e064689ac81f17e0629be6abbc848205c1"
+      },
+      {
+        "path": "server/src/mcp/server.ts",
+        "gitBlobAndVpsSha256": "991dbee970dd9a336d18d4605c1232f8322f7a0b273e18400f5ce994d8f962d7",
+        "localUtf8LfSha256": "991dbee970dd9a336d18d4605c1232f8322f7a0b273e18400f5ce994d8f962d7"
+      },
+      {
+        "path": "server/src/middleware/auth.ts",
+        "gitBlobAndVpsSha256": "c863d480ab03125c0967bcb8bbbc12afbd2b0861fcab1c8abfa2fc7d5b1e2f06",
+        "localUtf8LfSha256": "c863d480ab03125c0967bcb8bbbc12afbd2b0861fcab1c8abfa2fc7d5b1e2f06"
+      },
+      {
+        "path": "server/src/onboarding-assets/commander/AGENTS.md",
+        "gitBlobAndVpsSha256": "4639475479c5499a9fb07975c214d10f714e7dbed4b9ade093f2f70f9a640c1c",
+        "localUtf8LfSha256": "4639475479c5499a9fb07975c214d10f714e7dbed4b9ade093f2f70f9a640c1c"
+      },
+      {
+        "path": "server/src/onboarding-assets/commander/TOOLS.md",
+        "gitBlobAndVpsSha256": "334e895a4e2a4c16c34a600b277b2f37f3e8a5148a0692270717e474ccd88cca",
+        "localUtf8LfSha256": "334e895a4e2a4c16c34a600b277b2f37f3e8a5148a0692270717e474ccd88cca"
+      },
+      {
+        "path": "server/src/routes/agents.ts",
+        "gitBlobAndVpsSha256": "f557edfc4ac000d3e15f156e62040c29bba3ce33348f3d2fc79a9f0745c2bfa2",
+        "localUtf8LfSha256": "f557edfc4ac000d3e15f156e62040c29bba3ce33348f3d2fc79a9f0745c2bfa2"
+      },
+      {
+        "path": "server/src/routes/internal-agent.ts",
+        "gitBlobAndVpsSha256": "2943efa15258d2e3786f80ebd2fe36cbda9acca96bf6a87a99149d7b384e41c4",
+        "localUtf8LfSha256": "2943efa15258d2e3786f80ebd2fe36cbda9acca96bf6a87a99149d7b384e41c4"
+      },
+      {
+        "path": "server/src/services/commander-distributed-output.ts",
+        "gitBlobAndVpsSha256": "facf21cab3c4416f8d22e0914d3232c3eb8e0be231ccf9f57a942857988571da",
+        "localUtf8LfSha256": "facf21cab3c4416f8d22e0914d3232c3eb8e0be231ccf9f57a942857988571da"
+      },
+      {
+        "path": "server/src/services/commander-distributed-reply.ts",
+        "gitBlobAndVpsSha256": "6815bd83574f62e1780e5a9a21aa22864ba0a9409d8547295f2dd3dc8012addc",
+        "localUtf8LfSha256": "6815bd83574f62e1780e5a9a21aa22864ba0a9409d8547295f2dd3dc8012addc"
+      },
+      {
+        "path": "server/src/services/commander-distributed-store.ts",
+        "gitBlobAndVpsSha256": "72f2016ba66a2dbe056faf384df6836de733ca7c3db5cab928d6b22b84ffd8c2",
+        "localUtf8LfSha256": "72f2016ba66a2dbe056faf384df6836de733ca7c3db5cab928d6b22b84ffd8c2"
+      },
+      {
+        "path": "server/src/services/costs.ts",
+        "gitBlobAndVpsSha256": "0c825399c6e6e1b66cd3daa57dc95b5ebd975fa2583a1c45c3294d956f3f6a88",
+        "localUtf8LfSha256": "0c825399c6e6e1b66cd3daa57dc95b5ebd975fa2583a1c45c3294d956f3f6a88"
+      },
+      {
+        "path": "server/src/services/crew-cancellation.ts",
+        "gitBlobAndVpsSha256": "c0980770473053957b4a0f6c82b4576cb5533292049a5570a9698c9c44b75739",
+        "localUtf8LfSha256": "c0980770473053957b4a0f6c82b4576cb5533292049a5570a9698c9c44b75739"
+      },
+      {
+        "path": "server/src/services/extraction-cli.ts",
+        "gitBlobAndVpsSha256": "52f0175d56e5634ec88f342e3a2f70845b4c96c3ba5ea367443bd59a793e111a",
+        "localUtf8LfSha256": "52f0175d56e5634ec88f342e3a2f70845b4c96c3ba5ea367443bd59a793e111a"
+      },
+      {
+        "path": "server/src/services/hub-curation.ts",
+        "gitBlobAndVpsSha256": "b1ede488fdebc76b38b4cc9e2cc7f1def2223876aab600f31b3b8fdd0b6eca19",
+        "localUtf8LfSha256": "b1ede488fdebc76b38b4cc9e2cc7f1def2223876aab600f31b3b8fdd0b6eca19"
+      },
+      {
+        "path": "server/src/services/internal-agent/__tests__/model-resolution.test.ts",
+        "gitBlobAndVpsSha256": "f6fede352a7dbdaed5213e3090e05a3bcb44d052f17a68102647ffbba1b35439",
+        "localUtf8LfSha256": "f6fede352a7dbdaed5213e3090e05a3bcb44d052f17a68102647ffbba1b35439"
+      },
+      {
+        "path": "server/src/services/internal-agent/agent-loop.ts",
+        "gitBlobAndVpsSha256": "567bf1f5439ab1156ddd037ccd00bd2a79e523b1472c84a3ecba2c2338fce8fa",
+        "localUtf8LfSha256": "567bf1f5439ab1156ddd037ccd00bd2a79e523b1472c84a3ecba2c2338fce8fa"
+      },
+      {
+        "path": "server/src/services/internal-agent/aoa-agents/__tests__/runner-model-resolution.test.ts",
+        "gitBlobAndVpsSha256": "feef2cb945267aabb01249a942d4dd7af1e9e1b154d82dac472759c5d174d9d8",
+        "localUtf8LfSha256": "feef2cb945267aabb01249a942d4dd7af1e9e1b154d82dac472759c5d174d9d8"
+      },
+      {
+        "path": "server/src/services/internal-agent/aoa-agents/aoa-trigger-prompt.ts",
+        "gitBlobAndVpsSha256": "eaa12da4d214130842179100659871144202e1dc79edb0637438dc12a06de29f",
+        "localUtf8LfSha256": "eaa12da4d214130842179100659871144202e1dc79edb0637438dc12a06de29f"
+      },
+      {
+        "path": "server/src/services/internal-agent/aoa-agents/codex-crew-tool-capture.ts",
+        "gitBlobAndVpsSha256": "1cee10c0c9f83b63ee3dbb4c37def55f4b826531ae2852928810a0a814cb10c6",
+        "localUtf8LfSha256": "1cee10c0c9f83b63ee3dbb4c37def55f4b826531ae2852928810a0a814cb10c6"
+      },
+      {
+        "path": "server/src/services/internal-agent/aoa-agents/native-crew-tool-capture.ts",
+        "gitBlobAndVpsSha256": "4e70a3049d4e617c3ba2ff38abd5fb1ec40f69981d14396711df3bf3dc2159f5",
+        "localUtf8LfSha256": "4e70a3049d4e617c3ba2ff38abd5fb1ec40f69981d14396711df3bf3dc2159f5"
+      },
+      {
+        "path": "server/src/services/internal-agent/aoa-agents/resolve-crew-adapter.ts",
+        "gitBlobAndVpsSha256": "c1ef109d09c6a6902b6160af6932ccc1c642a6570fb09ce2ae8e3f252b078210",
+        "localUtf8LfSha256": "c1ef109d09c6a6902b6160af6932ccc1c642a6570fb09ce2ae8e3f252b078210"
+      },
+      {
+        "path": "server/src/services/internal-agent/aoa-agents/runner.ts",
+        "gitBlobAndVpsSha256": "e22a2a922952fd1bc402f5e43e7807abbdb71e7fb17b67fa35972e2b45123c56",
+        "localUtf8LfSha256": "840064f8e06172ee78c8399dba33b682059e61eb6fa6da61accd62e60e576167"
+      },
+      {
+        "path": "server/src/services/internal-agent/cli-mode.ts",
+        "gitBlobAndVpsSha256": "29b09932e5717218103d9318b25e7926191958e82ab0342d5982ca5866760d76",
+        "localUtf8LfSha256": "29b09932e5717218103d9318b25e7926191958e82ab0342d5982ca5866760d76"
+      },
+      {
+        "path": "server/src/services/internal-agent/cli-summarizer.ts",
+        "gitBlobAndVpsSha256": "81dca92d0abedbbf4a06af5c286028ba02516bcc67777c58ed6424cf82352ea3",
+        "localUtf8LfSha256": "81dca92d0abedbbf4a06af5c286028ba02516bcc67777c58ed6424cf82352ea3"
+      },
+      {
+        "path": "server/src/services/internal-agent/codex-exec.ts",
+        "gitBlobAndVpsSha256": "ea1f64aaf1b0c8c75c6b6240b2c3722189f69799b6773688d44b58cae32ef195",
+        "localUtf8LfSha256": "ea1f64aaf1b0c8c75c6b6240b2c3722189f69799b6773688d44b58cae32ef195"
+      },
+      {
+        "path": "server/src/services/internal-agent/codex-model.ts",
+        "gitBlobAndVpsSha256": "77ad9b4a686aad404685e1666e8e5ad04f34a8239b3a4a5d5fecb05c1fb254f3",
+        "localUtf8LfSha256": "77ad9b4a686aad404685e1666e8e5ad04f34a8239b3a4a5d5fecb05c1fb254f3"
+      },
+      {
+        "path": "server/src/services/internal-agent/commander-preamble.ts",
+        "gitBlobAndVpsSha256": "c6a79bd5d52daba959584a4db8e1d0239826d5b7744f5275bdaa72ba3fc4ce72",
+        "localUtf8LfSha256": "c6a79bd5d52daba959584a4db8e1d0239826d5b7744f5275bdaa72ba3fc4ce72"
+      },
+      {
+        "path": "server/src/services/internal-agent/commander-sandbox.ts",
+        "gitBlobAndVpsSha256": "7128c97f310a0ae8db8cef93592ecbcf8831880406269abaecfcd3aa55c4f766",
+        "localUtf8LfSha256": "7128c97f310a0ae8db8cef93592ecbcf8831880406269abaecfcd3aa55c4f766"
+      },
+      {
+        "path": "server/src/services/internal-agent/conversation.ts",
+        "gitBlobAndVpsSha256": "30f716b3892961ef42ccaa2ce091a7bb715c519a06aabdddc83a4b2b2c4aa363",
+        "localUtf8LfSha256": "30f716b3892961ef42ccaa2ce091a7bb715c519a06aabdddc83a4b2b2c4aa363"
+      },
+      {
+        "path": "server/src/services/internal-agent/crew-tool-authority.ts",
+        "gitBlobAndVpsSha256": "5eee655cbdf01f0cf38bdde56fd00a2709b2fb23f3890d86c3c0f02cfb3d748c",
+        "localUtf8LfSha256": "5eee655cbdf01f0cf38bdde56fd00a2709b2fb23f3890d86c3c0f02cfb3d748c"
+      },
+      {
+        "path": "server/src/services/internal-agent/mcp-bridge.ts",
+        "gitBlobAndVpsSha256": "808d1a2b341330625a9eaeab2e0c0beebac1c64ee0aa608f4dcb164799302d4a",
+        "localUtf8LfSha256": "808d1a2b341330625a9eaeab2e0c0beebac1c64ee0aa608f4dcb164799302d4a"
+      },
+      {
+        "path": "server/src/services/internal-agent/model-resolution.ts",
+        "gitBlobAndVpsSha256": "47a1296c8f9426bcbad4f9366264e62047ab4329a9538cd15c8a8640f39c5529",
+        "localUtf8LfSha256": "47a1296c8f9426bcbad4f9366264e62047ab4329a9538cd15c8a8640f39c5529"
+      },
+      {
+        "path": "server/src/services/internal-agent/options-output.ts",
+        "gitBlobAndVpsSha256": "bc19231be190ed52d4190847050fed9c12db858b0b6238b4560c967d08bab1fa",
+        "localUtf8LfSha256": "bc19231be190ed52d4190847050fed9c12db858b0b6238b4560c967d08bab1fa"
+      },
+      {
+        "path": "server/src/services/internal-agent/run-cost.ts",
+        "gitBlobAndVpsSha256": "8d1ce99b791093f8eb8cbcfe68abcb6e345cbf590cc1ffcb90b69390b5ddf282",
+        "localUtf8LfSha256": "8d1ce99b791093f8eb8cbcfe68abcb6e345cbf590cc1ffcb90b69390b5ddf282"
+      },
+      {
+        "path": "server/src/services/internal-agent/submission-recovery.ts",
+        "gitBlobAndVpsSha256": "96e5d37048a87894fd665dee8052811be650cedd00026d34e20f198e9134bb17",
+        "localUtf8LfSha256": "96e5d37048a87894fd665dee8052811be650cedd00026d34e20f198e9134bb17"
+      },
+      {
+        "path": "server/src/services/internal-agent/tools/action-tools.ts",
+        "gitBlobAndVpsSha256": "f71ece586f2afc68ed06c90e1dd50cf3beedea34b3f5600649e15194541475cf",
+        "localUtf8LfSha256": "f71ece586f2afc68ed06c90e1dd50cf3beedea34b3f5600649e15194541475cf"
+      },
+      {
+        "path": "server/src/services/internal-agent/tools/hub-curation-tools.ts",
+        "gitBlobAndVpsSha256": "aa304886d9f2731a20f930744625a5c479d84e627703ec40de214e1dca999bdb",
+        "localUtf8LfSha256": "aa304886d9f2731a20f930744625a5c479d84e627703ec40de214e1dca999bdb"
+      },
+      {
+        "path": "server/src/services/one-shot-provider-credential.ts",
+        "gitBlobAndVpsSha256": "95032e9743618ecaa8cf219cbd23664676318d35e92574b6523cb8e0f24064a6",
+        "localUtf8LfSha256": "95032e9743618ecaa8cf219cbd23664676318d35e92574b6523cb8e0f24064a6"
+      },
+      {
+        "path": "server/src/services/sandbox-readiness-probe.ts",
+        "gitBlobAndVpsSha256": "81fbe94e70aff6906a610fabb8f5a2e17f8c4b47ce6fe6db56db0c5610cca75e",
+        "localUtf8LfSha256": "81fbe94e70aff6906a610fabb8f5a2e17f8c4b47ce6fe6db56db0c5610cca75e"
+      },
+      {
+        "path": "server/src/services/server-shutdown.ts",
+        "gitBlobAndVpsSha256": "bedbbdf1e00042cc34cc751409826d5c07b6468e95534d3a588c0e63d163ca5f",
+        "localUtf8LfSha256": "bedbbdf1e00042cc34cc751409826d5c07b6468e95534d3a588c0e63d163ca5f"
+      },
+      {
+        "path": "tests/d1/m4-slot-host.test.mjs",
+        "gitBlobAndVpsSha256": "ae1aab044381b518b2d243aefcd6e3549507f6a7be93484fa264f64541c0aae4",
+        "localUtf8LfSha256": "ae1aab044381b518b2d243aefcd6e3549507f6a7be93484fa264f64541c0aae4"
+      },
+      {
+        "path": "tests/d1/m4-slot-ownership.test.mjs",
+        "gitBlobAndVpsSha256": "ff2c930ca349f0ca05222298377fca0130044940359f0f832b51b423d5a1e784",
+        "localUtf8LfSha256": "ff2c930ca349f0ca05222298377fca0130044940359f0f832b51b423d5a1e784"
+      },
+      {
+        "path": "tests/e2e/commander-codex-human-tools.spec.ts",
+        "gitBlobAndVpsSha256": "0397f4dfcf3d8915242e4a6245a52081f2e304f4e771a793abdc2e315749b050",
+        "localUtf8LfSha256": "0397f4dfcf3d8915242e4a6245a52081f2e304f4e771a793abdc2e315749b050"
+      },
+      {
+        "path": "tests/e2e/commander-codex-reply.spec.ts",
+        "gitBlobAndVpsSha256": "22549eb616ed8b7adbb8582a4217deef70f7e7e04e626d574f63d764a7403f14",
+        "localUtf8LfSha256": "22549eb616ed8b7adbb8582a4217deef70f7e7e04e626d574f63d764a7403f14"
+      },
+      {
+        "path": "tests/e2e/commander-codex-resume.spec.ts",
+        "gitBlobAndVpsSha256": "db95eae6d85b69d5ff493de695116f36b8ea684cf4fa4e0adcbb4cde86d94477",
+        "localUtf8LfSha256": "db95eae6d85b69d5ff493de695116f36b8ea684cf4fa4e0adcbb4cde86d94477"
+      },
+      {
+        "path": "tests/e2e/commander-codex-team-roster.spec.ts",
+        "gitBlobAndVpsSha256": "a5bfb46c8e8725559b8e672dcc719fcb2c6b0a3ac01791186389d71c5885f468",
+        "localUtf8LfSha256": "a5bfb46c8e8725559b8e672dcc719fcb2c6b0a3ac01791186389d71c5885f468"
+      },
+      {
+        "path": "tests/e2e/commander-codex-tokens-cost.spec.ts",
+        "gitBlobAndVpsSha256": "d478c08901b58fdbb13683af11116977f2a17fe3d631ffde5da00b37cdd8d254",
+        "localUtf8LfSha256": "d478c08901b58fdbb13683af11116977f2a17fe3d631ffde5da00b37cdd8d254"
+      },
+      {
+        "path": "tests/e2e/commander-error-states.spec.ts",
+        "gitBlobAndVpsSha256": "02e74097bdcb76a8c98d295e8024dd611fdd9e6e1b505080201701e1fb2689b6",
+        "localUtf8LfSha256": "02e74097bdcb76a8c98d295e8024dd611fdd9e6e1b505080201701e1fb2689b6"
+      },
+      {
+        "path": "tests/e2e/commander-transparency.spec.ts",
+        "gitBlobAndVpsSha256": "d631f767195432b16b7a61d5fe900c933ac49943ec0039121c39893120300655",
+        "localUtf8LfSha256": "d631f767195432b16b7a61d5fe900c933ac49943ec0039121c39893120300655"
+      },
+      {
+        "path": "tests/e2e/fixtures/fake-codex/fake-codex.mjs",
+        "gitBlobAndVpsSha256": "f9290a0c74fcb06e9a5eb3229c9d56df92fc2941b1dffe1d4b2403477d94e3a0",
+        "localUtf8LfSha256": "f9290a0c74fcb06e9a5eb3229c9d56df92fc2941b1dffe1d4b2403477d94e3a0"
+      },
+      {
+        "path": "tests/e2e/helpers/fake-codex.ts",
+        "gitBlobAndVpsSha256": "7b3d3fc8ce0edf9026f45e59883f530707003af93696aa223561b95b433476ac",
+        "localUtf8LfSha256": "7b3d3fc8ce0edf9026f45e59883f530707003af93696aa223561b95b433476ac"
+      },
+      {
+        "path": "tests/e2e/playwright.config.ts",
+        "gitBlobAndVpsSha256": "f6f03becdca928374390599443d5c02de88b81052e4f3a17524c07fcb4027100",
+        "localUtf8LfSha256": "f6f03becdca928374390599443d5c02de88b81052e4f3a17524c07fcb4027100"
+      },
+      {
+        "path": "tests/e2e/provider-switching.spec.ts",
+        "gitBlobAndVpsSha256": "3b180e0d8e4df4b6f2820ab82d74ff96f651cb4de59c2d15bc8a042da1318bbc",
+        "localUtf8LfSha256": "3b180e0d8e4df4b6f2820ab82d74ff96f651cb4de59c2d15bc8a042da1318bbc"
+      },
+      {
+        "path": "ui/src/__tests__/AgentConfigForm.model-key.test.tsx",
+        "gitBlobAndVpsSha256": "85d975510a4be11d3cecefe30e1a05ee4228b6458a128d8b97f3804c4856638d",
+        "localUtf8LfSha256": "85d975510a4be11d3cecefe30e1a05ee4228b6458a128d8b97f3804c4856638d"
+      },
+      {
+        "path": "ui/src/__tests__/AgentConfigForm.provider-switching.test.tsx",
+        "gitBlobAndVpsSha256": "54cd5fcb776c69c9c628ef755e9d5f90469b4b99455c886920902794c2304e7d",
+        "localUtf8LfSha256": "54cd5fcb776c69c9c628ef755e9d5f90469b4b99455c886920902794c2304e7d"
+      },
+      {
+        "path": "ui/src/__tests__/InternalAgentPanel.transient-confirm.test.ts",
+        "gitBlobAndVpsSha256": "466162f854bcb339b09da56e22cb4f20b6a47ab6b6c7a2de033ecf6d6101b19b",
+        "localUtf8LfSha256": "466162f854bcb339b09da56e22cb4f20b6a47ab6b6c7a2de033ecf6d6101b19b"
+      },
+      {
+        "path": "ui/src/__tests__/ProjectDetailWorkspaces.test.tsx",
+        "gitBlobAndVpsSha256": "673d77c571518777bca3040e1a03884971fbdf1457767e56e3afa71a2fef8424",
+        "localUtf8LfSha256": "673d77c571518777bca3040e1a03884971fbdf1457767e56e3afa71a2fef8424"
+      },
+      {
+        "path": "ui/src/api/agents.ts",
+        "gitBlobAndVpsSha256": "cb9bd3aafdf956a4677164f94cdbb62ece18f66e84f9c28f9a8eb9e04b753f07",
+        "localUtf8LfSha256": "cb9bd3aafdf956a4677164f94cdbb62ece18f66e84f9c28f9a8eb9e04b753f07"
+      },
+      {
+        "path": "ui/src/api/internal-agent.ts",
+        "gitBlobAndVpsSha256": "c7687e0d428d909929998ee6f9586ad46fecfe1f92b352f781e6890a2f44606c",
+        "localUtf8LfSha256": "c7687e0d428d909929998ee6f9586ad46fecfe1f92b352f781e6890a2f44606c"
+      },
+      {
+        "path": "ui/src/components/AgentConfigForm.tsx",
+        "gitBlobAndVpsSha256": "f15b2a6c08ac09be43566f21edc6f39c59b4b877e778390b0e82ffd3f8669b74",
+        "localUtf8LfSha256": "f15b2a6c08ac09be43566f21edc6f39c59b4b877e778390b0e82ffd3f8669b74"
+      },
+      {
+        "path": "ui/src/components/InternalAgentPanel.bstates.test.tsx",
+        "gitBlobAndVpsSha256": "30ec11e13f608bfe2819bf98ae6725d22a037381da990c07183faccd00206be1",
+        "localUtf8LfSha256": "30ec11e13f608bfe2819bf98ae6725d22a037381da990c07183faccd00206be1"
+      },
+      {
+        "path": "ui/src/components/InternalAgentPanel.toolCalls.test.tsx",
+        "gitBlobAndVpsSha256": "d917ce2020b7807876f17019f1c90478bf0fd815384dce33db243cfd68eb437b",
+        "localUtf8LfSha256": "d917ce2020b7807876f17019f1c90478bf0fd815384dce33db243cfd68eb437b"
+      },
+      {
+        "path": "ui/src/components/InternalAgentPanel.tsx",
+        "gitBlobAndVpsSha256": "145b891c734de473940202e970b03bb10ef9ee7adb6837e8c35d59aa2f424b22",
+        "localUtf8LfSha256": "145b891c734de473940202e970b03bb10ef9ee7adb6837e8c35d59aa2f424b22"
+      },
+      {
+        "path": "ui/src/components/NewIssueDialog.tsx",
+        "gitBlobAndVpsSha256": "c60408e156aa040ca4a9b8b796cb693ea4f82473dd02df54a3d3bc232678a008",
+        "localUtf8LfSha256": "c60408e156aa040ca4a9b8b796cb693ea4f82473dd02df54a3d3bc232678a008"
+      },
+      {
+        "path": "ui/src/components/composer/ComposerSendFailedBanner.tsx",
+        "gitBlobAndVpsSha256": "7bcd72d78f4d087fa332ab671ef08ee8fbd1148d741ab092797d12d7adafbbc2",
+        "localUtf8LfSha256": "7bcd72d78f4d087fa332ab671ef08ee8fbd1148d741ab092797d12d7adafbbc2"
+      },
+      {
+        "path": "ui/src/components/settings/sections/CommanderSection.tsx",
+        "gitBlobAndVpsSha256": "b449d83a9373ac95d60826deb70585f62002b2b157970d143d7eb7300bc1225c",
+        "localUtf8LfSha256": "b449d83a9373ac95d60826deb70585f62002b2b157970d143d7eb7300bc1225c"
+      },
+      {
+        "path": "ui/src/components/settings/sections/RunHistoryTabContent.test.tsx",
+        "gitBlobAndVpsSha256": "69af1720928979bfe024cde5b3d76b64382e4465baa7cfe09704083e7370a6b7",
+        "localUtf8LfSha256": "69af1720928979bfe024cde5b3d76b64382e4465baa7cfe09704083e7370a6b7"
+      },
+      {
+        "path": "ui/src/lib/queryKeys.ts",
+        "gitBlobAndVpsSha256": "435df3085d6c52a1af21e2a298d069c87ae93adc09ed75a382640f7c9e5c0b78",
+        "localUtf8LfSha256": "435df3085d6c52a1af21e2a298d069c87ae93adc09ed75a382640f7c9e5c0b78"
+      },
+      {
+        "path": "ui/src/onboarding/steps/__tests__/CommanderStep.test.tsx",
+        "gitBlobAndVpsSha256": "db78ef0f836e9326af7b7e22ef9410a3a43364d723967f6dcfa948cef7928ea4",
+        "localUtf8LfSha256": "db78ef0f836e9326af7b7e22ef9410a3a43364d723967f6dcfa948cef7928ea4"
+      },
+      {
+        "path": "ui/src/pages/AgentDetail.tsx",
+        "gitBlobAndVpsSha256": "48176f422aed5c97759d57005eff6e90cb1d05c7a016c661554f382ff3834888",
+        "localUtf8LfSha256": "48176f422aed5c97759d57005eff6e90cb1d05c7a016c661554f382ff3834888"
+      },
+      {
+        "path": "ui/src/pages/AoaAgentDetail.tsx",
+        "gitBlobAndVpsSha256": "cdf25f7442982e5265c86d20a1e6a8eacba174cce51eeccc2bb193e336fc8876",
+        "localUtf8LfSha256": "cdf25f7442982e5265c86d20a1e6a8eacba174cce51eeccc2bb193e336fc8876"
+      }
+    ]
+  },
+  "unhandledErrors": "unknown; native exit/JSON assertions verified separately, no conversion to a zero counter",
+  "rawEvidence": [
+    {
+      "path": "external/cleanup-investigation/cleanup-followup-result.json",
+      "bytes": 5990,
+      "sha256": "684289bebf9007f64d25a93936041ea8003332c459bc609ad6fd09cbd3cdd9ba"
+    },
+    {
+      "path": "external/cleanup-investigation/cleanup-result.json",
+      "bytes": 4632,
+      "sha256": "0fa58035ec92681da226ef05a563bf219bde4ede769b0c0ee4308bdca39e7579"
+    },
+    {
+      "path": "external/cleanup-investigation/final-hash-manifest.json",
+      "bytes": 4282,
+      "sha256": "2d753b711dee6d0dec63404d5a9e973debc989dfe24b2c805f41fb538ed1f272"
+    },
+    {
+      "path": "external/cleanup-investigation/followup-hash-manifest.json",
+      "bytes": 1862,
+      "sha256": "2c90bd994a2e9811a741f37019d90aa0d63e5df64422fe4af371a1d35e3d6162"
+    },
+    {
+      "path": "external/cleanup-investigation/followup.ps1",
+      "bytes": 9584,
+      "sha256": "f419882944e768af2325abde8dd45c60d7650a5b9c4afd8a52107c836aec4a5b"
+    },
+    {
+      "path": "external/cleanup-investigation/guarded-stop-result.json",
+      "bytes": 3933,
+      "sha256": "d6849b8d201dc59f2d18b997ce588a73fdbb2ff93194d9aaa25fd2a631f9ddd6"
+    },
+    {
+      "path": "external/cleanup-investigation/guarded-stop.ps1",
+      "bytes": 5803,
+      "sha256": "51aa5c2ef8ae26e321549dfe4d1939f3917edcd265e215e61708ef6cedd06d95"
+    },
+    {
+      "path": "external/cleanup-investigation/hash-manifest.json",
+      "bytes": 827,
+      "sha256": "add634c73f21e66e4c512994d038615b27f47d5c7a24312a3d014652adda608b"
+    },
+    {
+      "path": "external/cleanup-investigation/preflight.json",
+      "bytes": 5319,
+      "sha256": "4b0adde68b48b50ac78e32464c7f433b59070ad72941b7b3a327a003af098b68"
+    },
+    {
+      "path": "external/cleanup-investigation/preflight.mjs",
+      "bytes": 3103,
+      "sha256": "56b31f56adc40eca529f14881370c5684b4f8bded7f6962abfe5b21c7bf98b3a"
+    },
+    {
+      "path": "external/cleanup-investigation/run.ps1",
+      "bytes": 9583,
+      "sha256": "261f8f45c0536ecbfda79882a387986e86023e69ea432c791d505a5fdc47b855"
+    },
+    {
+      "path": "external/local-smoke/database-stop.log",
+      "bytes": 122,
+      "sha256": "fc50e969560665025e6f41ce73c4221076415e625c34f1f611dd2fd15452afaa"
+    },
+    {
+      "path": "external/local-smoke/fresh-home-acl.log",
+      "bytes": 354,
+      "sha256": "0a8ea789acec89a77b0348da1c2d07c908d573e54130687ae850a1c35a68d575"
+    },
+    {
+      "path": "external/local-smoke/health.json",
+      "bytes": 326,
+      "sha256": "6708434fab8b42d817806c9325aeb0cac1e0f99ccb03fd79154a13d4459fe641"
+    },
+    {
+      "path": "external/local-smoke/onboard.result.json",
+      "bytes": 10763,
+      "sha256": "93dd9084002854123e88eceea2c004cd2da7bc06f2c5528964b3be37e735532f"
+    },
+    {
+      "path": "external/local-smoke/onboard.stderr.log",
+      "bytes": 721,
+      "sha256": "ddb6d5c6d7721a81cb0a4763e5ab4d840007772b7e647568e7fee566575471b3"
+    },
+    {
+      "path": "external/local-smoke/onboard.stdout.log",
+      "bytes": 91581,
+      "sha256": "ebcd89201535e946c1a3aa0c56557d3b9a35342fabd49897f1878abdce85c220"
+    },
+    {
+      "path": "external/local-smoke/onboarding.html",
+      "bytes": 3875,
+      "sha256": "1711acbada0454fe51fe662de5a1ad790cdf938d8ef932c677711e21fab5f1cf"
+    },
+    {
+      "path": "external/local-smoke/owned-processes-before-stop.json",
+      "bytes": 7259,
+      "sha256": "1c422445fe60e2a1713b05cc21e3afbb21659f7599725bfa807f97e1fd2ac022"
+    },
+    {
+      "path": "external/local-smoke/process-stop.log",
+      "bytes": 524,
+      "sha256": "247cf965328c7238cd620db523be2888af15d9298800dbc5b50739843dab6745"
+    },
+    {
+      "path": "external/local-smoke/run.ps1",
+      "bytes": 13150,
+      "sha256": "7436744febc96045eb965be7beeacc8a0a82935d501df31415c4cd0e28a85aa1"
+    },
+    {
+      "path": "external/local-smoke/smoke-summary.json",
+      "bytes": 6462,
+      "sha256": "635a56fb43844228a8948ecfa3d62081e756f6880d4706557da2784f7b9b71e5"
+    },
+    {
+      "path": "external/local-smoke/ui-root.html",
+      "bytes": 3875,
+      "sha256": "1711acbada0454fe51fe662de5a1ad790cdf938d8ef932c677711e21fab5f1cf"
+    },
+    {
+      "path": "local-core/artifact-db.json",
+      "bytes": 13961,
+      "sha256": "87eb5c084e7ab639eb87a1b222eea28ccbe6a95a21a5f8bfe99ada6ff9ed52de"
+    },
+    {
+      "path": "local-core/artifact-db/result.json",
+      "bytes": 2095,
+      "sha256": "bf8d8229323d99b228674fdfa24803b3837233d7065b61b8b32909886d7dceea"
+    },
+    {
+      "path": "local-core/artifact-db/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-core/artifact-db/stdout.txt",
+      "bytes": 79905,
+      "sha256": "26b7b617ff267f1625d8a9f757bcc74e7b5eb437a99f00c233fdf639f755c763"
+    },
+    {
+      "path": "local-core/build/result.json",
+      "bytes": 1686,
+      "sha256": "ddbf05fa6e100b4b8234fd639b96a6acb114e14342613380864614075da318d1"
+    },
+    {
+      "path": "local-core/build/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-core/build/stdout.txt",
+      "bytes": 1145,
+      "sha256": "7586412caf70495ad6ee5dd3eeff3fbac40e88b1f0992c177d0e7b5b84e5c644"
+    },
+    {
+      "path": "local-core/cleanup-observation.json",
+      "bytes": 479,
+      "sha256": "188f1d898144095aded6ce8d88fa98305a740f54166178926cb7e602b9da10c9"
+    },
+    {
+      "path": "local-core/postgres-after-tests.json",
+      "bytes": 6956,
+      "sha256": "3c4882adfe00b1cbcd54b1feb705534d2687550174436faf325d6ea04e39e6b8"
+    },
+    {
+      "path": "local-core/postgres-before-tests.json",
+      "bytes": 6954,
+      "sha256": "0c205bb2db3d6b47672a6bf4598cf730453d3c55f22179f579d9b7e30dc3974f"
+    },
+    {
+      "path": "local-core/provider.json",
+      "bytes": 24644,
+      "sha256": "40ffa6852f5dadc48e0c494f6d879b3fccab840766bf10004dde7d010b879e91"
+    },
+    {
+      "path": "local-core/provider/result.json",
+      "bytes": 1524,
+      "sha256": "bea375f61bfd3c1b482ed0e0328ed7fef8eb4f8f116ab58197968776c082d961"
+    },
+    {
+      "path": "local-core/provider/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-core/provider/stdout.txt",
+      "bytes": 583,
+      "sha256": "c72b1f97b7d4a543ac0938fee66d9e1b4c6c2513d4a7040b7ccfa7eacaf1e618"
+    },
+    {
+      "path": "local-core/selected-tests.json",
+      "bytes": 4311,
+      "sha256": "0877fc520631f537f468092c4a6194fc8667a8153745a8063ae4d3f47028f95d"
+    },
+    {
+      "path": "local-core/summary.json",
+      "bytes": 32013,
+      "sha256": "fcfccb50e5a20e827af1290226e73d035ebef43efe7e7e745a61f290018d7ad7"
+    },
+    {
+      "path": "local-core/targeted.json",
+      "bytes": 255184,
+      "sha256": "390d062531ccfdd5a31a4e4cc59868149192d0a7a1fdeb791f6a22f166d92af0"
+    },
+    {
+      "path": "local-core/targeted/result.json",
+      "bytes": 5821,
+      "sha256": "7f7d8c2f9c43e738e15363df269c65c4dd62b17b8f3c968f286c5dd8298c92da"
+    },
+    {
+      "path": "local-core/targeted/stderr.txt",
+      "bytes": 10340,
+      "sha256": "8c532ece8ad1a18cbc9d958aca90d31c1081f4933577d6401c207f3c86aa11b2"
+    },
+    {
+      "path": "local-core/targeted/stdout.txt",
+      "bytes": 157897,
+      "sha256": "a22392bbb4878687224ecfb086106c3fe0eac319d9bf6d821bafb432c9ed75a7"
+    },
+    {
+      "path": "local-core/typecheck/result.json",
+      "bytes": 1698,
+      "sha256": "9d36059f98635ff51adc72cd0648bad194eab4aed582247fa67f6ad7535e749f"
+    },
+    {
+      "path": "local-core/typecheck/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-core/typecheck/stdout.txt",
+      "bytes": 909,
+      "sha256": "422814dbba5833d3e2a22a7cb052ee0ce599aca5e9b65f1f5a0ac8761e284f75"
+    },
+    {
+      "path": "local-w12/containers-after.json",
+      "bytes": 110,
+      "sha256": "4e9df77f165b9cb8e8780365de36c87b9837a5714173d9759520377fc3f8b476"
+    },
+    {
+      "path": "local-w12/containers-before.json",
+      "bytes": 110,
+      "sha256": "afb8e2026e14e3492ad7accc0b3ee8fe9b93dd1ecdc41efa35ff7218683e6008"
+    },
+    {
+      "path": "local-w12/image-inspection.json",
+      "bytes": 840,
+      "sha256": "cf670cab51a4ee8403ce956862988781b3d264656d2da97cd500bdc0dfd0d383"
+    },
+    {
+      "path": "local-w12/image/result.json",
+      "bytes": 1170,
+      "sha256": "c5f51536022aa774f95eae66e8885b537eec9708e7b9ebdaa0e348748c9a47e8"
+    },
+    {
+      "path": "local-w12/image/stderr.txt",
+      "bytes": 14499,
+      "sha256": "d5285ee8ebcd7e26976df9b34e3d6ff618860aca3ab259c050f024c35f675113"
+    },
+    {
+      "path": "local-w12/image/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-w12/linux-and-native-restore/result.json",
+      "bytes": 1195,
+      "sha256": "16f630e282b1922357203409dc4042010870cdf88d513e9023abf618ffa51410"
+    },
+    {
+      "path": "local-w12/linux-and-native-restore/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-w12/linux-and-native-restore/stdout.txt",
+      "bytes": 994,
+      "sha256": "944b168f779199522216f99e9c4eee0899efbe2f83954d6afa3dc6da7c34f2e1"
+    },
+    {
+      "path": "local-w12/progress.json",
+      "bytes": 5155,
+      "sha256": "f51ff173f25573c28e8b72cd8230d73b772e8849ada821b9b7cfdf07a2c27b3f"
+    },
+    {
+      "path": "local-w12/run.mjs",
+      "bytes": 9338,
+      "sha256": "95df0145660e95fad80d7b8116fc12e29f59d3890dc355589aa68ae2cadf8ec1"
+    },
+    {
+      "path": "local-w12/runtime/aoa-m4-native-fence-3kUaDB/artifact-recovery-result.json",
+      "bytes": 13548,
+      "sha256": "c00c1e5eb316c60774ca5c7671a38c27aaa00310e4447c44e1c04f5fe01ea9b8"
+    },
+    {
+      "path": "local-w12/runtime/aoa-m4-native-fence-3kUaDB/ownership.json",
+      "bytes": 99,
+      "sha256": "4f3db5651c051bd715ce1b72a20db3a76d9df66f1721616201e85d50853afda7"
+    },
+    {
+      "path": "local-w12/runtime/aoa-m4-native-fence-3kUaDB/pg_dump.mjs",
+      "bytes": 741,
+      "sha256": "328bbe45d4ff019ba083e54d5b519e7155090b3ec4683b4ce09c382c7043dddf"
+    },
+    {
+      "path": "local-w12/runtime/aoa-m4-native-fence-3kUaDB/psql.mjs",
+      "bytes": 744,
+      "sha256": "8f729d6b2eee9c29a88eb322033095a198f9485a96d95b111e42257519a15e50"
+    },
+    {
+      "path": "local-w12/runtime/aoa-m4-native-fence-3kUaDB/vitest-result.json",
+      "bytes": 3066,
+      "sha256": "074a9896328d7228e2d574f8edafe80fc316c2bdff4e58fa8fe25f9b1fba4dd1"
+    },
+    {
+      "path": "local-w12/source-receipt.json",
+      "bytes": 5075,
+      "sha256": "566fa40cc8b20ed3ace4e7da03fbf47f01efaa1cdb8e2ddf64d1f0ac36dbbb34"
+    },
+    {
+      "path": "local-w12/summary.json",
+      "bytes": 14956,
+      "sha256": "fcd6f6f6b2f6e20f6134267b562f006840c4dad265806fbdf325c2c939f78ae4"
+    },
+    {
+      "path": "local-w12/targeted/result.json",
+      "bytes": 2112,
+      "sha256": "5d7890721810789ee728ead8ffc7b06ddb4b438f589b3d0771838db34ef975bc"
+    },
+    {
+      "path": "local-w12/targeted/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "local-w12/targeted/stdout.txt",
+      "bytes": 472298,
+      "sha256": "761a98f4e052c0017afb771d209c6a71315ba0ee20b26f1e84f30b7114f7da16"
+    },
+    {
+      "path": "local-w12/vitest.json",
+      "bytes": 37109,
+      "sha256": "d8a0f9181f80e677dd1ce01116347ae5d5894ab1daa500d1e9627c10670454d3"
+    },
+    {
+      "path": "vps/evidence/artifactdb/result.json",
+      "bytes": 2090,
+      "sha256": "25f7ce082140719c60d82abf5d2697eb08c92f043a865654d34aaf533d817f8e"
+    },
+    {
+      "path": "vps/evidence/artifactdb/stage.json",
+      "bytes": 1450,
+      "sha256": "82cc80929cb11a6a7fe77720e2faeac4755ac52c30ba82e607dde657fef9d414"
+    },
+    {
+      "path": "vps/evidence/artifactdb/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/artifactdb/stdout.txt",
+      "bytes": 100190,
+      "sha256": "40b3bf4697f32f015a8c11cb55d7a5075ac2aa6f2ee59992386699b6e6615dca"
+    },
+    {
+      "path": "vps/evidence/artifactdb/vitest-capture/result.json",
+      "bytes": 2186,
+      "sha256": "2ba984c3f5e32fd35c095d65c986b155a1c77076f3c068231a1e748c57da2dc6"
+    },
+    {
+      "path": "vps/evidence/artifactdb/vitest-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/artifactdb/vitest-capture/stdout.txt",
+      "bytes": 100190,
+      "sha256": "40b3bf4697f32f015a8c11cb55d7a5075ac2aa6f2ee59992386699b6e6615dca"
+    },
+    {
+      "path": "vps/evidence/artifactdb/vitest.json",
+      "bytes": 13978,
+      "sha256": "deea19f0f64378ec142974540476c63af4e92783baaa4d65b6a56b14c3b1b133"
+    },
+    {
+      "path": "vps/evidence/build/result.json",
+      "bytes": 1570,
+      "sha256": "2fd1bef3fcbab79e0204243c050d8d9333256cde8312fb1755666ff6c539c4d4"
+    },
+    {
+      "path": "vps/evidence/build/stage.json",
+      "bytes": 915,
+      "sha256": "811e2d88b3b41f9b5427883b05c2e208b9fb5fd1749f3e4045c1d4403be4b38c"
+    },
+    {
+      "path": "vps/evidence/build/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/build/stdout.txt",
+      "bytes": 1145,
+      "sha256": "3d9950a58f098a399b7c78b634cd375152bcf36c0f28b2532d9d1f7b72c0d542"
+    },
+    {
+      "path": "vps/evidence/bundle-attempt1.json",
+      "bytes": 532,
+      "sha256": "977765d60142ac5b7a4f7cc8ac5fdadf27dc551fcf9979412a61904d4665381f"
+    },
+    {
+      "path": "vps/evidence/cleanup.json",
+      "bytes": 1474,
+      "sha256": "5d8a9ab02b42ef1118a7c50a4392a35482ead7765d6b98c291c66f2ba0a381ba"
+    },
+    {
+      "path": "vps/evidence/dependencies/result.json",
+      "bytes": 1624,
+      "sha256": "d0bda83153a6b009f9f5df6836174c98741ebab4c53b9dee5f86a199a94b33b8"
+    },
+    {
+      "path": "vps/evidence/dependencies/stage.json",
+      "bytes": 962,
+      "sha256": "be15b251544f18910e9ade1fc7c2dd5bcd7c5a6972f938d3cf933fb15fd71a28"
+    },
+    {
+      "path": "vps/evidence/dependencies/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/dependencies/stdout.txt",
+      "bytes": 813,
+      "sha256": "487eb39391626c79ce23b39c9207d949c74657b220b9d7e12e6695db017f2f99"
+    },
+    {
+      "path": "vps/evidence/dependencies2/result.json",
+      "bytes": 1627,
+      "sha256": "f3da2dd9d7b8758e13a9b43a12ece9dc20294638c5c6cab6dd631942f2b2c2e6"
+    },
+    {
+      "path": "vps/evidence/dependencies2/stage.json",
+      "bytes": 963,
+      "sha256": "a8947f7c4170615741a2606080822076c148b1b1f3966931382e44428a3af202"
+    },
+    {
+      "path": "vps/evidence/dependencies2/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/dependencies2/stdout.txt",
+      "bytes": 2447,
+      "sha256": "d1b7f80dba842ba31fa72db0b5a6abd9909513434e5b10b0eefdfac8e29af9f0"
+    },
+    {
+      "path": "vps/evidence/deployment.json",
+      "bytes": 2053,
+      "sha256": "d11b4ffce1f5229e806586fe25c3ecdaf1a52308b1ad7bfb6b59c7daa8c3ff21"
+    },
+    {
+      "path": "vps/evidence/harness/deploy-vps.py",
+      "bytes": 7173,
+      "sha256": "6d00acef96ade30409cdc5d1cd215b0b8763cdcaa545fd76ff94f4e644f51795"
+    },
+    {
+      "path": "vps/evidence/harness/finalize-evidence.py",
+      "bytes": 10619,
+      "sha256": "15466ae63561af64a9e8d4a575e6c72850f54fc4045a867280bcfe0f5930e9c1"
+    },
+    {
+      "path": "vps/evidence/harness/inspect-ownership.py",
+      "bytes": 1829,
+      "sha256": "5224438ee8624b231dbdd51457c14af672afb9f24ed3ccea7970274b2503d50c"
+    },
+    {
+      "path": "vps/evidence/harness/run-checks.mjs",
+      "bytes": 5495,
+      "sha256": "69052597a12dee39f1671465c833388fb7cbeb77565daa2c60ccafb8ac793649"
+    },
+    {
+      "path": "vps/evidence/harness/selected-tests.txt",
+      "bytes": 754,
+      "sha256": "64adfd35ea2ed31a99a43d11069746318d2f4b4bb265e41f8a3597305b6ff99f"
+    },
+    {
+      "path": "vps/evidence/image/result.json",
+      "bytes": 1104,
+      "sha256": "dfdbd547f7353b47aa3c3cfb17bcee588bd44a0c1cf4b72c2ae7ef0d81e36332"
+    },
+    {
+      "path": "vps/evidence/image/stage.json",
+      "bytes": 474,
+      "sha256": "1613bd7ef3d20d592b3c3d33c784f457c615cfa84728ea65d0ded08870ebf50d"
+    },
+    {
+      "path": "vps/evidence/image/stderr.txt",
+      "bytes": 206,
+      "sha256": "d86cb49dd44ce17a9da506b4e732433d5755f98bac9a709da0462523638defc5"
+    },
+    {
+      "path": "vps/evidence/image/stdout.txt",
+      "bytes": 18761,
+      "sha256": "07d4c3961934cb1fe8ab66a53e67cf1d8d6ce4c0476685f21841ccc0d99c8c96"
+    },
+    {
+      "path": "vps/evidence/install/result.json",
+      "bytes": 1020,
+      "sha256": "011b2e8af8f4584e687e4d71bc0fc176968cd0d818e8615ccf8d8ffccab55ff5"
+    },
+    {
+      "path": "vps/evidence/install/stage.json",
+      "bytes": 403,
+      "sha256": "ba8fbf737ea0aa3912e2ed0a6707d5bd849f3a3d49d6cc8280753e813d970356"
+    },
+    {
+      "path": "vps/evidence/install/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/install/stdout.txt",
+      "bytes": 8765,
+      "sha256": "6ff0fc164f5ca6a8e016a3b2e5b0fd1e7226da6a1e18590a30cc6e694a4d145d"
+    },
+    {
+      "path": "vps/evidence/native-fixtures/aoa-m4-native-fence-7fEUvL/artifact-recovery-result.json",
+      "bytes": 13565,
+      "sha256": "21d786ea89c731f69109a5f3edfc3cf3ec4d7d1fd37a3f0ac38a961c8f2579a3"
+    },
+    {
+      "path": "vps/evidence/native-fixtures/aoa-m4-native-fence-7fEUvL/ownership.json",
+      "bytes": 99,
+      "sha256": "2b5171087db8d7fc83602e4993716bf858aeffec3766d47165a8717259819988"
+    },
+    {
+      "path": "vps/evidence/native-fixtures/aoa-m4-native-fence-7fEUvL/vitest-result.json",
+      "bytes": 3081,
+      "sha256": "27becb460a010d422bd7177012b22988aa492219c87eebffcd305d872aa09b11"
+    },
+    {
+      "path": "vps/evidence/native/result.json",
+      "bytes": 1072,
+      "sha256": "5615993d283df232005d6b1edd32365cca4ab310fe712276c6974d6f331fa03a"
+    },
+    {
+      "path": "vps/evidence/native/stage.json",
+      "bytes": 452,
+      "sha256": "c0707308e620ed20ccb90d5b1cc1b8b169323fd2c4d073cd2dda7b471f17eb6b"
+    },
+    {
+      "path": "vps/evidence/native/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/native/stdout.txt",
+      "bytes": 1002,
+      "sha256": "026331d7146e68cf0a27d0008386cbdc741d54ff8f6be7d38678bd7d3b57ab82"
+    },
+    {
+      "path": "vps/evidence/pre-deployment-isolation.json",
+      "bytes": 295,
+      "sha256": "7c02eed1474c63518775dc9c9358172e8b5b400a67753cafd7e835d5f7c24405"
+    },
+    {
+      "path": "vps/evidence/provider/result.json",
+      "bytes": 1520,
+      "sha256": "bd4655153b44a2a8b1d4bfe22fde107a18fd7fe921d49505885ca3dcf42fd160"
+    },
+    {
+      "path": "vps/evidence/provider/stage.json",
+      "bytes": 875,
+      "sha256": "6ea0a75e24d3633a3657b9efd5b3d9690e6c82751aa20b018175d3c0413638ce"
+    },
+    {
+      "path": "vps/evidence/provider/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/provider/stdout.txt",
+      "bytes": 883,
+      "sha256": "936f6ff4b8d769988826f59600bd82158aa3aa2e1b6f4434aecb7d7c857b1744"
+    },
+    {
+      "path": "vps/evidence/provider/vitest-capture/result.json",
+      "bytes": 1619,
+      "sha256": "e926e28ca51028f76a5e6c81971e7331df674194576b67ec3f0b6c305a7e4ec9"
+    },
+    {
+      "path": "vps/evidence/provider/vitest-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/provider/vitest-capture/stdout.txt",
+      "bytes": 883,
+      "sha256": "936f6ff4b8d769988826f59600bd82158aa3aa2e1b6f4434aecb7d7c857b1744"
+    },
+    {
+      "path": "vps/evidence/provider/vitest.json",
+      "bytes": 24666,
+      "sha256": "4cec8d14a9a671723e1d7c688dd6c81f236f3243f772e82b38bb859e474c70ad"
+    },
+    {
+      "path": "vps/evidence/selection.json",
+      "bytes": 7564,
+      "sha256": "fa169e284a48e1120374489eb641d30a62c980dd2edd09c4979ed4230cc4d185"
+    },
+    {
+      "path": "vps/evidence/source-receipt.json",
+      "bytes": 1557102,
+      "sha256": "2fc75beefaffab4dd9cef2e5c4d7b38b1221baa59d968143f77b5b13cecf7c6e"
+    },
+    {
+      "path": "vps/evidence/source-transfer.json",
+      "bytes": 391,
+      "sha256": "b9adb3a86e718d1c8f43469758ee70077da6f213c00433e31eec3cb03dd0ab94"
+    },
+    {
+      "path": "vps/evidence/summary.json",
+      "bytes": 28718,
+      "sha256": "c033fc0ac96d0abd8ad5b6218c00d44ff135b776c164d613b1d0c7e8007da21c"
+    },
+    {
+      "path": "vps/evidence/targeted/result.json",
+      "bytes": 6680,
+      "sha256": "d5fadd69a8822ac52607192990e68b9aa4ff0efd173618a68c6c16e5232ea792"
+    },
+    {
+      "path": "vps/evidence/targeted/stage.json",
+      "bytes": 5896,
+      "sha256": "fc656d52369f73071118c9c669b25cfe8c2baa3bce610557c0ca635ea6344f3a"
+    },
+    {
+      "path": "vps/evidence/targeted/stderr.txt",
+      "bytes": 10427,
+      "sha256": "b6b22612123851ff7f1a3435bdd0c598233cdd59fed90e9e35a34c7804b79e58"
+    },
+    {
+      "path": "vps/evidence/targeted/stdout.txt",
+      "bytes": 787801,
+      "sha256": "1129f37c7902b7c21227b6a818aec491f0199a41da614122060a8b369a852a12"
+    },
+    {
+      "path": "vps/evidence/targeted/vitest-capture/result.json",
+      "bytes": 6779,
+      "sha256": "fd86a243bd987c188919a4b9aa4d3c584daea57e8d0df5ca62b7fdc9327dde55"
+    },
+    {
+      "path": "vps/evidence/targeted/vitest-capture/stderr.txt",
+      "bytes": 10427,
+      "sha256": "b6b22612123851ff7f1a3435bdd0c598233cdd59fed90e9e35a34c7804b79e58"
+    },
+    {
+      "path": "vps/evidence/targeted/vitest-capture/stdout.txt",
+      "bytes": 787801,
+      "sha256": "1129f37c7902b7c21227b6a818aec491f0199a41da614122060a8b369a852a12"
+    },
+    {
+      "path": "vps/evidence/targeted/vitest.json",
+      "bytes": 293016,
+      "sha256": "c7a5c34fbaed7e2b5e193ef1f9e80be84169fe58ba5ab380b770453e6267d122"
+    },
+    {
+      "path": "vps/evidence/typecheck/result.json",
+      "bytes": 1583,
+      "sha256": "b7acf5b8ba91023fb1c18eccf8293f460931a4019bf8b7848c3f1d32573b9489"
+    },
+    {
+      "path": "vps/evidence/typecheck/stage.json",
+      "bytes": 923,
+      "sha256": "b553f328825f452366e37cbc77a5b4ce7bd463a123b9e8c528192bbe20e3681a"
+    },
+    {
+      "path": "vps/evidence/typecheck/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "vps/evidence/typecheck/stdout.txt",
+      "bytes": 909,
+      "sha256": "8f8b131d7f7f0d17dd669ece61fa0a87c4611f43f12abd59474b51cc77940864"
+    },
+    {
+      "path": "vps/evidence/ui/result.json",
+      "bytes": 1025,
+      "sha256": "273bf6cbd4aaadb04ac921f20d4a8bf1730f90d0a4c5d5a4e9d99f6ecbfbf3c6"
+    },
+    {
+      "path": "vps/evidence/ui/stage.json",
+      "bytes": 411,
+      "sha256": "579da1c2455ea2cc4a53cdad3090114547cae2b944bfc166412bf483be89aaad"
+    },
+    {
+      "path": "vps/evidence/ui/stderr.txt",
+      "bytes": 833,
+      "sha256": "c5893a5f9649c6966b0a713824515c5a4157e8f45afc3d05fe2626d49b49d421"
+    },
+    {
+      "path": "vps/evidence/ui/stdout.txt",
+      "bytes": 29796,
+      "sha256": "cc25ab721d903403519ee72e06690acb1761a3987ae1fb559ee227145701e5ec"
+    },
+    {
+      "path": "vps/raw-evidence-manifest.json",
+      "bytes": 11438,
+      "sha256": "7e8986409cbeae3636e4b0360f53855eec82581837142e608353a8e6e64cc81e"
+    }
+  ]
+}
