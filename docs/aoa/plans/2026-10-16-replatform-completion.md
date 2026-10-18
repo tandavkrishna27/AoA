@@ -360,15 +360,24 @@ Split implementation into separately reviewable commits: output capture; ACL/sta
 
 ### W12 — Finish supported worker retirement/replacement and restored identity journeys
 
+**18 October independent follow-up:** [completed/pending checklist](2026-10-18-w12-handoff.md)
+and [targeted report](../reports/2026-10-18-w12-targeted-report.md) track implementation
+`14abdff924985eec2652b1980e575ed18937593b` in the separately authorized W12 worktree.
+Windows and Linux VPS each pass 12 selected files (88 pass / 1 native-fixture skip)
+plus 4 separate Linux/native Docker cases, including 3 nested recovery cases.
+These boundary fixtures do not close restored live-fleet acceptance.
+
 **Type / owner:** Design disposition and fleet integration / worker + enrollment engineering. **Inputs:** P07, WRK-016; I16/I22 are retained passing components.
 
 **Files:** `packages/worker-daemon/src/identity/slot-binding.ts`, `packages/worker-daemon/src/identity/slot-ownership.ts`, `packages/worker-daemon/src/bin/slot-host.ts`, enrollment/receipt code if the contract changes, `tests/d1/m4-slot-ownership.test.mjs`, `tests/d1/m4-slot-host.test.mjs`, and `docs/replatform/worker-slots-runbook.md`.
 
 **Contract:** Keep independent durable slot identities and exclusive ownership. The current receipt lacks authenticated metadata for safe legacy adoption; the supported default is revoke/retire and enroll a new target.
 
-- [ ] At W00, select and record that supported migration for this completion scope. Only implement legacy adoption if explicitly added as a required capability; that separate design must authenticate company/owner/target/generation metadata and follow protocol compatibility rules.
+- [x] Record the supported migration for this completion scope: drain, revoke/retire, then provision a new target, enrollment code, binding and state. The independent W12 follow-up retains that existing default. Legacy adoption was not selected; any later adoption design must authenticate company/owner/target/generation metadata and follow protocol compatibility rules.
+- [x] Add bounded real-PG enrollment/session and real-HTTP daemon lifecycle journeys for an authenticated draining heartbeat, revocation, old session/code-replay denial and independent replacement enrollment/bootstrap/renewal; add real Linux process ownership/crash/restored-state checks. Memory-backed daemon stores and injected slot bootstrap remain explicit fixture limits.
 - [ ] Add full fleet journeys for drain → revoke → replacement → new enrollment, duplicate slot refusal, old receipt/session denial, crash/restart, and restored database/worker identity mismatch.
 - [ ] Test a live worker after restore: old authority cannot resume effects or ordinary commits; approved reenrollment restores work; orphan outputs remain reviewable quarantine, not promoted artifacts.
+- [x] Run the selected enrollment/session/drain/revocation/restored-fence and Linux slot/native-object recovery fixtures locally and on the isolated VPS; server/worker types and builds pass. No product defect was demonstrated. Full fleet/topology acceptance remains below and in W14/W15.
 - [ ] Run existing Linux slot fixtures plus these fleet journeys. **Exit:** one supported documented migration/restore route; no claim of unimplemented adoption.
 
 ### W13 — Close service and authenticated realtime integration gaps

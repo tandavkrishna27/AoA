@@ -46,7 +46,9 @@ test('Linux slot lock: contention, aliases, crash release and unavailable holder
     const replay = await prepareSlot({bindingDir:'/tmp/records', stateDir:'/tmp/data'});
     assert.throws(()=>replay.validateIdentity(null,null), /missing/);
   `;
-  const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '--user', 'node', '--entrypoint', 'node',
+  const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '--user', 'node',
+    ...(process.env.AOA_WORKER_TEST_DOCKER_LABEL ? ['--label', process.env.AOA_WORKER_TEST_DOCKER_LABEL] : []),
+    '--entrypoint', 'node',
     process.env.AOA_M4_WORKER_IMAGE ?? 'aoa-worker:m4-slots-local', '--input-type=module', '-e', script], { encoding: 'utf8', timeout: 30000 });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}\n${result.error ?? ''}`);
 });

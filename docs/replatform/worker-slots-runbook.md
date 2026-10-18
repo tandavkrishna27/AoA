@@ -74,6 +74,9 @@ claimed. The staging template starts with four slots across two failure domains.
 
 ## Retirement and replacement
 
+The W12 completion scope selects this existing route. Legacy adoption and copying
+an old worker identity into a new target are not supported migration steps.
+
 1. Stop new work and invoke existing bounded worker drain/shutdown.
 2. Revoke the target through the existing organization-admin target revoke route.
    Preserve its generation fencing, authorization and activity logging.
@@ -113,3 +116,37 @@ evidence. A real cloud-to-desktop journey and any desktop-local execution backen
 remain explicitly unverified here. M4's actual CLI restore rehearsal and full HA
 requirement reconciliation follow separately; local tests do not prove production
 RPO/RTO, load floors or the remaining M3 provider/session prerequisites.
+
+### W12 targeted lifecycle verification
+
+The [18 October W12 checklist](../aoa/plans/2026-10-18-w12-handoff.md) records
+the independently isolated Windows/VPS increment and its remaining live gate.
+The focused enrollment suite now follows an authenticated draining heartbeat,
+revokes the old target, rejects its session/consumed enrollment-code replay and
+worker-ID transfer, then authenticates a fresh replacement. The daemon session
+suite drives actual enrollment/bootstrap/renewal clients through a real HTTP
+listener and PostgreSQL; its retained stores are memory-backed simulated boots.
+
+The Linux host fixture starts separate real processes over independent binding
+and state directories. It checks duplicate ownership before bootstrap, SIGKILL
+release and unchanged identity on restart, refusal of missing/wrong restored
+identity or incarnation, and replacement storage isolation. Its bootstrap remains
+injected; none of these cases claims model/provider execution.
+
+Run the Linux fixtures against a separately tagged worker image:
+
+```sh
+AOA_M4_WORKER_IMAGE=aoa-worker:w12-local \
+AOA_WORKER_TEST_DOCKER_LABEL=aoa.work=w12-20261018 \
+node --test --test-concurrency=1 \
+  tests/d1/m4-slot-ownership.test.mjs tests/d1/m4-slot-host.test.mjs \
+  tests/d1/m4-native-fence-restore.test.mjs
+```
+
+The final test uses its own randomly named PostgreSQL container, dynamic loopback
+port and native clients to check stale-fence refusal after full-schema restore
+and quarantine of missing/corrupt recovered bytes. It removes only its recorded
+container ID. This is disposable recovery evidence; a continuous restored live
+worker/replacement/useful-work journey and W14/W15 topology/timing gates remain
+separate. On Windows, opt into the selected PostgreSQL integration files with
+`AOA_RUN_WIN_INTEGRATION=1`; a gated skip is not positive authority evidence.

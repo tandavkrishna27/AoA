@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,6 +27,7 @@ import {
 import { provisionTenantAppRoleLoginSql } from "../db/rls-tenant.js";
 import { workerControlRoutes } from "../routes/worker-control.js";
 import { createWorkerEnrollmentService } from "../services/worker-enrollment.js";
+import { revokeExecutionTarget } from "../services/execution-targets.js";
 import { errorHandler } from "../middleware/error-handler.js";
 
 // ★ WRK-010 slice 2 (go-book Sprint 2.5) — the renewal route gets its FIRST caller, proven
@@ -99,11 +101,11 @@ const clockEnroller: NonNullable<Parameters<typeof enrollOnce>[0]["createEnrolle
   (d) => createEnroller({ keyStore: d.keyStore, client: d.client, now: () => clock });
 
 /** Fresh identity + receipt stores, a client at the real listener, and a lifecycle wired to them. */
-function composeLifecycle(code: string, stores?: { identityStore: DeviceRecordStore<DeviceIdentityRecord> & { peek(): DeviceIdentityRecord | null }; receiptStore: DeviceRecordStore<DeviceEnrollmentReceipt> & { peek(): DeviceEnrollmentReceipt | null } }) {
+function composeLifecycle(code: string, stores?: { identityStore: DeviceRecordStore<DeviceIdentityRecord> & { peek(): DeviceIdentityRecord | null }; receiptStore: DeviceRecordStore<DeviceEnrollmentReceipt> & { peek(): DeviceEnrollmentReceipt | null } }, targetId = TARGET_A) {
   const identityStore = stores?.identityStore ?? memoryStore<DeviceIdentityRecord>();
   const receiptStore = stores?.receiptStore ?? memoryStore<DeviceEnrollmentReceipt>();
   const client = createControlPlaneClient({ baseUrl });
-  const readInput = (): EnrollmentInput => ({ targetId: TARGET_A, enrollmentCode: code });
+  const readInput = (): EnrollmentInput => ({ targetId, enrollmentCode: code });
   const lifecycle = createWorkerSessionLifecycle({
     identityStore, client, now: () => clock, readInput,
     platform: process.platform, arch: process.arch,
@@ -116,10 +118,10 @@ function decodeClaims(token: string): { iat: number; exp: number; generation: nu
   return JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString("utf8"));
 }
 
-async function issueCode(): Promise<string> {
+async function issueCode(targetId = TARGET_A): Promise<string> {
   const { enrollment } = guard();
   const issued = await enrollment.issueTenantCode({
-    organizationId: ORG_A, executionTargetId: TARGET_A, scope: "organization",
+    organizationId: ORG_A, executionTargetId: targetId, scope: "organization",
     ownerUserId: null, createdByPrincipalKind: "user", createdByPrincipalId: OWNER_USER,
   });
   return issued.code;
@@ -284,6 +286,131 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       clock += MIN;
       const renewed = await lifecycle.store.forceRefresh();
       expect(renewed.token).not.toBe(first.token);
+    });
+
+    it("W12: revoked identity stays terminal across restore and a new target restores worker authority", async () => {
+      const { admin } = guard();
+      const oldCode = await issueCode();
+      const oldIdentityStore = memoryStore<DeviceIdentityRecord>();
+      const oldReceiptStore = memoryStore<DeviceEnrollmentReceipt>();
+      const old = composeLifecycle(oldCode, { identityStore: oldIdentityStore, receiptStore: oldReceiptStore });
+
+      // The stores are in-memory in this embedded-Postgres integration case. They preserve the
+      // same identity + receipt across simulated boots while the actual daemon enrollment,
+      // bootstrap, renewal clients and server HTTP routes remain real.
+      const enrolled = await enrollOnce({
+        identityStore: oldIdentityStore,
+        receiptStore: oldReceiptStore,
+        client: old.client,
+        readInput: old.readInput,
+        platform: process.platform,
+        arch: process.arch,
+        createEnrollerFn: clockEnroller,
+        onSessionMinted: old.lifecycle.onSessionMinted,
+      });
+      expect(enrolled.enrolled).toBe(true);
+      expect(enrolled.skipped).toBe(false);
+      const oldIdentity = oldIdentityStore.peek();
+      const oldIdentitySnapshot = JSON.stringify(oldIdentity);
+      const oldReceipt = structuredClone(oldReceiptStore.peek());
+      expect(oldIdentity).not.toBeNull();
+      expect(oldReceipt).toMatchObject({ workerId: oldIdentity!.workerId, targetId: TARGET_A, deviceGeneration: 1 });
+      expect(old.lifecycle.store.current()).toMatchObject({ workerId: oldIdentity!.workerId, targetId: TARGET_A });
+
+      const revoked = await revokeExecutionTarget({
+        appDb: appConn!.db,
+        operatorDb: operatorConn!.db,
+        targetId: TARGET_A,
+        organizationId: ORG_A,
+        reason: "w12_lifecycle_test",
+      });
+      expect(revoked).toMatchObject({ revoked: true, revokedGeneration: 1, targetScope: "organization" });
+
+      // The live daemon lifecycle presents its current session to the real renewal route.
+      await expect(old.lifecycle.store.forceRefresh()).rejects.toMatchObject({
+        kind: "unauthorized", stopAndBackoff: true, httpStatus: 401,
+      });
+      expect(old.lifecycle.store.isStopped()).toBe(true);
+      expect(old.lifecycle.store.current()).toBeNull();
+
+      // A restored boot still finds the old identity and receipt, so enrollOnce short-circuits
+      // without reminting. Its empty session store then tries the real code-replay bootstrap;
+      // the disabled target denies it and the lifecycle stops permanently.
+      const restored = composeLifecycle(oldCode, { identityStore: oldIdentityStore, receiptStore: oldReceiptStore });
+      const restoredEnroll = await enrollOnce({
+        identityStore: oldIdentityStore,
+        receiptStore: oldReceiptStore,
+        client: restored.client,
+        readInput: restored.readInput,
+        platform: process.platform,
+        arch: process.arch,
+        createEnrollerFn: clockEnroller,
+        onSessionMinted: restored.lifecycle.onSessionMinted,
+      });
+      expect(restoredEnroll).toMatchObject({ skipped: true, workerId: oldIdentity!.workerId, targetId: TARGET_A });
+      expect(JSON.stringify(oldIdentityStore.peek())).toBe(oldIdentitySnapshot);
+      expect(oldReceiptStore.peek()).toEqual(oldReceipt);
+      await expect(restored.lifecycle.store.forceRefresh()).rejects.toMatchObject({
+        kind: "unauthorized", stopAndBackoff: true, httpStatus: 401,
+      });
+      expect(restored.lifecycle.store.isStopped()).toBe(true);
+      expect(restored.lifecycle.store.current()).toBeNull();
+
+      // Supported replacement is a new target with a new enrollment code and fresh device
+      // stores. The target row uses the same organization authority contract as TARGET_A.
+      const replacementTargetId = randomUUID();
+      await admin`INSERT INTO execution_targets
+        (id, organization_id, owner_user_id, slug, kind, trust_class, status, capabilities, config, scope, target_authority_key)
+        VALUES (${replacementTargetId}, ${ORG_A}, NULL, ${`w12-${replacementTargetId}`}, 'dedicated_worker', 'dedicated_tenant', 'active',
+          ${JSON.stringify({ providerConstraints: { profileId: "desktop-v1", version: 1, digest: "b".repeat(64) } })}::jsonb,
+          '{}', 'organization', ${`organization:${ORG_A}`})`;
+      const replacementCode = await issueCode(replacementTargetId);
+      const replacementIdentityStore = memoryStore<DeviceIdentityRecord>();
+      const replacementReceiptStore = memoryStore<DeviceEnrollmentReceipt>();
+      const replacement = composeLifecycle(replacementCode, {
+        identityStore: replacementIdentityStore,
+        receiptStore: replacementReceiptStore,
+      }, replacementTargetId);
+      const replacementEnroll = await enrollOnce({
+        identityStore: replacementIdentityStore,
+        receiptStore: replacementReceiptStore,
+        client: replacement.client,
+        readInput: replacement.readInput,
+        platform: process.platform,
+        arch: process.arch,
+        createEnrollerFn: clockEnroller,
+        onSessionMinted: replacement.lifecycle.onSessionMinted,
+      });
+      expect(replacementEnroll).toMatchObject({ enrolled: true, skipped: false, targetId: replacementTargetId, deviceGeneration: 1 });
+      const replacementIdentity = replacementIdentityStore.peek();
+      const replacementReceipt = replacementReceiptStore.peek();
+      expect(replacementIdentity).not.toBeNull();
+      expect(replacementIdentity!.workerId).not.toBe(oldIdentity!.workerId);
+      expect(replacementReceipt).toMatchObject({ workerId: replacementIdentity!.workerId, targetId: replacementTargetId, deviceGeneration: 1 });
+
+      // Simulate a replacement worker restart: retain its identity + receipt, bootstrap by
+      // replaying its new code, then renew that bootstrapped session through the real route.
+      const replacementBoot = composeLifecycle(replacementCode, {
+        identityStore: replacementIdentityStore,
+        receiptStore: replacementReceiptStore,
+      }, replacementTargetId);
+      const replacementSteadyState = await enrollOnce({
+        identityStore: replacementIdentityStore,
+        receiptStore: replacementReceiptStore,
+        client: replacementBoot.client,
+        readInput: replacementBoot.readInput,
+        platform: process.platform,
+        arch: process.arch,
+        createEnrollerFn: clockEnroller,
+        onSessionMinted: replacementBoot.lifecycle.onSessionMinted,
+      });
+      expect(replacementSteadyState.skipped).toBe(true);
+      const bootstrapped = await replacementBoot.lifecycle.store.forceRefresh();
+      expect(bootstrapped).toMatchObject({ workerId: replacementIdentity!.workerId, targetId: replacementTargetId, deviceGeneration: 1 });
+      clock += MIN;
+      const renewed = await replacementBoot.lifecycle.store.forceRefresh();
+      expect(renewed.token).not.toBe(bootstrapped.token);
+      expect(renewed).toMatchObject({ workerId: replacementIdentity!.workerId, targetId: replacementTargetId, deviceGeneration: 1 });
     });
   },
 );

@@ -1,0 +1,726 @@
+{
+  "schemaVersion": 1,
+  "workItem": "W12",
+  "branch": "codex/w12-worker-lifecycle",
+  "implementationSha": "14abdff924985eec2652b1980e575ed18937593b",
+  "baseSha": "1e1ec04c0d2705cfc6d29dd6216eb956fa7f3e56",
+  "preparedDate": "2026-10-18",
+  "timezone": "Asia/Calcutta",
+  "scope": "Independent credential-free boundary verification; full restored live fleet and W14/W15 acceptance remain open",
+  "sourceReceipt": {
+    "baseSha": "1e1ec04c0d2705cfc6d29dd6216eb956fa7f3e56",
+    "hashNormalization": "UTF-8 LF",
+    "baseArchiveSha256": "e8c5de654e4ad4d925dfcd39ee898e49ef96e8f5922517a66e162799bd7f1347",
+    "files": [
+      {
+        "path": "docker/worker/Dockerfile",
+        "sha256": "53e8f4502de0da8192e263c3e2409c916b68d9eaee61fd34f7d481fc661e3a66"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+        "sha256": "7b78cccb5b8c18f8c91c61407c5db469c14ece420d53463d0838d6f9f83b076a"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+        "sha256": "a2ff4ce07f60c85a87a74ddd81bac1735e62525f50031669e1c1072335d4a524"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+        "sha256": "fbcc405acfdb95f60aea4f29f9da9759fa5a56643d46fdf6c064b5d31b86cd1a"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+        "sha256": "8740e15c3e0e72dfebea2696373c8ef466b7a1c5f1a35b02ccbed2315b92c6b2"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+        "sha256": "5518726f2e9185a2d0a5c53f78df59d38ac8d6c85b79e477446744e3b37ea416"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+        "sha256": "23e224e64769b27f1a746b7dcd1bb3ba5e30d0387616c3cd6bc050b985009625"
+      },
+      {
+        "path": "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+        "sha256": "e8af208759d26a0bf88199836a1ec5cc6b96024d74e30661efbb706ff46db864"
+      },
+      {
+        "path": "packages/worker-daemon/src/bin/container-host.ts",
+        "sha256": "713248b3ffbc0fd37208b144b4be89a2f38c47ea00dc34d0b1645ffa5933e9c3"
+      },
+      {
+        "path": "packages/worker-daemon/src/bin/slot-host.ts",
+        "sha256": "749a3226080936a3d31789d5c7c9c9be7ca880610891818fdbdc5f13d8c8b403"
+      },
+      {
+        "path": "packages/worker-daemon/src/enrollment/enroll-once.ts",
+        "sha256": "aeba987b3b6a99fcc8719cbccd46725af8bdddd01d1cf7f30ebf58bad8867a55"
+      },
+      {
+        "path": "packages/worker-daemon/src/identity/slot-binding.ts",
+        "sha256": "f80d6d520081b1e05960acddb0ae198f4696388103a9b48c74db5365b5f3ff01"
+      },
+      {
+        "path": "packages/worker-daemon/src/identity/slot-ownership.ts",
+        "sha256": "06394af29e830587667b5bcef50c74442edabf65bd9edae08dd59cf021b6e200"
+      },
+      {
+        "path": "packages/worker-daemon/src/identity/worker-session-lifecycle.ts",
+        "sha256": "670e6ff2629a34afd8f9cbe5c0e7352e75a44e9d72898a16e1ff1d0536e01156"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sha256": "2cda8e472cf2f1d0f2cc8da64dcde3334d24be3b5244d5bc904dddc6343116a0"
+      },
+      {
+        "path": "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+        "sha256": "803010e23860f49da14ba2677053962a4f7bd6c77798a71aae0852511e4e7f51"
+      },
+      {
+        "path": "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+        "sha256": "4a2daa37f23cd297ba9e053020840786e2cf0a44a309954e2ce7829b93b89d56"
+      },
+      {
+        "path": "server/src/__tests__/worker-enrollment.integration.test.ts",
+        "sha256": "02f395cadde4211d4bdb179b726dc869589c645fb67c331afb4712b46c6b3c3d"
+      },
+      {
+        "path": "server/src/__tests__/worker-revocation.integration.test.ts",
+        "sha256": "5cb624aa5f1eeb5ff076e9ba83fef785f6dc1848db5a6e9326cbaf66956cedac"
+      },
+      {
+        "path": "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+        "sha256": "7644a5d5d49941637fbea486cb4681640c7e23b6ac05c7a49694b2f714b28c70"
+      },
+      {
+        "path": "server/src/middleware/worker-session-auth.ts",
+        "sha256": "8493f655673b31fd42fc6f1bcdd8a27c19efdee8fb26ff4f8bbf74a8a0e77924"
+      },
+      {
+        "path": "server/src/services/execution-targets.ts",
+        "sha256": "e4d78bd657c6e0c47feb8b886efd9fb5207df36897746f823c880881651cc179"
+      },
+      {
+        "path": "server/src/services/worker-enrollment.ts",
+        "sha256": "993eeb1f7e6e0d2008a6a24dd8e10eb82158363438ff10450ee732dd2bdc1cee"
+      },
+      {
+        "path": "tests/d1/m4-native-fence-restore.test.mjs",
+        "sha256": "f4bece43b5def93f655e855b67f356e815ed7e6bbc30c25915d9afd4d83bffa0"
+      },
+      {
+        "path": "tests/d1/m4-slot-host.test.mjs",
+        "sha256": "ae1aab044381b518b2d243aefcd6e3549507f6a7be93484fa264f64541c0aae4"
+      },
+      {
+        "path": "tests/d1/m4-slot-ownership.test.mjs",
+        "sha256": "ff2c930ca349f0ca05222298377fca0130044940359f0f832b51b423d5a1e784"
+      }
+    ]
+  },
+  "local": {
+    "targeted": {
+      "selectedFiles": 12,
+      "total": 89,
+      "passed": 88,
+      "failed": 0,
+      "skipped": 1
+    },
+    "targetedReceipt": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "command": {
+        "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+        "args": [
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+          "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+          "server/src/__tests__/worker-enrollment.integration.test.ts",
+          "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+          "server/src/__tests__/worker-revocation.integration.test.ts",
+          "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+          "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-w12-2026-10-18\\local-final\\vitest.json"
+        ]
+      },
+      "startedAt": "2026-10-17T20:10:12.905Z",
+      "durationMs": 34737.71
+    },
+    "reviewFollowup": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "command": {
+        "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+        "args": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\w12-worker-lifecycle\\node_modules\\.pnpm\\vitest@3.2.6_patch_hash=2h6nzbcqsknlj7sn7jgbmgi3pa_@types+debug@4.1.12_@types+node@25.2.3_jit_tbsrftky2tiwtd3nduvaid24p4\\node_modules\\vitest\\vitest.mjs",
+          "run",
+          "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+          "--maxWorkers=1",
+          "--minWorkers=1"
+        ]
+      },
+      "startedAt": "2026-10-17T20:13:26.470Z",
+      "durationMs": 15084.93
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "command": {
+        "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+        "args": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+          "--filter",
+          "@armyofagents/server",
+          "--filter",
+          "@armyofagents/worker-daemon",
+          "typecheck"
+        ]
+      },
+      "startedAt": "2026-10-17T20:10:57.745Z",
+      "durationMs": 55933.38
+    },
+    "build": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "command": {
+        "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+        "args": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+          "--filter",
+          "@armyofagents/server",
+          "--filter",
+          "@armyofagents/worker-daemon",
+          "build"
+        ]
+      },
+      "startedAt": "2026-10-17T20:11:53.682Z",
+      "durationMs": 45982.67
+    },
+    "linuxAndNative": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "command": {
+        "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+        "args": [
+          "--test",
+          "--test-concurrency=1",
+          "tests/d1/m4-slot-ownership.test.mjs",
+          "tests/d1/m4-slot-host.test.mjs",
+          "tests/d1/m4-native-fence-restore.test.mjs"
+        ]
+      },
+      "startedAt": "2026-10-17T20:10:47.645Z",
+      "durationMs": 134651.99
+    },
+    "outerNodeCases": 4,
+    "nestedNativeCases": 3
+  },
+  "vps": {
+    "targeted": {
+      "selectedFiles": 12,
+      "total": 89,
+      "passed": 88,
+      "failed": 0,
+      "skipped": 1
+    },
+    "targetedReceipt": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "command": {
+        "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+          "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+          "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+          "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+          "server/src/__tests__/worker-enrollment.integration.test.ts",
+          "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+          "server/src/__tests__/worker-revocation.integration.test.ts",
+          "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+          "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+          "--maxWorkers=1",
+          "--minWorkers=1",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=/opt/aoa-w12-20261018/evidence/final/vitest.json"
+        ]
+      },
+      "startedAt": "2026-10-17T20:20:59.071Z",
+      "durationMs": 33899.17
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "command": {
+        "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "--filter",
+          "@armyofagents/server",
+          "--filter",
+          "@armyofagents/worker-daemon",
+          "typecheck"
+        ]
+      },
+      "startedAt": "2026-10-17T20:18:03.491Z",
+      "durationMs": 86436.44
+    },
+    "build": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "command": {
+        "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "--filter",
+          "@armyofagents/server",
+          "--filter",
+          "@armyofagents/worker-daemon",
+          "build"
+        ]
+      },
+      "startedAt": "2026-10-17T20:19:29.928Z",
+      "durationMs": 89141.25
+    },
+    "image": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "command": {
+        "executable": "docker",
+        "args": [
+          "build",
+          "-f",
+          "docker/worker/Dockerfile",
+          "-t",
+          "aoa-worker:w12-vps",
+          "--label",
+          "aoa.work=w12-20261018",
+          "."
+        ]
+      },
+      "startedAt": "2026-10-17T20:21:32.971Z",
+      "durationMs": 186275.88
+    },
+    "linuxAndNative": {
+      "exitCode": 0,
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "command": {
+        "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "--test",
+          "--test-concurrency=1",
+          "tests/d1/m4-slot-ownership.test.mjs",
+          "tests/d1/m4-slot-host.test.mjs",
+          "tests/d1/m4-native-fence-restore.test.mjs"
+        ]
+      },
+      "startedAt": "2026-10-17T20:24:39.248Z",
+      "durationMs": 82112.77
+    },
+    "outerNodeCases": 4,
+    "nestedNativeCases": 3
+  },
+  "isolation": {
+    "observedAt": "2026-10-17T20:26:52.771277+00:00",
+    "result": "pass",
+    "w12Directory": "/opt/aoa-w12-20261018",
+    "dockerLabel": "aoa.work=w12-20261018",
+    "w12ContainersRemaining": 0,
+    "nativeRestoreContainerRemaining": 0,
+    "sharedDatabaseBeforeId": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0",
+    "sharedDatabaseAfterId": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0",
+    "sharedDatabaseRunning": true,
+    "reviewService": "active",
+    "caddyService": "active",
+    "reviewHealth": {
+      "status": "ok",
+      "revision": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+      "deploymentMode": "cloud_auth",
+      "deploymentExposure": "public",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": false
+      }
+    },
+    "reviewDeploymentOwner": "W02/W05; independently updated by that chat",
+    "w12ChangedSharedDeployment": false,
+    "image": {
+      "id": "sha256:d047d78332fd64f874e5078abef11449bdffc30ce3f41bf5b25834a107aaee77",
+      "architecture": "arm64",
+      "tag": "aoa-worker:w12-vps",
+      "user": "node"
+    },
+    "publicPortsCreatedByW12": 0,
+    "credentialsCopied": false,
+    "globalDockerPrune": false,
+    "local": {
+      "workerImageId": "sha256:656e1abc4a1714288bc238062ce40935535e155a65159490d37fdbdb3aadcda8",
+      "w12ContainersRemaining": 0,
+      "nativeRestoreContainerRemaining": 0
+    }
+  },
+  "limits": [
+    "Daemon lifecycle uses actual HTTP/PG with memory-backed stores; slot processes use actual disk and injected bootstrap",
+    "Native restore/object checks use disposable DB and local files, not external-store RPO/RTO or a continuous restored live fleet",
+    "Whole repository suite, recursive whole-tree typecheck and authoritative root build not run; user requested targeted checks",
+    "No personal authentication or provider keys used; no shared review app deployment or rollout changes by W12",
+    "Native opt-in skip in each main suite is executed separately by the native Docker wrapper; outer/nested cases must not be double-counted"
+  ],
+  "priorAttempts": [
+    "Fresh worktree needed built dependencies; initial collection failure preserved",
+    "Local dependency-build attempts needed pinned pnpm and Git POSIX tools; successful build retained",
+    "Snapshot review follow-up initially compared Buffer with structuredClone Uint8Array; corrected independent byte snapshot passes"
+  ],
+  "rawEvidence": {
+    "localDirectory": "C:\\Users\\Dell\\Desktop\\aoa\\validation-w12-2026-10-18",
+    "vpsDirectory": "/opt/aoa-w12-20261018/evidence",
+    "receipts": [
+      {
+        "path": "baseline/result.json",
+        "bytes": 1661,
+        "sha256": "f40da7578edc5ad950fab544597c4632ca1771a52f5a46f3f684f033ba29cc67"
+      },
+      {
+        "path": "baseline/stderr.txt",
+        "bytes": 7345,
+        "sha256": "1a338da381b41b02c8c7f9268e407448ab5e566539584ad16a2a1e99c1d05951"
+      },
+      {
+        "path": "baseline/stdout.txt",
+        "bytes": 422,
+        "sha256": "8a77a58b3b6b439149e940b2195d2730f31bd633363443f7d592071b374df06c"
+      },
+      {
+        "path": "check-local.mjs",
+        "bytes": 880,
+        "sha256": "0439d3634b5a7510ee9ca700dd6663e90cd1c02a47e3b9a3ac69256094396d8f"
+      },
+      {
+        "path": "finalize.mjs",
+        "bytes": 2240,
+        "sha256": "4377fb6041fae0b9790d33420a82cd786d624e3c3d108620cb63b50a61020e5a"
+      },
+      {
+        "path": "inspect-isolation.py",
+        "bytes": 1923,
+        "sha256": "a8228110228bd819daa7fda577176f208abc709712c0628b796e8cc0e1ae8e5d"
+      },
+      {
+        "path": "isolation.json",
+        "bytes": 1383,
+        "sha256": "a1e5b89935a439b2ad73c76d092aaacc600033c108370a853beafac9401913ba"
+      },
+      {
+        "path": "local-checks/build/result.json",
+        "bytes": 1195,
+        "sha256": "27553139ee58a3f3e16bc335d37bf116b3f39367c1b7efc2afc9a13e2dc49d14"
+      },
+      {
+        "path": "local-checks/build/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "local-checks/build/stdout.txt",
+        "bytes": 268,
+        "sha256": "18e3fb986245f1736fb6eab5c9ce01ecaff274fc172cc9ae752f79f39d02fa2e"
+      },
+      {
+        "path": "local-checks/typecheck/result.json",
+        "bytes": 1207,
+        "sha256": "d16e181fc34547afc92e9ccffbf019e0b50754a0b65211220c09679c3743e921"
+      },
+      {
+        "path": "local-checks/typecheck/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "local-checks/typecheck/stdout.txt",
+        "bytes": 174,
+        "sha256": "5a09743dd0e8689b08a779a876d7ee0a64e38f85c8c13be775bf38e395f543f7"
+      },
+      {
+        "path": "local-checks.log",
+        "bytes": 452,
+        "sha256": "0d01ac53b00f7c42e401186a899269301428d52df6e63120f91c547efd27f9b3"
+      },
+      {
+        "path": "local-dependencies-build-2.log",
+        "bytes": 1212,
+        "sha256": "ac8f85a925568200d86de0fb175f9cd1f072bf3e891c0e9c7d7383a411a6574a"
+      },
+      {
+        "path": "local-dependencies-build-3.log",
+        "bytes": 2335,
+        "sha256": "be2573e2e6621593d06698518e7a356389be07036f13b7751262dae83652d8b8"
+      },
+      {
+        "path": "local-dependencies-build.log",
+        "bytes": 3978,
+        "sha256": "02624db9a5333c77a1d9eac3a7d9e582eb1e833a340c2cafc4fcc49f2643e3eb"
+      },
+      {
+        "path": "local-final/linux-and-native-restore/result.json",
+        "bytes": 1184,
+        "sha256": "eadd59a9f8c1b7fd6d7fa94632698cd178d03c47bc97a585e5a40fa51aaca617"
+      },
+      {
+        "path": "local-final/linux-and-native-restore/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "local-final/linux-and-native-restore/stdout.txt",
+        "bytes": 994,
+        "sha256": "10476c13035cb4ce7d31d65fde61af1a8804fa3bbe3d26b367086ec4e246c27b"
+      },
+      {
+        "path": "local-final/targeted/result.json",
+        "bytes": 2090,
+        "sha256": "8d3d9f70abf75ca14bbb57086130f1e2f22b790146ff6f1e8a6af6605c513369"
+      },
+      {
+        "path": "local-final/targeted/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "local-final/targeted/stdout.txt",
+        "bytes": 472455,
+        "sha256": "15240f82bf195c3dcc4e04e4aa38034e65165502d5d23a6df3992f3302427a5c"
+      },
+      {
+        "path": "local-final/vitest.json",
+        "bytes": 37302,
+        "sha256": "7025aeb1b551bce85fc412e3088a3a3bea37a0cbc88a40ee8ce72b5ea081301b"
+      },
+      {
+        "path": "local-final.log",
+        "bytes": 485647,
+        "sha256": "43452beb0b6b4b3a25e062a2549f48c400e484a1420cd6c190b7f1ef4142a023"
+      },
+      {
+        "path": "local-review-final/result.json",
+        "bytes": 1337,
+        "sha256": "b54331836f23b9273ce713c3464027db584454f155c8f850fed080a1244a6822"
+      },
+      {
+        "path": "local-review-final/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "local-review-final/stdout.txt",
+        "bytes": 70110,
+        "sha256": "84ec4e4893eec837f64353178a259062da0ea115310feb0fca7b64352bbcc191"
+      },
+      {
+        "path": "local-review-final.log",
+        "bytes": 72182,
+        "sha256": "77560344cb0e7928c40a950877d6ea0e5dc881a08c37e8a37818a9bb170929c5"
+      },
+      {
+        "path": "local-review-followup/result.json",
+        "bytes": 1343,
+        "sha256": "4ab0e23bfdd0098681774e551201f546d2f0cd6690c7f8036b978b075e18ec9c"
+      },
+      {
+        "path": "local-review-followup/stderr.txt",
+        "bytes": 1373,
+        "sha256": "0f92c9ea304bd45e70fc626ee090c03037452a0913440377237a3ec6c243bb6f"
+      },
+      {
+        "path": "local-review-followup/stdout.txt",
+        "bytes": 70829,
+        "sha256": "0f5e00e5381e826a1b3fb94bc0f9d0ef37d01c5205e27e48cb7906e4d64c8678"
+      },
+      {
+        "path": "local-review-followup.log",
+        "bytes": 74324,
+        "sha256": "32551cbc84dbf3bc123ac8178ae172d621ffbdcb459e8f504cd80cd63d21d3a0"
+      },
+      {
+        "path": "prepare-vps.sh",
+        "bytes": 609,
+        "sha256": "9f7fd83565eb8efb5b6eb3d318efcee6edce629182301179d6dbde5f5441dc8b"
+      },
+      {
+        "path": "publish-evidence.mjs",
+        "bytes": 3894,
+        "sha256": "6d91cf76d0d166b31f61e189557477e57eff484cdfc9a24a10df1d9a96dda187"
+      },
+      {
+        "path": "report-draft.md",
+        "bytes": 7087,
+        "sha256": "ce3044619c76294fa54e6a819792f5ae9e08d196a70c063fa1353120123be89f"
+      },
+      {
+        "path": "run-local.mjs",
+        "bytes": 1414,
+        "sha256": "d9d80b66503836f1270995e0b5a2f4b870cc6563c5d30c8733f7eb535da49a4f"
+      },
+      {
+        "path": "run-vps.mjs",
+        "bytes": 2273,
+        "sha256": "a392a86a3fa66e27f83730f5a24fe010c0379440af695926ba8063ee69d31238"
+      },
+      {
+        "path": "selected-tests.txt",
+        "bytes": 754,
+        "sha256": "64adfd35ea2ed31a99a43d11069746318d2f4b4bb265e41f8a3597305b6ff99f"
+      },
+      {
+        "path": "source-receipt.json",
+        "bytes": 4487,
+        "sha256": "d999ab4dd56a0bc1287983570895625cfeb2b379ce916423e0979a19463f0248"
+      },
+      {
+        "path": "source-receipt.mjs",
+        "bytes": 1635,
+        "sha256": "fd6ef699f17d134d9a03bff6ab6c262922de64b4b932206a53bde37a9bc9f0b0"
+      },
+      {
+        "path": "vps-evidence/dependencies-build.log",
+        "bytes": 2266,
+        "sha256": "b703aac28927a629c52cc66d1b1e9f66e474152c3ed3009f1ab34f9d13775a09"
+      },
+      {
+        "path": "vps-evidence/final/build/result.json",
+        "bytes": 1016,
+        "sha256": "eb126dc1d009c2200c2fd1837f516137a652a3bd35b15f06440e85e88074ec6e"
+      },
+      {
+        "path": "vps-evidence/final/build/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/final/build/stdout.txt",
+        "bytes": 268,
+        "sha256": "18e3fb986245f1736fb6eab5c9ce01ecaff274fc172cc9ae752f79f39d02fa2e"
+      },
+      {
+        "path": "vps-evidence/final/image/result.json",
+        "bytes": 908,
+        "sha256": "8b36a4fdc20bef598d0b510ff0eb1a568fb6cf039fa66703ee6ad6e620288cb6"
+      },
+      {
+        "path": "vps-evidence/final/image/stderr.txt",
+        "bytes": 206,
+        "sha256": "d86cb49dd44ce17a9da506b4e732433d5755f98bac9a709da0462523638defc5"
+      },
+      {
+        "path": "vps-evidence/final/image/stdout.txt",
+        "bytes": 20049,
+        "sha256": "5aef53e7caaa93036fa64928825a0c64fa9f59eb2a2349434457c47ccdb1072e"
+      },
+      {
+        "path": "vps-evidence/final/linux-and-native-restore/result.json",
+        "bytes": 1034,
+        "sha256": "fd5f87278b00acb7c0ede9967297ac7e6d09d024e94ed399e29bb1e8e0595130"
+      },
+      {
+        "path": "vps-evidence/final/linux-and-native-restore/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/final/linux-and-native-restore/stdout.txt",
+        "bytes": 1001,
+        "sha256": "7f8373b636d44b9e5248fe1db1e57d535f171a3b68330d0b1ad18f904371cf3f"
+      },
+      {
+        "path": "vps-evidence/final/targeted/result.json",
+        "bytes": 1907,
+        "sha256": "a653650483efb5338bb8ceb9cd2b7fddc8faf4383fb5e1415ca1b10e419f64a6"
+      },
+      {
+        "path": "vps-evidence/final/targeted/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/final/targeted/stdout.txt",
+        "bytes": 584112,
+        "sha256": "ef496bffe6adcc99a6aae854e40b14555d4f9e370d6e15feb34ef7610fd9ab84"
+      },
+      {
+        "path": "vps-evidence/final/typecheck/result.json",
+        "bytes": 1028,
+        "sha256": "eeeb488b1edef3c4a0efde51cccf387ca4aba649b0f1e67c4d3725baaa563673"
+      },
+      {
+        "path": "vps-evidence/final/typecheck/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/final/typecheck/stdout.txt",
+        "bytes": 174,
+        "sha256": "5a09743dd0e8689b08a779a876d7ee0a64e38f85c8c13be775bf38e395f543f7"
+      },
+      {
+        "path": "vps-evidence/final/verified-source.json",
+        "bytes": 4486,
+        "sha256": "682629a11134b46df11a909b0bb749c2c69a830fcd6e5a86d860086226eed45e"
+      },
+      {
+        "path": "vps-evidence/final/vitest.json",
+        "bytes": 37092,
+        "sha256": "7818d3ecc0546ad448ca193c6ef69edb988f1bdd7cebfa2fc92a88f46bb78a64"
+      },
+      {
+        "path": "vps-evidence/install.log",
+        "bytes": 7930,
+        "sha256": "bb3000cb6be19a3b1b26358b82b19e42db9450623c59b38d31dd1875b9367f78"
+      },
+      {
+        "path": "vps-evidence/isolation.json",
+        "bytes": 1195,
+        "sha256": "991bb1229e7134336e16f13efa29f33f1f246e7fdff1c2a706991873a0e5525d"
+      },
+      {
+        "path": "vps-evidence/run.log",
+        "bytes": 605810,
+        "sha256": "fcd52b337bd356c23d9656be042b58df16bc788c50e13d9b5bf53c6021ae4e95"
+      }
+    ]
+  }
+}
