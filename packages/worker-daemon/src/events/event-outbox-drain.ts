@@ -93,6 +93,8 @@ export interface EventOutboxDrain {
   recover(): number;
   /** Start the background tick loop (deferred first tick). */
   start(): void;
+  /** Coalesced, non-blocking hint after durable append. Inert before start/after stop. */
+  wake(): void;
   /** Stop the loop (idempotent, cooperative). */
   stop(): void;
   /** Run ONE full drain pass over all active streams (deterministic; used by the
@@ -121,7 +123,12 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
 
   const states = new Map<string, StreamDrainState>();
   let stopped = false;
+  let started = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let timerIsWake = false;
+  let wakeRequested = false;
+  let ticking = false;
+  let activePass: Promise<DrainTickSummary> | null = null;
 
   function stateFor(streamKey: string): StreamDrainState {
     let st = states.get(streamKey);
@@ -311,7 +318,7 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
     }
   }
 
-  async function drainOnce(final = false): Promise<DrainTickSummary> {
+  async function runPass(final: boolean): Promise<DrainTickSummary> {
     const active = store.listActiveStreams();
     const summary = { batches: 0, accepted: 0, stopped: 0 };
     let processed = 0;
@@ -334,16 +341,59 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
     };
   }
 
+  // Background, startup/manual and shutdown callers share one pass. In
+  // particular, no two uploads may race one stream's accepted watermark.
+  function drainOnce(final = false): Promise<DrainTickSummary> {
+    if (activePass !== null) return activePass;
+    const pass = runPass(final);
+    activePass = pass;
+    const settled = (): void => {
+      if (activePass === pass) activePass = null;
+      if (wakeRequested && !ticking) wake();
+    };
+    void pass.then(settled, settled);
+    return pass;
+  }
+
+  function schedule(delayMs: number, isWake = false): void {
+    timerIsWake = isWake;
+    timer = setTimeout(() => {
+      timer = null;
+      timerIsWake = false;
+      void tick();
+    }, delayMs);
+    timer.unref?.();
+  }
+
+  function wake(): void {
+    if (!started || stopped) return;
+    if (activePass !== null || ticking) {
+      wakeRequested = true;
+      return;
+    }
+    if (timerIsWake) return;
+    wakeRequested = false;
+    if (timer !== null) clearTimeout(timer);
+    schedule(0, true);
+  }
+
   async function tick(): Promise<void> {
     if (stopped) return;
+    ticking = true;
+    // Joining a manual/startup pass does not refresh its stream snapshot, so it
+    // cannot consume a wake for a stream appended after that snapshot.
+    if (activePass === null) wakeRequested = false;
     try {
       await drainOnce();
     } catch (err) {
       deps.logger?.error({ err }, "event-outbox: drain tick failed");
+    } finally {
+      ticking = false;
     }
     if (!stopped) {
-      timer = setTimeout(() => void tick(), tuning.intervalMs);
-      timer.unref?.();
+      // A new stream may have been appended after this pass took its stream
+      // snapshot. Consume one latched hint; keep the idle safety interval.
+      schedule(wakeRequested ? 0 : tuning.intervalMs, wakeRequested);
     }
   }
 
@@ -352,12 +402,14 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
       return store.recoverStalledUploading();
     },
     start(): void {
-      if (timer !== null) return;
-      timer = setTimeout(() => void tick(), tuning.initialDelayMs);
-      timer.unref?.();
+      if (started || stopped) return;
+      started = true;
+      schedule(tuning.initialDelayMs);
     },
+    wake,
     stop(): void {
       stopped = true;
+      wakeRequested = false;
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
@@ -369,6 +421,11 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
       // latched `stopped` (the shutdown order is stop → flush → close): `final = true`
       // bypasses the loop's cooperative-cancel guard so the last durably-persisted
       // events get one delivery attempt instead of waiting for the next boot.
+      // Let an already-uploading pass apply its ACK before the final snapshot.
+      // stop() prevents a latched append hint from restarting the background loop.
+      while (activePass !== null) {
+        try { await activePass; } catch { /* final pass still gets its attempt */ }
+      }
       await drainOnce(true);
     },
   };

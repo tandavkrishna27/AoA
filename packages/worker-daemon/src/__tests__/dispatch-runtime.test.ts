@@ -86,8 +86,8 @@ function harness() {
   const seams: Partial<ComposeDispatchRuntimeDeps> = {
     probes: HUGE_PROBES,
     openStore: (async (o: unknown) => { order.push("openStore"); captured.storeOpts = o; return { close: () => {}, __store: true } as never; }) as never,
-    makeSink: ((d: { store: unknown; kek: unknown }) => { order.push("makeSink"); captured.sinkStore = d.store; captured.sinkKek = d.kek; return sinkSentinel; }) as never,
-    makeDrain: ((d: { kek: unknown }) => { order.push("makeDrain"); captured.drainKek = d.kek; return { recover: () => { order.push("recover"); return 0; }, start: () => { order.push("drainStart"); }, stop: () => {}, drainOnce: async () => ({}), flush: async () => {} } as never; }) as never,
+    makeSink: ((d: { store: unknown; kek: unknown; onPersisted?: () => void }) => { order.push("makeSink"); captured.sinkStore = d.store; captured.sinkKek = d.kek; captured.sinkPersisted = d.onPersisted; return sinkSentinel; }) as never,
+    makeDrain: ((d: { kek: unknown }) => { order.push("makeDrain"); captured.drainKek = d.kek; return { recover: () => { order.push("recover"); return 0; }, start: () => { order.push("drainStart"); }, wake: () => { order.push("drainWake"); }, stop: () => {}, drainOnce: async () => ({}), flush: async () => {} } as never; }) as never,
     makeSupervisor: ((d: { eventSink: unknown; redactionCanaries: unknown; observeRun?: unknown; opDeadlineMs?: unknown }) => { order.push("makeSupervisor"); captured.supEventSink = d.eventSink; captured.redactionCanaries = d.redactionCanaries; captured.observeRun = d.observeRun; captured.opDeadlineMs = d.opDeadlineMs; captured.pendingControl = (d as { onBrowserDecisionPending?: unknown }).onBrowserDecisionPending; captured.envProbe = (d as { envProbe?: unknown }).envProbe; captured.hasEnvProbeKey = "envProbe" in (d as object); return supSentinel; }) as never,
     makeDriver: ((d: { eventSink: unknown; supervisor: unknown; schedule: unknown; controlHandlers?: unknown }) => { order.push("makeDriver"); captured.driverEventSink = d.eventSink; captured.driverSupervisor = d.supervisor; captured.driverSchedule = d.schedule; captured.driverControlHandlers = d.controlHandlers; return driverSentinel; }) as never,
     makePollLoop: ((d: { supervisor: unknown; self: unknown; measure: unknown }) => { order.push("makePollLoop"); captured.pollSupervisor = d.supervisor; captured.pollSelf = d.self; captured.pollMeasure = d.measure; captured.pollRun = () => { order.push("pollRun"); }; return { ...pollSentinel, run: async () => { order.push("pollRun"); return { kind: "stopped" }; } } as never; }) as never,
@@ -151,6 +151,13 @@ describe("composeDispatchRuntime — the composition wiring", () => {
     expect(captured.sinkKek).toBeInstanceOf(Buffer);
     expect(captured.drainKek).toBeInstanceOf(Buffer);
     expect(captured.sinkKek).toEqual(captured.drainKek);
+  });
+
+  it("a durable sink append notification reaches the same composed drain", async () => {
+    const { captured, order } = await compose();
+    expect(captured.sinkPersisted).toBeTypeOf("function");
+    (captured.sinkPersisted as () => void)();
+    expect(order.at(-1)).toBe("drainWake");
   });
 
   // WRK-018 — FLIPPED. This pinned `observeRun` UNDEFINED while no sandbox output rode the

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createEventOutboxDrain, type EventOutboxDrain } from "../events/event-outbox-drain.js";
 import { DurableWorkerEventSink } from "../events/durable-event-sink.js";
@@ -63,9 +63,208 @@ beforeEach(async () => {
   drain = await buildDrain();
 });
 afterEach(async () => {
+  drain.stop();
+  vi.useRealTimers();
   store.close();
   await fake.close();
   rmSync(dir, { recursive: true, force: true });
+});
+
+describe("event-outbox scheduler — durable append latency", () => {
+  function scheduledDrain(notify: boolean) {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(1_000);
+    const uploads: { atMs: number; seqs: number[]; key: string }[] = [];
+    const behavior = { gate: null as Promise<void> | null, failures: 0, unauthorized: false, active: 0, maxActive: 0 };
+    const transport = {
+      ...client,
+      eventUploadPath: client.eventUploadPath,
+      eventUpload: async ({ bytes }: { bytes: Buffer }) => {
+        const request = JSON.parse(bytes.toString("utf8"));
+        const events = request.body.events;
+        uploads.push({ atMs: Date.now(), seqs: events.map((event: { seq: number }) => event.seq), key: request.idempotencyKey });
+        behavior.active += 1;
+        behavior.maxActive = Math.max(behavior.active, behavior.maxActive);
+        try {
+        await behavior.gate;
+        if (behavior.unauthorized || behavior.failures-- > 0) return { status: behavior.unauthorized ? 401 : 503,
+          body: { protocolVersion: 1, correlationId: request.correlationId, serverTime: new Date().toISOString(),
+            code: behavior.unauthorized ? "unauthorized" : "internal_unavailable", message: "unavailable",
+            retryAfterMs: 5000, redaction: "secret", detail: {} } };
+        const acceptedThroughSeq = events.at(-1).seq;
+        return { status: 200, body: { protocolVersion: 1, correlationId: request.correlationId,
+          serverTime: new Date().toISOString(), ack: { protocolVersion: 1, ...IDENTITY, jobId: request.body.jobId,
+            acceptedThroughSeq, expectedNextSeq: acceptedThroughSeq + 1, status: "accepted" } } };
+        } finally { behavior.active -= 1; }
+      },
+    };
+    drain = createEventOutboxDrain({ store, client: transport as never, session: staticSessionProvider(session), key, kek: KEK });
+    sink = new DurableWorkerEventSink({ store, kek: KEK,
+      ...(notify ? { onPersisted: () => drain.wake() } : {}) });
+    return { uploads, behavior };
+  }
+
+  it("periodic-only control leaves a real SQLite terminal idle for 1900ms after append", async () => {
+    const { uploads } = scheduledDrain(false);
+    drain.start();
+    await vi.advanceTimersByTimeAsync(1_500); // first pass finds no rows
+    await vi.advanceTimersByTimeAsync(100);
+    emit(1, "terminal");
+    expect(store.getRow(STREAM_KEY, 1)?.status).toBe("pending");
+    await vi.advanceTimersByTimeAsync(1_899);
+    expect(uploads).toEqual([]);
+    expect(store.countPending()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(uploads).toMatchObject([{ atMs: 4_500, seqs: [1] }]);
+    expect(store.countPending()).toBe(0);
+  });
+
+  it("a post-commit wake uploads the same terminal without waiting for the idle interval", async () => {
+    const { uploads } = scheduledDrain(true);
+    drain.start();
+    await vi.advanceTimersByTimeAsync(1_500);
+    await vi.advanceTimersByTimeAsync(100);
+    emit(1, "terminal");
+    // Callback only schedules: emit has returned with the real row committed,
+    // without doing any network work inline.
+    expect(store.getRow(STREAM_KEY, 1)?.status).toBe("pending");
+    expect(uploads).toEqual([]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toMatchObject([{ atMs: 2_600, seqs: [1] }]);
+    expect(store.countPending()).toBe(0);
+  });
+
+  it("coalesces a synchronous append burst and never uploads inline or before start", async () => {
+    const { uploads } = scheduledDrain(true);
+    emit(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toEqual([]);
+    drain.start();
+    emit(2);
+    emit(3, "terminal");
+    expect(uploads).toEqual([]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads.map(call => call.seqs)).toEqual([[1, 2, 3]]);
+  });
+
+  it("a wake for another stream during upload is latched into one subsequent pass", async () => {
+    const { uploads, behavior } = scheduledDrain(true);
+    drain.start();
+    await vi.advanceTimersByTimeAsync(1_500);
+    let release!: () => void;
+    behavior.gate = new Promise<void>(resolve => { release = resolve; });
+    emit(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toHaveLength(1);
+    const other = eventIdentity({ jobId: "00000000-0000-4000-8000-000000000088" });
+    sink.emit(stampEvent(other, 1, "terminal", samplePayloadFor("terminal")));
+    drain.wake();
+    drain.wake();
+    expect(uploads).toHaveLength(1);
+    behavior.gate = null;
+    release();
+    // Wait for the shared active pass, then fire the single latched wake.
+    await drain.drainOnce();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toHaveLength(2);
+    expect(store.getStream(deriveStreamKey(other))?.acceptedThroughSeq).toBe(1);
+    expect(behavior.maxActive).toBe(1);
+  });
+
+  it("append wakes cannot bypass the persisted head backoff or change its retry key", async () => {
+    const { uploads, behavior } = scheduledDrain(true);
+    drain.start();
+    await vi.advanceTimersByTimeAsync(1_500);
+    behavior.failures = 1;
+    emit(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toHaveLength(1);
+    const retryAt = store.getRow(STREAM_KEY, 1)?.nextRetryAt;
+    expect(retryAt).toBe(Date.now() + 5_000);
+    emit(2, "terminal");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toHaveLength(1);
+    expect(store.getRow(STREAM_KEY, 1)?.nextRetryAt).toBe(retryAt);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(uploads).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await drain.drainOnce();
+    expect(uploads.map(call => call.seqs)).toEqual([[1], [1, 2]]);
+    expect(uploads[1]!.key).toBe(uploads[0]!.key);
+    expect(store.countPending()).toBe(0);
+  });
+
+  it("a periodic timer joining a manual pass cannot consume another stream's latched append", async () => {
+    const { uploads, behavior } = scheduledDrain(true);
+    let release!: () => void;
+    behavior.gate = new Promise<void>(resolve => { release = resolve; });
+    emit(1); // before start: only the deferred safety timer exists
+    drain.start();
+    const manual = drain.drainOnce();
+    await vi.advanceTimersByTimeAsync(0);
+    const other = eventIdentity({ jobId: "00000000-0000-4000-8000-000000000089" });
+    sink.emit(stampEvent(other, 1, "terminal", samplePayloadFor("terminal")));
+    await vi.advanceTimersByTimeAsync(1_500); // timer joins the still-blocked pass
+    expect(uploads).toHaveLength(1);
+    behavior.gate = null;
+    release();
+    await manual;
+    await vi.advanceTimersByTimeAsync(1);
+    expect(uploads).toHaveLength(2); // no additional idle interval
+    expect(store.getStream(deriveStreamKey(other))?.acceptedThroughSeq).toBe(1);
+    expect(behavior.maxActive).toBe(1);
+  });
+
+  it("an append between shared-pass settlement and tick continuation creates only one subsequent idle timer", async () => {
+    const { uploads, behavior } = scheduledDrain(true);
+    const passes = vi.spyOn(store, "listActiveStreams");
+    let release!: () => void;
+    behavior.gate = new Promise<void>(resolve => { release = resolve; });
+    emit(1);
+    drain.start();
+    const manual = drain.drainOnce();
+    const other = eventIdentity({ jobId: "00000000-0000-4000-8000-000000000090" });
+    // Registered before the timer joins: this callback runs after the pass's
+    // settlement handler clears activePass, but before tick's await continues.
+    void manual.then(() => sink.emit(stampEvent(other, 1, "terminal", samplePayloadFor("terminal"))));
+    await vi.advanceTimersByTimeAsync(1_500);
+    behavior.gate = null;
+    release();
+    await manual;
+    await vi.advanceTimersByTimeAsync(1);
+    expect(uploads).toHaveLength(2);
+    const completedPasses = passes.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(passes.mock.calls.length - completedPasses).toBe(1);
+  });
+
+  it("manual passes are single-flight and stop/flush waits for old ACK before final append delivery", async () => {
+    const { uploads, behavior } = scheduledDrain(true);
+    drain.start();
+    await vi.advanceTimersByTimeAsync(1_500);
+    let release!: () => void;
+    behavior.gate = new Promise<void>(resolve => { release = resolve; });
+    emit(1);
+    await vi.advanceTimersByTimeAsync(0);
+    const first = drain.drainOnce(), second = drain.drainOnce();
+    emit(2, "terminal");
+    drain.stop();
+    const flush = drain.flush();
+    drain.wake();
+    drain.start(); // stop is latched, not a restart
+    await vi.advanceTimersByTimeAsync(0);
+    expect(uploads).toHaveLength(1);
+    behavior.gate = null;
+    release();
+    await Promise.all([first, second, flush]);
+    expect(uploads.map(call => call.seqs)).toEqual([[1], [2]]);
+    expect(store.getStream(STREAM_KEY)?.acceptedThroughSeq).toBe(2);
+    expect(behavior.maxActive).toBe(1);
+    emit(3);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(uploads).toHaveLength(2);
+    expect(store.getRow(STREAM_KEY, 3)?.status).toBe("pending");
+  });
 });
 
 describe("event-outbox-drain — upload in seq order, advance cursor, classify (slice 4)", () => {
