@@ -66,6 +66,12 @@ requires snapshot fallback. The test also requires cross-tenant/invalid-key HTTP
 403, same-company private/foreign thread subscription and live/replay denial,
 authorized positive controls, durable order, and token canaries absent from
 socket frames and denial audit details.
+Before publishing hidden thread events, the child waits for the genuine
+subscription authorizer's private-thread discussion/participant queries, the
+foreign-thread empty discussion query, and the public-thread discussion/participant
+queries to complete, then drains their remaining Promise continuations. The raw
+ledger retains those completed query receipts. This test-only observer delegates
+all database queries and values unchanged; it uses no timed sleep as a barrier.
 
 The full quantitative realtime lane preserves the normative counts and duration:
 
@@ -80,7 +86,10 @@ env -i PATH="$PATH" HOME="$EVIDENCE/home" TMPDIR="$EVIDENCE/tmp" \
 
 On Windows add `$env:AOA_W13_REALTIME_FULL='1'` and use a new report filename.
 Full mode requires 10,000 initial durable events, 100 reconnect gaps, 100 duplicate
-injections and a literal 900,000 ms outage. Allow about 22 minutes. A smaller
+injections and a literal 900,000 ms outage. The outer test budget is explicitly
+900,000 ms outage + 300,000 ms maximum catchup + 600,000 ms bounded startup and
+workload allowance (30 minutes total). This runner allowance does not extend the
+15-minute fault or five-minute catchup acceptance limits. A smaller
 smoke result cannot close this lane. Do not change the normative constants to
 make a run finish sooner. The report and `.raw.json` ledger use exclusive create;
 each new attempt needs new paths. The ledger retains accepted event identities,
@@ -119,15 +128,24 @@ node scripts/d4-service-availability.mjs evaluate manifest.json samples.ndjson r
 ```
 
 The probe is a local Node adapter supplied for the actual service environment.
-It receives one expected sample plus actual submission timestamp on stdin and
+It receives one expected sample plus the separate `driverStartedAt` timestamp on stdin and
 must return one JSON object, without diagnostics, on stdout. A successful result
 must record `success`, `reason`, `telemetryComplete`, `durableSuccess`,
-`authorizedReadback`, actual `readbackAt`, `fencedInstanceCount: 1`, current
+`authorizedReadback`, actual operation `submittedAt` and `readbackAt`, `fencedInstanceCount: 1`, current
 `healthCurrent`, and matching nonempty `generation`/`desiredGeneration`. The
 adapter must actually inspect the authoritative fence and process-observation
 health, submit the synthetic operation and perform authorized durable readback.
-No health-endpoint-only adapter is provided as an acceptance shortcut. Collection
-pins frozen identity/dimensions and actual submission/observation timestamps;
+No health-endpoint-only adapter is provided as an acceptance shortcut. The adapter
+must measure submission when the synthetic operation is actually submitted after
+any setup. Driver process launch never substitutes for that timestamp. Collection
+pins frozen identity/dimensions, driver launch time and observation time, and
+preserves the adapter's actual submission time. Missing, malformed, backdated or
+future submission evidence fails closed; successful chronology requires
+`driverStartedAt <= submittedAt <= readbackAt <= observedAt`. The actual operation
+must be submitted in its scheduled minute and reach readback within the unchanged
+60-second SLO. An adapter launched in one minute whose operation starts in the
+next minute is a failed scheduled sample even if readback is fast.
+An
 adapter timeout, exit failure, malformed JSON or output overflow is failed raw
 evidence. Raw records are flushed to disk per sample.
 

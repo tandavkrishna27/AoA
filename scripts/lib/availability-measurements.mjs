@@ -82,6 +82,7 @@ function success(sample, expected, m) {
 function reconstructable(sample) {
   try {
     const observed = instant(sample.observedAt), submitted = instant(sample.submittedAt);
+    if (sample.driverStartedAt !== undefined && submitted < instant(sample.driverStartedAt)) return false;
     if (sample.success === true) {
       const readback = instant(sample.readbackAt);
       if (observed < readback || readback < submitted) return false;
