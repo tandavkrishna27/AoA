@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { runProbe } from '../../d4-service-availability.mjs';
+import { runProbe, collectAvailabilitySamples } from '../../d4-service-availability.mjs';
 import { freezeAvailabilitySchedule, evaluateAvailability } from '../availability-measurements.mjs';
 
 const cli = fileURLToPath(new URL('../../d4-service-availability.mjs', import.meta.url));
@@ -81,4 +81,41 @@ for (const submittedAt of [undefined, 'invalid', '2099-01-01T00:00:00.000Z']) te
     const result = await runProbe(path, { sampleId: 'test', scheduledAt: new Date().toISOString(), dimensions: {} });
     assert.equal(result.success, false); assert.equal(result.telemetryComplete, false);
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+for (const [operationMs, passed] of [[56_000, true], [60_001, false]]) test('5s setup preserves actual ' + operationMs + 'ms readback SLO verdict beyond the former launch cap', async context => {
+  const dir = await mkdtemp(join(tmpdir(), 'aoa-d4-adapter-budget-'));
+  try {
+    const start = Date.parse('2026-10-19T00:00:00.000Z');
+    const m = freezeAvailabilitySchedule({ campaignId: 'adapter-budget', mode: 'D4', candidate: 'rev', timezone: 'UTC', frozenAt: '2026-10-18T00:00:00.000Z',
+      start: new Date(start).toISOString(), end: new Date(start + 60_000).toISOString(), workloadSlosMs: { service: 60_000 },
+      dimensions: [{ organizationId: 'org', workload: 'service', target: 'target', provider: 'local', revision: 'rev' }] });
+    const body = { success: true, reason: 'actual_readback', telemetryComplete: true, submittedAt: new Date(start + 5000).toISOString(),
+      readbackAt: new Date(start + 5000 + operationMs).toISOString(), durableSuccess: true, authorizedReadback: true,
+      fencedInstanceCount: 1, healthCurrent: true, generation: 'g', desiredGeneration: 'g' };
+    const path = join(dir, 'probe.mjs'); await writeFile(path, `console.log(${JSON.stringify(JSON.stringify(body))});`);
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    let calls = 0;
+    const probe = runProbe(path, m.expected[0], undefined, { now: () => start + (calls++ === 0 ? 0 : 5000 + operationMs + 100) });
+    context.mock.timers.tick(5000 + operationMs);
+    const result = await probe;
+    assert.notEqual(result.reason, 'probe_timeout', 'setup must not consume the actual-operation SLO');
+    const report = evaluateAvailability(m, [result]); assert.equal(report.passed, passed); assert.equal(report.denominator, 1);
+    assert.equal(report.numerator, passed ? 1 : 0);
+  } finally { context.mock.timers.reset(); await rm(dir, { recursive: true, force: true }); }
+});
+test('a probe still inside its admissible collection window cannot delay the next frozen minute', async () => {
+  const start = Date.parse('2026-10-19T00:00:00.000Z'); let clock = start - 1;
+  const expected = [0, 60_000, 120_000].map(offset => ({ sampleId: String(offset), scheduledAt: new Date(start + offset).toISOString() }));
+  const launched = [], retained = []; let release;
+  const held = new Promise(resolve => { release = resolve; });
+  const collecting = collectAvailabilitySamples(expected, async sample => {
+    launched.push({ sampleId: sample.sampleId, at: clock });
+    return sample.sampleId === '0' ? held : sample;
+  }, async result => { retained.push(result); }, { now: () => clock, sleep: async ms => { clock += ms; } });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(launched.length, 3, 'later scheduled probes must start while the first adapter is still pending');
+    assert.deepEqual(launched.map(r => r.at - start), [0, 60_000, 120_000]);
+  } finally { release(expected[0]); await collecting; }
+  assert.equal(retained.length, 3);
 });
