@@ -40,12 +40,23 @@ test('runtime source parses and uses actual HTTP submit plus production placemen
 
 test('assembler joins lost worker starts and refuses a missing daemon journal',async()=>{
   const {assembleDaemonPhase}=await import('../../m4-daemon-load.mjs');
-  const records=[{type:'phase',originMs:10000,durationMs:15000,tenantKeys:['quiet']},
+  const records=[{type:'phase',originMs:10000,durationMs:15000,tenantKeys:['quiet'],jobs:[]},
     {type:'result',jobs:[],failures:[],observedUntilMs:45000}];
   const samples=[{type:'boot',tenantKey:'quiet',atMs:9999},{type:'start',requestId:'lost',tenantKey:'quiet',kind:'poll',startedAtMs:10001,deadlineAtMs:20001}];
   const {summary}=assembleDaemonPhase(records,{quiet:samples});
   assert.equal(summary.totalRequests,1);assert.equal(summary.censoredRequests,1);
   assert.throws(()=>assembleDaemonPhase(records,{}),/telemetry/);
+});
+
+test('assembler freezes job schedule/deadlines and refuses missing or duplicated job evidence',async()=>{
+  const {assembleDaemonPhase}=await import('../../m4-daemon-load.mjs');
+  const job={intentId:'a',tenantKey:'quiet',scheduledAtMs:0,deadlineAtMs:45000};
+  const phase={type:'phase',originMs:10000,durationMs:15000,tenantKeys:['quiet'],jobs:[job]};
+  const result={type:'result',jobs:[{...job}],failures:[],observedUntilMs:45000};
+  const workers={quiet:[{type:'boot',tenantKey:'quiet',atMs:9999}]};
+  for(const jobs of [[],[{...job,deadlineAtMs:60000}],[{...job},{...job}]]) {
+    assert.throws(()=>assembleDaemonPhase([phase,{...result,jobs}],workers),/job/i);
+  }
 });
 
 test('a job timeout fails the bounded verdict even with successful request histograms',async()=>{

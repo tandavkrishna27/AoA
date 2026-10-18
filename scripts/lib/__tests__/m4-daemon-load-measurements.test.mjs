@@ -71,6 +71,13 @@ test('an unsubmitted scheduled job and unresolved job cannot disappear', () => {
   assert.equal(summary.tenants.quiet.jobs.deadlineMisses,2);
 });
 
+test('unknown job dimensions and duplicate intent across tenants refuse reconstruction',()=>{
+  const job={intentId:'a',tenantKey:'quiet',scheduledAtMs:0,deadlineAtMs:1500};
+  for(const jobs of [[{...job,tenantKey:'unknown'}],[{...job,scheduledAtMs:NaN}],[job,job]]) {
+    assert.throws(()=>measurements.summarizeLoadPhase(phase({jobs})),/job/i);
+  }
+});
+
 test('job throughput uses durable job observation inside fixed window; attempt success is distinct', () => {
   const summary=measurements.summarizeLoadPhase(phase({jobs:[{intentId:'a',tenantKey:'quiet',scheduledAtMs:0,submittedAtMs:5,
     deadlineAtMs:2000,jobId:'job',jobStatus:'succeeded',jobCompletedAtMs:900,attemptStatus:'succeeded',attemptCompletedAtMs:800}]}));
@@ -93,6 +100,15 @@ test('telemetry overhead remains explicit and never subtracts latency', () => {
   assert.equal(summary.telemetry.writeMs,5);
   assert.equal(summary.telemetry.cloneWaitMs,4);
   assert.equal(summary.telemetry.observerCpuMs,1);
+});
+
+test('successful provider wire requests cannot dilute the API 5xx denominator',()=>{
+  const summary=measurements.summarizeLoadPhase(phase({requestStarts:[start('api'),start('provider',{kind:'providerExecute'})],
+    requests:[finish('api',{status:503}),finish('provider')]}));
+  assert.equal(summary.totalRequests,2);
+  assert.equal(summary.apiRequestCount,1);
+  assert.equal(summary.http5xxRate,1);
+  assert.equal(summary.providerRequestCount,1);
 });
 
 test('quiet tenant comparison keeps the unchanged 90 percent / 2x thresholds', () => {

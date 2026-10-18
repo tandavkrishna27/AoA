@@ -14,6 +14,14 @@ const writeJson=(file,value)=>writeFileSync(file,JSON.stringify(value,null,2)+'\
 export function assembleDaemonPhase(records,workerRecords) {
   const phase=records.find(r=>r.type==='phase'),result=records.find(r=>r.type==='result');
   if(!phase||!result||records.some(r=>r.type==='fatal'))throw Error('Campaign incomplete; raw journals retained');
+  const schedule=new Map(phase.jobs.map(j=>[j.intentId,j]));
+  const observedJobs=new Set();
+  if(schedule.size!==phase.jobs.length || result.jobs.length!==phase.jobs.length)throw Error('Incomplete or duplicate job evidence');
+  for(const job of result.jobs) {
+    const frozen=schedule.get(job.intentId);
+    if(!frozen || observedJobs.has(job.intentId) || ['tenantKey','scheduledAtMs','deadlineAtMs'].some(key=>job[key]!==frozen[key]))throw Error('Job schedule or deadline changed');
+    observedJobs.add(job.intentId);
+  }
   const requestStarts=records.filter(r=>r.type==='start'),requests=records.filter(r=>r.type==='finish');
   const coverage=[];
   for(const tenantKey of phase.tenantKeys) {

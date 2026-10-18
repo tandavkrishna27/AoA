@@ -7,11 +7,20 @@ export function percentile95(values) {
 
 export function summarizeLoadPhase(phase) {
   if (!Number.isFinite(phase.durationMs) || phase.durationMs <= 0) throw Error('Invalid measurement window');
+  if(phase.jobs) {
+    const ids=new Set();
+    for(const job of phase.jobs) {
+      if(!job.intentId || ids.has(job.intentId) || !phase.tenantKeys.includes(job.tenantKey) || !validMs(job.scheduledAtMs)
+        || !validMs(job.deadlineAtMs) || job.deadlineAtMs<job.scheduledAtMs)throw Error('Invalid or duplicate job intent');
+      ids.add(job.intentId);
+    }
+  }
   const accounted = accountRequests(phase);
   // Cohort by request start: a slow response/timeout remains in its original
   // window; follow-up requests first sent during draining are separate.
   const requests = accounted.requests.filter(r => r.startedAtMs >= 0 && r.startedAtMs < phase.durationMs);
-  const http5xx = requests.filter(r => r.status >= 500 && r.status <= 599).length;
+  const apiRequests=requests.filter(r=>!r.kind?.startsWith('provider'));
+  const http5xx = apiRequests.filter(r => r.status >= 500 && r.status <= 599).length;
   const transportErrors = requests.filter(r => r.status === 0).length;
   const tenants = Object.fromEntries(phase.tenantKeys.map(key => {
     if (phase.jobs) return [key, summarizeJobs(phase, key)];
@@ -31,7 +40,8 @@ export function summarizeLoadPhase(phase) {
     accountingMode:accounted.mode, requestAccountingComplete:accounted.complete && requests.every(r=>!r.censored),
     censoredRequests:requests.filter(r=>r.censored).length, timeoutRequests:requests.filter(r=>r.timedOut).length,
     lateRequests:requests.filter(r=>r.late).length, requestHistograms,
-    http5xxRate: requests.length ? http5xx / requests.length : null,
+    apiRequestCount:apiRequests.length,providerRequestCount:requests.length-apiRequests.length,
+    http5xxRate: apiRequests.length ? http5xx / apiRequests.length : null,
     submitP95Ms:requestHistograms.submit?.p95Ms ?? null,
     pollP95Ms:requestHistograms.poll?.p95Ms ?? null,
     eventAckP95Ms:requestHistograms.events?.p95Ms ?? null,
