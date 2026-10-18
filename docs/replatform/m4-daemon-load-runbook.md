@@ -16,6 +16,11 @@ uses the server's recognized one-shot invocation builder, with independently
 established fixture company-key authority. The deterministic provider scripts
 that invocation; this diagnostic does not execute capture files or prove usable
 one-shot output. The existing 600-second external workload ceiling is unchanged.
+The provider declares output enumeration and artifact export unsupported. The
+daemon's ordinary best-effort export window therefore reports `export_artifact`
+failure before emitting the scripted command terminal. This does not establish
+captured-result success for COV-01 readiness, extraction or compaction. Accepted
+terminal ingestion and the resulting job/lease/capacity lifecycle remain real.
 
 Each phase has **15 seconds of fixed arrivals and an immutable 30-second drain**.
 Baseline schedules 30 quiet jobs at 2/s. Loaded schedules 30 quiet jobs at 2/s and
@@ -31,6 +36,24 @@ policy hash change. These are not the historical 64-slot/64-operation inputs and
 cannot establish improvement over that run. Preserve the historical **3.382×
 quiet-delay failure** and **102/300 noisy deadline misses**, including the later
 reads showing success (`m4-code-execution.md`). No production tuning is included.
+
+For a separate historical-capacity engineering reproduction, prepare a **fresh**
+fixture with `--capacity-profile historical64`. This selects the documented
+64 batch slots / 64 provider operations and two same-host control-plane replicas;
+all campaign traffic still goes to replica A. It preserves 2/s and 20/s arrivals,
+15+30-second timing, resources, runtime ceilings and verdict thresholds. It
+neither changes existing targets nor raises the default fixture's limits.
+Each historical fixture gets independent organizations, targets, enrollment
+tickets and provider-profile IDs. The existing enrollment seeder computes the
+canonical 64-operation digest and binds it into the fresh registered reference;
+an existing target is refused before enrollment authority is created. This
+requires a candidate control-plane image containing the updated seeder.
+
+This is a capacity-matched diagnostic, not an exact replay of the unrecovered
+historical overlay: the current campaign submits API `one_shot` jobs, whereas the
+old real-daemon cohort used SQL-seeded `task_run` jobs. It cannot alone establish
+improvement over the historical 3.382× measurement, provider qualification, HA
+across failure domains, or a performance fix.
 
 ## Prepare and start (operator only)
 
@@ -55,6 +78,13 @@ docker compose --project-name "$AOA_E6F_COMPOSE_PROJECT" \
   --env-file /absolute/private/w11-fixture/fixture.env \
   -f docker-compose.d1.yml -f /absolute/private/w11-fixture/compose.json up -d --wait
 node scripts/m4-daemon-load.mjs run /absolute/private/w11-fixture baseline
+```
+
+To select that independent historical cohort, replace only the preparation
+command and use a new project name and absent private path for the entire run:
+
+```sh
+node scripts/m4-daemon-load.mjs prepare /absolute/private/w11-historical64 --capacity-profile historical64
 ```
 
 PowerShell uses `$env:AOA_D1_LIVE='1'` and
@@ -138,7 +168,9 @@ Inventory comes from the durable control-plane journal and must contain valid,
 distinct quiet/noisy worker, target, provider-profile and enrolled hello snapshots.
 The captured stdout inventory must agree. Comparison refuses missing inventory,
 changed snapshots or mismatched fixture UUIDs; absent values cannot compare as a
-passing match.
+passing match. Reports retain the selected capacity cohort. Actual enrolled
+batch slots and provider-operation limits must match it; historical provider
+profile IDs must also bind the exact fixture UUID.
 
 Before selecting a product fix, add candidate-scoped timing evidence for pool
 acquisition, SQL execution, authority locks, event ingestion and daemon
