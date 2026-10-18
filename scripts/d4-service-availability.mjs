@@ -8,12 +8,17 @@ import { freezeAvailabilitySchedule, evaluateAvailability, scheduleHash } from '
 
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
 const exclusiveJson = (path, data) => writeFile(path, JSON.stringify(data, null, 2) + '\n', { flag: 'wx' });
-export async function runProbe(probePath, expected, timeoutMs = 60_000, { now = Date.now } = {}) {
+export async function runProbe(probePath, expected, timeoutMs, { now = Date.now } = {}) {
   const driverStartedAt = new Date(now()).toISOString();
+  // Submission may occur anywhere in the scheduled minute; its readback then
+  // has its own 60s SLO. Allow bounded local reporting after the last admissible
+  // readback. This collection limit never changes the verdict's actual 60s SLO.
+  const collectionDeadline = Date.parse(expected.scheduledAt) + 60_000 + 60_000 + 5000;
+  const adapterTimeoutMs = timeoutMs ?? Math.max(1, collectionDeadline - Date.parse(driverStartedAt));
   return new Promise(resolveProbe => {
     const child = spawn(process.execPath, [resolve(probePath)], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     let output = '', overflow = false, completed = false;
-    const timer = setTimeout(() => { child.kill(); finish({ success: false, telemetryComplete: false, reason: 'probe_timeout' }); }, timeoutMs);
+    const timer = setTimeout(() => { child.kill(); finish({ success: false, telemetryComplete: false, reason: 'probe_timeout' }); }, adapterTimeoutMs);
     function finish(result) {
       if (completed) return; completed = true; clearTimeout(timer);
       const observedAt = new Date(now()).toISOString();
@@ -36,6 +41,31 @@ export async function runProbe(probePath, expected, timeoutMs = 60_000, { now = 
     child.stdin.on('error', () => {});
     child.stdin.end(JSON.stringify({ ...expected, driverStartedAt }) + '\n');
   });
+}
+export async function collectAvailabilitySamples(expected, execute, persist, { now = Date.now, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+  const pending = new Set();
+  let writes = Promise.resolve(), failure;
+  try {
+    for (const sample of expected) {
+      const scheduled = Date.parse(sample.scheduledAt);
+      while (now() < scheduled) await sleep(Math.min(1000, scheduled - now()));
+      if (failure) throw failure;
+      // Never backfill suppressed minutes. A prior adapter may still be inside
+      // its valid readback window, so it cannot hold the next scheduled probe.
+      if (now() >= scheduled + 60_000) continue;
+      const collecting = Promise.resolve(execute(sample)).then(result => {
+        writes = writes.then(() => persist(result));
+        return writes;
+      }).catch(error => { failure ??= error; });
+      pending.add(collecting);
+      collecting.then(() => pending.delete(collecting));
+    }
+  } finally {
+    // Keep the raw file open until every bounded adapter and serialized write
+    // settles, including the last minute's legitimate post-boundary readback.
+    await Promise.all(pending);
+  }
+  if (failure) throw failure;
 }
 export async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv;
@@ -63,16 +93,9 @@ export async function main(argv = process.argv.slice(2)) {
     if (Date.now() >= Date.parse(m.start)) throw Error('Collection must start before the frozen campaign start; create a new attempt');
     const raw = await open(samplesPath, 'wx');
     try {
-      for (let i = 0; i < m.expected.length;) {
-        const scheduledAt = m.expected[i].scheduledAt;
-        while (Date.now() < Date.parse(scheduledAt)) await new Promise(r => setTimeout(r, Math.min(1000, Date.parse(scheduledAt) - Date.now())));
-        const cohort = [];
-        while (i < m.expected.length && m.expected[i].scheduledAt === scheduledAt) cohort.push(m.expected[i++]);
-        // Never silently backfill a suppressed/late minute. Its absence fails SLI-04.
-        if (Date.now() >= Date.parse(scheduledAt) + 60_000) continue;
-        const results = await Promise.all(cohort.map(expected => runProbe(probePath, expected)));
-        for (const result of results) { await raw.write(JSON.stringify(result) + '\n'); await raw.sync(); }
-      }
+      await collectAvailabilitySamples(m.expected, expected => runProbe(probePath, expected), async result => {
+        await raw.write(JSON.stringify(result) + '\n'); await raw.sync();
+      });
     } finally { await raw.close(); }
     return;
   }

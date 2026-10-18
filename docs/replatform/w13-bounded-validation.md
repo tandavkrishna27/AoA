@@ -145,8 +145,15 @@ future submission evidence fails closed; successful chronology requires
 must be submitted in its scheduled minute and reach readback within the unchanged
 60-second SLO. An adapter launched in one minute whose operation starts in the
 next minute is a failed scheduled sample even if readback is fast.
-An
-adapter timeout, exit failure, malformed JSON or output overflow is failed raw
+The adapter process collection deadline is the end of the scheduled submission
+minute plus the actual-operation 60-second readback window plus five seconds
+for local result reporting. This bounded collection allowance does not extend
+either the scheduled submission minute or the actual-operation SLO. For example,
+five seconds of setup followed by 56 seconds to readback remains eligible; an
+actual-operation duration of 60,001 ms fails. Scheduled probes launch independently
+while a previous adapter is still collecting, and raw writes remain serialized;
+a valid long readback cannot silently suppress the next expected minute.
+Adapter timeout, exit failure, malformed JSON or output overflow is failed raw
 evidence. Raw records are flushed to disk per sample.
 
 If exclusions were scheduled, evaluation requires actual observations with
