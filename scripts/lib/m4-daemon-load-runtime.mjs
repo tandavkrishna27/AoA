@@ -4,7 +4,14 @@ export function buildDaemonCampaignSource(params) {
   if(params.durationMs!==15000 || params.drainMs!==30000)throw Error('Preserve the 15s window and 30s drain deadline');
   return `const prepareDaemonCredentialFixture=${prepareDaemonCredentialFixture.toString()};
 const buildDaemonLoadCommand=${buildDaemonLoadCommand.toString()};
-(${runDaemonCampaign.toString()})(${JSON.stringify(params)}).catch(e=>{console.log('__M4__'+JSON.stringify({type:'fatal',code:e.code||e.name}));process.exitCode=1;});`;
+(${runDaemonCampaign.toString()})(${JSON.stringify(params)},${waitUntilScheduled.toString()}).catch(e=>{console.log('__M4__'+JSON.stringify({type:'fatal',code:e.code||e.name}));process.exitCode=1;});`;
+}
+
+export async function waitUntilScheduled(scheduledAt,{now=Date.now,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+  // Timers may wake before their requested wall-clock instant. Re-read the
+  // actual clock; neither timestamps nor the frozen schedule may be adjusted.
+  let remaining;
+  while((remaining=scheduledAt-now())>0)await sleep(remaining);
 }
 
 // The standalone diagnostic process must initialize the same trusted deployment
@@ -32,7 +39,7 @@ export function buildDaemonLoadCommand(operationId,deps) {
     input:{...invocation.workload,maxRuntimeSeconds:600}};
 }
 
-async function runDaemonCampaign(P) {
+async function runDaemonCampaign(P,waitUntilScheduled) {
   const {default:postgres}=await import('postgres');
   const {randomUUID}=await import('node:crypto');
   const {openSync,writeSync,fsyncSync}=await import('node:fs');
@@ -77,7 +84,7 @@ async function runDaemonCampaign(P) {
     emit({type:'phase',phase:P.phase,originMs:origin,durationMs:P.durationMs,drainMs:P.drainMs,tenantKeys:tenants.map(t=>t.tenantKey),jobs});
     const started=jobs.map(async job=>{
       const tenant=tenants.find(t=>t.tenantKey===job.tenantKey);
-      await sleep(origin+job.scheduledAtMs-Date.now());
+      await waitUntilScheduled(origin+job.scheduledAtMs);
       if(Date.now()>=end){failures.push({intentId:job.intentId,stage:'arrival_late'});return;}
       const requestId=randomUUID(),began=performance.now(),startedAtMs=Date.now()-origin;
       job.submittedAtMs=startedAtMs;

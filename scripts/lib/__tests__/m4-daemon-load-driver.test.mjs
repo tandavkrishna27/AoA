@@ -16,6 +16,55 @@ const validInventory=()=>['quiet','noisy'].map((tenantKey,index)=>({tenantKey,
     targetId:`00000000-0000-4000-8000-00000000000${index+3}`,policyHash:'c'.repeat(64),capacity:{batchSlots:1}}}));
 const inventoryRecord=()=>({type:'inventory',inventory:validInventory()});
 
+test('scheduled wall-time barrier repeats an early timer wake instead of submitting before origin',async()=>{
+  let clock=900; const delays=[];
+  await credentialRuntime.waitUntilScheduled(1000,{now:()=>clock,sleep:async delay=>{
+    delays.push(delay); clock=delays.length===1?999:clock+delay;
+  }});
+  assert.deepEqual(delays,[100,1]); assert.equal(clock,1000);
+});
+
+test('scheduled barrier preserves a late arrival and never backdates or extends its deadline',async()=>{
+  const origin=1000,durationMs=15000; let clock=origin+durationMs+1; const delays=[];
+  await credentialRuntime.waitUntilScheduled(origin,{now:()=>clock,sleep:async delay=>{delays.push(delay);}});
+  const startedAtMs=clock-origin;
+  assert.deepEqual(delays,[]); assert.equal(startedAtMs,15001);
+  assert.equal(clock>=origin+durationMs,true,'the existing arrival_late check must still fail');
+  assert.equal(startedAtMs+10000,25001,'request deadline remains based on actual start');
+  clock=origin;
+  await credentialRuntime.waitUntilScheduled(origin,{now:()=>clock,sleep:async delay=>{delays.push(delay);}});
+  assert.deepEqual(delays,[]); assert.equal(clock-origin,0,'an on-time arrival needs no sleep or timestamp adjustment');
+});
+
+test('serialized scheduled barrier has no module-scope dependency and is passed into the campaign',async()=>{
+  const {runInNewContext}=await import('node:vm');
+  const isolated=runInNewContext('('+credentialRuntime.waitUntilScheduled.toString()+')');
+  let clock=999; const waits=[];
+  await isolated(1000,{now:()=>clock,sleep:async delay=>{waits.push(delay);clock+=delay;}});
+  assert.deepEqual(waits,[1]); assert.equal(clock,1000);
+  const source=credentialRuntime.buildDaemonCampaignSource({phase:'loaded',durationMs:15000,drainMs:30000,tenants:[]});
+  assert.ok(source.includes('runDaemonCampaign(P,waitUntilScheduled)'));
+  assert.ok(source.includes('await waitUntilScheduled(origin+job.scheduledAtMs)'));
+  assert.ok(source.includes(credentialRuntime.waitUntilScheduled.toString()));
+});
+
+test('independent scheduled producers proceed while an earlier request is still pending',async()=>{
+  let clock=900; const sleepers=[],starts=[]; let releaseFirst;
+  const firstResponse=new Promise(resolve=>{releaseFirst=resolve;});
+  const submit=scheduled=> (async()=>{
+    await credentialRuntime.waitUntilScheduled(scheduled,{now:()=>clock,sleep:delay=>new Promise(resolve=>sleepers.push({delay,resolve}))});
+    starts.push({scheduled,actual:clock});
+    if(scheduled===1000)await firstResponse;
+  })();
+  const first=submit(1000),second=submit(1050);
+  assert.deepEqual(sleepers.map(s=>s.delay),[100,150]);
+  clock=1000;sleepers[0].resolve();await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(starts,[{scheduled:1000,actual:1000}]);
+  clock=1050;sleepers[1].resolve();await second;
+  assert.deepEqual(starts,[{scheduled:1000,actual:1000},{scheduled:1050,actual:1050}]);
+  releaseFirst();await first;
+});
+
 test('fresh fixture renders separate identities, unchanged ceilings and real daemon boot roots',async()=>{
   const {prepareDaemonFixture}=await import('../m4-daemon-load-fixture.mjs');
   const parent=mkdtempSync(path.join(tmpdir(),'m4-fixture-')),dir=path.join(parent,'fresh');
