@@ -55,6 +55,7 @@ const policy = parseDistributedNetworkPolicies(
 describe.skipIf(
   process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1"
 )("browser native credential broker PostgreSQL", () => {
+  let createApp: typeof import("../app.js")["createApp"];
   let f: JobControlFixture;
   let owner: ReturnType<typeof postgres>;
   let ownerDb: Db;
@@ -79,6 +80,10 @@ describe.skipIf(
     },
   } as unknown as StorageProvider;
   beforeAll(async () => {
+    // Module transformation belongs to fixture setup; the signed GET still gets
+    // the ordinary request-test budget and creates the real app after beforeEach.
+    process.env.AOA_SECRETS_MASTER_KEY = "a".repeat(64);
+    ({ createApp } = await import("../app.js"));
     f = await setupJobControlFixture("browser-session-credentials");
     const o = f.admin.options;
     owner = postgres({
@@ -558,7 +563,6 @@ describe.skipIf(
     }
   });
   it("serves the native signed GET through createApp without board authentication", async () => {
-    const { createApp } = await import("../app.js");
     const resolveSession = vi.fn(async () => {
       throw new Error("must not resolve board session");
     });

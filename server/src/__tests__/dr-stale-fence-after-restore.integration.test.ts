@@ -56,13 +56,7 @@ import { openDistributedExecutionDatabases } from "../db/distributed-execution-d
 import { createJobLeasingService, type VerifiedWorkerOperation } from "../services/job-leasing.js";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { runInTenant } from "../db/tenant-context.js";
-
-type EmbeddedPostgresInstance = {
-  initialise(): Promise<void>;
-  start(): Promise<void>;
-  stop(): Promise<void>;
-};
-type EmbeddedPostgresCtor = new (opts: Record<string, unknown>) => EmbeddedPostgresInstance;
+import { createOwnedEmbeddedPostgres, type OwnedEmbeddedPostgres } from "./helpers/owned-embedded-postgres.js";
 
 const ORG = "b3300000-0000-4000-8000-000000000001";
 const COMPANY = "b3300000-0000-4000-8000-000000000002";
@@ -255,7 +249,7 @@ function ackRequest(offer: LeaseOfferV1): LeaseAckOperationRequestV1 {
 }
 
 integration("REL-003 Lane B — restored state rejects a stale fence (real guardActiveFence gate)", () => {
-  let embedded: EmbeddedPostgresInstance | null = null;
+  let embedded: OwnedEmbeddedPostgres | null = null;
   let dataDir = "";
   let admin: Sql | null = null;
   let app: NonOwnerDbConnection | null = null;
@@ -399,16 +393,8 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
           throw new Error("Native recovery test requires its owned loopback database and native tool wrappers");
         }
       } else {
-        const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as { default: EmbeddedPostgresCtor };
         const port = await allocateEmbeddedPgPort();
-        embedded = new EmbeddedPostgres({
-          databaseDir: join(dataDir, "db"),
-          user: "test",
-          password: "test",
-          port,
-          persistent: false,
-          initdbFlags: ["--encoding=UTF8", "--locale=C"],
-        });
+        embedded = await createOwnedEmbeddedPostgres(join(dataDir, "db"), port);
         await embedded.initialise();
         await embedded.start();
         adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
@@ -450,11 +436,16 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
   }, 180_000);
 
   afterAll(async () => {
-    await operator?.close({ timeoutSeconds: 5 }).catch(() => {});
-    await app?.close({ timeoutSeconds: 5 }).catch(() => {});
-    await admin?.end().catch(() => {});
-    // Preserve data if the owned server cannot stop; never delete a live cluster.
-    await embedded?.stop();
+    const errors: unknown[] = [];
+    for (const cleanup of [
+      () => operator?.close({ timeoutSeconds: 5 }),
+      () => app?.close({ timeoutSeconds: 5 }),
+      () => admin?.end({ timeout: 5 }),
+      () => embedded?.stop(),
+    ]) {
+      try { await cleanup(); } catch (error) { errors.push(error); }
+    }
+    if (errors.length) throw new AggregateError(errors, `Recovery fixture cleanup failed; inspect retained directory: ${dataDir}`);
     if (dataDir) {
       if (dirname(resolve(dataDir)) !== resolve(tmpdir()) || !basename(dataDir).startsWith("aoa-dr-lane-b-")) {
         throw new Error("Unsafe recovery fixture cleanup path");

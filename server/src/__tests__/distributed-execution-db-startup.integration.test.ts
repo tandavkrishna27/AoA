@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -7,6 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { promisify } from "node:util";
 import postgres, { type Sql } from "postgres";
 import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -21,9 +22,7 @@ import {
 } from "../db/rls-tenant.js";
 import { openDistributedExecutionDatabases } from "../db/distributed-execution-databases.js";
 import * as legacyGrants from "../db/job-control-legacy-grants.js";
-
-type EmbeddedPostgresInstance = { initialise(): Promise<void>; start(): Promise<void>; stop(): Promise<void> };
-type EmbeddedPostgresCtor = new (opts: Record<string, unknown>) => EmbeddedPostgresInstance;
+import { createOwnedEmbeddedPostgres, type OwnedEmbeddedPostgres } from "./helpers/owned-embedded-postgres.js";
 
 const APP_PASSWORD = "startup-app-password";
 const OPERATOR_PASSWORD = "startup-operator-password";
@@ -49,7 +48,7 @@ const STARTUP_LOG_PHASES = new Set([
   "positive-peers",
 ]);
 
-let embedded: EmbeddedPostgresInstance | null = null;
+let embedded: OwnedEmbeddedPostgres | null = null;
 let dataDir = "";
 let adminUrl = "";
 let appUrl = "";
@@ -173,19 +172,19 @@ async function restoreLeaseRejectionPolicy(): Promise<void> {
 
 beforeAll(async () => {
   try {
+    // Prepare the Windows TSX cache in a separate process with no server
+    // or database startup. These security cases measure the real boot gate, not
+    // cold compilation of the shared app graph. observeServer retains its 30s
+    // watchdog and each boot still evaluates the graph in a fresh process.
+    if (process.platform === "win32") {
+      const appEntry = new URL("../app.ts", import.meta.url).href;
+      await promisify(execFile)(process.execPath, [
+        "--import", "tsx", "--eval", `import(${JSON.stringify(appEntry)})`,
+      ], { cwd: process.cwd(), windowsHide: true, timeout: 30_000, maxBuffer: 64 * 1024 });
+    }
     dataDir = await mkdtemp(join(tmpdir(), "aoa-distributed-startup-"));
-    const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as {
-      default: EmbeddedPostgresCtor;
-    };
     const port = await allocateEmbeddedPgPort();
-    embedded = new EmbeddedPostgres({
-      databaseDir: join(dataDir, "db"),
-      user: "test",
-      password: "test",
-      port,
-      persistent: false,
-      initdbFlags: ["--encoding=UTF8", "--locale=C"],
-    });
+    embedded = await createOwnedEmbeddedPostgres(join(dataDir, "db"), port);
     await embedded.initialise();
     await embedded.start();
     adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
@@ -257,12 +256,20 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  try { await aclOwnerClient?.end(); } catch { /* ignore */ }
-  try { await aclAdmin?.end(); } catch { /* ignore */ }
-  try { await ownerClient?.end(); } catch { /* ignore */ }
-  try { await admin?.end(); } catch { /* ignore */ }
-  try { await embedded?.stop(); } catch { /* ignore */ }
-  try { if (dataDir) await rm(dataDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    () => aclOwnerClient?.end({ timeout: 5 }),
+    () => aclAdmin?.end({ timeout: 5 }),
+    () => ownerClient?.end({ timeout: 5 }),
+    () => admin?.end({ timeout: 5 }),
+    () => embedded?.stop(),
+  ]) {
+    try { await cleanup(); } catch (error) { errors.push(error); }
+  }
+  if (errors.length === 0 && dataDir) {
+    try { await rm(dataDir, { recursive: true, force: true }); } catch (error) { errors.push(error); }
+  }
+  if (errors.length) throw new AggregateError(errors, `Startup fixture cleanup failed; inspect retained directory: ${dataDir}`);
 }, 60_000);
 
 async function observeStartup(input: {

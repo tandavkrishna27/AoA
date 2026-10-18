@@ -29,9 +29,7 @@ import {
 import { provisionTenantAppRoleLoginSql } from "../../db/rls-tenant.js";
 import { createJobLeasingService, type VerifiedWorkerOperation } from "../../services/job-leasing.js";
 import { allocateEmbeddedPgPort } from "./embedded-pg-port.js";
-
-type EmbeddedPostgresInstance = { initialise(): Promise<void>; start(): Promise<void>; stop(): Promise<void> };
-type EmbeddedPostgresCtor = new (opts: Record<string, unknown>) => EmbeddedPostgresInstance;
+import { createOwnedEmbeddedPostgres } from "./owned-embedded-postgres.js";
 
 export const ORG = "a6000000-0000-4000-8000-000000000001";
 export const COMPANY = "a6000000-0000-4000-8000-000000000002";
@@ -182,16 +180,8 @@ export interface JobControlFixture {
 
 export async function setupJobControlFixture(prefix: string): Promise<JobControlFixture> {
   const dataDir = await mkdtemp(join(tmpdir(), `aoa-${prefix}-`));
-  const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as { default: EmbeddedPostgresCtor };
   const port = await allocateEmbeddedPgPort();
-  const embedded = new EmbeddedPostgres({
-    databaseDir: join(dataDir, "db"),
-    user: "test",
-    password: "test",
-    port,
-    persistent: false,
-    initdbFlags: ["--encoding=UTF8", "--locale=C"],
-  });
+  const embedded = await createOwnedEmbeddedPostgres(join(dataDir, "db"), port);
   await embedded.initialise();
   await embedded.start();
   const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
@@ -357,12 +347,23 @@ export async function setupJobControlFixture(prefix: string): Promise<JobControl
     return { attemptId, offer, identity: fenceIdentity({ jobId: seeded.jobId, attemptId }, offer) };
   }
 
-  async function teardown(): Promise<void> {
-    await operator.close({ timeoutSeconds: 5 }).catch(() => {});
-    await app.close({ timeoutSeconds: 5 }).catch(() => {});
-    await admin.end().catch(() => {});
-    await embedded.stop().catch(() => {});
-    if (dataDir) await rm(dataDir, { recursive: true, force: true }).catch(() => {});
+  let disposal: Promise<void> | undefined;
+  function teardown(): Promise<void> {
+    return disposal ??= (async () => {
+      const errors: unknown[] = [];
+      for (const cleanup of [
+        () => operator.close({ timeoutSeconds: 5 }),
+        () => app.close({ timeoutSeconds: 5 }),
+        () => admin.end({ timeout: 5 }),
+        () => embedded.stop(),
+      ]) {
+        try { await cleanup(); } catch (error) { errors.push(error); }
+      }
+      if (errors.length === 0) {
+        try { await rm(dataDir, { recursive: true, force: true }); } catch (error) { errors.push(error); }
+      }
+      if (errors.length) throw new AggregateError(errors, `Job-control fixture cleanup failed; inspect retained directory: ${dataDir}`);
+    })();
   }
 
   return {

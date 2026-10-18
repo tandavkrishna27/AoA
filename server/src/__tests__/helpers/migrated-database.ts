@@ -12,12 +12,9 @@
 // Callers are responsible for skipping on Windows without AOA_RUN_WIN_INTEGRATION=1
 // (embedded-postgres cannot start on the `runneradmin` CI runner — Issue #114).
 
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
-import { platform, tmpdir } from "node:os";
-import { promisify } from "node:util";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import postgres, { type Sql } from "postgres";
 import {
   applyPendingMigrations,
@@ -27,13 +24,7 @@ import {
 } from "@armyofagents/db";
 import { provisionTenantAppRoleLoginSql } from "../../db/rls-tenant.js";
 import { allocateEmbeddedPgPort } from "./embedded-pg-port.js";
-
-type EmbeddedPostgresInstance = {
-  initialise(): Promise<void>;
-  start(): Promise<void>;
-  stop(): Promise<void>;
-};
-type EmbeddedPostgresCtor = new (opts: Record<string, unknown>) => EmbeddedPostgresInstance;
+import { createOwnedEmbeddedPostgres } from "./owned-embedded-postgres.js";
 
 export type MigratedDatabase = {
   /** Superuser/owner client. Seed through this — migrations run as the database owner. */
@@ -63,60 +54,11 @@ export async function startMigratedDatabase(
   const password = options.appPassword ?? "migrated-database-app-password";
   const operatorPassword = options.operatorPassword ?? "migrated-database-operator-password";
   const dataDir = await mkdtemp(join(tmpdir(), label));
-  const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as {
-    default: EmbeddedPostgresCtor;
-  };
   const port = await allocateEmbeddedPgPort();
-  const databaseDir = join(dataDir, "db");
-  const embedded = new EmbeddedPostgres({
-    databaseDir,
-    user: "test",
-    password: "test",
-    port,
-    persistent: true,
-    initdbFlags: ["--encoding=UTF8", "--locale=C"],
-  });
+  const embedded = await createOwnedEmbeddedPostgres(join(dataDir, "db"), port);
   let admin: Sql | null = null;
   let app: NonOwnerDbConnection | null = null;
   let operator: NonOwnerDbConnection | null = null;
-  const windows = platform() === "win32";
-  const pidFile = join(databaseDir, "postmaster.pid");
-  let startAttempted = false;
-  let identity: string | undefined;
-  const readIdentity = async () => {
-    const lines = (await readFile(pidFile, "utf8")).split(/\r?\n/);
-    const pid = Number(lines[0]);
-    const started = Number(lines[2]);
-    if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isSafeInteger(started) || started <= 0
-      || !lines[1] || resolve(lines[1]).toLowerCase() !== resolve(databaseDir).toLowerCase()
-      || Number(lines[3]) !== port) {
-      throw new Error(`Invalid migrated fixture ownership receipt: ${pidFile}`);
-    }
-    return JSON.stringify([pid, resolve(lines[1]).toLowerCase(), started, port]);
-  };
-  if (windows) {
-    let stopping: Promise<void> | undefined;
-    embedded.stop = () => stopping ??= (async () => {
-      if (!startAttempted) return;
-      if (!identity || await readIdentity() !== identity) {
-        throw new Error(`Migrated fixture ownership changed; refusing shutdown: ${pidFile}`);
-      }
-      const fixtureRequire = createRequire(import.meta.url);
-      const nativeRequire = createRequire(fixtureRequire.resolve("embedded-postgres"));
-      const entry = nativeRequire.resolve("@embedded-postgres/windows-x64");
-      const controller = resolve(dirname(entry), "..", "native", "bin", "pg_ctl.exe");
-      await promisify(execFile)(controller, ["stop", "-D", databaseDir, "-m", "fast", "-w", "-t", "15"], {
-        windowsHide: true, timeout: 20_000, maxBuffer: 64 * 1024,
-      });
-      try {
-        await readFile(pidFile, "utf8");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-        throw error;
-      }
-      throw new Error(`Migrated fixture PID file remains after shutdown: ${pidFile}`);
-    })();
-  }
   let disposal: Promise<void> | undefined;
   const teardown = () => disposal ??= (async () => {
     const errors: unknown[] = [];
@@ -135,9 +77,7 @@ export async function startMigratedDatabase(
   })();
   try {
     await embedded.initialise();
-    startAttempted = true;
     await embedded.start();
-    if (windows) identity = await readIdentity();
     const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
     await applyPendingMigrations(adminUrl);
     admin = postgres(adminUrl, { max: 2 });
