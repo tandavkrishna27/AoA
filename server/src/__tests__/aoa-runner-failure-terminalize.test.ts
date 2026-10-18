@@ -8,6 +8,7 @@
 // Contract test (proxy-table + hoisted-mock harness, mirrors
 // aoa-runner-tmpfile-cleanup.test.ts). Windows-runnable.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AdapterExecutionResult } from "../adapters/types.js";
 
 const {
   writeFileMock,
@@ -20,7 +21,9 @@ const {
 } = vi.hoisted(() => ({
   writeFileMock: vi.fn().mockResolvedValue(undefined),
   unlinkMock: vi.fn().mockResolvedValue(undefined),
-  adapterExecute: vi.fn().mockResolvedValue(undefined),
+  adapterExecute: vi.fn<() => Promise<AdapterExecutionResult>>().mockResolvedValue({
+    exitCode: 0, signal: null, timedOut: false,
+  }),
   createEventMock: vi.fn().mockResolvedValue(undefined),
   buildMcpMock: vi.fn(() => ({})),
   buildBridgeSpecMock: vi.fn(() => ({
@@ -255,7 +258,9 @@ describe("FX1/B1: failed extraction run terminalizes its claimed entry", () => {
   beforeEach(() => {
     writeFileMock.mockClear().mockResolvedValue(undefined);
     unlinkMock.mockClear().mockResolvedValue(undefined);
-    adapterExecute.mockClear().mockResolvedValue(undefined);
+    // A successful shipped adapter returns an execution result, never void.
+    // Keep the fixture typed so metadata reads cannot mask the guard below.
+    adapterExecute.mockClear().mockResolvedValue({ exitCode: 0, signal: null, timedOut: false });
     createEventMock.mockClear().mockResolvedValue(undefined);
     buildMcpMock.mockClear().mockReturnValue({});
     publishLiveEventMock.mockClear();
@@ -271,13 +276,13 @@ describe("FX1/B1: failed extraction run terminalizes its claimed entry", () => {
         source: "outbox",
         entryId: "e-1",
       }),
-    ).resolves.toMatchObject({ status: expect.stringMatching(/succeeded|failed/) }); // T1.0: AoaRunResult, not void
+    ).resolves.toMatchObject({ status: "failed", errorMessage: "agent boom" });
 
     // The run row was terminalized → failed (internalAgentRuns update).
     const runFail = db._sets.find(
       (s: any) => s.set?.status === "failed" && "errorMessage" in (s.set ?? {}),
     );
-    expect(runFail).toBeDefined();
+    expect(runFail?.set.errorMessage).toBe("agent boom");
 
     // The claimed entry was terminalized mirroring extraction.ts: status
     // 'failed' + sourceInfo jsonb_set(extractionError).
@@ -351,13 +356,16 @@ describe("FX1/B1: failed extraction run terminalizes its claimed entry", () => {
         source: "outbox",
         entryId: "e-1",
       }),
-    ).resolves.toMatchObject({ status: expect.stringMatching(/succeeded|failed/) }); // T1.0: AoaRunResult, not void
+    ).resolves.toMatchObject({
+      status: "failed",
+      errorMessage: "extraction agent run completed without submitting results",
+    });
 
     // Run terminalized → failed (not 'completed' — it produced nothing).
     const runFail = db._sets.find(
       (s: any) => s.set?.status === "failed" && "errorMessage" in (s.set ?? {}),
     );
-    expect(runFail).toBeDefined();
+    expect(runFail?.set.errorMessage).toBe("extraction agent run completed without submitting results");
     const runCompleted = db._sets.find(
       (s: any) => s.set?.status === "completed",
     );
