@@ -135,12 +135,12 @@ const MANIFEST: PaperclipPluginManifestV1 = {
 function buildApp() {
   const app = express();
   app.use(express.json());
-  // "cloud_auth" — the exact deployment mode this task's block-lift applies
-  // to. verifyLocalAgentJwt's Bearer-token path (middleware/auth.ts) is
+  // "cloud_auth" — the exact deployment mode whose plugin dispatch is blocked.
+  // verifyLocalAgentJwt's Bearer-token path (middleware/auth.ts) is
   // deployment-mode-agnostic, so the JWT verifies identically to
   // broker-internal-registry.test.ts's "authenticated" mode; the point here
   // is exercising the broker end-to-end WHILE isCloudPluginExecutionBlocked()
-  // is asserted false under cloud_auth specifically.
+  // is asserted true under cloud_auth specifically.
   app.use(actorMiddleware(db, { deploymentMode: "cloud_auth" }));
   app.use("/api", mcpServerRoutes(db));
   return app;
@@ -225,18 +225,27 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       agentInC1 = firstId(
         await db.execute<{ id: string }>(sql`
           INSERT INTO agents (id, company_id, name, kind, status, skill_keys, runtime_config)
-          VALUES (gen_random_uuid(), ${c1}, 'C1 Crew Agent', 'aoa', 'idle', '[]'::jsonb, '{}'::jsonb)
+          VALUES (gen_random_uuid(), ${c1}, 'C1 Crew Agent', 'aoa', 'idle', '[]'::jsonb,
+            ${JSON.stringify({ aoa: { toolAllowlist: [TOOL_NAME] } })}::jsonb)
           RETURNING id`),
       );
       agentInC2 = firstId(
         await db.execute<{ id: string }>(sql`
           INSERT INTO agents (id, company_id, name, kind, status, skill_keys, runtime_config)
-          VALUES (gen_random_uuid(), ${c2}, 'C2 Crew Agent', 'aoa', 'idle', '[]'::jsonb, '{}'::jsonb)
+          VALUES (gen_random_uuid(), ${c2}, 'C2 Crew Agent', 'aoa', 'idle', '[]'::jsonb,
+            ${JSON.stringify({ aoa: { toolAllowlist: [TOOL_NAME] } })}::jsonb)
           RETURNING id`),
       );
 
       runInC1 = randomUUID();
       runInC2 = randomUUID();
+      // Signed crew JWTs require a currently running, company/agent-bound
+      // internal run and the tested external tool name in the current allowlist
+      // before reaching the broker's independent cloud-denial gate.
+      await db.execute(sql`
+        INSERT INTO internal_agent_runs (id, company_id, agent_id, trigger_type, trigger_source, status)
+        VALUES (${runInC1}, ${c1}, ${agentInC1}, 'sub_agent', 'integration_test', 'running'),
+               (${runInC2}, ${c2}, ${agentInC2}, 'sub_agent', 'integration_test', 'running')`);
       jwtC1 = createLocalAgentJwt(agentInC1, c1, "claude_local", runInC1) ?? "";
       jwtC2 = createLocalAgentJwt(agentInC2, c2, "claude_local", runInC2) ?? "";
       expect(jwtC1).not.toBe("");

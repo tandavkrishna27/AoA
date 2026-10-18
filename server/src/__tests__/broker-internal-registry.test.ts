@@ -16,12 +16,13 @@
  *   2. `tools/call query_memory` executes through the SAME service layer a
  *      local (non-sandboxed) crew run would use, returns as a `jsonRpcResult`,
  *      and writes a `memory_retrievals` audit row attributable to this
- *      agent+run (heartbeat_runs seeded so the FK on memory_retrievals.run_id
+ *      agent+run (a running internal_agent_runs row backs crew authentication;
+ *      heartbeat_runs is also seeded so the FK on memory_retrievals.run_id
  *      resolves — recordMemoryRetrievals is best-effort and silently drops
  *      the row on an FK violation, so this is load-bearing, not decorative).
  *   3. Unknown-tool invariant: `tools/call "__does_not_exist__"` returns a
  *      JSON-RPC top-level `error` (code -32601, message names the tool) —
- *      the ONLY case that is a transport-level error.
+ *      the only authenticated tool-dispatch case that is a transport-level error.
  *   4. Gating parity (in-band `isError`, NOT `-32601`):
  *      - `use_skill` for a tool NOT in the agent's runtimeConfig.aoa.toolAllowlist
  *        (the COARSE D2 allowlist gate in authorize-tool.ts, checked before
@@ -34,13 +35,12 @@
  *        per-skill-key denial — `NOT_IN_ALLOWLIST` is the COARSE gate's error
  *        code. Both are exercised here so the invariant — denial as in-band
  *        isError, never -32601 — is proven for both real gates.)
- *      - `ask_human` when the run-JWT's `run_id` is not attached to any task
- *        (no `internal_agent_runs` row backing it — the real "no active run"
- *        shape for an `agentKind:"aoa"` broker actor, since
+ *      - `ask_human` when the authenticated running crew run is not attached
+ *        to any task (its internal_agent_runs related-entity fields are null;
  *        askHumanForActiveRun resolves via `internal_agent_runs` for kind
  *        "aoa", never `heartbeat_runs`) returns `isError:true` with
  *        `ASK_HUMAN_FAILED` — an in-band refusal, not a thrown/unhandled error.
- *      Both come back as `result` (isError content), never JSON-RPC `error`.
+ *      These come back as `result` (isError content), never JSON-RPC `error`.
  *   5. Regression guard (U2c follow-up): a `source==="agent"` actor with NO
  *      runId — a standalone agent-API-key caller (auth.ts `source:"agent_key"`,
  *      populated only when the caller sends `x-aoa-run-id`, unlike the run-JWT
@@ -48,10 +48,12 @@
  *      broker. `tools/list` still returns the outbound `TOOL_DEFINITIONS`
  *      (not a 403 from `resolveBrokerToolContext`'s missing-runId guard), and
  *      `tools/call` for an outbound tool (`memory.get`) still dispatches.
+ *   6. A heartbeat audit row alone, or a terminal crew run, cannot authorize
+ *      a crew JWT. A valid running crew JWT is denied across companies.
  *
- * Skipped on Windows (embedded-postgres can't start on this platform's CI
- * runner — Issue #114); Linux CI `push` is the authoritative gate for this
- * file, mirroring every other `*.integration.test.ts` in this suite (e.g.
+ * Skipped on Windows CI by default (Issue #114); set AOA_RUN_WIN_INTEGRATION=1
+ * on a Windows developer host to exercise the real embedded PostgreSQL path.
+ * Linux CI `push` remains the authoritative gate for this file (e.g.
  * mcp-memory-read-rbac.integration.test.ts / memory-tools-agent-rbac.integration.test.ts,
  * whose embedded-pg harness this one is modeled on).
  */
@@ -131,6 +133,12 @@ async function callTool(app: express.Express, name: string, args: Record<string,
     .send({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } });
 }
 
+async function seedCrewRun(crewAgentId: string, crewRunId: string, status = "running") {
+  await db.execute(sql`
+    INSERT INTO internal_agent_runs (id, company_id, agent_id, trigger_type, trigger_source, status)
+    VALUES (${crewRunId}, ${co}, ${crewAgentId}, 'sub_agent', 'integration_test', ${status})`);
+}
+
 beforeAll(async () => {
   process.env[JWT_SECRET_ENV] = "broker-internal-registry-test-secret";
   try {
@@ -175,10 +183,10 @@ afterAll(async () => {
   }
 }, 60_000);
 
-describe.skipIf(process.platform === "win32")(
+describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRATION !== "1")(
   "MCP HTTP broker — internal registry dispatch for agent actors (U2c)",
   () => {
-    it("setup: company, a crew (kind='aoa') agent with a toolAllowlist + one enabled skill, a heartbeat_runs row backing the run-JWT's run_id (memory_retrievals FK), a company-wide memory item, and a mismatched skill NOT in skillKeys", async () => {
+    it("setup: company, crew agent and running crew run, heartbeat audit FK, company memory, and enabled/mismatched skills", async () => {
       assertSetupOk();
 
       co = firstId(
@@ -200,6 +208,9 @@ describe.skipIf(process.platform === "win32")(
                   "create_task",
                   "use_skill",
                   "ask_human",
+                  // Authorize the name gate so the unknown-tool test below
+                  // reaches registry resolution rather than permission denial.
+                  "__does_not_exist__",
                 ],
               },
             })}::jsonb
@@ -210,15 +221,13 @@ describe.skipIf(process.platform === "win32")(
       runId = randomUUID();
       // Backs the memory_retrievals.run_id FK (→ heartbeat_runs.id) so
       // recordMemoryRetrievals' insert doesn't silently drop on an FK
-      // violation. Deliberately NOT an internal_agent_runs row — that's what
-      // makes the ask_human "no active run" scenario below genuine: an
-      // agentKind:'aoa' ask_human call resolves its source task via
-      // internal_agent_runs, not heartbeat_runs (ask-founder-tool.ts
-      // sourceForRun), so this row existing here does not give ask_human
-      // anything to find.
+      // violation. Crew authentication separately requires a running
+      // internal_agent_runs row bound to the same company and agent. Leave
+      // its related-entity fields null for the authenticated no-task case.
       await db.execute(sql`
         INSERT INTO heartbeat_runs (id, company_id, agent_id)
         VALUES (${runId}, ${co}, ${agentId})`);
+      await seedCrewRun(agentId, runId);
 
       jwt = createLocalAgentJwt(agentId, co, "claude_local", runId) ?? "";
       expect(jwt).not.toBe("");
@@ -249,6 +258,28 @@ describe.skipIf(process.platform === "win32")(
       expect(co && agentId && runId).toBeTruthy();
     });
 
+    it.each(["missing", "completed", "failed", "cancelled"] as const)(
+      "crew JWT authentication rejects a %s internal run even when its heartbeat audit row exists",
+      async (status) => {
+        assertSetupOk();
+        const deniedRunId = randomUUID();
+        await db.execute(sql`
+          INSERT INTO heartbeat_runs (id, company_id, agent_id)
+          VALUES (${deniedRunId}, ${co}, ${agentId})`);
+        if (status !== "missing") await seedCrewRun(agentId, deniedRunId, status);
+        const deniedJwt = createLocalAgentJwt(agentId, co, "claude_local", deniedRunId);
+        expect(deniedJwt).toBeTruthy();
+        const res = await request(buildApp())
+          .post(`/api/companies/${co}/mcp`)
+          .set("Authorization", `Bearer ${deniedJwt}`)
+          .send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+
+        expect(res.status).toBe(401);
+        expect(res.body.result).toBeUndefined();
+        expect(res.body.error?.code).toBe(-32001);
+      },
+    );
+
     it("tools/list returns the agent's allowlist-filtered internal tools and excludes a non-allowlisted one", async () => {
       assertSetupOk();
       const app = buildApp();
@@ -265,6 +296,7 @@ describe.skipIf(process.platform === "win32")(
       // propose_crew_work is NOT in this agent's toolAllowlist — proves the
       // list is genuinely filtered, not the full registry unconditionally.
       expect(names).not.toContain("propose_crew_work");
+      expect(names).not.toContain("__does_not_exist__");
     });
 
     it("tools/call query_memory returns a jsonRpcResult and writes a memory_retrievals audit row for this agent+run", async () => {
@@ -283,7 +315,7 @@ describe.skipIf(process.platform === "win32")(
         SELECT agent_id, run_id, triggered_by FROM memory_retrievals
         WHERE company_id = ${co} AND agent_id = ${agentId} AND run_id = ${runId}`);
       const rows = Array.isArray(auditRows) ? auditRows : (auditRows as unknown as { rows: unknown[] }).rows;
-      expect((rows as unknown[]).length).toBeGreaterThan(0);
+      expect(rows).toEqual([{ agent_id: agentId, run_id: runId, triggered_by: "commander_query" }]);
     });
 
     it("unknown-tool invariant: tools/call for a name unknown in both registries returns a JSON-RPC top-level error (-32601)", async () => {
@@ -295,6 +327,15 @@ describe.skipIf(process.platform === "win32")(
       expect(res.body.error).toBeDefined();
       expect(res.body.error.code).toBe(-32601);
       expect(res.body.error.message).toMatch(/__does_not_exist__/);
+    });
+
+    it("a crew JWT cannot resolve a non-internal tool name absent from its current allowlist", async () => {
+      assertSetupOk();
+      const res = await callTool(buildApp(), "__not_authorized__");
+
+      expect(res.status).toBe(403);
+      expect(res.body.result).toBeUndefined();
+      expect(res.body.error).toMatchObject({ code: -32000, message: "Tool is not authorized" });
     });
 
     it("gating parity — use_skill NOT in the coarse toolAllowlist returns isError:true (NOT_IN_ALLOWLIST) as a jsonRpcResult, never -32601", async () => {
@@ -313,6 +354,7 @@ describe.skipIf(process.platform === "win32")(
       const noSkillRunId = randomUUID();
       await db.execute(sql`
         INSERT INTO heartbeat_runs (id, company_id, agent_id) VALUES (${noSkillRunId}, ${co}, ${noSkillAgentId})`);
+      await seedCrewRun(noSkillAgentId, noSkillRunId);
       const noSkillJwt = createLocalAgentJwt(noSkillAgentId, co, "claude_local", noSkillRunId) ?? "";
 
       const app = buildApp();
@@ -347,7 +389,7 @@ describe.skipIf(process.platform === "win32")(
       expect(payload.error).toBe("NOT_ENABLED");
     });
 
-    it("gating parity — ask_human with no active run (run_id not attached to any internal_agent_runs task) returns isError:true (ASK_HUMAN_FAILED) as a jsonRpcResult, never -32601", async () => {
+    it("gating parity — ask_human for an authenticated running crew run without a task returns in-band ASK_HUMAN_FAILED", async () => {
       assertSetupOk();
       const app = buildApp();
       const res = await callTool(app, "ask_human", { question: "Which vendor should we pick?" });
@@ -359,6 +401,7 @@ describe.skipIf(process.platform === "win32")(
       const payload = JSON.parse(res.body.result.content[0].text);
       expect(payload.success).toBe(false);
       expect(payload.error).toBe("ASK_HUMAN_FAILED");
+      expect(payload.summary).toBe("Active run is not attached to a task");
     });
 
     it("U2c follow-up regression guard: an agent-API-key actor with NO runId (source:'agent_key', no x-aoa-run-id header) is NOT run-scoped into the broker — tools/list still returns the outbound TOOL_DEFINITIONS (not a 403), and tools/call for an outbound tool still works", async () => {
@@ -517,7 +560,9 @@ describe.skipIf(process.platform === "win32")(
         .set("Authorization", `Bearer ${jwt}`)
         .send({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
 
-      expect(res.status).not.toBe(200);
+      expect(res.status).toBe(403);
+      expect(res.body.result).toBeUndefined();
+      expect(res.body.error).toMatchObject({ code: -32000, message: "MCP key cannot access another company" });
     });
   },
 );
