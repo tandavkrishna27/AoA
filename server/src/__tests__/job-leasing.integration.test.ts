@@ -1789,7 +1789,7 @@ integration("JOB-003 atomic poll/offer and ready hints", () => {
   });
 
   it.each(["succeeded", "failed", "cancelled"] as const)(
-    "offers the next batch after an accepted %s terminal without releasing or aging its prior lease",
+    "offers the next batch after an accepted %s terminal without manually releasing or aging its prior lease",
     async (terminalStatus) => {
       const { admin, app } = guard();
       await resetRuntimeRows();
@@ -1843,9 +1843,30 @@ integration("JOB-003 atomic poll/offer and ready hints", () => {
       const [before] = await admin<{ status: string; expiresAt: Date }[]>`SELECT status, expires_at AS "expiresAt" FROM leases WHERE id = ${offer.leaseId}`;
       expect(before?.status).toBe("active");
       expect((await accepted(2, "terminal", { status: terminalStatus, exitCode: terminalStatus === "succeeded" ? 0 : 1, errorCode: null, errorMessage: null })).ack.status).toBe("accepted");
-      const [after] = await admin<{ status: string; expiresAt: Date; attemptStatus: string; live: boolean }[]>`SELECT l.status, l.expires_at AS "expiresAt", a.status AS "attemptStatus", l.expires_at > clock_timestamp() AS live
-        FROM leases l JOIN job_attempts a ON a.id = l.attempt_id AND a.job_id = l.job_id AND a.company_id = l.company_id AND a.organization_id = l.organization_id WHERE l.id = ${offer.leaseId}`;
-      expect(after).toEqual({ ...before, attemptStatus: terminalStatus, live: true });
+      const firstState = () => admin<{
+        status: string; expiresAt: Date; leaseReleasedAt: Date | null;
+        attemptStatus: string; jobStatus: string; claimState: string;
+        capacityReleasedAt: Date | null; live: boolean;
+      }[]>`SELECT l.status, l.expires_at AS "expiresAt", l.released_at AS "leaseReleasedAt",
+        a.status AS "attemptStatus", j.status AS "jobStatus", a.capacity_claim_state AS "claimState",
+        a.capacity_released_at AS "capacityReleasedAt", l.expires_at > clock_timestamp() AS live
+        FROM leases l JOIN job_attempts a ON a.id = l.attempt_id AND a.job_id = l.job_id AND a.company_id = l.company_id AND a.organization_id = l.organization_id
+        JOIN jobs j ON j.id = a.job_id AND j.company_id = a.company_id AND j.organization_id = a.organization_id
+        WHERE l.id = ${offer.leaseId}`;
+      const [after] = await firstState();
+      const finalOutcome = terminalStatus !== "failed";
+      // Accepted success/cancellation owns immediate job/lease/quota convergence.
+      // A failed attempt instead keeps its counted claim for reaper retry transfer.
+      expect(after).toEqual({
+        status: terminalStatus === "succeeded" ? "released" : terminalStatus === "cancelled" ? "revoked" : "active",
+        expiresAt: before!.expiresAt,
+        leaseReleasedAt: finalOutcome ? expect.any(Date) : null,
+        attemptStatus: terminalStatus,
+        jobStatus: finalOutcome ? terminalStatus : "running",
+        claimState: finalOutcome ? "released" : "held",
+        capacityReleasedAt: finalOutcome ? expect.any(Date) : null,
+        live: true,
+      });
       expect(await snapshot()).toEqual({ total: 0, batch: 0, browserSession: 0, service: 0 });
       const nextResult = await pollNext();
       expect(nextResult.outcome).toBe("offer");
@@ -1859,11 +1880,15 @@ integration("JOB-003 atomic poll/offer and ready hints", () => {
       expect((await pollNext()).outcome, "the sibling active offer still consumes the slot beside a terminal lease").toBe("no_work");
       const claims = await admin<{ id: string; state: string; releasedAt: Date | null }[]>`SELECT id, capacity_claim_state AS state, capacity_released_at AS "releasedAt" FROM job_attempts WHERE id IN (${first.attemptId}, ${next.attemptId}) ORDER BY id`;
       expect(claims).toEqual([
-        { id: first.attemptId, state: "held", releasedAt: null },
+        { id: first.attemptId, state: finalOutcome ? "released" : "held", releasedAt: after!.capacityReleasedAt },
         { id: next.attemptId, state: "held", releasedAt: null },
       ]);
-      const [unchanged] = await admin<{ status: string; expiresAt: Date }[]>`SELECT status, expires_at AS "expiresAt" FROM leases WHERE id = ${offer.leaseId}`;
-      expect(unchanged).toEqual(before);
+      const [quota] = await admin<{ held: number }[]>`SELECT count(*)::int AS held FROM job_attempts
+        WHERE organization_id = ${ORG} AND capacity_claim_state = 'held'`;
+      expect(quota?.held).toBe(finalOutcome ? 1 : 2);
+      // Later polling/ACK/start cannot restamp the first winner's release or
+      // age its original TTL; no manual release/reaper intervention was used.
+      expect(await firstState()).toEqual([after]);
     },
     60_000,
   );
