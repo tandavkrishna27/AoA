@@ -1225,42 +1225,81 @@ describe("ensureRuntimeServicesForRun", () => {
 
   it("releases every service lease even when an earlier persistence operation fails", async () => {
     let persistCalls = 0;
+    const ownedPids = new Set<number>();
+    const persisted = new Map<string, { status: string; providerRef: string | null }>();
     const db = {
       insert: () => ({
-        values: () => ({
+        values: (values: { id: string; serviceName: string; status: string; providerRef: string | null }) => ({
           onConflictDoUpdate: async () => {
             persistCalls += 1;
             if (persistCalls === 5) throw new Error("release persistence failed");
+            persisted.set(values.id, { status: values.status, providerRef: values.providerRef });
           },
         }),
       }),
     } as never;
     const workspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-runtime-release-all-"));
-    const services = await ensureRuntimeServicesForRun({
-      db,
-      runId: "run-release-all",
-      agent: { id: "agent-1", name: "Codex Coder", companyId: "company-1" },
-      issue: null,
-      workspace: buildWorkspace(workspaceRoot),
-      executionWorkspaceId: "execution-workspace-release-all",
-      config: {
-        workspaceRuntime: {
-          services: ["one", "two"].map((name) => ({
-            name,
-            command: "node -e \"setInterval(() => {}, 1000)\"",
-            lifecycle: "shared",
-            reuseScope: "execution_workspace",
-            stopPolicy: { type: "on_run_finish" },
-          })),
+    try {
+      const services = await ensureRuntimeServicesForRun({
+        db,
+        runId: "run-release-all",
+        agent: { id: "agent-1", name: "Codex Coder", companyId: "company-1" },
+        issue: null,
+        workspace: buildWorkspace(workspaceRoot),
+        executionWorkspaceId: "execution-workspace-release-all",
+        config: {
+          workspaceRuntime: {
+            services: ["one", "two"].map((name) => ({
+              name,
+              command: "node -e \"console.log('owned:' + process.pid); setInterval(() => {}, 1000)\"",
+              lifecycle: "shared",
+              reuseScope: "execution_workspace",
+              stopPolicy: { type: "on_run_finish" },
+            })),
+          },
         },
-      },
-      adapterEnv: {},
-    });
+        adapterEnv: {},
+        onLog: async (_stream, chunk) => {
+          for (const match of chunk.matchAll(/owned:(\d+)/g)) ownedPids.add(Number(match[1]));
+        },
+      });
 
-    expect(services).toHaveLength(2);
-    await expect(releaseRuntimeServicesForRun("run-release-all"))
-      .rejects.toThrow("release persistence failed");
-    expect(areRuntimeServicesTrackedLocally(services.map((service) => service.id))).toBe(false);
+      expect(services).toHaveLength(2);
+      await expect(releaseRuntimeServicesForRun("run-release-all"))
+        .rejects.toThrow("release persistence failed");
+      expect(persistCalls).toBe(8);
+      for (const service of services) {
+        // The aggregate .every check cannot prove that every service was removed.
+        expect(areRuntimeServicesTrackedLocally([service.id])).toBe(false);
+        expect(persisted.get(service.id)).toEqual({ status: "stopped", providerRef: null });
+      }
+      // Observe child output that was already in flight when release returned;
+      // do not add a readiness barrier that changes the original release race.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      for (const pid of ownedPids) {
+        if (process.platform === "linux") await expectLinuxProcessExited(pid);
+        else expect(() => process.kill(pid, 0)).toThrow(expect.objectContaining({ code: "ESRCH" }));
+      }
+      console.log("runtime-release-all-owned-cleanup", { pids: Array.from(ownedPids), liveChildren: 0 });
+    } finally {
+      try {
+        await stopRuntimeServicesForExecutionWorkspace({
+          executionWorkspaceId: "execution-workspace-release-all",
+          workspaceCwd: workspaceRoot,
+        });
+      } finally {
+        // A broken stop can lose tracking while its actual Node child survives.
+        // Reap only PIDs self-reported by these fresh, childless timer fixtures.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        for (const pid of ownedPids) {
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+          }
+        }
+      }
+    }
   });
 
   it.skipIf(process.platform === "win32")(
@@ -2707,44 +2746,72 @@ describe("refreshLocalProcessRuntimeServiceRows", () => {
     });
   });
 
-  it("terminates a persisted local process before writing a health-driven stopped state", async () => {
-    const now = new Date("2026-05-17T10:01:00.000Z");
-    const updates: Array<Record<string, unknown>> = [];
-    const db = {
-      update: () => ({
-        set: (value: Record<string, unknown>) => {
-          updates.push(value);
-          return { where: async () => [] };
-        },
-      }),
-    } as never;
-    let aliveChecks = 0;
-    const terminate = vi.fn();
-
-    const result = await refreshPersistedRuntimeServiceRows({
-      processOwnerId: "owner-a",
-      db,
-      rows: [{
+  it.each(["linux", "win32"] as const)(
+    "verifies persisted process termination authority before a health-driven stopped state (%s)",
+    async (platform) => {
+      const now = new Date("2026-05-17T10:01:00.000Z");
+      const updates: Array<Record<string, unknown>> = [];
+      const persisted = {
         ...baseRow,
         issueId: null,
         healthStatus: "unhealthy",
         healthCheckedAt: new Date("2026-05-17T10:00:00.000Z"),
-      } as any],
-      now,
-      ttlMs: 30_000,
-      probeUrl: async () => false,
-      terminationDeps: {
-        isAlive: async () => aliveChecks++ === 0,
-        inspectIdentity: () => "matching",
-        terminate,
-        waitForExitMs: 10,
-      },
-    });
+      };
+      const db = {
+        update: () => ({
+          set: (value: Record<string, unknown>) => {
+            updates.push(value);
+            Object.assign(persisted, value);
+            return { where: async () => [] };
+          },
+        }),
+      } as never;
+      let aliveChecks = 0;
+      const isAlive = vi.fn(async () => aliveChecks++ === 0);
+      const inspectIdentity = vi.fn(() => "matching" as const);
+      const terminate = vi.fn();
 
-    expect(terminate).toHaveBeenCalled();
-    expect(result[0]).toMatchObject({ status: "stopped", healthStatus: "unhealthy" });
-    expect(updates.at(-1)).toMatchObject({ status: "stopped" });
-  });
+      const result = await refreshPersistedRuntimeServiceRows({
+        processOwnerId: "owner-a",
+        db,
+        rows: [{ ...persisted } as any],
+        now,
+        ttlMs: 30_000,
+        probeUrl: async () => false,
+        terminationDeps: {
+          platform,
+          isAlive,
+          inspectIdentity,
+          terminate,
+          waitForExitMs: 10,
+        },
+      });
+
+      if (platform === "linux") {
+        expect(terminate).toHaveBeenCalledWith(Number(baseRow.providerRef), Number(baseRow.providerRef));
+        expect(isAlive).toHaveBeenCalled();
+        expect(inspectIdentity).toHaveBeenCalled();
+        expect(result[0]).toMatchObject({ status: "stopped", healthStatus: "unhealthy" });
+        expect(persisted).toMatchObject({ status: "stopped" });
+      } else {
+        // A persisted PID does not confer Windows job containment authority.
+        expect(terminate).not.toHaveBeenCalled();
+        expect(isAlive).not.toHaveBeenCalled();
+        expect(inspectIdentity).not.toHaveBeenCalled();
+        const retained = {
+          status: "running",
+          healthStatus: "unhealthy",
+          stoppedAt: null,
+          providerRef: baseRow.providerRef,
+          processOwnerId: baseRow.processOwnerId,
+        };
+        expect(result[0]).toMatchObject(retained);
+        expect(persisted).toMatchObject(retained);
+        expect(updates.at(-1)).not.toHaveProperty("providerRef");
+        expect(updates.at(-1)).not.toHaveProperty("processOwnerId");
+      }
+    },
+  );
 
   it("keeps an unverifiable local process active and tracked after failed health probes", async () => {
     const updates: Array<Record<string, unknown>> = [];
