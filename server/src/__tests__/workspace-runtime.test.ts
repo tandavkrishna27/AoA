@@ -1908,7 +1908,7 @@ describe("ensureRuntimeServicesForRun", () => {
     10_000,
   );
 
-  it("does not stop services in sibling directories when matching by workspace cwd", async () => {
+  it.each([false, true])("does not stop services in sibling directories when matching by workspace cwd (fixture failure: %s)", async (failAfterAssertion) => {
     const workspaceParent = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-runtime-sibling-"));
     const targetWorkspaceRoot = path.join(workspaceParent, "project");
     const siblingWorkspaceRoot = path.join(workspaceParent, "project-extended", "service");
@@ -1919,52 +1919,90 @@ describe("ensureRuntimeServicesForRun", () => {
     const runId = "run-sibling";
     leasedRunIds.add(runId);
 
-    const services = await ensureRuntimeServicesForRun({
-      runId,
-      agent: {
-        id: "agent-1",
-        name: "Codex Coder",
-        companyId: "company-1",
-      },
-      issue: null,
-      workspace: siblingWorkspace,
-      executionWorkspaceId: "execution-workspace-sibling",
-      config: {
-        workspaceRuntime: {
-          services: [
-            {
-              name: "web",
-              command:
-                "node -e \"require('node:http').createServer((req,res)=>res.end('ok')).listen(Number(process.env.PORT), '127.0.0.1')\"",
-              port: { type: "auto" },
-              readiness: {
-                type: "http",
-                urlTemplate: "http://127.0.0.1:{{port}}",
-                timeoutSec: 10,
-                intervalMs: 100,
-              },
-              lifecycle: "shared",
-              reuseScope: "execution_workspace",
-              stopPolicy: {
-                type: "manual",
-              },
+    let serviceUrl: string | undefined;
+    let servicePid: number | undefined;
+    let cleanupAttempted = false;
+    const cleanupSibling = async () => {
+      cleanupAttempted = true;
+      try {
+        await stopRuntimeServicesForExecutionWorkspace({
+          executionWorkspaceId: "execution-workspace-sibling",
+          workspaceCwd: siblingWorkspace.cwd,
+        });
+      } finally {
+        await releaseRuntimeServicesForRun(runId);
+        leasedRunIds.delete(runId);
+      }
+    };
+
+    const exerciseSibling = async () => {
+      try {
+        const services = await ensureRuntimeServicesForRun({
+          runId,
+          agent: {
+            id: "agent-1",
+            name: "Codex Coder",
+            companyId: "company-1",
+          },
+          issue: null,
+          workspace: siblingWorkspace,
+          executionWorkspaceId: "execution-workspace-sibling",
+          config: {
+            workspaceRuntime: {
+              services: [
+                {
+                  name: "web",
+                  command:
+                    "node -e \"require('node:http').createServer((req,res)=>res.end(req.url === '/pid' ? String(process.pid) : 'ok')).listen(Number(process.env.PORT), '127.0.0.1')\"",
+                  port: { type: "auto" },
+                  readiness: {
+                    type: "http",
+                    urlTemplate: "http://127.0.0.1:{{port}}",
+                    timeoutSec: 10,
+                    intervalMs: 100,
+                  },
+                  lifecycle: "shared",
+                  reuseScope: "execution_workspace",
+                  stopPolicy: {
+                    type: "manual",
+                  },
+                },
+              ],
             },
-          ],
-        },
-      },
-      adapterEnv: {},
-    });
+          },
+          adapterEnv: {},
+        });
+        serviceUrl = services[0]!.url!;
+        servicePid = Number(await (await fetch(`${serviceUrl}/pid`)).text());
+        expect(Number.isSafeInteger(servicePid) && servicePid > 0).toBe(true);
 
-    await stopRuntimeServicesForExecutionWorkspace({
-      executionWorkspaceId: "execution-workspace-target",
-      workspaceCwd: targetWorkspaceRoot,
-    });
+        await stopRuntimeServicesForExecutionWorkspace({
+          executionWorkspaceId: "execution-workspace-target",
+          workspaceCwd: targetWorkspaceRoot,
+        });
 
-    const response = await fetch(services[0]!.url!);
-    expect(await response.text()).toBe("ok");
+        const response = await fetch(serviceUrl);
+        expect(await response.text()).toBe("ok");
+        if (failAfterAssertion) throw new Error("forced sibling fixture assertion failure");
+      } finally {
+        // Shared/manual services survive run release. Stop this exact sibling
+        // even when startup or an assertion fails, then release its run lease.
+        await cleanupSibling();
+      }
+    };
 
-    await releaseRuntimeServicesForRun(runId);
-    leasedRunIds.delete(runId);
+    try {
+      if (failAfterAssertion) await expect(exerciseSibling()).rejects.toThrow("forced sibling fixture assertion failure");
+      else await exerciseSibling();
+      await expect(fetch(serviceUrl!)).rejects.toThrow();
+      if (process.platform === "linux") await expectLinuxProcessExited(servicePid!);
+      else expect(() => process.kill(servicePid!, 0)).toThrow(expect.objectContaining({ code: "ESRCH" }));
+      console.log("runtime-sibling-owned-cleanup", { pid: servicePid, url: serviceUrl, liveChildren: 0, socketClosed: true });
+    } finally {
+      // A future broken fixture cleanup must fail the assertion without leaving
+      // its owned service behind (also used by the leak's RED control).
+      if (!cleanupAttempted) await cleanupSibling();
+    }
   });
 });
 
