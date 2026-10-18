@@ -137,6 +137,67 @@ describe("poll-backpressure — a saturated class advertises zero free slots and
     expect(limiter.freeSlots("batch")).toBe(1);
   }, 10_000);
 
+  it.each(["during poll", "during cadence"] as const)("wakes after terminal acceptance %s even with no local handoff", async (timing) => {
+    const { session, key, client } = await enrollFixtureWorker(fake, CODE);
+    const limiter = new ConcurrencyLimiter({ batch: 1, browser_session: 0, service: 0 });
+    let finishResponse!: () => void, finishCadence!: () => void, sawResponse!: () => void, enteredCadence!: () => void, sawDrain!: () => void;
+    const responseGate = new Promise<void>((resolve) => { finishResponse = resolve; });
+    const cadenceGate = new Promise<void>((resolve) => { finishCadence = resolve; });
+    const responseSeen = new Promise<void>((resolve) => { sawResponse = resolve; });
+    const sleeping = new Promise<void>((resolve) => { enteredCadence = resolve; });
+    const drainSeen = new Promise<boolean>((resolve) => { sawDrain = () => resolve(true); });
+    fake.enqueuePoll({ kind: "no_work", retryAfterMs: 750 });
+    fake.enqueuePoll({ kind: "drain" });
+    const loop = createPollLoop({
+      client: { ...client, poll: async (request) => {
+        const response = await client.poll(request);
+        if (fake.pollCount() === 1) { sawResponse(); if (timing === "during poll") await responseGate; }
+        else sawDrain();
+        return response;
+      } },
+      self, key, session: { get: async () => session, recover: async () => session }, limiter,
+      measure: () => measureCapacity({ probes: fixtureProbes(), reserved: { cpuMillis: 0, memoryMiB: 0, diskMiB: 0 }, slots: limiter.snapshot() }),
+      supervisor: { accept: () => {} }, backoff: BACKOFF,
+      sleep: async () => { enteredCadence(); await cadenceGate; },
+    });
+    const running = loop.run();
+    await (timing === "during poll" ? responseSeen : sleeping);
+    (loop as { notifyTerminalAccepted?: () => void }).notifyTerminalAccepted?.();
+    (loop as { notifyTerminalAccepted?: () => void }).notifyTerminalAccepted?.();
+    finishResponse();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      expect(await Promise.race([drainSeen, new Promise<boolean>((resolve) => { timeout = setTimeout(() => resolve(false), 5_000); })])).toBe(true);
+    } finally {
+      clearTimeout(timeout); finishResponse(); finishCadence(); await running;
+    }
+    expect(fake.pollCount()).toBe(2);
+  }, 10_000);
+
+  it.each(["transient", "drain"] as const)("terminal acceptance leaves a %s wait intact", async (kind) => {
+    const { session, key, client } = await enrollFixtureWorker(fake, CODE);
+    const limiter = new ConcurrencyLimiter({ batch: 1, browser_session: 0, service: 0 });
+    let finishCadence!: () => void, enteredCadence!: () => void;
+    const gate = new Promise<void>((resolve) => { finishCadence = resolve; });
+    const sleeping = new Promise<void>((resolve) => { enteredCadence = resolve; });
+    const sleeps: number[] = [];
+    fake.enqueuePoll(kind === "transient" ? { kind: "error", status: 503, code: "internal_unavailable", retryAfterMs: 0 } : { kind: "drain", retryAfterMs: 1 });
+    fake.enqueuePoll({ kind: "drain" });
+    const loop = createPollLoop({ client, self, key, session: { get: async () => session, recover: async () => session }, limiter,
+      measure: () => measureCapacity({ probes: fixtureProbes(), reserved: { cpuMillis: 0, memoryMiB: 0, diskMiB: 0 }, slots: limiter.snapshot() }),
+      supervisor: { accept: () => {} }, backoff: BACKOFF,
+      sleep: async (ms) => { sleeps.push(ms); enteredCadence(); await gate; },
+    });
+    const running = loop.run();
+    await sleeping;
+    try {
+      loop.notifyTerminalAccepted(); loop.notifyTerminalAccepted();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(fake.pollCount()).toBe(1);
+      expect(sleeps).toEqual([1_000]);
+    } finally { finishCadence(); await running; }
+  });
+
   it("the COMPOSED loop advertises backpressure when a slot saturates between measure() and tryAcquire", async () => {
     const { session, key, client } = await enrollFixtureWorker(fake, CODE);
     // The real limiter is already saturated; but measure() reports a (stale/racy)

@@ -268,6 +268,31 @@ describe("event-outbox scheduler — durable append latency", () => {
 });
 
 describe("event-outbox-drain — upload in seq order, advance cursor, classify (slice 4)", () => {
+  it.each(["accepted", "gap"] as const)("notifies only newly accepted terminals across partial and replayed %s watermarks", async (status) => {
+    const watermarks = [1, 1, 2, 2, 3];
+    const accepted: number[] = [];
+    drain.stop();
+    drain = createEventOutboxDrain({
+      store, key, kek: KEK, session: staticSessionProvider(session), now: () => clock.ms,
+      client: { ...client, eventUpload: async ({ bytes }: { bytes: Buffer }) => {
+        const request = JSON.parse(bytes.toString("utf8"));
+        const acceptedThroughSeq = watermarks.shift()!;
+        return { status: 200, body: { protocolVersion: 1, correlationId: request.correlationId,
+          serverTime: new Date(clock.ms).toISOString(), ack: { protocolVersion: 1, ...IDENTITY,
+            acceptedThroughSeq, expectedNextSeq: acceptedThroughSeq + 1, status } } };
+      } } as never,
+      tuning: { maxFlushesPerStreamPerTick: 1 },
+      onTerminalAccepted: () => accepted.push(store.getStream(STREAM_KEY)!.acceptedThroughSeq),
+    });
+    emit(1); emit(2, "terminal");
+    await drain.drainOnce(); expect(accepted).toEqual([]);
+    await drain.drainOnce(); expect(accepted).toEqual([]);
+    await drain.drainOnce(); expect(accepted).toEqual([2]);
+    emit(3, "terminal");
+    await drain.drainOnce(); expect(accepted).toEqual([2]);
+    await drain.drainOnce(); expect(accepted).toEqual([2, 3]);
+  });
+
   it("accepted → advances the durable cursor + prunes; builds a valid contiguous batch", async () => {
     emit(1);
     emit(2);

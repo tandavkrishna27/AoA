@@ -199,7 +199,10 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
   const store = await openStore({ path: deps.eventOutboxPath });
   const kek = deriveKekFromDeviceKey(deps.key);
   const eventSink = makeSink({ store, kek, onPersisted: () => drain.wake() });
-  const drain = makeDrain({ store, client: deps.client, session, key: deps.key, kek, logger: deps.logger });
+  const drain = makeDrain({ store, client: deps.client, session, key: deps.key, kek, logger: deps.logger,
+    // Invoked only after startup composition has assigned pollLoop below.
+    onTerminalAccepted: () => pollLoop.notifyTerminalAccepted(),
+  });
 
   // (1) RECOVER before the supervisor can emit into the store.
   drain.recover();

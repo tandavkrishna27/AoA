@@ -79,6 +79,8 @@ export interface EventOutboxDrainDeps {
   readonly maxConsecutiveRecoveries?: number;
   /** Injectable jitter source (tests pin the backoff). */
   readonly rng?: () => number;
+  /** Coalesced hint after a newly acknowledged terminal has durably advanced the cursor. */
+  readonly onTerminalAccepted?: () => void;
 }
 
 export interface DrainTickSummary {
@@ -192,6 +194,16 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
     final: boolean,
   ): Promise<void> {
     const st = stateFor(stream.streamKey);
+    let acceptedThroughSeq = stream.acceptedThroughSeq;
+    const advanceAccepted = (events: readonly WorkerEventV1[], watermark: number): void => {
+      const previous = acceptedThroughSeq;
+      store.advanceCursor(stream.streamKey, watermark);
+      acceptedThroughSeq = Math.max(previous, watermark);
+      if (events.some(event => event.eventType === "terminal" && event.seq > previous && event.seq <= acceptedThroughSeq)) {
+        try { deps.onTerminalAccepted?.(); }
+        catch (err) { deps.logger?.warn({ err }, "event-outbox: terminal acceptance notification failed"); }
+      }
+    };
     for (let flush = 0; flush < tuning.maxFlushesPerStreamPerTick; flush += 1) {
       if (stopped && !final) return;
       const nowMs = now();
@@ -261,7 +273,7 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
       summary.batches += 1;
 
       if (attempt.kind === "accepted") {
-        store.advanceCursor(stream.streamKey, attempt.acceptedThroughSeq);
+        advanceAccepted(batch.events, attempt.acceptedThroughSeq);
         summary.accepted += 1;
         st.flushKey = null;
         st.flushFromSeq = null;
@@ -276,7 +288,7 @@ export function createEventOutboxDrain(deps: EventOutboxDrainDeps): EventOutboxD
       }
       if (attempt.kind === "gap") {
         // The server accepted through acceptedThroughSeq; resend from expectedNextSeq.
-        store.advanceCursor(stream.streamKey, attempt.acceptedThroughSeq);
+        advanceAccepted(batch.events, attempt.acceptedThroughSeq);
         st.flushKey = null;
         st.flushFromSeq = null;
         st.recoveries = 0;
