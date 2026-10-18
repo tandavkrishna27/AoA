@@ -156,7 +156,7 @@ const PLAN_DERIVED_ACL_MATRIX = deepFreezeFixture({
       id: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       organization_id: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       owner_user_id: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
-      slug: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
+      slug: { aoa_app: ["SELECT", "UPDATE"], aoa_operator: ["SELECT"] },
       kind: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       trust_class: { aoa_app: ["SELECT"], aoa_operator: ["SELECT"] },
       status: { aoa_app: ["SELECT", "UPDATE"], aoa_operator: ["SELECT", "UPDATE"] },

@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { spawn } from "node:child_process";
 import { open as openFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { createGunzip, createGzip } from "node:zlib";
 import postgres from "postgres";
 import type { BackupRetentionPolicy, BackupRetentionTieredPolicy } from "@armyofagents/shared";
@@ -64,6 +64,11 @@ type TableDefinition = {
 type ExtensionDefinition = {
   extension_name: string;
   schema_name: string;
+};
+
+type ExplicitOwnerAclRelation = {
+  schema_name: string;
+  relation_name: string;
 };
 
 const DEFAULT_BACKUP_WRITE_BUFFER_BYTES = 1024 * 1024;
@@ -382,6 +387,8 @@ async function runPgDumpBackup(opts: {
   connectionString: string;
   backupFile: string;
   connectTimeout: number;
+  snapshot: string;
+  explicitOwnerAclRelations: readonly ExplicitOwnerAclRelation[];
 }): Promise<void> {
   const pgDumpBin = process.env.AOA_PG_DUMP_PATH || process.env.PAPERCLIP_PG_DUMP_PATH || "pg_dump";
   // Node wrappers are not directly executable on Windows. Keep arguments out of
@@ -392,6 +399,7 @@ async function runPgDumpBackup(opts: {
     [
       ...(nodeWrapper ? [pgDumpBin] : []),
       `--dbname=${opts.connectionString}`,
+      `--snapshot=${opts.snapshot}`,
       "--format=plain",
       "--clean",
       "--if-exists",
@@ -410,10 +418,92 @@ async function runPgDumpBackup(opts: {
     throw new Error("pg_dump did not expose stdout");
   }
 
-  await Promise.all([
-    pipeline(child.stdout, createGzip(), createWriteStream(opts.backupFile)),
-    waitForChildExit(child, pgDumpBin),
+  const restoreTrailer = createExplicitOwnerAclRestoreTrailer(opts.explicitOwnerAclRelations);
+  const appendRestoreTrailer = new Transform({
+    transform(chunk, _encoding, callback) {
+      callback(null, chunk);
+    },
+    flush(callback) {
+      if (restoreTrailer) this.push(Buffer.from(restoreTrailer, "utf8"));
+      callback();
+    },
+  });
+
+  const output = pipeline(child.stdout, appendRestoreTrailer, createGzip(), createWriteStream(opts.backupFile));
+  const exited = waitForChildExit(child, pgDumpBin);
+  const first = await Promise.race([
+    output.then(() => ({ kind: "output" as const }), (error: unknown) => ({ kind: "output-error" as const, error })),
+    exited.then(() => ({ kind: "exit" as const }), (error: unknown) => ({ kind: "exit-error" as const, error })),
   ]);
+
+  if (first.kind === "output-error" || first.kind === "exit-error") {
+    // Keep the exported snapshot transaction alive until pg_dump is definitely
+    // gone. In particular, a broken gzip/file pipe must not let the caller
+    // roll back and release the snapshot while pg_dump is still reading it.
+    child.kill();
+    await Promise.allSettled([output, exited]);
+    throw first.error;
+  }
+
+  if (first.kind === "output") {
+    await exited;
+  } else {
+    await output;
+  }
+}
+
+function sqlTextExpression(value: string): string {
+  const base64 = Buffer.from(value, "utf8").toString("base64");
+  return `convert_from(decode('${base64}', 'base64'), 'UTF8')`;
+}
+
+function createExplicitOwnerAclRestoreTrailer(
+  relations: readonly ExplicitOwnerAclRelation[],
+): string {
+  if (relations.length === 0) return "";
+  const manifestValues = relations.map((relation) =>
+    `(${sqlTextExpression(relation.schema_name)}, ${sqlTextExpression(relation.relation_name)})`).join(",\n      ");
+  const body =
+    `DECLARE restored_relation record;\n` +
+    `BEGIN\n` +
+    `  IF EXISTS (\n` +
+    `    SELECT 1\n` +
+    `    FROM (VALUES\n` +
+    `      ${manifestValues}\n` +
+    `    ) AS source_relation(schema_name, relation_name)\n` +
+    `    WHERE NOT EXISTS (\n` +
+    `      SELECT 1 FROM pg_class relation\n` +
+    `      JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace\n` +
+    `      WHERE namespace.nspname = source_relation.schema_name\n` +
+    `        AND relation.relname = source_relation.relation_name\n` +
+    `    )\n` +
+    `  ) THEN\n` +
+    `    RAISE EXCEPTION 'native restore is missing a source explicit-owner-ACL relation';\n` +
+    `  END IF;\n` +
+    `  FOR restored_relation IN\n` +
+    `    SELECT namespace.nspname AS schema_name, relation.relname AS relation_name,\n` +
+    `      relation.relowner AS owner_oid\n` +
+    `    FROM pg_class relation\n` +
+    `    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace\n` +
+    `    WHERE (namespace.nspname, relation.relname) IN (VALUES\n` +
+    `      ${manifestValues}\n` +
+    `    )\n` +
+    `      AND relation.relacl IS NULL\n` +
+    `  LOOP\n` +
+    `    EXECUTE format(\n` +
+    `      'GRANT ALL PRIVILEGES ON TABLE %I.%I TO %I',\n` +
+    `      restored_relation.schema_name, restored_relation.relation_name,\n` +
+    `      pg_get_userbyid(restored_relation.owner_oid)\n` +
+    `    );\n` +
+    `  END LOOP;\n` +
+    `END`;
+  let delimiter = "aoa_restore_explicit_owner_acl";
+  let suffix = 0;
+  while (body.includes(`$${delimiter}$`)) {
+    delimiter = `aoa_restore_explicit_owner_acl_${++suffix}`;
+  }
+  return `\n\n-- AoA native restore: rematerialize source explicit default-owner table ACLs.\n` +
+    `DO $${delimiter}$\n${body}\n$${delimiter}$;\n`;
 }
 
 async function restoreWithPsql(opts: RunDatabaseRestoreOptions, connectTimeout: number): Promise<void> {
@@ -598,12 +688,33 @@ export async function runDatabaseBackup(opts: RunDatabaseBackupOptions): Promise
     if (backupEngine === "pg_dump" || (backupEngine === "auto" && canUsePgDump)) {
       await sql`SELECT 1`;
       try {
-        await closeSql();
+        await sql`BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+        const [snapshotRow] = await sql<{ snapshot: string }[]>`
+          SELECT pg_export_snapshot() AS snapshot
+        `;
+        if (!snapshotRow?.snapshot) {
+          throw new Error("PostgreSQL did not return an exported backup snapshot");
+        }
+        const explicitOwnerAclRelations = await sql<ExplicitOwnerAclRelation[]>`
+          SELECT namespace.nspname AS schema_name, relation.relname AS relation_name
+          FROM pg_class relation
+          JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+          WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+            AND namespace.nspname NOT LIKE 'pg_%'
+            AND relation.relkind IN ('r', 'p', 'v', 'm', 'f')
+            AND relation.relacl IS NOT NULL
+            AND relation.relacl = acldefault('r', relation.relowner)
+          ORDER BY namespace.nspname, relation.relname
+        `;
         await runPgDumpBackup({
           connectionString: opts.connectionString,
           backupFile,
           connectTimeout,
+          snapshot: snapshotRow.snapshot,
+          explicitOwnerAclRelations,
         });
+        await sql`COMMIT`;
+        await closeSql();
         await writer.abort();
         const sizeBytes = statSync(backupFile).size;
         const prunedCount = pruneBackupFiles(opts.backupDir, retention, filenamePrefix);
@@ -613,6 +724,8 @@ export async function runDatabaseBackup(opts: RunDatabaseBackupOptions): Promise
           prunedCount,
         };
       } catch (error) {
+        await sql`ROLLBACK`.catch(() => {});
+        await closeSql();
         if (existsSync(backupFile)) {
           try { unlinkSync(backupFile); } catch { /* ignore */ }
         }

@@ -505,9 +505,11 @@ export {
   dockerIsolationSchema,
   gvisorEnvironmentConfigSchema,
   createExecutionTargetSchema,
+  canaryExecutionTargetSuccessorSchema,
   workerExecutionTargetHeartbeatSchema,
   issueWorkerEnrollmentCodeSchema,
   type CreateExecutionTargetInput,
+  type CanaryExecutionTargetSuccessorInput,
   type WorkerExecutionTargetHeartbeatInput,
   type IssueWorkerEnrollmentCodeInput,
 } from "./execution-target.js";

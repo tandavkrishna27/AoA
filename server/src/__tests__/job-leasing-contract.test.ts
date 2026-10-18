@@ -5399,6 +5399,8 @@ describe("JOB-003 frozen worker-operation HTTP contract", () => {
       // transaction/scope is established by ensureExecutionTargetCutoff (see exception below).
       "server/src/services/execution-targets.ts#bumpExecutionTargetGeneration:executionTargets:deviceGeneration,status,updatedAt:authority",
       "server/src/services/execution-targets.ts#ensureControlPlaneExecutionTarget:executionTargets:<insert>:authority",
+      "server/src/services/execution-targets.ts#handoffCanaryExecutionTargetSuccessor:executionTargets:slug,updatedAt:authority",
+      "server/src/services/execution-targets.ts#handoffCanaryExecutionTargetSuccessor:executionTargets:slug,updatedAt:authority",
     ].sort();
     expect.soft(inventory).toEqual(expected);
     expect.soft(inventory.some((identity) => /<(?:dynamic|computed|spread)>/.test(identity))).toBe(false);
@@ -5755,6 +5757,7 @@ describe("JOB-003 frozen worker-operation HTTP contract", () => {
       "server/src/services/execution-targets.ts#registerWorkerHeartbeat",
       "server/src/services/execution-targets.ts#revokeExecutionTargetWorkerToken",
       "server/src/services/execution-targets.ts#rotateExecutionTargetWorkerToken",
+      "server/src/services/execution-targets.ts#handoffCanaryExecutionTargetSuccessor",
     ]);
     const exactReviewedThisDelegates = new Set([
       "packages/db/src/repositories/tenant/worker-enrollment.ts#revokeTargetAuthority",
@@ -5820,10 +5823,26 @@ describe("JOB-003 frozen worker-operation HTTP contract", () => {
         continue;
       }
       if (exactNonPlatformWriters.has(key)) {
+        if (key.endsWith("#handoffCanaryExecutionTargetSuccessor")) {
+          const body = namedFunctionSource(sourceByFile.get(writer.file)!, writer.functionName);
+          expect.soft(body, "handoff must use the bounded tenant app transaction").toMatch(
+            /runInTenant\(input\.appDb,\s*organizationId/,
+          );
+          expect.soft(body, "handoff must lock exactly two target IDs in stable order").toMatch(
+            /\[retiredTargetId,\s*successorTargetId\]\.sort\(\)[\s\S]*?\.for\("update"\)/,
+          );
+          expect.soft(body.match(/tx\.update\(executionTargets\)\.set\(\{\s*slug:[^}]*updatedAt:\s*at\s*\}\)/g))
+            .toHaveLength(2);
+          expect.soft(body.match(/eq\(executionTargets\.organizationId,\s*organizationId\)/g)?.length)
+            .toBeGreaterThanOrEqual(4); // both locks and both conditional writes
+          expect.soft(body.match(/eq\(executionTargets\.id,\s*(?:retiredTargetId|successorTargetId)\)/g)?.length)
+            .toBeGreaterThanOrEqual(2);
+          expect.soft(body).not.toMatch(/update\(workers\)|acquirePlatformTargetAuthorityExclusive/);
+        }
         expect.soft(
           functionSource,
           `${key} may be exempt only while it has an explicit non-null Organization predicate`,
-        ).toMatch(/isNotNull\(executionTargets\.organizationId\)|eq\(executionTargets\.organizationId,\s*input\.organizationId\)/);
+        ).toMatch(/isNotNull\(executionTargets\.organizationId\)|eq\(executionTargets\.organizationId,\s*(?:input\.organizationId|organizationId)\)/);
         expect.soft(functionSource, `${key} must never accept a null-Org platform row`).not.toMatch(
           /isNull\(executionTargets\.organizationId\)/,
         );

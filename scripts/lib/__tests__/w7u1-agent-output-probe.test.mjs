@@ -105,7 +105,7 @@ test("W7U1's premise is now REFUTED: the production emitter carries a permission
   ];
   const codexTails = [
     '{ cat "$2"; echo; cat "$1"; } | "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox -',
-    'exec "$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"',
+    '"$0" exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox - < "$1"',
   ];
   for (const tail of claudeTails) {
     assert.ok(

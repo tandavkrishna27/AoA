@@ -22,6 +22,111 @@ import {
   resolveDeviceLivenessDeadlineMs,
 } from "./device-liveness.js";
 import { verifyDeviceEnrolmentKey, type DeviceKeyVerification } from "./device-verify.js";
+import { isUniqueViolation } from "./db-errors.js";
+
+const CANARY_EXECUTION_TARGET_SLUG = "aoa-canary-e2b";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type CanarySuccessorErrorCode = "not_found" | "invalid_input" | "invalid_lifecycle" | "invalid_profile" | "conflict";
+export class CanarySuccessorError extends Error {
+  constructor(readonly code: CanarySuccessorErrorCode) { super(`canary_successor_${code}`); }
+}
+
+/** Transfer only the fixed canary routing slug. Neither target's device authority changes. */
+export async function handoffCanaryExecutionTargetSuccessor(input: {
+  appDb: Db; operatorDb: Db; organizationId: string; retiredTargetId: string; successorTargetId: string; now?: Date;
+}) {
+  if (!UUID_PATTERN.test(input.organizationId) || !UUID_PATTERN.test(input.retiredTargetId) ||
+      !UUID_PATTERN.test(input.successorTargetId) ||
+      input.retiredTargetId.toLowerCase() === input.successorTargetId.toLowerCase()) {
+    throw new CanarySuccessorError("invalid_input");
+  }
+  const organizationId = input.organizationId.toLowerCase();
+  const retiredTargetId = input.retiredTargetId.toLowerCase();
+  const successorTargetId = input.successorTargetId.toLowerCase();
+  const retirementSlug = `retired-to-${successorTargetId}`;
+  // The operator connection reads only this durable operator-metadata projection.
+  // A reused app session can retain the empty custom-GUC placeholder and lose
+  // metadata visibility; no operator handle enters the tenant target transaction.
+  const [receipt] = await input.operatorDb.select({
+    id: executionTargetRevocations.id,
+    targetId: executionTargetRevocations.targetId,
+    organizationId: executionTargetRevocations.organizationId,
+    revokedGeneration: executionTargetRevocations.revokedGeneration,
+  }).from(executionTargetRevocations).where(and(
+    eq(executionTargetRevocations.targetId, retiredTargetId),
+    eq(executionTargetRevocations.organizationId, organizationId),
+    eq(executionTargetRevocations.targetScope, "organization"),
+    eq(executionTargetRevocations.status, "completed"),
+  )).orderBy(sql`${executionTargetRevocations.revokedGeneration} DESC`).limit(1);
+
+  try {
+    return await runInTenant(input.appDb, organizationId, async (_repos, tx) => {
+      await tx.execute(sql`SELECT set_config('lock_timeout', ${"5s"}, true)`);
+      const locked = new Map<string, (typeof executionTargets.$inferSelect)>();
+      for (const targetId of [retiredTargetId, successorTargetId].sort()) {
+        const [row] = await tx.select(placementProfileTargetColumns).from(executionTargets).where(and(
+          eq(executionTargets.organizationId, organizationId), eq(executionTargets.id, targetId),
+        )).limit(1).for("update");
+        if (!row) throw new CanarySuccessorError("not_found");
+        locked.set(targetId, row as typeof executionTargets.$inferSelect);
+      }
+      const retired = locked.get(retiredTargetId)!;
+      const successor = locked.get(successorTargetId)!;
+      const correctAuthority = (row: typeof retired) => row.organizationId === organizationId &&
+        row.scope === "organization" && row.ownerUserId === null && row.kind === "dedicated_worker" &&
+        row.trustClass === "dedicated_tenant" && row.targetAuthorityKey === `organization:${organizationId}`;
+      if (!correctAuthority(retired) || !correctAuthority(successor)) throw new CanarySuccessorError("invalid_lifecycle");
+      if (!receipt || receipt.targetId !== retired.id || receipt.organizationId !== organizationId ||
+          retired.status !== "disabled" || retired.deviceGeneration <= receipt.revokedGeneration) {
+        throw new CanarySuccessorError("invalid_lifecycle");
+      }
+      if (successor.status !== "active") throw new CanarySuccessorError("invalid_lifecycle");
+      const parsedProfile = registeredTargetProfileV1Schema.safeParse(successor.registeredProfile);
+      const normalized = await normalizePlacementRegistryTarget(successor);
+      if (!parsedProfile.success || parsedProfile.data.revokedAt !== null ||
+          !normalized || normalized.targetClass !== "organization_dedicated") {
+        throw new CanarySuccessorError("invalid_profile");
+      }
+      if (retired.slug === retirementSlug && successor.slug === CANARY_EXECUTION_TARGET_SLUG) {
+        return { result: "already_current" as const, organizationId,
+          retiredTargetId, successorTargetId, retiredSlug: retirementSlug,
+          executionTargetSlug: CANARY_EXECUTION_TARGET_SLUG };
+      }
+      if (retired.slug !== CANARY_EXECUTION_TARGET_SLUG ||
+          successor.slug === CANARY_EXECUTION_TARGET_SLUG || successor.slug.startsWith("retired-to-")) {
+        throw new CanarySuccessorError("conflict");
+      }
+      const [collision] = await tx.select({ id: executionTargets.id }).from(executionTargets).where(and(
+        eq(executionTargets.organizationId, organizationId), eq(executionTargets.slug, retirementSlug),
+      )).limit(1);
+      if (collision) throw new CanarySuccessorError("conflict");
+      const at = input.now ?? new Date();
+      const previous = await tx.update(executionTargets).set({ slug: retirementSlug, updatedAt: at }).where(and(
+        eq(executionTargets.organizationId, organizationId), eq(executionTargets.id, retiredTargetId),
+        eq(executionTargets.slug, CANARY_EXECUTION_TARGET_SLUG), eq(executionTargets.status, "disabled"),
+        eq(executionTargets.deviceGeneration, retired.deviceGeneration),
+      )).returning({ id: executionTargets.id });
+      if (previous.length !== 1) throw new CanarySuccessorError("conflict");
+      const next = await tx.update(executionTargets).set({ slug: CANARY_EXECUTION_TARGET_SLUG, updatedAt: at }).where(and(
+        eq(executionTargets.organizationId, organizationId), eq(executionTargets.id, successorTargetId),
+        eq(executionTargets.slug, successor.slug), eq(executionTargets.status, "active"),
+        eq(executionTargets.deviceGeneration, successor.deviceGeneration),
+      )).returning({ id: executionTargets.id });
+      if (next.length !== 1) throw new CanarySuccessorError("conflict");
+      return { result: "handed_off" as const, organizationId,
+        retiredTargetId, successorTargetId, retiredSlug: retirementSlug,
+        executionTargetSlug: CANARY_EXECUTION_TARGET_SLUG };
+    });
+  } catch (error) {
+    const pg = error as { code?: string; cause?: { code?: string } };
+    if (["55P03", "40P01"].includes(pg.code ?? pg.cause?.code ?? "")) throw new CanarySuccessorError("conflict");
+    if (isUniqueViolation(error, "execution_targets_org_slug_uq")) {
+      throw new CanarySuccessorError("conflict");
+    }
+    throw error;
+  }
+}
 
 // Rotatable worker credential (Finding #3). The row id is NOT a credential;
 // this token is. Only its hash is persisted (execution_targets.worker_token_hash);

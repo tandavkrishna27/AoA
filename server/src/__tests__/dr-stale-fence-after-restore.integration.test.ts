@@ -29,15 +29,19 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join, dirname, basename, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import postgres, { type Sql } from "postgres";
+import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
 import {
   applyPendingMigrations,
   createOperatorDbConnection,
   createTenantAppDbConnection,
+  loadRequiredMigrationIdentity,
   runDatabaseBackup,
   runDatabaseRestore,
   type ActiveFenceRequest,
+  type Db,
   type NonOwnerDbConnection,
 } from "@armyofagents/db";
+import * as dbSchema from "@armyofagents/db";
 import {
   canonicalProviderConstraintProfileDigestInputV1,
   canonicalizeJsonV1,
@@ -48,6 +52,7 @@ import {
   type RegisteredTargetProfileV1,
 } from "@armyofagents/worker-protocol";
 import { provisionTenantAppRoleLoginSql } from "../db/rls-tenant.js";
+import { openDistributedExecutionDatabases } from "../db/distributed-execution-databases.js";
 import { createJobLeasingService, type VerifiedWorkerOperation } from "../services/job-leasing.js";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
 import { runInTenant } from "../db/tenant-context.js";
@@ -74,6 +79,92 @@ const integration = describe.skipIf(
 
 function sha256(value: Uint8Array | string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+async function openNormalDistributedStartup(adminUrl: string): Promise<void> {
+  const ownerClient = postgres(adminUrl, { max: 4 });
+  let opened: Awaited<ReturnType<typeof openDistributedExecutionDatabases>> = null;
+  try {
+    const app = new URL(adminUrl);
+    app.username = "aoa_app";
+    app.password = PASSWORD;
+    const operator = new URL(adminUrl);
+    operator.username = "aoa_operator";
+    operator.password = PASSWORD;
+    const ownerDb = drizzlePg(ownerClient, { schema: dbSchema }) as unknown as Db;
+    opened = await openDistributedExecutionDatabases({
+      enabled: true,
+      ownerDb,
+      requiredMigrationIdentity: await loadRequiredMigrationIdentity(),
+      appDatabaseUrl: app.toString(),
+      operatorDatabaseUrl: operator.toString(),
+    });
+    expect(opened).not.toBeNull();
+  } finally {
+    await opened?.close().catch(() => {});
+    await ownerClient.end();
+  }
+}
+
+const ACL_REMAP_PROBE = "native_acl_owner_remap_probe";
+const ACL_REMAP_SOURCE_OWNER = "aoa_task2_acl_source_owner";
+const ACL_REMAP_SENTINEL_ROLE = "aoa_task2_acl_sentinel";
+
+async function installAclOwnerRemapProbe(admin: Sql): Promise<void> {
+  await admin.unsafe(`DO $role$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${ACL_REMAP_SOURCE_OWNER}') THEN
+      CREATE ROLE ${ACL_REMAP_SOURCE_OWNER} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${ACL_REMAP_SENTINEL_ROLE}') THEN
+      CREATE ROLE ${ACL_REMAP_SENTINEL_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
+  END $role$`);
+  await admin.unsafe(`DROP TABLE IF EXISTS public.${ACL_REMAP_PROBE}`);
+  await admin.unsafe(`CREATE TABLE public.${ACL_REMAP_PROBE} (id integer, sentinel text)`);
+  await admin.unsafe(`ALTER TABLE public.${ACL_REMAP_PROBE} OWNER TO ${ACL_REMAP_SOURCE_OWNER}`);
+  await admin.begin(async (transaction) => {
+    await transaction.unsafe(`SET LOCAL ROLE ${ACL_REMAP_SOURCE_OWNER}`);
+    await transaction.unsafe(`GRANT ALL PRIVILEGES ON TABLE public.${ACL_REMAP_PROBE} TO ${ACL_REMAP_SOURCE_OWNER}`);
+    await transaction.unsafe(`GRANT SELECT (sentinel) ON TABLE public.${ACL_REMAP_PROBE} TO ${ACL_REMAP_SENTINEL_ROLE}`);
+  });
+}
+
+async function readAclOwnerRemapProbe(admin: Sql): Promise<{
+  owner: string;
+  relaclIsNull: boolean;
+  relaclMatchesOwnerDefault: boolean;
+  columnAcl: Array<{ grantor: string; grantee: string; privilege: string; grantable: boolean }>;
+}> {
+  const [relation] = await admin<{ owner: string; relacl_is_null: boolean; relacl_matches_owner_default: boolean }[]>`
+    SELECT relation_owner.rolname AS owner,
+      relation.relacl IS NULL AS relacl_is_null,
+      relation.relacl = acldefault('r', relation.relowner) AS relacl_matches_owner_default
+    FROM pg_class relation
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    JOIN pg_roles relation_owner ON relation_owner.oid = relation.relowner
+    WHERE namespace.nspname = 'public' AND relation.relname = ${ACL_REMAP_PROBE}
+  `;
+  if (!relation) throw new Error("ACL owner-remap probe table is missing");
+  const columnAcl = await admin<{ grantor: string; grantee: string; privilege: string; grantable: boolean }[]>`
+    SELECT CASE WHEN acl.grantor = relation.relowner THEN 'RELATION_OWNER' ELSE grantor.rolname END AS grantor,
+      CASE WHEN acl.grantee = 0 THEN 'PUBLIC' ELSE grantee.rolname END AS grantee,
+      acl.privilege_type AS privilege, acl.is_grantable AS grantable
+    FROM pg_class relation
+    JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
+    JOIN pg_attribute attribute ON attribute.attrelid = relation.oid
+      AND attribute.attname = 'sentinel' AND attribute.attnum > 0 AND NOT attribute.attisdropped
+    CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
+    JOIN pg_roles grantor ON grantor.oid = acl.grantor
+    LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
+    WHERE namespace.nspname = 'public' AND relation.relname = ${ACL_REMAP_PROBE}
+    ORDER BY grantor, grantee, acl.privilege_type, acl.is_grantable
+  `;
+  return {
+    owner: relation.owner,
+    relaclIsNull: relation.relacl_is_null,
+    relaclMatchesOwnerDefault: relation.relacl_matches_owner_default,
+    columnAcl,
+  };
 }
 
 function providerProfile(maxConcurrentOperations = 2): ProviderConstraintProfileV1 {
@@ -376,6 +467,15 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
     "actual native backup/restore rejects stale fence authorities and admits fresh authority", async () => {
       ctx();
       await resetRuntimeRows();
+      await installAclOwnerRemapProbe(ctx().admin);
+      const sourceAclProbe = await readAclOwnerRemapProbe(ctx().admin);
+      expect(sourceAclProbe.owner).toBe(ACL_REMAP_SOURCE_OWNER);
+      expect(sourceAclProbe.relaclIsNull).toBe(false);
+      expect(sourceAclProbe.relaclMatchesOwnerDefault).toBe(true);
+      expect(sourceAclProbe.columnAcl).toEqual([{
+        grantor: "RELATION_OWNER", grantee: ACL_REMAP_SENTINEL_ROLE, privilege: "SELECT", grantable: false,
+      }]);
+      await openNormalDistributedStartup(adminUrl);
       const backup = await runDatabaseBackup({
         connectionString: adminUrl, backupDir: dataDir,
         filenamePrefix: "m4-native-fence", backupEngine: "pg_dump",
@@ -399,6 +499,12 @@ integration("REL-003 Lane B — restored state rejects a stale fence (real guard
         operator = createOperatorDbConnection(operatorUrl.toString(), { max: 8 });
       }
       await restore(backup.backupFile);
+      const restoredAclProbe = await readAclOwnerRemapProbe(ctx().admin);
+      expect(restoredAclProbe.owner).toBe("postgres");
+      expect(restoredAclProbe.columnAcl).toEqual(sourceAclProbe.columnAcl);
+      await openNormalDistributedStartup(adminUrl);
+      expect(restoredAclProbe.relaclIsNull).toBe(false);
+      expect(restoredAclProbe.relaclMatchesOwnerDefault).toBe(true);
       // This absence is produced by restoring the actual earlier backup, not by
       // deleting the lease in the scenario under test.
       const [restored] = await ctx().admin`SELECT count(*)::int AS n FROM leases WHERE id = ${old.identity.leaseId}`;
