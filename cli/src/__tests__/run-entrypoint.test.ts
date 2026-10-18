@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { cp, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { build } from "esbuild";
 import { beforeAll, expect, it } from "vitest";
@@ -73,15 +74,22 @@ async function fixture(options: { source?: boolean; installed?: boolean; without
     for (const key of ["PATH", "Path", "SystemRoot", "SYSTEMROOT", "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME", "USERPROFILE"]) {
       if (process.env[key] !== undefined) env[key] = process.env[key];
     }
-    const args = options.source ? [join(cliDir, "node_modules", "tsx", "dist", "cli.mjs"), entry] : [entry];
+    // Use the same tsx loader in the owned child directly. Its CLI wrapper
+    // starts a second Node process, adding avoidable startup work to this test.
+    const args = options.source
+      ? ["--import", pathToFileURL(createRequire(import.meta.url).resolve("tsx")).href, entry]
+      : [entry];
+    let pid: number | undefined;
     try {
-      const result = await execFileAsync(process.execPath, [...args, "onboard", "--yes", "--data-dir", join(directory, "state")], {
+      const execution = execFileAsync(process.execPath, [...args, "onboard", "--yes", "--data-dir", join(directory, "state")], {
         cwd: directory, env: { ...env, ...extraEnv }, timeout: 15_000,
       });
-      return { code: 0, stdout: result.stdout, stderr: result.stderr };
+      pid = execution.child.pid;
+      const result = await execution;
+      return { code: 0, stdout: result.stdout, stderr: result.stderr, pid };
     } catch (error) {
       const result = error as Error & { code: number; stdout: string; stderr: string };
-      return { code: result.code, stdout: result.stdout, stderr: result.stderr };
+      return { code: result.code, stdout: result.stdout, stderr: result.stderr, pid };
     }
   }
   return { directory, run, cleanup: () => rm(directory, { recursive: true, force: true }) };
@@ -186,11 +194,15 @@ it("installed CLI resolves its server package even when run from a source worksp
 it.each([undefined, "false"])("source CLI keeps the tsx server path and respects UI development middleware override %s", async (uiDev) => {
   const test = await fixture({ source: true });
   try {
-    await put(join(test.directory, "server", "src", "index.ts"), marker("source"));
+    await put(join(test.directory, "server", "src", "index.ts"),
+      marker("source") + 'console.log(JSON.stringify({ entryProcessId: process.pid }));');
     await put(join(test.directory, "server", "dist", "index.js"), 'throw new Error("BUILD_ENTRY_WAS_SELECTED");');
     const result = await test.run(uiDev === undefined ? {} : { AOA_UI_DEV_MIDDLEWARE: uiDev });
     expect(result, result.stderr).toMatchObject({ code: 0 });
     expect(result.stdout).toContain(JSON.stringify({ entry: "source", uiDev: uiDev ?? "true" }));
+    // The fixture should execute the source CLI in the child it owns, without
+    // paying for a tsx CLI supervisor and a second Node startup.
+    expect(result.stdout).toContain(JSON.stringify({ entryProcessId: result.pid }));
   } finally { await test.cleanup(); }
 });
 
