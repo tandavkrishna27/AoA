@@ -22,6 +22,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execute, type CodexExecuteDeps } from "../server/execute.js";
+import { testModelCatalogLoader } from "../server/__tests__/model-catalog-fixture.js";
 import type { DriverResult } from "../server/app-server/driver.js";
 import type { RunAppServerTurnInput } from "../server/execute-app-server.js";
 import type {
@@ -121,7 +122,7 @@ describe("codex execute — runtime-decision path routing", () => {
   it("flag true + local target → invokes the bridged runner (not exec)", async () => {
     await withWorkspace(async (workspace, commandPath) => {
       const runAppServerTurn = makeRunAppServerTurnSpy(async () => makeDriverResult());
-      const deps: CodexExecuteDeps = { runAppServerTurn };
+      const deps: CodexExecuteDeps = { runAppServerTurn, getModelCatalog: testModelCatalogLoader };
       const result = await execute(
         baseCtx(workspace, commandPath, {
           runtimeDecisionRoutingEnabled: true,
@@ -140,7 +141,7 @@ describe("codex execute — runtime-decision path routing", () => {
   it("flag ABSENT but broker present → exec path (P1 miswire regression)", async () => {
     await withWorkspace(async (workspace, commandPath) => {
       const runAppServerTurn = vi.fn(async () => makeDriverResult());
-      const deps: CodexExecuteDeps = { runAppServerTurn };
+      const deps: CodexExecuteDeps = { runAppServerTurn, getModelCatalog: testModelCatalogLoader };
       const result = await execute(
         // Broker present (as on EVERY run) but routing flag unset.
         baseCtx(workspace, commandPath, { runtimeDecisionBroker: dummyBroker }),
@@ -161,7 +162,7 @@ describe("codex execute — runtime-decision path routing", () => {
           runtimeDecisionRoutingEnabled: false,
           runtimeDecisionBroker: dummyBroker,
         }),
-        { runAppServerTurn },
+        { runAppServerTurn, getModelCatalog: testModelCatalogLoader },
       );
       expect(runAppServerTurn).not.toHaveBeenCalled();
       expect(result.sessionId).toBe("codex-session-exec");
@@ -208,7 +209,7 @@ describe("codex execute — runtime-decision path routing", () => {
             logs.push(chunk);
           },
         },
-        { runAppServerTurn },
+        { runAppServerTurn, getModelCatalog: testModelCatalogLoader },
       );
       // Bridged runner NOT used; the remote exec runner was.
       expect(runAppServerTurn).not.toHaveBeenCalled();
@@ -237,7 +238,7 @@ describe("codex execute — runtime-decision path routing", () => {
             logs.push(chunk);
           },
         }),
-        { runAppServerTurn },
+        { runAppServerTurn, getModelCatalog: testModelCatalogLoader },
       );
       expect(runAppServerTurn).toHaveBeenCalledTimes(1);
       // The behavioral guarantee that bypass is ignored: a warning is emitted on
@@ -266,7 +267,7 @@ describe("codex execute — result assembly parity", () => {
           runtimeDecisionRoutingEnabled: true,
           runtimeDecisionBroker: dummyBroker,
         }),
-        { runAppServerTurn },
+        { runAppServerTurn, getModelCatalog: testModelCatalogLoader },
       );
       // session fields
       expect(result.sessionId).toBe("thread-xyz");
@@ -295,7 +296,7 @@ describe("codex execute — result assembly parity", () => {
           runtimeDecisionRoutingEnabled: true,
           runtimeDecisionBroker: dummyBroker,
         }),
-        { runAppServerTurn },
+        { runAppServerTurn, getModelCatalog: testModelCatalogLoader },
       );
       expect(result.timedOut).toBe(true);
       expect(result.errorMessage).toContain("Timed out after");
@@ -307,6 +308,7 @@ describe("codex execute — result assembly parity", () => {
     await withWorkspace(async (workspace, commandPath) => {
       const result = await execute(baseCtx(workspace, commandPath), {
         runAppServerTurn: vi.fn(async () => makeDriverResult()),
+        getModelCatalog: testModelCatalogLoader,
       });
       // fake exits cleanly → signal null (the field is present + preserved)
       expect(result.signal).toBeNull();

@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "recordDate": "2026-10-16",
+  "timezone": "Asia/Calcutta",
+  "branch": "codex/replatform-baseline-w00-w04",
+  "testedApplication": "05522b0f22e9df84ddfa6d3444d0362e4ad8a6cd",
+  "publicationScope": "Sanitized portable summary and raw-file hash receipts, not raw logs, credentials or a new test run",
+  "verdict": "Not fully green; native TST-008 and broader acceptance remain open",
+  "tooling": {
+    "node": "24.19.0",
+    "pnpm": "9.15.4",
+    "nativeCodex": "0.145.0"
+  },
+  "normalFull": {
+    "windows": {
+      "nativeExit": 1,
+      "platform": "win32",
+      "architecture": "x64",
+      "node": "v24.19.0",
+      "files": {
+        "nativeSummary": "Test Files  3 failed | 2523 passed | 227 skipped (2753)",
+        "passed": 2523,
+        "failed": 3,
+        "skipped": 227
+      },
+      "tests": {
+        "nativeSummary": "Tests  3 failed | 24360 passed | 2132 skipped (26495)",
+        "passed": 24360,
+        "failed": 3,
+        "skipped": 2132
+      },
+      "unhandledErrorObservation": "Native summary reports 1 error; artifact WireProtocolError unhandled rejection",
+      "captureCounters": "Original capture summary/unhandled counters remain unknown; native counts above are separately transcribed from final stdout"
+    },
+    "linuxArm64": {
+      "nativeExit": 0,
+      "platform": "linux",
+      "architecture": "arm64",
+      "node": "v24.19.0",
+      "files": {
+        "nativeSummary": "Test Files  2743 passed | 10 skipped (2753)",
+        "passed": 2743,
+        "failed": 0,
+        "skipped": 10
+      },
+      "tests": {
+        "nativeSummary": "Tests  26414 passed | 81 skipped (26495)",
+        "passed": 26414,
+        "failed": 0,
+        "skipped": 81
+      },
+      "unhandledErrorObservation": "No Errors line in native final summary; native exit 0",
+      "captureCounters": "Original capture summary/unhandled counters remain unknown; native counts above are separately transcribed from final stdout"
+    }
+  },
+  "focused": {
+    "windows": {
+      "nativeExit": 1,
+      "passed": 252,
+      "failed": 1
+    },
+    "linuxArm64": {
+      "nativeExit": 0,
+      "passed": 253,
+      "failed": 0
+    }
+  },
+  "diagnostics": {
+    "windowsThreeFileRerun": {
+      "nativeExit": 0,
+      "passed": 55,
+      "doesNotReplacePrimaryLane": true
+    },
+    "windowsArtifactRerun": {
+      "nativeExit": 0,
+      "passed": 34,
+      "doesNotReplacePrimaryLane": true
+    },
+    "extractionParser": {
+      "inferenceCalls": 0,
+      "currentArgumentOrderExit": 2,
+      "version": "0.145.0",
+      "rootOptionOrderControlExit": 0
+    }
+  },
+  "fixtures": {
+    "spine": {
+      "nativeExit": 0,
+      "passed": 10
+    },
+    "faultProfileWindows": {
+      "nativeExit": 1,
+      "passed": 25,
+      "failed": 1,
+      "failedBoundary": "Linux-only uid/gid ownership case refused win32"
+    },
+    "selectedLinuxExpiry": {
+      "nativeExit": 0,
+      "passed": 1,
+      "notFullProfile": true
+    },
+    "slots": {
+      "nativeExit": 0,
+      "passed": 2
+    },
+    "nativeRestore": {
+      "nativeExit": 0,
+      "passedTopLevel": 2,
+      "notExpandedStaging": true
+    }
+  },
+  "userRetry": {
+    "observedAt": "2026-10-16T14:27:23.832Z",
+    "task": {
+      "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+      "identifier": "QAN-1",
+      "title": "QA Commander tool smoke 05522b0f2",
+      "status": "backlog",
+      "workMode": "standard",
+      "assigneeAgentId": null,
+      "assigneeUserId": null,
+      "executionRunId": null,
+      "createdAt": "2026-10-16T14:23:49.720Z"
+    },
+    "crewPaused": true,
+    "activeCommanderCrewRuns": 0,
+    "taskLinkedCommanderCrewRuns": 0,
+    "conclusion": "Task creation now verified after user retry/approval. Requested planning mode was not honored: persisted workMode=standard. Raw OPTIONS markup remains. No assignee or execution-run link observed; no automatic inference retry was initiated by this observer."
+  },
+  "e2b": {
+    "result": "pass",
+    "passedChecks": 5,
+    "cleanup": "verified_absent",
+    "notInference": true
+  },
+  "custody": {
+    "workstation": "Operator workspace sibling validation-2026-10-16 (outside checkout)",
+    "vps": "/opt/aoa-validation-2026-10-16/evidence",
+    "cloneAvailability": "Originals are not committed attachments; access must be arranged with the operator",
+    "exclusions": "No auth homes, protected runtime environments, database volumes or raw archives published"
+  },
+  "receipts": [
+    {
+      "file": "TEST-REPORT.txt",
+      "sizeBytes": 11109,
+      "sha256": "bf4821bfb1330147204ba730ef21f4cd896160f5174a9170ca4da1a25d1b11c1"
+    },
+    {
+      "file": "full/result.json",
+      "sizeBytes": 1194,
+      "sha256": "66af6fe0c1c38cdcbe4ef07ef890eeac704ea30a3671af539260f593ff568cb3"
+    },
+    {
+      "file": "full/stdout.txt",
+      "sizeBytes": 531067,
+      "sha256": "8dffffdbd8639f8b02ff555f33b22dbd31f9e3430b94657196c45d84aa67d5bc"
+    },
+    {
+      "file": "full/stderr.txt",
+      "sizeBytes": 91235,
+      "sha256": "4491f076a8efa0c92f152ec3aa195258fc4c64e6039dc63abeb5afedad76666e"
+    },
+    {
+      "file": "focused/result.json",
+      "sizeBytes": 1827,
+      "sha256": "31e21c5f31d3ecd2a1729f0014a4577e35ce5336dfe16b89ff40258f6df787f5"
+    },
+    {
+      "file": "focused/stdout.txt",
+      "sizeBytes": 610397,
+      "sha256": "2bc5a6d22e01a58fb47a1bf9a58934a3c1582c3d065c967ca1f6e910d9da5752"
+    },
+    {
+      "file": "focused/stderr.txt",
+      "sizeBytes": 898,
+      "sha256": "ef12b2e548e8d66448f9765f988c1dbe643b74ec5283ec7d5939bc78f0faf2ac"
+    },
+    {
+      "file": "vps-evidence/full/result.json",
+      "sizeBytes": 1145,
+      "sha256": "27c3b92046d2272aaff69945325f3734d3c8bef0d93329e4c5bfc226f73c37fa"
+    },
+    {
+      "file": "vps-evidence/full/stdout.txt",
+      "sizeBytes": 23700528,
+      "sha256": "685e98c812bbf0b3721d506f500d32b62efa23a2a08dc0fd640b69d3a4ce70bd"
+    },
+    {
+      "file": "vps-evidence/full/stderr.txt",
+      "sizeBytes": 97419,
+      "sha256": "bfcd9ad1263e6631af66f3ad8781653b3c4d5a3001456f7eef97a496dbea1a2d"
+    },
+    {
+      "file": "vps-evidence/focused/result.json",
+      "sizeBytes": 1779,
+      "sha256": "1ea32dc0ee262dc81b37fe77e7c4939189f30c8734056345bceff481efe57abd"
+    },
+    {
+      "file": "isolated-full-failures/result.json",
+      "sizeBytes": 1423,
+      "sha256": "3d3532230772c3630bb43766184336dee52ca92d6c4ee7fcc79fba36365129a0"
+    },
+    {
+      "file": "isolated-full-failures/stdout.txt",
+      "sizeBytes": 1483,
+      "sha256": "fb3eda8ae0d9d1652f188825e15463570175d777e277a63a2b4d779ff0f86a95"
+    },
+    {
+      "file": "isolated-artifacts-correct-argv/result.json",
+      "sizeBytes": 1323,
+      "sha256": "f5af50a30f463b2c571424d0db602010b114f786cfd3069bd5d0a62292fbf037"
+    },
+    {
+      "file": "isolated-artifacts-correct-argv/stdout.txt",
+      "sizeBytes": 671,
+      "sha256": "37069b94704515af18d8d94a5d823083d27c25c6833bb48b8d30dc209c2422d9"
+    },
+    {
+      "file": "native-extraction-observe.json",
+      "sizeBytes": 720,
+      "sha256": "2654122b447b96f530219bc26fb8d1dbe10e9a29a5988a63a8bb07427cc33aac"
+    },
+    {
+      "file": "extraction-argv.result.json",
+      "sizeBytes": 124,
+      "sha256": "81a1ea818a83b0ae11240e05636c1bddf69f86339be178296cafefa405ff3776"
+    },
+    {
+      "file": "native-catalog-diagnostic-absolute-managed-short-home.json",
+      "sizeBytes": 978,
+      "sha256": "2a17363c0866708a53b59ad4d5caaad2321ab218ee040a1c46256d9cc012abd1"
+    },
+    {
+      "file": "native-user-retry-observation.json",
+      "sizeBytes": 2572,
+      "sha256": "f03dd3671b5364383ed90f90f25bc864d21316de88efcba2a19d016862516e84"
+    },
+    {
+      "file": "cloud-boundary.json",
+      "sizeBytes": 493,
+      "sha256": "fe9f6d45b71b96c51ebf608e1eec9912fb89ece59aa19634e83887e265c121c8"
+    },
+    {
+      "file": "vps-evidence/e2b-smoke.json",
+      "sizeBytes": 1262,
+      "sha256": "8bd33648671a99cf87ebd40eb509ca364ab184d02a6f5bdb3a6088e5fa637f48"
+    },
+    {
+      "file": "d1-spine.result.json",
+      "sizeBytes": 287,
+      "sha256": "79f7143c06df0c159c7de3bec044e3ba6a83bcb938219e551406bfd2520a7512"
+    },
+    {
+      "file": "d1-fault.result.json",
+      "sizeBytes": 305,
+      "sha256": "383f3cc97e1add033d986db3cc3de6528172db8461cc4ece92247bb5f03164d1"
+    },
+    {
+      "file": "d1-linux-expiry.result.json",
+      "sizeBytes": 282,
+      "sha256": "28110ab0a58e28a9ba1a75839e97e4c1ddc7dd93ce66b24d5f7d838cd3df5817"
+    },
+    {
+      "file": "d1-slots.result.json",
+      "sizeBytes": 303,
+      "sha256": "255450b56582cf7467533165c2524f0a998a42079e8ad5446705256e25eb127d"
+    },
+    {
+      "file": "native-restore.result.json",
+      "sizeBytes": 282,
+      "sha256": "43e31a4d20d2b9aae3faaae14260cb00a462c4c1c9bf51d11a617b84b4221df6"
+    }
+  ]
+}

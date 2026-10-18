@@ -491,8 +491,16 @@ function AoaConfigurePage({
   const { pushToast } = useToast();
 
   const { data: adapterModels } = useQuery({
-    queryKey: queryKeys.agents.adapterModels(companyId, agent.adapterType),
-    queryFn: () => agentsApi.adapterModels(companyId, agent.adapterType),
+    queryKey: queryKeys.agents.adapterModels(
+      companyId,
+      agent.adapterType,
+      agent.adapterType === "codex_local" ? agent.id : undefined,
+    ),
+    queryFn: () => agentsApi.adapterModels(
+      companyId,
+      agent.adapterType,
+      agent.adapterType === "codex_local" ? agent.id : undefined,
+    ),
     enabled: Boolean(companyId),
   });
 

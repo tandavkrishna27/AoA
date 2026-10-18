@@ -1,0 +1,796 @@
+{
+  "schemaVersion": 1,
+  "recordDate": "2026-10-17",
+  "timezone": "Asia/Calcutta",
+  "branch": "codex/replatform-baseline-w00-w04",
+  "testedApplication": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+  "publicationScope": "Sanitized exact-candidate retest summary and finalized raw-file hash receipts; no raw credentials/private homes or new application fixes",
+  "verdict": "Bounded F01 extraction, F02 cloud denial recovery/retry, F03 Planning and F04 native choices passed; F05 raw built startup remains failed; distributed/other-owner live cases pending",
+  "tooling": {
+    "pnpm": "9.15.4",
+    "node": "24.19.0",
+    "codex": "0.145.0"
+  },
+  "selectedTests": [
+    "cli/src/__tests__/run-entrypoint.test.ts",
+    "server/src/__tests__/agent-loop.test.ts",
+    "server/src/__tests__/cli-mode.test.ts",
+    "server/src/__tests__/commander-adapter-turn.test.ts",
+    "server/src/__tests__/commander-claimed-rejoin.test.ts",
+    "server/src/__tests__/commander-distributed-output.test.ts",
+    "server/src/__tests__/commander-history-recovery.test.ts",
+    "server/src/__tests__/commander-turn-claim.integration.test.ts",
+    "server/src/__tests__/extraction-cli.test.ts",
+    "server/src/__tests__/extraction-file-import-sandbox.test.ts",
+    "server/src/__tests__/job-placement.integration.test.ts",
+    "ui/src/__tests__/InternalAgentPanel.transient-confirm.test.ts",
+    "ui/src/components/InternalAgentPanel.bstates.test.tsx"
+  ],
+  "automated": {
+    "linux": {
+      "initialSummary": {
+        "testsFailed": 1,
+        "filesFailed": 1,
+        "filesPassed": 12,
+        "testsPassed": 249,
+        "failure": "source CLI keeps the tsx server path and respects UI development middleware override undefined: Test timed out in 5000ms"
+      },
+      "quietCli": {
+        "stage": "cli-quiet",
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "exitCode": 0,
+        "durationSeconds": 23,
+        "workers": 1,
+        "timeoutsChanged": false
+      },
+      "install": {
+        "stage": "install",
+        "exitCode": 0,
+        "durationSeconds": 11,
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "initialTargeted": {
+        "stage": "targeted",
+        "exitCode": 1,
+        "durationSeconds": 99,
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "serialTargeted": {
+        "stage": "targeted-serial",
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "exitCode": 0,
+        "durationSeconds": 95,
+        "workers": 1,
+        "timeoutsChanged": false
+      },
+      "typecheckAffected": {
+        "stage": "typecheck-affected",
+        "exitCode": 0,
+        "durationSeconds": 203,
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "interpretation": "Original two-worker red retained; isolated and serial reruns pass unchanged timeouts/assertions; cause not proven",
+      "serialSummary": {
+        "testsPassed": 250,
+        "filesPassed": 13
+      },
+      "build": {
+        "stage": "build",
+        "exitCode": 0,
+        "durationSeconds": 393,
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      }
+    },
+    "windows": {
+      "build": {
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "startedAt": "2026-10-17T16:35:33.3850781Z",
+        "stage": "build",
+        "durationSeconds": 147.05,
+        "exitCode": 0,
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "nativeSummary": {
+        "testsSkipped": 47,
+        "filesPassed": 12,
+        "testsPassed": 203,
+        "filesSkipped": 1
+      },
+      "install": {
+        "pnpm": "9.15.4",
+        "node": "24.19.0",
+        "startedAt": "2026-10-17T16:35:10.6107263Z",
+        "durationSeconds": 6.07,
+        "exitCode": 0,
+        "stage": "install",
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9"
+      },
+      "targeted": {
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "startedAt": "2026-10-17T16:38:00.4971492Z",
+        "stage": "targeted",
+        "durationSeconds": 34.67,
+        "exitCode": 0,
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      },
+      "typecheckAffected": {
+        "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "startedAt": "2026-10-17T16:38:35.2142986Z",
+        "stage": "typecheck-affected",
+        "durationSeconds": 70.28,
+        "exitCode": 0,
+        "node": "24.19.0",
+        "pnpm": "9.15.4"
+      }
+    },
+    "scope": "13 changed test files, four affected-package typechecks and authoritative builds; no complete-suite repeat"
+  },
+  "F01": {
+    "exitEvidence": "Service completed and persisted output; separate raw child exit receipt unavailable; do not infer generic capture counters",
+    "ui": "Two useful pending review items visible in saved Discussion",
+    "discussionId": "cf032493-3779-4271-8635-e62f2f59bacd",
+    "verifyOutcome": "verified",
+    "entry": {
+      "id": "883aac26-6db2-4677-8cf1-20ab0e210094",
+      "extractionStatus": "completed",
+      "extractedItems": [
+        {
+          "id": "84e64b35-d829-426e-9892-b72c41a1260c",
+          "discussionEntryId": "883aac26-6db2-4677-8cf1-20ab0e210094",
+          "type": "task",
+          "title": "Prepare dashboard indicator persistence checklist",
+          "description": "Prepare a QA checklist confirming that the disposable blue dashboard indicator persists after a reload.",
+          "suggestedPriority": null,
+          "suggestedAssigneeId": null,
+          "suggestedDepartmentId": null,
+          "suggestedProjectId": null,
+          "suggestedLayer": "working",
+          "suggestedGoalId": null,
+          "layer": "working",
+          "priority": null,
+          "dedupAction": null,
+          "selectedMemoryId": null,
+          "mergedContent": null,
+          "status": "pending",
+          "resultTaskId": null,
+          "resultMemoryId": null,
+          "conflictsWith": null,
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "departmentId": null,
+          "embedding": null,
+          "createdAt": "2026-10-17T16:40:05.981Z",
+          "updatedAt": "2026-10-17T16:40:05.981Z"
+        },
+        {
+          "id": "ca1a4a65-d3fb-4d16-b0d8-3d588d0e4759",
+          "discussionEntryId": "883aac26-6db2-4677-8cf1-20ab0e210094",
+          "type": "decision",
+          "title": "Use blue status indicator for dummy dashboard",
+          "description": "A blue status indicator will be used for the dummy dashboard.",
+          "suggestedPriority": null,
+          "suggestedAssigneeId": null,
+          "suggestedDepartmentId": null,
+          "suggestedProjectId": null,
+          "suggestedLayer": "active_context",
+          "suggestedGoalId": null,
+          "layer": "active_context",
+          "priority": null,
+          "dedupAction": null,
+          "selectedMemoryId": null,
+          "mergedContent": null,
+          "status": "pending",
+          "resultTaskId": null,
+          "resultMemoryId": null,
+          "conflictsWith": null,
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "departmentId": null,
+          "embedding": null,
+          "createdAt": "2026-10-17T16:40:05.981Z",
+          "updatedAt": "2026-10-17T16:40:05.981Z"
+        }
+      ]
+    }
+  },
+  "F02": {
+    "discard": "Explicit Discard cleared composer; dismissed recovery stayed absent across chat switch/back",
+    "keyboardDraft": {
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "editor": "QA unsent keyboard draft 6ebc400d2",
+      "failureBannerCount": 0
+    },
+    "durableUserRows": 1,
+    "editProof": {
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "editor": "QA F02 retest 6ebc400d2: reply only AOA_F02_OK. Do not use tools, change tasks, or execute anything. The attached QA note is disposable test context.\n\nReferenced context:\n- File: qa-reference.txt | id=346d94eb-1c1f-4bb7-a086-7ee370659ef6 | route=/api/assets/346d94eb-1c1f-4bb7-a086-7ee370659ef6/content | source=commander-upload | detail=contentType=text/plain | byteSize=158 | capability=text-readable"
+    },
+    "after": {
+      "observedAt": "2026-10-17T22:26:01.930049+05:30",
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "messages": [
+        {
+          "id": "fcfd5556-be79-404d-b8d8-463daf33d849",
+          "role": "user",
+          "content": "QA F02 retest 6ebc400d2: reply only AOA_F02_OK. Do not use tools, change tasks, or execute anything. The attached QA note is disposable test context.\n\nReferenced context:\n- File: qa-reference.txt | id=346d94eb-1c1f-4bb7-a086-7ee370659ef6 | route=/api/assets/346d94eb-1c1f-4bb7-a086-7ee370659ef6/content | source=commander-upload | detail=contentType=text/plain | byteSize=158 | capability=text-readable",
+          "turn_status": "failed",
+          "client_submission_id": "e9741e23-e20f-4cbc-bb76-3e47fb6f59a5",
+          "conversation_id": "fd234759-227e-4b4a-9310-229f05178a8c",
+          "run_id": "472a8284-7c02-4594-b0e3-bf376ca8d178",
+          "tool_results": {
+            "v": 1,
+            "kind": "commander_submission",
+            "payload": {
+              "message": "QA F02 retest 6ebc400d2: reply only AOA_F02_OK. Do not use tools, change tasks, or execute anything. The attached QA note is disposable test context.\n\nReferenced context:\n- File: qa-reference.txt | id=346d94eb-1c1f-4bb7-a086-7ee370659ef6 | route=/api/assets/346d94eb-1c1f-4bb7-a086-7ee370659ef6/content | source=commander-upload | detail=contentType=text/plain | byteSize=158 | capability=text-readable",
+              "pageContext": "Commander",
+              "contextScope": {
+                "route": "/QAC/commander",
+                "surface": "commander"
+              },
+              "departmentContext": null,
+              "attachmentAssetIds": [
+                "346d94eb-1c1f-4bb7-a086-7ee370659ef6"
+              ]
+            }
+          }
+        }
+      ],
+      "runs": [
+        {
+          "id": "98e7418c-29d6-44b6-aba8-1340b0145560",
+          "status": "failed",
+          "error_message": "Refusing to dispatch a Commander run without genuine per-tenant isolation (the unsandboxed control-plane host, or a local Docker target) under enforced tenant isolation (cloud_auth). Per-tenant execution isolation is not yet implemented; set AOA_ALLOW_UNSANDBOXED_MULTITENANT=1 to explicitly allow unsandboxed runs on this shared deployment, or configure a provider-sandbox execution target. A tenant-authored runtime name is not proof of worker isolation.",
+          "summary": null,
+          "provider": null,
+          "model": null,
+          "execution_owner": null,
+          "distributed_job_id": null,
+          "distributed_attempt_id": null,
+          "created_at": "2026-10-17T22:23:38.503277+05:30"
+        },
+        {
+          "id": "472a8284-7c02-4594-b0e3-bf376ca8d178",
+          "status": "failed",
+          "error_message": "Refusing to dispatch a Commander run without genuine per-tenant isolation (the unsandboxed control-plane host, or a local Docker target) under enforced tenant isolation (cloud_auth). Per-tenant execution isolation is not yet implemented; set AOA_ALLOW_UNSANDBOXED_MULTITENANT=1 to explicitly allow unsandboxed runs on this shared deployment, or configure a provider-sandbox execution target. A tenant-authored runtime name is not proof of worker isolation.",
+          "summary": null,
+          "provider": null,
+          "model": null,
+          "execution_owner": null,
+          "distributed_job_id": null,
+          "distributed_attempt_id": null,
+          "created_at": "2026-10-17T22:24:32.561393+05:30"
+        }
+      ]
+    },
+    "oldChat": "Explicit unavailable exact-Retry reason; missing original attachment/context metadata is not guessed",
+    "failedAttemptRuns": 2,
+    "draftProof": {
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "observedAt": "2026-10-17T16:56:30.123Z",
+      "editor": "QA newer draft 6ebc400d2 — keep this unsent while the original attachment-bearing retry finishes."
+    },
+    "ui": "Actionable guidance and Retry/Edit/Discard after reload/reopen; Run History failed rows and no inferred provider/model",
+    "payloadIdentical": true,
+    "before": {
+      "observedAt": "2026-10-17T22:24:11.579898+05:30",
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "messages": [
+        {
+          "id": "fcfd5556-be79-404d-b8d8-463daf33d849",
+          "role": "user",
+          "content": "QA F02 retest 6ebc400d2: reply only AOA_F02_OK. Do not use tools, change tasks, or execute anything. The attached QA note is disposable test context.\n\nReferenced context:\n- File: qa-reference.txt | id=346d94eb-1c1f-4bb7-a086-7ee370659ef6 | route=/api/assets/346d94eb-1c1f-4bb7-a086-7ee370659ef6/content | source=commander-upload | detail=contentType=text/plain | byteSize=158 | capability=text-readable",
+          "turn_status": "failed",
+          "client_submission_id": "e9741e23-e20f-4cbc-bb76-3e47fb6f59a5",
+          "conversation_id": "fd234759-227e-4b4a-9310-229f05178a8c",
+          "run_id": "98e7418c-29d6-44b6-aba8-1340b0145560",
+          "tool_results": {
+            "v": 1,
+            "kind": "commander_submission",
+            "payload": {
+              "message": "QA F02 retest 6ebc400d2: reply only AOA_F02_OK. Do not use tools, change tasks, or execute anything. The attached QA note is disposable test context.\n\nReferenced context:\n- File: qa-reference.txt | id=346d94eb-1c1f-4bb7-a086-7ee370659ef6 | route=/api/assets/346d94eb-1c1f-4bb7-a086-7ee370659ef6/content | source=commander-upload | detail=contentType=text/plain | byteSize=158 | capability=text-readable",
+              "pageContext": "Commander",
+              "contextScope": {
+                "route": "/QAC/commander",
+                "surface": "commander"
+              },
+              "departmentContext": null,
+              "attachmentAssetIds": [
+                "346d94eb-1c1f-4bb7-a086-7ee370659ef6"
+              ]
+            }
+          }
+        }
+      ],
+      "runs": [
+        {
+          "id": "98e7418c-29d6-44b6-aba8-1340b0145560",
+          "status": "failed",
+          "error_message": "Refusing to dispatch a Commander run without genuine per-tenant isolation (the unsandboxed control-plane host, or a local Docker target) under enforced tenant isolation (cloud_auth). Per-tenant execution isolation is not yet implemented; set AOA_ALLOW_UNSANDBOXED_MULTITENANT=1 to explicitly allow unsandboxed runs on this shared deployment, or configure a provider-sandbox execution target. A tenant-authored runtime name is not proof of worker isolation.",
+          "summary": null,
+          "provider": null,
+          "model": null,
+          "execution_owner": null,
+          "distributed_job_id": null,
+          "distributed_attempt_id": null,
+          "created_at": "2026-10-17T22:23:38.503277+05:30"
+        }
+      ]
+    }
+  },
+  "F03": {
+    "approvalReplay": {
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "observedAt": "2026-10-17T16:44:13.886Z",
+      "approvals": [
+        {
+          "id": "ffd9083e-1134-4271-9028-a4450757331a",
+          "tool_name": "create_task",
+          "params": {
+            "title": "QA Planning retest 6ebc400d2",
+            "workMode": "planning"
+          },
+          "status": "approved",
+          "decision": "allow_once",
+          "executed_at": "2026-10-17T16:43:26.027Z",
+          "result_summary": "Created task \"QA Planning retest 6ebc400d2\"",
+          "result_error": null
+        }
+      ],
+      "before": [
+        {
+          "id": "b45f4166-226b-4d2a-84b6-f13be85a182e",
+          "title": "QA Planning retest 6ebc400d2",
+          "workMode": "planning",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        },
+        {
+          "id": "c63290a6-16ee-4d95-8af4-7c2473f4b37f",
+          "title": "QA Planning retest fe3db70fe",
+          "workMode": "planning",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        },
+        {
+          "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+          "title": "QA Commander tool smoke 05522b0f2",
+          "workMode": "standard",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        }
+      ],
+      "replay": {
+        "status": 404,
+        "body": {
+          "error": "No pending confirmation for id: ffd9083e-1134-4271-9028-a4450757331a"
+        }
+      },
+      "after": [
+        {
+          "id": "b45f4166-226b-4d2a-84b6-f13be85a182e",
+          "title": "QA Planning retest 6ebc400d2",
+          "workMode": "planning",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        },
+        {
+          "id": "c63290a6-16ee-4d95-8af4-7c2473f4b37f",
+          "title": "QA Planning retest fe3db70fe",
+          "workMode": "planning",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        },
+        {
+          "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+          "title": "QA Commander tool smoke 05522b0f2",
+          "workMode": "standard",
+          "status": "backlog",
+          "assigneeAgentId": null,
+          "assigneeUserId": null,
+          "executionRunId": null
+        }
+      ],
+      "pass": true
+    },
+    "tasks": [
+      {
+        "id": "b45f4166-226b-4d2a-84b6-f13be85a182e",
+        "identifier": "QAN-3",
+        "title": "QA Planning retest 6ebc400d2",
+        "workMode": "planning",
+        "status": "backlog",
+        "assigneeAgentId": null,
+        "assigneeUserId": null,
+        "executionRunId": null
+      },
+      {
+        "id": "c63290a6-16ee-4d95-8af4-7c2473f4b37f",
+        "identifier": "QAN-2",
+        "title": "QA Planning retest fe3db70fe",
+        "workMode": "planning",
+        "status": "backlog",
+        "assigneeAgentId": null,
+        "assigneeUserId": null,
+        "executionRunId": null
+      },
+      {
+        "id": "5ab995d7-6774-474b-814c-13b96cfdcdaf",
+        "identifier": "QAN-1",
+        "title": "QA Commander tool smoke 05522b0f2",
+        "workMode": "standard",
+        "status": "backlog",
+        "assigneeAgentId": null,
+        "assigneeUserId": null,
+        "executionRunId": null
+      }
+    ],
+    "config": {
+      "cliTool": "codex",
+      "model": null,
+      "crewModel": null,
+      "crewPaused": true
+    }
+  },
+  "F04": {
+    "approval": "One Allow once side effect, no task before approval, replay refused",
+    "native": "Canonical buttons visible at actual stream completion, unanswered survives reload, answered stays dismissed after reload/switch/back; legacy answered/unanswered preserved",
+    "pending": "Accepted distributed OPTIONS-only and text-plus-OPTIONS delivery/recovery not exercised"
+  },
+  "uiReconciliationObservation": {
+    "afterCloudRetry": "Live duplicate user text observed; final explicit reload has one user row; DB has one user message throughout",
+    "classification": "UI observation/investigation, not duplicated execution or durable-message proof",
+    "beforeNativeApproval": "Repeated assistant narration observed during live history reconciliation; exactly one approval card and one side effect"
+  },
+  "F05": {
+    "artifactBoundary": "Raw built workspace failed; installed/packed distribution not tested",
+    "plainBuilt": {
+      "stage": "f05-built-onboard",
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "startedAt": "2026-10-17T16:38:59.6612221Z",
+      "result": "fail",
+      "command": "node cli/dist/index.js onboard --yes --data-dir <fresh-owned-home>",
+      "error": "Built CLI exited before usable setup: 1",
+      "remainingListeners": []
+    },
+    "stderr": "Cannot load @napi-rs/canvas: ENOENT node:os?tsx-namespace=<dynamic>; Cannot polyfill DOMMatrix/ImageData/Path2D; DOMMatrix is not defined",
+    "importDiagnostic": {
+      "scopedExit": 1,
+      "directExit": 0,
+      "scope": "Read-only module import diagnostic; no server or provider calls",
+      "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9"
+    },
+    "cleanup": {
+      "ownedProcessesRemaining": 0,
+      "listenersRemaining": 0
+    },
+    "doctorPassed": 9
+  },
+  "incidentalNativeRuns": [
+    {
+      "id": "ec2a2c1a-4c25-412d-b6e8-6e9a48354945",
+      "agent_id": "84467e4c-9c39-432c-943f-d5c3acb4105f",
+      "trigger_type": "sub_agent",
+      "trigger_source": "thread.controller",
+      "status": "completed",
+      "summary": null,
+      "error_message": null,
+      "provider": null,
+      "model": null,
+      "tools_called": [],
+      "related_entity_id": null,
+      "created_at": "2026-10-17T16:40:25.667Z"
+    },
+    {
+      "id": "b0e555bb-4cdf-468d-8293-e8b1930a9857",
+      "agent_id": null,
+      "trigger_type": "conversation",
+      "trigger_source": "user_message",
+      "status": "completed",
+      "summary": null,
+      "error_message": null,
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "tools_called": [],
+      "related_entity_id": null,
+      "created_at": "2026-10-17T16:40:56.412Z"
+    },
+    {
+      "id": "47de9a72-d744-4e84-a527-72f8a45b3cad",
+      "agent_id": null,
+      "trigger_type": "conversation",
+      "trigger_source": "user_message",
+      "status": "completed",
+      "summary": null,
+      "error_message": null,
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "tools_called": [],
+      "related_entity_id": null,
+      "created_at": "2026-10-17T16:42:17.472Z"
+    }
+  ],
+  "incidentalRunLimit": "One automatic thread.controller sub_agent run observed after extraction despite saved crewPaused=true; completed with null provider/model/summary. Not a QAN task dispatch, not a claimed W02/TST-008 pass; no further crew test requested.",
+  "deployment": {
+    "candidate": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+    "observedAt": "2026-10-17T22:21:27.254271+05:30",
+    "health": {
+      "status": "ok",
+      "revision": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "deploymentMode": "cloud_auth",
+      "deploymentExposure": "public",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": false
+      }
+    },
+    "distributedRolloutEnabled": false,
+    "e2bCredentialPresent": false,
+    "scope": "In-place upgrade of owned review app; existing DB/OAuth retained, no personal auth transfer or exposure change"
+  },
+  "pending": [
+    "F05 real workspace startup dependency graph",
+    "Investigate transient duplicate text if retained as a UI issue",
+    "Accepted distributed retry/stale-running rejoin",
+    "Distributed choices-only/text delivery and result recovery",
+    "Separate other-owner/company live session checks",
+    "Deterministic race timing covered by tests, not independently controlled live timing",
+    "Full native TST-008/W02 and release campaign acceptance",
+    "F06-F09 historical investigations unchanged"
+  ],
+  "rawEvidence": {
+    "note": "Original reports, QAN-1/QAN-2 and old captures preserved; generated private homes/auth/runtime archives excluded",
+    "vps": "/opt/aoa-validation-2026-10-17-retest-6ebc400d2/evidence; Linux receipts copied to local vps/",
+    "windows": "Sibling validation-2026-10-17-retest-6ebc400d2 on original test PC; raw files and screenshots not committed"
+  },
+  "rawFileReceipts": [
+    {
+      "file": "install.result.json",
+      "sha256": "68b3ffab5360531ec0f2f299171427a1c90340a83e40e810c9488657dcd58cf1"
+    },
+    {
+      "file": "build.result.json",
+      "sha256": "58d7173d7d2ecfd073cb3838ef69d0c4780c4052ff3633229581c81f580705e9"
+    },
+    {
+      "file": "targeted.result.json",
+      "sha256": "267e6611ab855ed1361da425c175eac983c0701962e91556adf7430ae4a3c339"
+    },
+    {
+      "file": "targeted.stdout.log",
+      "sha256": "638dc5809608c2fde4fb83953f6930fab02c2201ef4b7a345b84a50117aa2acd"
+    },
+    {
+      "file": "typecheck-affected.result.json",
+      "sha256": "ef8015f7b468f646b3586106015e8fb3716a1a261b1d4d6548fa16987a4cd9d8"
+    },
+    {
+      "file": "selected-tests.json",
+      "sha256": "bdc2ffa3fb4e032bc6d2a29edff8055d8a29bd2e6dcc436659931a5ce24d6e92"
+    },
+    {
+      "file": "vps/install.result.json",
+      "sha256": "2605051d7745375a336d56c0151f1a2d34081977f0d38dc42ae603f18813fe0e"
+    },
+    {
+      "file": "vps/build.result.json",
+      "sha256": "f41328979b5fe6cfe2f3adc9a5a318c35b2f3a80a280c983336218e2fd084e16"
+    },
+    {
+      "file": "vps/targeted.result.json",
+      "sha256": "cd3c6acd5180dcab7d1b1dd1f499c080d687a8d894d0fb1208c30a4b730f5c8c"
+    },
+    {
+      "file": "vps/targeted.log",
+      "sha256": "17f030e8eeebeccf86907cd7f943cedaae8113c29eb72a6e158d261dfd38d0df"
+    },
+    {
+      "file": "vps/cli-quiet.result.json",
+      "sha256": "6a2e259cb01c2de6c7a2b50c957d0208e99287880d9face38ad774d7efb94734"
+    },
+    {
+      "file": "vps/cli-quiet.log",
+      "sha256": "990ccbb044a7bdd428a1ba9583b419d88d5792c838bcbfb6cf20a834ee142a5d"
+    },
+    {
+      "file": "vps/targeted-serial.result.json",
+      "sha256": "e7e2359be59365da90ec2b990be6d08b60d7f9ffff0ccc69cc40bda0724eabde"
+    },
+    {
+      "file": "vps/targeted-serial.log",
+      "sha256": "e3cb636bfc83080c0744a34e767e69bd5cd328ad78c8eded29ba151b20870c32"
+    },
+    {
+      "file": "vps/typecheck-affected.result.json",
+      "sha256": "4c9e0c2a6b1b639f8ae94612665d2c26a90dcb3b84d2436b8d3af68a2fd2eb68"
+    },
+    {
+      "file": "vps/deployment.json",
+      "sha256": "a5059f08059606775b195819d80dc24cbd53398ad09ef93a6daa1c3cd5f2ad61"
+    },
+    {
+      "file": "native-verify-ready.json",
+      "sha256": "d376e567ac01545bb406816efc7a60e58e276ff59230762b0024ac43dcbecdcc"
+    },
+    {
+      "file": "native-extraction-start.json",
+      "sha256": "9e9b019aeb109c5cd8df67115932cd5c472fb341b8fd7904d2def6eed2d67265"
+    },
+    {
+      "file": "native-extraction-observe.json",
+      "sha256": "c94c3fc81134df36bf68891c0540c6607d1e522cde9008b73c68be1ef019aefc"
+    },
+    {
+      "file": "native-snapshot-before-approval.json",
+      "sha256": "7b81aa36a21647e027ae4dc84f7366419a362ea25bee8845222afb36d0a0f809"
+    },
+    {
+      "file": "native-snapshot-final.json",
+      "sha256": "94bcab20185cc372e32333e1e716da85686315ac71bc5c9617d808e3fb37e93e"
+    },
+    {
+      "file": "native-approval-replay.json",
+      "sha256": "c465ad30cb52aa3c1b8f98c89054b72c2cdd3f6eec4aa48d0d0aeba0e4e4cba3"
+    },
+    {
+      "file": "native-run-audit.json",
+      "sha256": "f4d0e4fc685760e1f04e6d469ecedf7ed009a0fc83b12f821596442273393b15"
+    },
+    {
+      "file": "f01-persisted-ui.txt",
+      "sha256": "fc90c1f917add74d27dbb1d0a489486f4133a82b691fab556beb8e39910f019e"
+    },
+    {
+      "file": "f01-persisted-ui.png",
+      "sha256": "ea07515701ec39afb4d298a59a899ac595ca6737c28e70734243b482cbeb294c"
+    },
+    {
+      "file": "f03-planning-ui.txt",
+      "sha256": "a47ff092fb85c15c045c13e0f12545360b89f73e672935405695c724e7ed9d8a"
+    },
+    {
+      "file": "f03-planning-ui.png",
+      "sha256": "decf3aae71de4c5f835c06147ddb5c8d5ad0105033d517b46c21282c2ee9f41c"
+    },
+    {
+      "file": "f04-canonical-stream-ui.txt",
+      "sha256": "43004855285e9f5ee07f96b3ea9613f638b0837208c6a666d48de4417a821f26"
+    },
+    {
+      "file": "f04-canonical-stream.png",
+      "sha256": "74fa0ddbe7d0be8a2756bd9c0d26ba6d01c62d8c6d14affebcb46f7b7da66db6"
+    },
+    {
+      "file": "f04-unanswered-reload-ui.txt",
+      "sha256": "bf674cff84202a7304b935e6fdd71d85b60e361b65c4fc5a34b9e7c7ba8dbb95"
+    },
+    {
+      "file": "f04-pending-approval-ui.txt",
+      "sha256": "664b965fa4b1d385b9e79b3a25ecc016ca9d99d698503efc5b4b6b88e2fbe39a"
+    },
+    {
+      "file": "f04-answered-reload-ui.txt",
+      "sha256": "4c9a90444ca9cd76c6b37c557cd4ed72d0c2767a281bb272b3786a93f70f58b8"
+    },
+    {
+      "file": "f04-answered-switch-back-ui.txt",
+      "sha256": "10531f86675efea773b8a441638591f54783d0627d60e55447670e3483a45d4a"
+    },
+    {
+      "file": "f04-legacy-ui.txt",
+      "sha256": "2526135b13f08d45ae53447df2f0ad65cabd958faa6e7e82aeef3811878f149b"
+    },
+    {
+      "file": "f04-old-answered-dismissed-ui.txt",
+      "sha256": "81678e520f5ab57ea2c2d6edaa886862cfe9aa473463943c422a900deddf28c1"
+    },
+    {
+      "file": "cloud-before-reload-complete.json",
+      "sha256": "c30dcbdae77f7461af990084b5f15da5ceebfd0ee4c953bc624f882d17203ac7"
+    },
+    {
+      "file": "cloud-after-retry-complete.json",
+      "sha256": "4232ccfd236ec8200bd17bcc802f766701bcfa1294e9eafb324081bc739c4155"
+    },
+    {
+      "file": "f02-reloaded-guidance-ui.txt",
+      "sha256": "a41c2de61a91b4bb0a40e45f0c352e1eeb1704f1b53fd34a81be4c6be1a907ff"
+    },
+    {
+      "file": "f02-reloaded-guidance.png",
+      "sha256": "aa377a03f050ec76fd6341bf53ffa7e34af517d7c8b305b4eca5908550209f34"
+    },
+    {
+      "file": "f02-after-retry-live-ui.txt",
+      "sha256": "fd6417382ab45cca61412425588fec80c943dbae51ee14bd0ea20f58c83340fd"
+    },
+    {
+      "file": "f02-after-retry-live.png",
+      "sha256": "d1d43409d286fa37ed97a7ee1951426286b0637b61906b86b0eb4bf5a8b01bf0"
+    },
+    {
+      "file": "f02-final-reload-ui.txt",
+      "sha256": "e37ee06f3d66a55c4e7401c908cbed5ececeef803beb545877e77061d92a7d23"
+    },
+    {
+      "file": "f02-old-chat-guidance-ui.txt",
+      "sha256": "8307b743b5cacdfa49a68a7f13094143e95b2c3991b1089ed8a050d704afae38"
+    },
+    {
+      "file": "f02-draft-preserved.json",
+      "sha256": "bda1f2d788d49e2a5f3b3d05501016fa075bec069c3aeb74bfaff6a8e24a91b9"
+    },
+    {
+      "file": "f02-keyboard-draft.json",
+      "sha256": "cc6d9bbc1a8bd54251908df8aaa6e27bcab5c2772cf04cf06d01a08d31cc488a"
+    },
+    {
+      "file": "f02-discard-switch-back-ui.txt",
+      "sha256": "7b616b17a17fd1710ae4f9ffee7274d457b37d087996eeb970ac10edbbe95c94"
+    },
+    {
+      "file": "f02-edit-restored-ui.txt",
+      "sha256": "15a5cc09e77c6dc3fb26c342e097afb1fbe2bf1d5453c6242f561afd246980b6"
+    },
+    {
+      "file": "f02-edit-restored-editor.json",
+      "sha256": "0a3b7db45fd9337e44ab22249dadcdb6171c973206e63c43745885432384ee73"
+    },
+    {
+      "file": "f02-run-history-ui.txt",
+      "sha256": "7a0c526b42f25e9f74439f64bced2a4cf75638b63126df78d310a07da799ab6d"
+    },
+    {
+      "file": "f05-built-onboard.result.json",
+      "sha256": "fc661cda48015fd2904f2a4bd29cb02bf450859759ab3bb373d3a0b34a70657f"
+    },
+    {
+      "file": "f05-built-onboard.stdout.log",
+      "sha256": "d3c798075bb66ba74b3c61c36853b5635583d029bccf4b0840dc368e6ef0d409"
+    },
+    {
+      "file": "f05-built-onboard.stderr.log",
+      "sha256": "3fe5c3ab05636a1899227535e2a552bc7cfe02be2b9d7afeedc53ab485b35801"
+    },
+    {
+      "file": "f05-import-diagnostic.result.json",
+      "sha256": "9025d705a94fa27f34e549b73fd1dbe2e9b8122567b7c5a677a25b6ceeb2de8f"
+    },
+    {
+      "file": "f05-import-direct.stdout.log",
+      "sha256": "19b60799807277fffad2fb79b7e9516bac148f4bd223e5f791ad3499349684a3"
+    },
+    {
+      "file": "f05-import-scoped.stderr.log",
+      "sha256": "b2841c7a899cbb5271fbba9844661563a8f91b9a8d856f58a9af3269fd10ab32"
+    },
+    {
+      "file": "final-audit.json",
+      "sha256": "c656904c4ebd58ee6f77ace3c051a1443bd10ab9ea68a3c3eea1286576db8ab7"
+    },
+    {
+      "file": "vps-final-audit.txt",
+      "sha256": "0baa9b6285299d6e351865269258f60c595f64700c1c0420eb92c79c9701064a"
+    }
+  ]
+}

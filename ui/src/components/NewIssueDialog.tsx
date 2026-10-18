@@ -305,6 +305,9 @@ export function NewIssueDialog() {
   const supportsAssigneeOverrides = Boolean(
     assigneeAdapterType && ISSUE_OVERRIDE_ADAPTER_TYPES.has(assigneeAdapterType),
   );
+  const modelCatalogAgentId = assigneeAdapterType === "codex_local"
+    ? selectedAssigneeAgentId ?? undefined
+    : undefined;
   const mentionOptions = useMemo<MentionOption[]>(() => {
     const options: MentionOption[] = [];
     const activeAgents = [...(agents ?? [])]
@@ -332,9 +335,9 @@ export function NewIssueDialog() {
   const { data: assigneeAdapterModels } = useQuery({
     queryKey:
       effectiveCompanyId && assigneeAdapterType
-        ? queryKeys.agents.adapterModels(effectiveCompanyId, assigneeAdapterType)
+        ? queryKeys.agents.adapterModels(effectiveCompanyId, assigneeAdapterType, modelCatalogAgentId)
         : ["agents", "none", "adapter-models", assigneeAdapterType ?? "none"],
-    queryFn: () => agentsApi.adapterModels(effectiveCompanyId!, assigneeAdapterType!),
+    queryFn: () => agentsApi.adapterModels(effectiveCompanyId!, assigneeAdapterType!, modelCatalogAgentId),
     enabled: Boolean(effectiveCompanyId) && newIssueOpen && supportsAssigneeOverrides,
   });
 

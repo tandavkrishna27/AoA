@@ -16,23 +16,22 @@
  *     while off cloud a real fork is attempted (self-hosted positive). These
  *     need no database, so they run and bind on every platform.
  *
- * REAL-`createApp()` STARTUP: a runtime proof that `createApp()` composes no
- * plugin subsystem in `cloud_auth` cannot be written here — importing the real
- * app (or `plugin-lifecycle.js`) under vitest triggers the drizzle-orm
- * `require(esm)` cycle on EVERY lane, unit and integration alike (finding
- * E0-F005). The final `describe` documents that constraint honestly rather than
- * faking a skipped proof; the checker + the runtime negatives above are the
- * binding evidence.
+ * REAL-`createApp()` STARTUP: importing the app (or `plugin-lifecycle.js`)
+ * under vitest triggers the documented drizzle-orm `require(esm)` cycle on
+ * every lane (finding E0-F005), so runtime proof stays at the worker-manager
+ * boundary. The dependency-free source-boundary checker is the binding
+ * evidence for app construction.
  */
 import {
   afterEach,
-  beforeAll,
   beforeEach,
   describe,
   expect,
   it,
   vi,
 } from "vitest";
+import { fileURLToPath } from "node:url";
+import { runCheck } from "../../../scripts/check-distributed-execution-foundation.mjs";
 
 // Sentinel over the actual process fork. The mock delegates to the real
 // implementation so the off-cloud path attempts (and naturally fails) a real
@@ -49,7 +48,6 @@ vi.mock("node:child_process", async (importOriginal) => {
     },
   };
 });
-
 import {
   createPluginWorkerManager,
   createPluginWorkerHandle,
@@ -91,6 +89,15 @@ const ALL_SINKS = [
 afterEach(() => {
   setDeploymentMode("local_trusted");
   delete process.env[PLUGIN_WORKER_PROCESS_ENV_VAR];
+});
+describe("FND-006 app composition source boundary", () => {
+  it("runs the production source checker that binds hosted plugin construction", async () => {
+    // Loading the complete app graph in Vitest hits the known Drizzle
+    // require(esm) cycle (E0-F005). Run the same dependency-free checker used
+    // by policy CI so app construction is still asserted without a fake app.
+    const { errors } = await runCheck(fileURLToPath(new URL("../../../", import.meta.url)));
+    expect(errors).toEqual([]);
+  });
 });
 
 describe("FND-006 process composition — the hosted parent forks/starts ZERO plugin worker on cloud_auth", () => {
@@ -160,35 +167,5 @@ describe("FND-006 process composition — the hosted parent forks/starts ZERO pl
     ).rejects.not.toBeInstanceOf(CloudPluginExecutionBlockedError);
     expect(forkSpy).toHaveBeenCalled();
     expect(manager.getWorker("p1")?.status).toBe("crashed");
-  });
-});
-
-describe("FND-006 real-createApp() composition — import-constraint (E0-F005)", () => {
-  let appModule: typeof import("../app.js") | null = null;
-  let importError: unknown = null;
-
-  beforeAll(async () => {
-    try {
-      appModule = await import("../app.js");
-    } catch (err) {
-      importError = err;
-      appModule = null;
-    }
-  });
-
-  it("documents that the real app is not importable under vitest (drizzle require(esm) cycle)", () => {
-    // The binding composition-boundary proof is the source-boundary checker
-    // (app.ts construction guarded by `hostedPluginProcessDisabled`) plus the
-    // runtime worker-manager negatives above. A runtime real-`createApp()`
-    // startup proof is blocked by the drizzle-orm require(esm) cycle on every
-    // vitest lane (E0-F005). If a future toolchain fixes the cycle, assert the
-    // entry point at least exists so this test upgrades to a real proof site.
-    if (appModule) {
-      expect(typeof appModule.createApp).toBe("function");
-    } else {
-      expect(String((importError as Error)?.message ?? "")).toMatch(
-        /require\(\) ES Module|cycle/i,
-      );
-    }
   });
 });

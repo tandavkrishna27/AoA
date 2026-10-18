@@ -41,6 +41,16 @@ function makeCtx(services: ServiceContainer): ToolContext {
 }
 
 describe("Action Tools", () => {
+  it("create_task exposes explicit standard and planning modes", () => {
+    const createTask = createActionTools().find((tool) => tool.name === "create_task")!;
+    const properties = createTask.parameters.properties as Record<string, any>;
+
+    expect(properties.workMode).toMatchObject({
+      type: "string",
+      enum: ["standard", "planning"],
+    });
+  });
+
   it("create_task schema exposes responsibleUserId as accountable human distinct from executor assignee", () => {
     const createTask = createActionTools().find((tool) => tool.name === "create_task")!;
     const properties = createTask.parameters.properties as Record<string, any>;
@@ -105,6 +115,55 @@ describe("Action Tools", () => {
         responsibleFallbackUserId: "user-1",
       }),
     );
+  });
+
+  it("create_task forwards explicitly requested planning mode without inferring it from text", async () => {
+    const services = mockServices();
+    const ctx = makeCtx(services);
+    const createTask = createActionTools().find((tool) => tool.name === "create_task")!;
+
+    await createTask.execute(
+      {
+        title: "Write a planning document",
+        description: "A plan for launching the product",
+        workMode: "planning",
+      },
+      ctx,
+    );
+
+    expect(services.issues.create).toHaveBeenCalledWith(
+      "comp-1",
+      expect.objectContaining({ title: "Write a planning document", workMode: "planning" }),
+    );
+    const [, created] = (services.issues.create as any).mock.calls[0];
+    expect(created).not.toHaveProperty("assigneeAgentId");
+    expect(created).not.toHaveProperty("assigneeUserId");
+    expect(services.heartbeat.wakeup).not.toHaveBeenCalled();
+  });
+
+  it("create_task leaves workMode unset when omitted so the issue service keeps its standard default", async () => {
+    const services = mockServices();
+    const ctx = makeCtx(services);
+    const createTask = createActionTools().find((tool) => tool.name === "create_task")!;
+
+    await createTask.execute({ title: "A task whose description says planning" }, ctx);
+
+    const [, created] = (services.issues.create as any).mock.calls[0];
+    expect(created).not.toHaveProperty("workMode");
+  });
+
+  it("create_task refuses unsupported workMode values before creating a task", async () => {
+    const services = mockServices();
+    const ctx = makeCtx(services);
+    const createTask = createActionTools().find((tool) => tool.name === "create_task")!;
+
+    const result = await createTask.execute({ title: "Bad mode", workMode: "automatic" }, ctx);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "workMode must be standard or planning",
+    });
+    expect(services.issues.create).not.toHaveBeenCalled();
   });
 
   it("create_task can create a human-assigned task and clears agent assignee", async () => {

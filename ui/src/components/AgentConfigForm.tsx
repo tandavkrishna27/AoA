@@ -398,9 +398,17 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
     error: fetchedModelsError,
   } = useQuery({
     queryKey: selectedCompanyId
-      ? queryKeys.agents.adapterModels(selectedCompanyId, adapterType)
+      ? queryKeys.agents.adapterModels(
+          selectedCompanyId,
+          adapterType,
+          !isCreate && adapterType === "codex_local" ? props.agent.id : undefined,
+        )
       : ["agents", "none", "adapter-models", adapterType],
-    queryFn: () => agentsApi.adapterModels(selectedCompanyId!, adapterType),
+    queryFn: () => agentsApi.adapterModels(
+      selectedCompanyId!,
+      adapterType,
+      !isCreate && adapterType === "codex_local" ? props.agent.id : undefined,
+    ),
     enabled: Boolean(selectedCompanyId),
   });
   const models = fetchedModels ?? externalModels ?? [];
@@ -774,7 +782,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
           )}
 
           {/* ---- Brain (create mode): runtime · model · thinking ---- */}
-          {isCreate && models.length > 0 && (
+          {isCreate && (models.length > 0 || adapterType === "codex_local") && (
             <div className="rounded-lg border border-border bg-accent/20 p-3 space-y-3">
               <div className="flex items-center gap-2">
                 <Brain className="h-3.5 w-3.5 text-muted-foreground" />
@@ -796,7 +804,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
                 allowDefault={adapterType !== "opencode_local"}
                 required={adapterType === "opencode_local"}
                 groupByProvider={adapterType === "opencode_local"}
-                defaultLabel={adapterType === "codex_local" ? `Default → ${DEFAULT_CODEX_LOCAL_MODEL}` : undefined}
+                defaultLabel={adapterType === "codex_local" ? "Account default (Codex CLI)" : undefined}
                 defaultValue={adapterType === "codex_local" ? DEFAULT_CODEX_LOCAL_MODEL : ""}
               />
               {fetchedModelsError && (
@@ -964,7 +972,7 @@ export function AgentConfigForm(props: AgentConfigFormProps) {
                     allowDefault={adapterType !== "opencode_local"}
                     required={adapterType === "opencode_local"}
                     groupByProvider={adapterType === "opencode_local"}
-                    defaultLabel={adapterType === "codex_local" ? `Default → ${DEFAULT_CODEX_LOCAL_MODEL}` : undefined}
+                    defaultLabel={adapterType === "codex_local" ? "Account default (Codex CLI)" : undefined}
                     defaultValue={adapterType === "codex_local" ? DEFAULT_CODEX_LOCAL_MODEL : ""}
                   />
                   {fetchedModelsError && (
@@ -1626,9 +1634,8 @@ export function ModelDropdown({
   required: boolean;
   groupByProvider: boolean;
   defaultLabel?: string;
-  /** Value written when the "Default" option is chosen. Codex passes its real
-   *  default (gpt-5.5) so an edited agent doesn't persist an empty model that
-   *  runs the CLI default instead (Codex P2-3). Others omit → empty. */
+  /** Value written when "Default" is chosen. Empty lets Codex resolve the
+   *  active account's default through its CLI catalog. */
   defaultValue?: string;
 }) {
   const [modelSearch, setModelSearch] = useState("");

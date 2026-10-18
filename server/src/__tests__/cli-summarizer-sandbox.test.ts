@@ -128,6 +128,13 @@ describe("summarizeViaCli — sandbox routing (U13.6)", () => {
     expect(input.args).toEqual(
       expect.arrayContaining(["exec", "--model", FAKE_CREDENTIAL.model]),
     );
+    const execIdx = input.args.indexOf("exec");
+    const approvalIdx = input.args.indexOf("--ask-for-approval");
+    expect(approvalIdx).toBeGreaterThanOrEqual(0);
+    expect(approvalIdx).toBeLessThan(execIdx);
+    expect(input.args[approvalIdx + 1]).toBe("never");
+    expect(input.args).toContain("--sandbox");
+    expect(input.args[input.args.indexOf("--sandbox") + 1]).toBe("read-only");
   });
 
   it("on sandbox failure, propagates the throw (caller treats it as skip-this-turn)", async () => {

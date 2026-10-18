@@ -571,7 +571,7 @@ test("readJobGates reads every job and its job-level if (anti-vacuity)", () => {
 });
 
 test("POSITIVE CONTROL: each workflow mutation reds with its own code", () => {
-  const good = readFileSync(WORKFLOW, "utf8");
+  const good = readFileSync(WORKFLOW, "utf8").replace(/\r\n/g, "\n");
   const codes = (t) => evaluateWorkflowShape(t).violations.map((x) => x.code);
   const mutate = (from, to) => {
     assert.ok(good.includes(from), `mutation anchor missing: ${from}`);

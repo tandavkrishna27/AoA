@@ -1,4 +1,4 @@
-import type { CommanderContextScope, CompanySkillListItem, ShowRef, UpdateInternalAgentConfig } from "@armyofagents/shared";
+import type { ChatMessage, CommanderContextScope, CompanySkillListItem, ShowRef, UpdateInternalAgentConfig } from "@armyofagents/shared";
 import { api, ApiError } from "./client";
 
 /* ------------------------------------------------------------------ */
@@ -26,6 +26,12 @@ export interface AgentMessage {
   id: string;
   role: "assistant" | "user" | "system" | "tool";
   content: string | null;
+  turnStatus?: string | null;
+  failure?: {
+    message: string;
+    retry: Required<Pick<ChatMessage, "message" | "pageContext" | "departmentContext" | "contextScope" | "attachmentAssetIds" | "clientSubmissionId">> | null;
+    retryUnavailableReason: string | null;
+  };
   toolCalls: AgentMessageToolCall[] | null;
   reasoning: string | null;
   outputRefs: ShowRef[] | null;
@@ -75,9 +81,10 @@ export interface AgentRun {
   triggerType: "conversation" | "proactive" | "event" | "sub_agent";
   triggerSource: string;
   status: "running" | "completed" | "failed";
+  errorMessage: string | null;
   toolsCalled: AgentRunToolCall[];
-  tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
-  costCents: number;
+  tokenUsage: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | null;
+  costCents: number | null;
   durationMs: number;
   activeExecutionMs: number;
   humanQuestionWaitMs: number;
@@ -201,6 +208,7 @@ export async function* streamAgentChat(
   contextScope?: CommanderContextScope | null,
   attachmentAssetIds?: string[],
   clientSubmissionId?: string,
+  departmentContext?: string | null,
 ): AsyncGenerator<SSEEvent> {
   const response = await fetch(
     `/api/companies/${encodeURIComponent(companyId)}/internal-agent/chat`,
@@ -211,6 +219,7 @@ export async function* streamAgentChat(
       body: JSON.stringify({
         message,
         pageContext,
+        ...(departmentContext !== undefined ? { departmentContext } : {}),
         ...(conversationId ? { conversationId } : {}),
         ...(contextScope ? { contextScope } : {}),
         ...(attachmentAssetIds && attachmentAssetIds.length > 0 ? { attachmentAssetIds } : {}),

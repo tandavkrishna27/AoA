@@ -115,6 +115,13 @@ describe("probeReadinessInSandbox (U13.7)", () => {
     const [input] = mockRunOneShotCliInSandbox.mock.calls[0];
     expect(input.command).toBe("codex");
     expect(input.args).toEqual(expect.arrayContaining(["exec", "--model", "gpt-5.5"]));
+    const execIdx = input.args.indexOf("exec");
+    const approvalIdx = input.args.indexOf("--ask-for-approval");
+    expect(approvalIdx).toBeGreaterThanOrEqual(0);
+    expect(approvalIdx).toBeLessThan(execIdx);
+    expect(input.args[approvalIdx + 1]).toBe("never");
+    expect(input.args).toContain("--sandbox");
+    expect(input.args[input.args.indexOf("--sandbox") + 1]).toBe("read-only");
   });
 
   it("no company key configured (resolveCompanyProviderCredential throws ProviderUnavailableError) propagates UNCHANGED — never runs the sandbox", async () => {

@@ -66,6 +66,22 @@ five company-owned assets.
 An accepted or in-progress replay does not launch a second CLI turn or persist a
 duplicate user message.
 
+Yielded runtime errors are terminal failures, even when a lower-level stream follows them with a synthetic completion summary. A stream ending without a completion summary or meaningful response also fails. Failed legacy runs retain actionable `errorMessage`; missing runtime model/provider provenance stays null rather than using a pricing estimate. A failed partial reply is recorded with its failure state: retrying the same submission replays its evidence and failure without repeating tool side effects. An error-only turn without a linked reply remains retryable. Rejoined distributed runs retain their existing ownership rules.
+
+Both conversation-history endpoints expose an optional `failure` on a failed user message: `{ message, retry, retryUnavailableReason }`. The error comes from an exactly linked, company/owner-scoped failed run, with generic actionable guidance when no unambiguous binding exists. The board restores this guidance when reopening saved chats and in the docked conversation.
+
+For the conversation owner, `retry` contains the retained original `message`, `pageContext`, `departmentContext`, `contextScope`, `attachmentAssetIds` and `clientSubmissionId`. Re-send these frozen values to the same conversation; navigation or composer changes must not silently change a retry's payload. Normal server validation and authorization still apply. The original user row is reused under the durable turn claim, and a failed retry updates that row's run binding. Raw internal submission metadata and claim tokens are excluded from history responses.
+
+A genuine retry of an error-only failed turn may create a new run-attempt receipt. This preserves attempt history while reusing the user submission; accepted/in-progress replay and rejoin still avoid duplicate execution and preserve the authoritative run.
+
+`retry` is null with an explanation for another owner's history, legacy/incomplete request metadata or a saved partial assistant reply. Existing authorized founder history visibility is preserved without exposing the owner's private retry payload. Edit/Discard remain available; editing is a deliberately new submission. Never guess lost attachments/context or treat a partial failed reply as permission to repeat effects.
+
+The governed `create_task` tool accepts optional `workMode` (`standard` or `planning`). Omission retains Standard behavior; explicit Planning mode passes through the stored runtime approval payload and does not auto-dispatch. Description text does not select a mode.
+
+Conversational choices use `⚡OPTIONS:{"question":"Proceed?","options":["Proceed","Cancel"]}⚡`. Older `confirm:true` and `choices` payloads are normalized as choices, including persisted legacy markup in the board UI. They never grant runtime approval; the separate durable approval remains authoritative.
+
+Codex summary output emits typed choices during native, sandbox and distributed Commander streaming, preserving surrounding text and leaving malformed markers as text. Both explicit saved-history loading and transient message merging keep choices dismissed once a later user turn exists; unanswered choices remain available.
+
 The stream may emit `thinking`, `content`, `reasoning`, `tool_call`,
 `tool_result`, `action_confirm`, `options_prompt`, `error`, and `done` events.
 Clients should treat event payloads as typed stream events and wait for `done`

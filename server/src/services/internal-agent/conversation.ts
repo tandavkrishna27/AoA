@@ -20,6 +20,9 @@ export interface MessageInput {
   reasoning?: string | null;
   clientSubmissionId?: string | null;
   replyToUserMessageId?: string | null;
+  /** Marks a durable partial assistant reply as failed so idempotent replay
+   * preserves the failure even before the user-turn claim is released. */
+  turnStatus?: "failed" | null;
 }
 
 const MESSAGE_THRESHOLD = 20;
@@ -102,6 +105,7 @@ export function conversationService(db: Db) {
           reasoning: message.reasoning ?? null,
           clientSubmissionId: message.clientSubmissionId ?? null,
           replyToUserMessageId: message.replyToUserMessageId ?? null,
+          turnStatus: message.turnStatus ?? null,
         })
         // Concurrency backstop for the replay check in agent-loop.chat(): a
         // simultaneous duplicate key resolves to one row via the partial
@@ -183,10 +187,29 @@ export function conversationService(db: Db) {
      * gates heartbeatTurn/finishTurn so a reclaimed original owner can neither
      * bump the new owner's lease nor overwrite its status.
      */
-    async claimTurn(userMessageId: string): Promise<string | null> {
+    async claimTurn(userMessageId: string, runId?: string): Promise<string | null> {
+      // Reclaim the lease without erasing an accepted distributed operation.
+      // Running legacy attempts may still be transferring ownership; only a
+      // scoped terminal legacy attempt is safe to replace with retry provenance.
       const result = await db.execute(sql`
         UPDATE internal_agent_messages
-        SET turn_status = 'running', turn_claimed_at = now(), turn_claim_token = gen_random_uuid()
+        SET turn_status = 'running', turn_claimed_at = now(), turn_claim_token = gen_random_uuid(),
+            run_id = CASE
+              WHEN run_id IS NULL OR EXISTS (
+                SELECT 1 FROM internal_agent_runs AS previous_run
+                JOIN internal_agent_conversations AS conversation
+                  ON conversation.id = internal_agent_messages.conversation_id
+                WHERE previous_run.id = internal_agent_messages.run_id
+                  AND previous_run.company_id = conversation.company_id
+                  AND previous_run.user_id = conversation.user_id
+                  AND previous_run.trigger_type = 'conversation'
+                  AND previous_run.status IN ('failed', 'cancelled')
+                  AND (previous_run.execution_owner IS NULL OR previous_run.execution_owner = 'legacy')
+                  AND previous_run.distributed_job_id IS NULL
+                  AND previous_run.distributed_attempt_id IS NULL
+              ) THEN COALESCE(${runId ?? null}::uuid, run_id)
+              ELSE run_id
+            END
         WHERE id = ${userMessageId}
           AND (
             turn_status IS NULL

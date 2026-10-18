@@ -1677,6 +1677,44 @@ test("FND-006: an unguarded worker-manager construction in app.ts fails", async 
   );
 });
 
+test("FND-006: a second worker-manager construction after the guard fails", async (t) => {
+  const root = makeFixture(t, ({ appPath }) => {
+    fs.appendFileSync(appPath, "\ncreatePluginWorkerManager({});\n", "utf8");
+  });
+  const { errors } = await runCheck(root);
+  assert.ok(
+    hasError(errors, "unguarded plugin createPluginWorkerManager construction"),
+    report(errors),
+  );
+});
+
+test("FND-006: a worker-manager construction in the guard's else branch fails", async (t) => {
+  const root = makeFixture(t, ({ appPath }) => {
+    patchText(
+      appPath,
+      "    // FND-008 (Decision #103 CP-003/CP-004):",
+      "    createPluginWorkerManager({});\n    // FND-008 (Decision #103 CP-003/CP-004):",
+    );
+  });
+  const { errors } = await runCheck(root);
+  assert.ok(
+    hasError(errors, "unguarded plugin createPluginWorkerManager construction"),
+    report(errors),
+  );
+});
+
+test("FND-006: constructor names in comments and strings are not treated as calls", async (t) => {
+  const root = makeFixture(t, ({ appPath }) => {
+    fs.appendFileSync(
+      appPath,
+      '\n// createPluginWorkerManager()\nconst documentation = "pluginLifecycleManager()";\n',
+      "utf8",
+    );
+  });
+  const { errors } = await runCheck(root);
+  assert.deepEqual(errors, [], report(errors));
+});
+
 test("FND-006: missing cloud-plugin-execution.ts is named", async (t) => {
   const root = makeFixture(t, ({ cloudPluginExecutionPath }) =>
     fs.rmSync(cloudPluginExecutionPath),

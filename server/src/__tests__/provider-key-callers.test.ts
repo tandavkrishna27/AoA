@@ -79,7 +79,8 @@ function callSites(relPath: string): string[][] {
 
 const EXPECTED: Array<{ file: string; adapterTypeArgs: string[] }> = [
   // The opencode_local constraint check + the `:type` probe route + claude-login.
-  { file: "routes/agents.ts", adapterTypeArgs: ["adapterType", "type", "agent.adapterType"] },
+  // The authorized model-list route also resolves the selected agent's config.
+  { file: "routes/agents.ts", adapterTypeArgs: ["adapterType", "agent.adapterType", "type", "agent.adapterType"] },
   { file: "services/commander-verify.ts", adapterTypeArgs: ["adapterType"] },
   // Task 9 — the Providers tab probe. Triaged: `descriptor.adapterType` is the
   // catalog descriptor being probed, and it is the SAME value passed to
@@ -129,7 +130,7 @@ describe("repo-wide inventory of runtime config resolution", () => {
       if (n) found[relative(serverSrc, file).replace(/\\/g, "/")] = n;
     }
     expect(found).toEqual({
-      "routes/agents.ts": 3,
+      "routes/agents.ts": 4,
       // Settings -> Providers probe (Task 9), company_default and agent scopes.
       "routes/providers.ts": 1,
       "services/commander-verify.ts": 1,
@@ -191,8 +192,8 @@ describe("every resolveAdapterConfigForRuntime call site threads its adapter typ
 
       it("never passes a literal or a placeholder as the adapter type", () => {
         for (const site of sites) {
-          // A string literal here would be a hardcoded guess; `undefined`/`null`
-          // would silently disable the fallback while satisfying nothing.
+          // Thread the selected type instead of guessing a literal that could
+          // silently disable the intended credential fallback.
           expect(site[1]).not.toMatch(/^["'`]/);
           expect(site[1]).not.toMatch(/^(undefined|null)$/);
         }

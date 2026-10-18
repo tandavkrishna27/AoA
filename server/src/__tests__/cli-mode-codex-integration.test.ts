@@ -15,8 +15,8 @@
  *  2. ARGV: The spawned argv matches the codex contract — exec --json
  *     [--dangerously-bypass-approvals-and-sandbox] --model <codex-model> -c
  *     model_reasoning_effort=high -c model_reasoning_summary=detailed [-]
- *  3. MODEL: A claude default model string (e.g. "claude-sonnet-4-6") is resolved to
- *     a codex-compatible model (DEFAULT_CODEX_CHAT_MODEL = "gpt-5.5") before spawn.
+ *  3. MODEL: A legacy Claude value is treated as inherited, and the active
+ *     account's synthetic catalog default is selected before spawn.
  *  4. CODEX_HOME: The spawn env carries a managed CODEX_HOME; config.toml was written
  *     there by cli-mode before spawn (configTomlExists === true in the invocation record).
  *  5. CHUNKS: The yielded chunks from cliModeService.chat are: reasoning → text → done,
@@ -99,7 +99,20 @@ vi.mock("@armyofagents/adapter-codex-local/server", async (importOriginal) => {
       } catch { /* best-effort */ }
     }),
     ensureCodexAuthInHome: vi.fn(async () => true),
-    readSharedCodexModel: vi.fn(async () => null), // null → falls through to DEFAULT_CODEX_CHAT_MODEL
+    getCodexModelCatalog: vi.fn(async (request: { companyId: string; authHome: string }) => ({
+      identity: {
+        companyId: request.companyId,
+        authHome: request.authHome,
+        authGeneration: "fake-codex-test-auth",
+        authMode: "subscription" as const,
+        cliVersion: "0.130.0-fixture",
+      },
+      models: [
+        { id: "gpt-fixture-default", isDefault: true },
+        { id: "gpt-fixture-listed", isDefault: false },
+      ],
+    })),
+    readSharedCodexModel: vi.fn(async () => null),
   };
 });
 
@@ -196,7 +209,7 @@ async function drainCodexChat(
     {
       cliTool: "codex",
       executionMode: "cli",
-      model: "claude-sonnet-4-6", // claude default → should resolve to gpt-5.5
+      model: null, // inherit the signed-in account default from the synthetic catalog
       ...configOverride,
     } as any,
   )) {
@@ -315,9 +328,9 @@ describe("cli-mode-codex-integration — real fake-codex spawn (no child_process
     expect(stored.codexSessionId).toBe("integ-sess-001");
   }, 30_000);
 
-  // ── 2. Model: claude default → DEFAULT_CODEX_CHAT_MODEL ──────────────────
+  // ── 2. Legacy explicit model: fail closed before spawning ────────────────
 
-  it("claude default config.model is translated to codex-compatible model (not a claude string)", async () => {
+  it("refuses a stale Claude model explicitly stored on a Codex config before spawning", async () => {
     const { ctrl, inv } = freshTempFiles();
     writeControl(ctrl, {
       sessionId: "integ-model-sess",
@@ -328,17 +341,14 @@ describe("cli-mode-codex-integration — real fake-codex spawn (no child_process
     process.env.AOA_E2E_FAKE_CODEX_CONTROL = ctrl;
     process.env.AOA_E2E_FAKE_CODEX_INVOCATIONS = inv;
 
-    await drainCodexChat("cmp-model", "hi", { model: "claude-opus-4-6" });
+    const { chunks } = await drainCodexChat("cmp-model", "hi", { model: "claude-opus-4-6" });
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].type).toBe("error");
+    expect(chunks[0].message).toMatch(/not a valid Codex model identifier/i);
 
     const invocations = readInvocations(inv);
-    expect(invocations).toHaveLength(1);
-
-    const modelIdx = invocations[0].argv.indexOf("--model");
-    expect(modelIdx).toBeGreaterThan(-1);
-    const usedModel = invocations[0].argv[modelIdx + 1];
-    expect(usedModel).not.toContain("claude");
-    expect(usedModel).not.toContain("opus");
-    expect(usedModel.length).toBeGreaterThan(0);
+    expect(invocations).toHaveLength(0);
   }, 20_000);
 
   // ── 3. RESUME: second turn has `resume <sessionId>` in argv ──────────────
@@ -365,7 +375,7 @@ describe("cli-mode-codex-integration — real fake-codex spawn (no child_process
       enabledCapabilities: [],
       conversationId: "conversation-resume",
     };
-    const chatConfig: any = { cliTool: "codex", executionMode: "cli", model: "claude-sonnet-4-6" };
+    const chatConfig: any = { cliTool: "codex", executionMode: "cli", model: null };
 
     // Turn 1
     const t1: any[] = [];
@@ -476,7 +486,7 @@ describe("cli-mode-codex-integration — real fake-codex spawn (no child_process
     process.env.AOA_E2E_FAKE_CODEX_CONTROL = ctrl;
     process.env.AOA_E2E_FAKE_CODEX_INVOCATIONS = inv;
 
-    await drainCodexChat("cmp-argv", "argv test", { model: "claude-sonnet-4-6" });
+    await drainCodexChat("cmp-argv", "argv test", { model: null });
 
     const invocations = readInvocations(inv);
     expect(invocations).toHaveLength(1);

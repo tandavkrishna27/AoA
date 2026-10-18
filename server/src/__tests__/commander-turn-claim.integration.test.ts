@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { applyPendingMigrations, createDb, type Db } from "@armyofagents/db";
 import { conversationService } from "../services/internal-agent/conversation.js";
@@ -104,6 +105,63 @@ afterAll(async () => {
 describe.skipIf(process.platform === "win32")("Commander durable turn claim (real DB)", () => {
   it("boots the harness", () => {
     expect(setupError).toBeNull();
+  });
+
+  it.each(["failed", "running"])(
+    "retains the original distributed run when reclaiming a %s turn",
+    async (status) => {
+      const messageId = randomUUID();
+      const originalRunId = randomUUID();
+      const placeholderId = randomUUID();
+      await insertUserMessage(messageId, `distributed-${status}`);
+      await db.execute(sql`
+          INSERT INTO internal_agent_runs
+            (id, company_id, user_id, trigger_type, trigger_source, status, execution_owner,
+             distributed_job_id, distributed_attempt_id, conversation_message_id)
+          VALUES (${originalRunId}, ${companyId}, ${userId}, 'conversation', 'user_message',
+            ${status}, 'distributed', ${randomUUID()}, ${randomUUID()}, ${messageId}),
+            (${placeholderId}, ${companyId}, ${userId}, 'conversation', 'user_message',
+            'running', NULL, NULL, NULL, ${messageId})
+        `);
+      await db.execute(sql`
+          UPDATE internal_agent_messages SET run_id = ${originalRunId}, turn_status = ${status},
+            turn_claimed_at = now() - interval '40 minutes' WHERE id = ${messageId}
+        `);
+      const svc = conversationService(db);
+      const token = await svc.claimTurn(messageId, placeholderId);
+      expect(token).not.toBeNull();
+      const rows = await db.execute(
+        sql`SELECT run_id FROM internal_agent_messages WHERE id = ${messageId}`,
+      );
+      const result = Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? [];
+      expect(result[0]).toMatchObject({ run_id: originalRunId });
+      expect(await svc.claimTurn(messageId, placeholderId)).toBeNull();
+      await svc.finishTurn(messageId, randomUUID(), "failed");
+      expect(await readTurnStatus(messageId)).toBe("running");
+    },
+  );
+
+  it("rebinds a failed scoped legacy attempt to the winning retry", async () => {
+    const messageId = randomUUID();
+    const originalRunId = randomUUID();
+    const placeholderId = randomUUID();
+    await insertUserMessage(messageId, "legacy-retry-binding");
+    await db.execute(sql`
+          INSERT INTO internal_agent_runs
+            (id, company_id, user_id, trigger_type, trigger_source, status)
+          VALUES (${originalRunId}, ${companyId}, ${userId}, 'conversation', 'user_message', 'failed'),
+            (${placeholderId}, ${companyId}, ${userId}, 'conversation', 'user_message', 'running')
+        `);
+    await db.execute(sql`
+          UPDATE internal_agent_messages SET run_id = ${originalRunId}, turn_status = 'failed'
+          WHERE id = ${messageId}
+        `);
+    expect(await conversationService(db).claimTurn(messageId, placeholderId)).not.toBeNull();
+    const rows = await db.execute(
+      sql`SELECT run_id FROM internal_agent_messages WHERE id = ${messageId}`,
+    );
+    const result = Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? [];
+    expect(result[0]).toMatchObject({ run_id: placeholderId });
   });
 
   it("exactly one of two racing claims wins; the loser gets no token", async () => {

@@ -22,6 +22,46 @@ function message(id: string, role: "user" | "assistant", content: string): Agent
 }
 
 describe("mergeServerMessagesWithTransientLocal", () => {
+  it("keeps a live approval on its original message when dismissed choices repeat across saved turns", () => {
+    const marker = '⚡OPTIONS:{"question":"Proceed?","options":["Proceed","Cancel"]}⚡';
+    const serverMessages = [
+      message("older-question", "assistant", `Older turn\n${marker}`),
+      message("older-answer", "user", "Proceed"),
+      message("current-question", "assistant", `Current turn\n${marker}`),
+      message("current-answer", "user", "Proceed"),
+    ];
+    const merged = mergeServerMessagesWithTransientLocal(serverMessages, [
+      {
+        id: "current-live-message",
+        role: "assistant",
+        content: "Current turn",
+        streamingDone: true,
+        createdAt: "2026-10-16T00:00:00Z",
+        optionsPrompt: {
+          promptId: "current-live-choice",
+          question: "Proceed?",
+          options: ["Proceed", "Cancel"],
+          dismissed: true,
+        },
+        actionConfirm: {
+          confirmId: "22222222-2222-4222-8222-222222222222",
+          action: "create_task",
+          description: "Current task",
+          status: "pending",
+        },
+      },
+    ]);
+    expect(merged.filter((m) => m.actionConfirm)).toEqual([
+      expect.objectContaining({
+        id: "current-live-message",
+        actionConfirm: expect.objectContaining({ confirmId: "22222222-2222-4222-8222-222222222222" }),
+      }),
+    ]);
+    expect(merged.find((m) => m.id === "older-question")?.actionConfirm).toBeUndefined();
+    expect(merged.find((m) => m.id === "current-question")?.actionConfirm).toBeUndefined();
+    expect(merged.filter((m) => m.optionsPrompt && !m.optionsPrompt.dismissed)).toHaveLength(0);
+  });
+
   it("preserves a local approval card that has no persisted assistant message yet", () => {
     const serverMessages = [message("server-user-1", "user", "Create task")];
 

@@ -187,6 +187,66 @@ async function* replayChatStream() {
   yield { type: "text" as const, delta: "Original answer (replayed)." };
 }
 
+async function* errorThenDoneChatStream() {
+  yield { type: "error" as const, message: "No OpenAI provider key is configured for this company. Configure one in Settings → Providers." };
+  yield {
+    type: "done" as const,
+    summary: {
+      runId: "",
+      toolsCalled: [],
+      durationMs: 0,
+      costCents: 0,
+      tokenUsage: { inputTokens: 0, outputTokens: 0 },
+    },
+  };
+}
+
+async function* errorWithoutDoneChatStream() {
+  yield { type: "error" as const, message: "Internal agent not configured. Go to Settings to set up." };
+}
+
+async function* emptyChatStream() {
+  // Iterator ended without an error or the required completion summary.
+}
+
+async function* thrownChatStream() {
+  throw new Error("sandbox acquisition was denied");
+}
+
+async function* skippedThenErrorChatStream() {
+  yield { type: "run_skipped" as const };
+  yield { type: "error" as const, message: "This Commander turn is already running. Retry shortly." };
+}
+
+async function* zeroSummaryCompletionChatStream() {
+  yield {
+    type: "done" as const,
+    summary: { runId: "", toolsCalled: [], durationMs: 0, costCents: 0, tokenUsage: { inputTokens: 0, outputTokens: 0 } },
+  };
+}
+
+async function* toolOnlyCompletionChatStream() {
+  yield { type: "tool_call" as const, id: "tc-tool-only", name: "query_tasks", input: {} };
+  yield {
+    type: "tool_result" as const,
+    id: "tc-tool-only",
+    name: "query_tasks",
+    result: { success: true, summary: "Found tasks", data: [{ id: "task-1" }] },
+  };
+  yield {
+    type: "done" as const,
+    summary: { runId: "", toolsCalled: ["query_tasks"], durationMs: 1, costCents: 0, tokenUsage: { inputTokens: 1, outputTokens: 0 } },
+  };
+}
+
+async function* approvalCompletionChatStream() {
+  yield { type: "action_confirmation" as const, toolName: "create_task", params: { title: "Plan" }, runId: "confirm-1" };
+  yield {
+    type: "done" as const,
+    summary: { runId: "", toolsCalled: [], durationMs: 1, costCents: 0, tokenUsage: { inputTokens: 1, outputTokens: 0 } },
+  };
+}
+
 // The chat stream is swappable per test (default = the scripted genuine run).
 const streamState = vi.hoisted(() => ({
   impl: null as null | (() => AsyncGenerator<unknown>),
@@ -361,6 +421,7 @@ async function callChatRoute(opts: {
 describe("internal-agent chat route SSE-contract + run persistence (Task 3)", () => {
   beforeEach(() => {
     streamState.impl = null; // default: the genuine scripted run
+    rejoinState.apply.mockClear();
   });
 
   it("does NOT record a run for an idempotent replay — it deletes the pre-created row (round-8 #3)", async () => {
@@ -394,6 +455,120 @@ describe("internal-agent chat route SSE-contract + run persistence (Task 3)", ()
     expect(done?.data.messageId).toBe(originalRunId);
     expect(persistedRun?.status).toBe("completed");
     expect(sseEvents.some((event) => event.event === "run_rejoined")).toBe(false);
+  });
+
+  it("deletes a skipped placeholder but preserves an error instead of reporting done", async () => {
+    streamState.impl = skippedThenErrorChatStream;
+    const { sseEvents, persistedRun, runDeleted } = await callChatRoute({ db: {} });
+    expect(runDeleted).toBe(true);
+    expect(persistedRun).toBeNull();
+    expect(sseEvents.find((event) => event.event === "error")?.data.message).toContain("already running");
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+  });
+
+  it("fails a zero-summary completion with no meaningful response", async () => {
+    streamState.impl = zeroSummaryCompletionChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    expect(persistedRun).toMatchObject({ status: "failed" });
+    expect(persistedRun?.errorMessage).toMatch(/completed without a reply or action/i);
+    expect(sseEvents.find((event) => event.event === "error")?.data.message).toMatch(/completed without a reply or action/i);
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+  });
+
+  it("accepts a completed tool-only turn as meaningful output", async () => {
+    streamState.impl = toolOnlyCompletionChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    expect(persistedRun?.status).toBe("completed");
+    expect(sseEvents.some((event) => event.event === "tool_result")).toBe(true);
+    expect(sseEvents.some((event) => event.event === "done")).toBe(true);
+    expect(sseEvents.some((event) => event.event === "error")).toBe(false);
+  });
+
+  it("accepts an approval request as meaningful output", async () => {
+    streamState.impl = approvalCompletionChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    expect(persistedRun?.status).toBe("completed");
+    expect(sseEvents.some((event) => event.event === "action_confirm")).toBe(true);
+    expect(sseEvents.some((event) => event.event === "done")).toBe(true);
+    expect(sseEvents.some((event) => event.event === "error")).toBe(false);
+  });
+
+  it("removes only the retry placeholder when a rejoined result yields an error", async () => {
+    const originalRunId = "distributed-error-run";
+    streamState.impl = async function* () {
+      yield { type: "run_rejoined", runId: originalRunId };
+      yield { type: "error", message: "distributed result could not be parsed" };
+    };
+    rejoinState.apply.mockImplementationOnce(async (db: any, input: { originalRunId: string }) => {
+      await db.delete().where();
+      return input.originalRunId;
+    });
+
+    const { sseEvents, runDeleted, runUpdatePredicates } = await callChatRoute({ db: {} });
+    expect(rejoinState.apply).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      companyId: "cmp-sse-test", userId: "user-sse-1", originalRunId, placeholderRunId: "run-sse-123",
+    }));
+    expect(runDeleted).toBe(true);
+    expect(sseEvents.find((event) => event.event === "error")?.data.message).toBe("distributed result could not be parsed");
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+    expect(JSON.stringify(runUpdatePredicates)).not.toContain(originalRunId);
+  });
+
+  it("removes only the retry placeholder when parsing a rejoined result throws", async () => {
+    const originalRunId = "distributed-thrown-run";
+    streamState.impl = async function* () {
+      yield { type: "run_rejoined", runId: originalRunId };
+      throw new Error("distributed result parser crashed");
+    };
+    rejoinState.apply.mockImplementationOnce(async (db: any, input: { originalRunId: string }) => {
+      await db.delete().where();
+      return input.originalRunId;
+    });
+
+    const { sseEvents, runDeleted, runUpdatePredicates } = await callChatRoute({ db: {} });
+    expect(rejoinState.apply).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      companyId: "cmp-sse-test", userId: "user-sse-1", originalRunId, placeholderRunId: "run-sse-123",
+    }));
+    expect(runDeleted).toBe(true);
+    expect(sseEvents.find((event) => event.event === "error")?.data.message).toBe("distributed result parser crashed");
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+    expect(JSON.stringify(runUpdatePredicates)).not.toContain(originalRunId);
+  });
+
+  it("persists a yielded refusal as failed even when the loop emits a synthetic done", async () => {
+    streamState.impl = errorThenDoneChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    const error = sseEvents.find((event) => event.event === "error");
+    expect(error?.data.message).toContain("Settings → Providers");
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+    expect(persistedRun).toMatchObject({ status: "failed", errorMessage: error?.data.message, model: null, provider: null });
+  });
+
+  it("persists an error without done and keeps its actionable setup guidance", async () => {
+    streamState.impl = errorWithoutDoneChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    expect(sseEvents.find((event) => event.event === "error")?.data.message).toContain("Settings");
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+    expect(persistedRun).toMatchObject({ status: "failed", model: null, provider: null });
+    expect(persistedRun?.errorMessage).toContain("Go to Settings");
+  });
+
+  it("fails an empty stream with an actionable message and null runtime provenance", async () => {
+    streamState.impl = emptyChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    const error = sseEvents.find((event) => event.event === "error");
+    expect(error?.data.message).toMatch(/did not complete.*retry/i);
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+    expect(persistedRun).toMatchObject({ status: "failed", model: null, provider: null });
+    expect(persistedRun?.errorMessage).toBe(error?.data.message);
+  });
+
+  it("persists thrown iterator failures as failed runs", async () => {
+    streamState.impl = thrownChatStream;
+    const { sseEvents, persistedRun } = await callChatRoute({ db: {} });
+    expect(sseEvents.find((event) => event.event === "error")?.data.message).toBe("sandbox acquisition was denied");
+    expect(sseEvents.some((event) => event.event === "done")).toBe(false);
+    expect(persistedRun).toMatchObject({ status: "failed", errorMessage: "sandbox acquisition was denied", model: null, provider: null });
   });
 
   it("leaves distributed run status with its owner when partial delivery disconnects", async () => {

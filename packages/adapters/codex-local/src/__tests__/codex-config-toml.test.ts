@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { writeCodexMcpConfigToml } from "../server/codex-config-toml.js";
 import { execute } from "../server/execute.js";
+import { testModelCatalogLoader } from "../server/__tests__/model-catalog-fixture.js";
 
 // ---------------------------------------------------------------------------
 // Minimal hand-rolled TOML reader. Codex's config.toml MCP block is a tiny,
@@ -1406,7 +1407,7 @@ describe("codex execute writes the MCP bridge into managed CODEX_HOME", () => {
         },
         authToken: "secret-run-token",
         onLog: async () => {},
-      });
+      }, { runAppServerTurn: async () => { throw new Error("bridged path not expected in this test"); }, getModelCatalog: testModelCatalogLoader });
 
       expect(result.exitCode).toBe(0);
 
@@ -1501,7 +1502,7 @@ describe("codex execute writes the MCP bridge into managed CODEX_HOME", () => {
         },
         authToken: "secret-run-token",
         onLog: async () => {},
-      });
+      }, { runAppServerTurn: async () => { throw new Error("bridged path not expected in this test"); }, getModelCatalog: testModelCatalogLoader });
 
       expect(result.exitCode).toBe(0);
 
@@ -1573,7 +1574,7 @@ describe("codex execute writes the MCP bridge into managed CODEX_HOME", () => {
         },
         authToken: "secret-run-token",
         onLog: async () => {},
-      });
+      }, { runAppServerTurn: async () => { throw new Error("bridged path not expected in this test"); }, getModelCatalog: testModelCatalogLoader });
 
       expect(result.exitCode).toBe(0);
 
@@ -1634,7 +1635,7 @@ describe("codex execute writes the MCP bridge into managed CODEX_HOME", () => {
         runtimeCommandSpec: { command: "codex", installCommand: "do-not-run" },
         authToken: "secret-run-token",
         onLog: async () => {},
-      });
+      }, { runAppServerTurn: async () => { throw new Error("bridged path not expected in this test"); }, getModelCatalog: testModelCatalogLoader });
 
       expect(result.exitCode).toBe(0);
       const managedHome = path.join(codexHome, "aoa-instances", "company-1", "agent-1");

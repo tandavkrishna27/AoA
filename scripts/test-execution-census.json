@@ -390,6 +390,11 @@
       "workflow": "pr.yml",
       "step": "Invisible control characters (a shell must not write a regex escape)"
     },
+    "scripts/lib/__tests__/vitest-capture.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "Vitest native output capture"
+    },
     "scripts/lib/__tests__/m1-route-inventory.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",

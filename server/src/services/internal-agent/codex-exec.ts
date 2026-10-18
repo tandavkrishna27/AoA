@@ -12,9 +12,10 @@
  * (`runCodexTurn` in cli-mode.ts) so the keyless extractor inherits the exact
  * model-resolution + auth + JSONL-parse semantics rather than hand-rolling a
  * bare `codex exec`:
- *   - `readSharedCodexModel` + `resolveCodexChatModel` — pin a
- *     subscription-supported model (the per-session CODEX_HOME has no `model`
- *     line, so codex would otherwise 400 on a ChatGPT account).
+ *   - `getCodexModelCatalog` + `resolveCodexChatModel` — resolve a blank
+ *     inherited selection from the active account's pinned CLI catalog and
+ *     refuse an unavailable explicit selection. The catalog is a picker, not
+ *     an entitlement check; inference errors are surfaced without billing fallback.
  *   - `ensureCodexAuthInHome` — copy the shared ~/.codex/auth.json into the
  *     managed home so `codex exec` is authenticated (no 401).
  *   - `parseCodexJsonl` — extract the final assistant text (the `summary`),
@@ -44,6 +45,8 @@ export interface RunCodexExecJsonOptions {
   timeoutMs?: number;
   /** internal_agent_config.model — validated downstream; pins the codex model. */
   codexModel?: string | null;
+  /** Required cache/account scope for the company-owned Codex login. */
+  companyId?: string;
 }
 
 export interface RunCodexExecJsonResult {
@@ -78,12 +81,17 @@ export async function runCodexExecJson(
   options: RunCodexExecJsonOptions = {},
 ): Promise<RunCodexExecJsonResult> {
   const { timeoutMs = 60_000, codexModel = null } = options;
+  const companyId = options.companyId?.trim();
+  if (!companyId) {
+    throw new Error("Codex model resolution requires a company account scope. Retry from the company workspace.");
+  }
   const isWin = platform() === "win32";
 
   const {
     ensureCodexAuthInHome,
     readSharedCodexModel,
     parseCodexJsonl,
+    getCodexModelCatalog,
   } = await import("@armyofagents/adapter-codex-local/server");
 
   // Per-run, UNGUESSABLE credential + cwd dirs (P2, Codex re-review): a stable
@@ -104,10 +112,24 @@ export async function runCodexExecJson(
   // authenticated (no-op if the user has no login).
   await ensureCodexAuthInHome(codexHomeDir);
 
-  // Model: same layered, validated resolution as the chat path so a claude
-  // default / GPT-Codex / shell-unsafe value can never reach codex.
+  // The probe uses the same scrubbed environment and auth home as the eventual
+  // subprocess. It resolves the exact account catalog before invoking a turn.
+  const codexEnv = {
+    ...buildScrubbedCliEnv(),
+    CODEX_HOME: codexHomeDir,
+  };
+  const catalog = await getCodexModelCatalog({
+    companyId,
+    authHome: codexHomeDir,
+    authMode: "auto",
+    command: "codex",
+    cwd: codexCwd,
+    env: codexEnv,
+  });
+
+  // Preserve exact explicit choices and refuse stale/mismatched model ids.
   const sharedCodexModel = await readSharedCodexModel();
-  const resolvedModel = resolveCodexChatModel(codexModel, sharedCodexModel);
+  const resolvedModel = resolveCodexChatModel(codexModel, sharedCodexModel, catalog, catalog.identity);
 
   // SECURITY (P1, Codex): extraction feeds ARBITRARY discussion text into codex
   // as the prompt, so it must NOT run with the approvals/sandbox bypass — a
@@ -117,12 +139,14 @@ export async function runCodexExecJson(
   // (read-only) and never auto-approve escalations (non-interactive, so it can't
   // hang waiting for one either).
   const args = [
-    "exec",
-    "--json",
-    "--sandbox",
-    "read-only",
+    // Codex CLI parses this as a root option; it must precede `exec`.
     "--ask-for-approval",
     "never",
+    "exec",
+    "--json",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "read-only",
     "--model",
     resolvedModel,
     "-c",
@@ -141,10 +165,7 @@ export async function runCodexExecJson(
   // AOA_* / ANTHROPIC_API_KEY are likewise withheld.
   const proc = spawn("codex", args, {
     stdio: ["pipe", "pipe", "pipe"],
-    env: {
-      ...buildScrubbedCliEnv(),
-      CODEX_HOME: codexHomeDir,
-    },
+    env: codexEnv,
     shell: isWin,
     cwd: codexCwd,
   });

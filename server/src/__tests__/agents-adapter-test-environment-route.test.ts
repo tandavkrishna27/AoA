@@ -14,6 +14,7 @@ vi.mock("@armyofagents/db", () => ({
 }));
 
 const mockAdapterTestEnvironment = vi.hoisted(() => vi.fn());
+const mockGetAgentById = vi.hoisted(() => vi.fn());
 const mockNormalizeAdapterConfigForPersistence = vi.hoisted(() =>
   vi.fn(async (_companyId: string, config: Record<string, unknown>) => config),
 );
@@ -27,7 +28,7 @@ const mockFindServerAdapter = vi.hoisted(() => vi.fn());
 
 vi.mock("../services/index.js", () => ({
   agentService: () => ({
-    getById: vi.fn(),
+    getById: mockGetAgentById,
     list: vi.fn().mockResolvedValue([]),
     resolveByReference: vi.fn(),
     update: vi.fn(),
@@ -72,6 +73,13 @@ vi.mock("../adapters/index.js", () => ({
   findActiveServerAdapter: vi.fn(),
   findServerAdapter: mockFindServerAdapter,
   listAdapterModels: vi.fn(),
+}));
+
+const mockListCodexModels = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const mockListCodexModelsForAgent = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+vi.mock("../adapters/codex-models.js", () => ({
+  listCodexModels: mockListCodexModels,
+  listCodexModelsForAgent: mockListCodexModelsForAgent,
 }));
 
 vi.mock("../adapters/provider-status.js", () => ({
@@ -149,6 +157,9 @@ function makeApp(actorOverride?: Record<string, unknown>) {
 describe("POST /companies/:companyId/adapters/:type/test-environment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetAgentById.mockReset();
+    mockListCodexModels.mockReset().mockResolvedValue([]);
+    mockListCodexModelsForAgent.mockReset().mockResolvedValue([]);
     // Default: process adapter (skips model resolution)
     mockFindServerAdapter.mockReturnValue({
       type: "process",
@@ -279,7 +290,7 @@ describe("POST /companies/:companyId/adapters/:type/test-environment", () => {
     );
   });
 
-  it("resolves the model via getProviderStatus for codex_local before probing", async () => {
+  it("preserves an explicit Codex model for account-scoped resolution inside the adapter probe", async () => {
     // Override adapter type to codex_local for this test
     mockFindServerAdapter.mockReturnValue({
       type: "codex_local",
@@ -306,26 +317,17 @@ describe("POST /companies/:companyId/adapters/:type/test-environment", () => {
       });
 
     expect(res.status).toBe(200);
-    expect(mockGetProviderStatus).toHaveBeenCalledWith(
-      "codex_local",
-      expect.objectContaining({ companyId: COMPANY_ID }),
-      expect.anything(),
-    );
-    // gpt-5.3-codex is CODEX_INCOMPATIBLE (contains "codex") in chatgpt mode →
-    // resolveModel should fall back to defaultModelResolved "gpt-5.5"
+    // Codex resolves against the exact account catalog in the adapter. The
+    // route must not substitute a host/shared model before invoking the probe.
+    expect(mockGetProviderStatus).not.toHaveBeenCalled();
     expect(mockAdapterTestEnvironment).toHaveBeenCalledWith(
       expect.objectContaining({
-        config: expect.objectContaining({ model: "gpt-5.5" }),
+        config: expect.objectContaining({ model: "gpt-5.3-codex" }),
       }),
     );
   });
 
-  it("resolves an EMPTY codex_local model to the default (gpt-5.5) before probing (P2-1)", async () => {
-    // P2-1: previously the probe skipped resolution when the model was empty
-    // (the UI/default-model path), so codex probes ran with the CLI default
-    // instead of gpt-5.5 and could falsely fail on ChatGPT/subscription auth —
-    // even though the saved agent RUN is corrected to gpt-5.5. The probe must
-    // resolve the SAME model a real run would, including the empty case.
+  it("leaves a blank Codex model unset for exact account-catalog inheritance in the probe", async () => {
     mockFindServerAdapter.mockReturnValue({
       type: "codex_local",
       testEnvironment: mockAdapterTestEnvironment,
@@ -349,12 +351,12 @@ describe("POST /companies/:companyId/adapters/:type/test-environment", () => {
       .send({ adapterConfig: {} }); // no model at all
 
     expect(res.status).toBe(200);
-    // Resolution must run even for an empty model …
-    expect(mockGetProviderStatus).toHaveBeenCalled();
-    // … and codex's empty model resolves to the default gpt-5.5 for the probe.
+    // The adapter owns account-scoped catalog resolution, so an empty setting
+    // reaches it unchanged and inherits that target's CLI default.
+    expect(mockGetProviderStatus).not.toHaveBeenCalled();
     expect(mockAdapterTestEnvironment).toHaveBeenCalledWith(
       expect.objectContaining({
-        config: expect.objectContaining({ model: "gpt-5.5" }),
+        config: expect.not.objectContaining({ model: expect.anything() }),
       }),
     );
   });
@@ -461,5 +463,146 @@ describe("POST /companies/:companyId/adapters/:type/test-environment", () => {
       .send({ adapterConfig: {} });
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /companies/:companyId/adapters/codex_local/models", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAgentById.mockReset();
+    mockResolveAdapterConfigForRuntime.mockReset().mockImplementation(
+      async (_companyId: string, _type: string, config: Record<string, unknown>) => config,
+    );
+    mockListCodexModels.mockReset().mockResolvedValue([]);
+    mockListCodexModelsForAgent.mockReset().mockResolvedValue([
+      { id: "gpt-account-default", label: "Account Default" },
+    ]);
+  });
+
+  it("keeps the create/no-agent picker account-default-only", async () => {
+    const res = await request(makeApp())
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .expect(200);
+
+    expect(res.body).toEqual([]);
+    expect(mockListCodexModels).toHaveBeenCalledWith();
+    expect(mockListCodexModelsForAgent).not.toHaveBeenCalled();
+    expect(mockGetAgentById).not.toHaveBeenCalled();
+  });
+
+  it("loads choices from the same-company Codex agent's resolved config", async () => {
+    const agent = {
+      id: "agent-one",
+      companyId: COMPANY_ID,
+      adapterType: "codex_local",
+      adapterConfig: { command: "codex", env: { OPENAI_API_KEY: { type: "secret_ref" } } },
+    };
+    mockGetAgentById.mockResolvedValue(agent);
+    mockResolveAdapterConfigForRuntime.mockResolvedValue({
+      command: "codex",
+      env: { OPENAI_API_KEY: "agent-one-resolved-key" },
+    });
+
+    const res = await request(makeApp())
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .query({ agentId: agent.id, authHome: "C:/attacker-home" })
+      .expect(200);
+
+    expect(res.body).toEqual([{ id: "gpt-account-default", label: "Account Default" }]);
+    expect(mockResolveAdapterConfigForRuntime).toHaveBeenCalledWith(
+      COMPANY_ID,
+      "codex_local",
+      agent.adapterConfig,
+      expect.objectContaining({
+        consumerType: "agent",
+        consumerId: agent.id,
+        actorType: "user",
+        actorId: "board",
+      }),
+    );
+    expect(mockListCodexModelsForAgent).toHaveBeenCalledWith({
+      companyId: COMPANY_ID,
+      agentId: agent.id,
+      adapterConfig: {
+        command: "codex",
+        env: { OPENAI_API_KEY: "agent-one-resolved-key" },
+      },
+    });
+    expect(mockListCodexModelsForAgent.mock.calls[0]![0]).not.toHaveProperty("authHome");
+  });
+
+  it("does not resolve credentials for missing or cross-company agents", async () => {
+    mockGetAgentById.mockResolvedValue(null);
+    await request(makeApp())
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .query({ agentId: "missing-agent" })
+      .expect(404);
+
+    mockGetAgentById.mockResolvedValue({
+      id: "other-agent",
+      companyId: "company-other",
+      adapterType: "codex_local",
+      adapterConfig: { env: { OPENAI_API_KEY: "other-company-key" } },
+    });
+    await request(makeApp())
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .query({ agentId: "other-agent" })
+      .expect(404);
+
+    expect(mockResolveAdapterConfigForRuntime).not.toHaveBeenCalled();
+    expect(mockListCodexModelsForAgent).not.toHaveBeenCalled();
+  });
+
+  it("does not probe agents configured for another adapter", async () => {
+    mockGetAgentById.mockResolvedValue({
+      id: "agent-one",
+      companyId: COMPANY_ID,
+      adapterType: "claude_local",
+      adapterConfig: { env: { ANTHROPIC_API_KEY: "secret" } },
+    });
+
+    const res = await request(makeApp())
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .query({ agentId: "agent-one" })
+      .expect(200);
+
+    expect(res.body).toEqual([]);
+    expect(mockResolveAdapterConfigForRuntime).not.toHaveBeenCalled();
+    expect(mockListCodexModelsForAgent).not.toHaveBeenCalled();
+  });
+
+  it("requires configuration-read permission before resolving an agent's secrets", async () => {
+    mockGetAgentById.mockResolvedValue({
+      id: "agent-one",
+      companyId: COMPANY_ID,
+      adapterType: "codex_local",
+      adapterConfig: { env: { OPENAI_API_KEY: { type: "secret_ref" } } },
+    });
+    const actor = {
+      type: "board",
+      source: "session",
+      userId: "reader-without-config-access",
+      companyIds: [COMPANY_ID],
+      isInstanceAdmin: false,
+    };
+
+    await request(makeApp(actor))
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .query({ agentId: "agent-one" })
+      .expect(403);
+
+    expect(mockGetAgentById).not.toHaveBeenCalled();
+    expect(mockResolveAdapterConfigForRuntime).not.toHaveBeenCalled();
+    expect(mockListCodexModelsForAgent).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty agentId instead of falling back to a shared catalog", async () => {
+    await request(makeApp())
+      .get(`/api/companies/${COMPANY_ID}/adapters/codex_local/models`)
+      .query({ agentId: " " })
+      .expect(422);
+
+    expect(mockGetAgentById).not.toHaveBeenCalled();
+    expect(mockListCodexModelsForAgent).not.toHaveBeenCalled();
   });
 });

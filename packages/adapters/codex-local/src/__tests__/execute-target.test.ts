@@ -2,9 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { execute } from "../server/execute.js";
+import { execute, type CodexExecuteDeps } from "../server/execute.js";
 import { testEnvironment } from "../server/test.js";
+import { testModelCatalogLoader } from "../server/__tests__/model-catalog-fixture.js";
 import type { AdapterInvocationMeta, AdapterProviderSandboxRunInput, McpHttpServerSpec } from "@armyofagents/adapter-utils";
+
+const testExecuteDeps: CodexExecuteDeps = {
+  runAppServerTurn: async () => { throw new Error("bridged path not expected in this test"); },
+  getModelCatalog: testModelCatalogLoader,
+};
+
+function executeWithTestCatalog(ctx: Parameters<typeof execute>[0]) {
+  return execute(ctx, testExecuteDeps);
+}
 
 async function expectSameRealPath(actual: string, expected: string): Promise<void> {
   await expect(fs.realpath(actual)).resolves.toBe(await fs.realpath(expected));
@@ -67,7 +77,7 @@ describe("codex execute target", () => {
     const metaEvents: AdapterInvocationMeta[] = [];
 
     try {
-      const result = await execute({
+      const result = await executeWithTestCatalog({
         runId: "run-codex-target",
         agent: {
           id: "agent-1",
@@ -153,7 +163,7 @@ describe("codex execute target", () => {
     const previousCodexHome = process.env.CODEX_HOME;
     process.env.CODEX_HOME = codexHome;
     try {
-      const result = await execute({
+      const result = await executeWithTestCatalog({
         runId: "run-envstrip",
         agent: { id: "agent-1", companyId: "company-1", name: "Codex Coder", adapterType: "codex_local", adapterConfig: {} },
         runtime: { sessionId: null, sessionParams: null, sessionDisplayId: null, taskKey: null },
@@ -226,7 +236,7 @@ describe("codex execute target", () => {
     const commandPath = await writeFakeCodexCommand(commandBase);
 
     try {
-      const result = await execute({
+      const result = await executeWithTestCatalog({
         runId: "run-codex-task",
         agent: {
           id: "agent-1",
@@ -306,7 +316,7 @@ describe("codex execute target", () => {
     };
 
     try {
-      const result = await execute({
+      const result = await executeWithTestCatalog({
         runId: "run-codex-provider",
         agent: {
           id: "agent-1",
@@ -404,7 +414,7 @@ describe("codex execute target", () => {
     };
 
     try {
-      const result = await execute({
+      const result = await executeWithTestCatalog({
         runId: "run-codex-mcp-stage",
         agent: {
           id: "agent-1",
@@ -486,7 +496,7 @@ describe("codex testEnvironment probe env-strip (Codex P2)", () => {
         companyId: "company-1",
         adapterType: "codex_local",
         config: { command: commandPath, cwd: workspace, env: { AOA_TEST_CAPTURE_PATH: capturePath, ...configEnv } },
-      });
+      }, { getModelCatalog: testModelCatalogLoader });
       const captured = JSON.parse(await fs.readFile(capturePath, "utf8")) as { env: Record<string, string | undefined> };
       return captured.env;
     } finally {

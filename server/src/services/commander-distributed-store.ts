@@ -93,7 +93,8 @@ export function createCommanderSourcePreparer(db: Db) {
       const [previous] = await tx.select().from(internalAgentRuns).where(and(eq(internalAgentRuns.id, message.runId),
         eq(internalAgentRuns.companyId, input.companyId), eq(internalAgentRuns.userId, input.userId))).limit(1);
       if (!previous || !["failed", "cancelled"].includes(previous.status)) return false;
-      if (previous.distributedJobId) return false;
+      if (previous.distributedJobId || previous.distributedAttemptId ||
+        (previous.executionOwner !== null && previous.executionOwner !== "legacy")) return false;
     }
     await tx.update(internalAgentMessages).set({ runId: input.turnId }).where(eq(internalAgentMessages.id, message.id));
     await tx.update(internalAgentRuns).set({ provider: input.provider, model: input.model ?? null, conversationMessageId: message.id })

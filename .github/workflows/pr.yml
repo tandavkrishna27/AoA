@@ -1156,6 +1156,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Vitest native output capture
+        if: matrix.shard == 1
+        run: node --test scripts/lib/__tests__/vitest-capture.test.mjs
+
       - name: M1 mobility route AST inventory
         if: matrix.shard == 1
         run: node --test scripts/lib/__tests__/m1-route-inventory.test.mjs

@@ -1,7 +1,8 @@
 export const type = "codex_local";
 export const label = "Codex (local)";
 export const SANDBOX_INSTALL_COMMAND = "npm install -g @openai/codex";
-export const DEFAULT_CODEX_LOCAL_MODEL = "gpt-5.5";
+/** Empty means inherit the default from the active Codex CLI account catalog. */
+export const DEFAULT_CODEX_LOCAL_MODEL = "";
 export const DEFAULT_CODEX_LOCAL_BYPASS_APPROVALS_AND_SANDBOX = true;
 
 export const CODEX_LOCAL_FAST_MODE_SUPPORTED_MODELS = ["gpt-5.4"] as const;
@@ -11,19 +12,9 @@ export function isCodexLocalFastModeSupported(model: string | null | undefined):
   return (CODEX_LOCAL_FAST_MODE_SUPPORTED_MODELS as readonly string[]).includes(model);
 }
 
-export const models = [
-  { id: "gpt-5.5", label: "gpt-5.5" },
-  { id: "gpt-5.4", label: "gpt-5.4" },
-  { id: "gpt-5.3-codex", label: "gpt-5.3-codex" },
-  { id: "gpt-5.3-codex-spark", label: "gpt-5.3-codex-spark" },
-  { id: "gpt-5", label: "gpt-5" },
-  { id: "o3", label: "o3" },
-  { id: "o4-mini", label: "o4-mini" },
-  { id: "gpt-5-mini", label: "gpt-5-mini" },
-  { id: "gpt-5-nano", label: "gpt-5-nano" },
-  { id: "o3-mini", label: "o3-mini" },
-  { id: "codex-mini-latest", label: "Codex Mini" },
-];
+// Model choices are loaded from the active CLI's model/list catalog. Do not
+// maintain a static list here: bundled slugs can be retired or incompatible.
+export const models: Array<{ id: string; label: string }> = [];
 
 export const agentConfigurationDoc = `# codex_local agent configuration
 

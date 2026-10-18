@@ -68,6 +68,20 @@ pnpm aoa run
 
 This auto-onboards if config is missing, runs health checks with auto-repair, and starts the server.
 
+## Built CLI from a checkout
+
+After a full workspace install, including development dependencies, the built CLI also supports plain Node:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+node cli/dist/index.js onboard --yes
+```
+
+Restart an existing configured instance with `node cli/dist/index.js run`. The built command selects the compiled server entry and handles source-exported workspace dependencies internally; no external `--import tsx` flag is required. Keep workspace development dependencies installed. Missing builds or dependencies produce install/build guidance. `pnpm aoa` remains the source-development command, and the published-package path remains separate from this checkout workflow.
+
+For isolated verification, pass `--data-dir` with a fresh owned directory and stop only that attempt's app/database processes afterward. See the [built onboarding retest checklist](../aoa/plans/2026-10-16-f01-f05-live-retest.md#f05-supported-raw-built-workspace-command) for complete live acceptance.
+
 ## Authenticated Deployment
 
 Google is the only human sign-in provider. An authenticated deployment must set

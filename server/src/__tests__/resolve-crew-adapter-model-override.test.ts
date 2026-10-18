@@ -11,13 +11,15 @@ describe("resolveCrewAdapterFor model override", () => {
     expect(resolveCrewAdapterFor("anthropic", "evil; rm -rf").adapterConfig.model).toBe("claude-sonnet-4-5-20250929");
   });
   it("applies a codex-compatible override for openai", () => {
-    expect(resolveCrewAdapterFor("openai", "gpt-5.5").adapterConfig.model).toBe("gpt-5.5");
+    expect(resolveCrewAdapterFor("openai", "gpt-fixture-listed").adapterConfig.model).toBe("gpt-fixture-listed");
   });
-  it("rejects a codex-INCOMPATIBLE override → openai default", () => {
-    // NOTE (review P0-3): isCodexCompatibleModel ACCEPTS gpt-4o (gpt-family, no
-    // "codex"). Genuinely-incompatible = a *-codex id or a non-OpenAI family model.
-    expect(resolveCrewAdapterFor("openai", "gpt-5.2-codex").adapterConfig.model).toBe(DEFAULT_CODEX_CHAT_MODEL);
-    expect(resolveCrewAdapterFor("openai", "claude-sonnet-4-5").adapterConfig.model).toBe(DEFAULT_CODEX_CHAT_MODEL);
+  it("preserves explicit Codex choices so the active account catalog can accept or refuse them", () => {
+    expect(resolveCrewAdapterFor("openai", "gpt-fixture-codex").adapterConfig.model).toBe("gpt-fixture-codex");
+    expect(resolveCrewAdapterFor("openai", "claude-fixture").adapterConfig.model).toBe("claude-fixture");
+  });
+  it("omits a blank Codex model so execution inherits the signed-in account default", () => {
+    expect(resolveCrewAdapterFor("openai").adapterConfig).not.toHaveProperty("model");
+    expect(resolveCrewAdapterFor("openai", "  ").adapterConfig).not.toHaveProperty("model");
   });
   it("requires slash form for opencode override; bare → default", () => {
     expect(resolveCrewAdapterFor("opencode", "anthropic/claude-sonnet-4").adapterConfig.model).toBe("anthropic/claude-sonnet-4");
@@ -29,5 +31,6 @@ describe("resolveCrewAdapterFor model override", () => {
   it("no override → unchanged per-provider defaults", () => {
     expect(resolveCrewAdapterFor("anthropic").adapterConfig.model).toBe("claude-sonnet-4-5-20250929");
     expect(resolveCrewAdapterFor("google").adapterConfig.model).toBe("gemini-2.5-pro");
+    expect(DEFAULT_CODEX_CHAT_MODEL).toBe("");
   });
 });

@@ -14,11 +14,25 @@ import { EventEmitter } from "node:events";
 import { setDeploymentMode } from "../config/deployment-mode.js";
 
 const warmOwner = vi.hoisted(() => vi.fn(async () => false));
-vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: warmOwner }));
-vi.mock("node:child_process", () => ({
-  execSync: vi.fn(),
-  spawn: vi.fn(),
+const getCodexModelCatalogMock = vi.hoisted(() => vi.fn(async (request: any) => {
+  const apiKeyAuth = [request.env?.OPENAI_API_KEY, request.env?.CODEX_API_KEY]
+    .some((value: unknown) => typeof value === "string" && value.trim().length > 0);
+  return {
+    identity: {
+      companyId: request.companyId,
+      authHome: request.authHome,
+      authGeneration: "synthetic-test-auth-generation",
+      authMode: apiKeyAuth ? "apikey" : "subscription",
+      cliVersion: "0.145.0-test",
+    },
+    models: [{ id: "gpt-5.5", isDefault: true }],
+  };
 }));
+vi.mock("../services/commander-warm-owner.js", () => ({ hasCommanderWarmOwner: warmOwner }));
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, execSync: vi.fn(), spawn: vi.fn(), execFile: vi.fn() };
+});
 
 // Simulate production layout: mcp-bridge.js exists → command = 'node' (not 'tsx').
 vi.mock("node:fs", async (importOriginal) => {
@@ -26,11 +40,15 @@ vi.mock("node:fs", async (importOriginal) => {
   return { ...actual, statSync: vi.fn() }; // never throws → .js "exists"
 });
 
-vi.mock("node:fs/promises", () => ({
-  writeFile: vi.fn(async () => {}),
-  mkdir: vi.fn(async () => {}),
-  unlink: vi.fn(async () => {}),
-}));
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    writeFile: vi.fn(async () => {}),
+    mkdir: vi.fn(async () => {}),
+    unlink: vi.fn(async () => {}),
+  };
+});
 
 vi.mock("@armyofagents/adapter-codex-local/server", async (importOriginal) => {
   const actual = await importOriginal<
@@ -41,6 +59,7 @@ vi.mock("@armyofagents/adapter-codex-local/server", async (importOriginal) => {
     writeCodexMcpConfigToml: vi.fn(async () => {}),
     ensureCodexAuthInHome: vi.fn(async () => true),
     readSharedCodexModel: vi.fn(async () => null),
+    getCodexModelCatalog: getCodexModelCatalogMock,
   };
 });
 

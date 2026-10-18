@@ -27,6 +27,20 @@ const guardedModules = [
   "job-ready-scheduler",
   "job-outbox-worker",
 ];
+
+function replaceExactlyOnce(source, pattern, replacement, label) {
+  let matches = 0;
+  const updated = source.replace(pattern, (match, ...args) => {
+    matches += 1;
+    if (typeof replacement === "function") return replacement(match, ...args);
+    return replacement.replace(/\$(\d+)/gu, (_placeholder, index) => args[Number(index) - 1] ?? "");
+  });
+  if (matches !== 1) {
+    throw new Error(`JOB_CONTROL_BOOTSTRAP_INSTRUMENTATION_MISSING:${label}:${matches}`);
+  }
+  return updated;
+}
+
 registerHooks({
   resolve(specifier, context, nextResolve) {
     // Guarded modules are all server-side (server/src/services + server/src/routes). The
@@ -57,34 +71,44 @@ registerHooks({
     const loaded = nextLoad(url, context);
     const normalizedUrl = url.replaceAll("\\", "/");
     if (sentinelMode?.startsWith("bootstrap-") && loaded.format === "module" &&
-      loaded.source !== undefined && loaded.source !== null &&
-      normalizedUrl.includes("/packages/db/src/client.")) {
+      loaded.source !== undefined && loaded.source !== null) {
       let source = String(loaded.source);
-      source = source.replace(
-        /(\b(?:export\s+)?async\s+function\s+loadRequiredMigrationIdentity\s*\([^)]*\)\s*(?::\s*Promise<RequiredMigrationIdentity>\s*)?\{)/u,
-        `$1
+      if (normalizedUrl.includes("/packages/db/src/required-migration-identity.")) {
+        source = replaceExactlyOnce(
+          source,
+          /(\b(?:export\s+)?async\s+function\s+loadRequiredMigrationIdentity\s*\([^)]*\)\s*(?::\s*Promise<RequiredMigrationIdentity>\s*)?\{)/u,
+          `$1
   process.stderr.write("JOB_CONTROL_BOOTSTRAP_LOADER_READ\\n");
   if (process.env.AOA_JOB_CONTROL_MODULE_LOAD_SENTINEL === "bootstrap-loader-deny") {
     throw new Error("JOB_CONTROL_BOOTSTRAP_LOADER_DENIED");
   }`,
-      );
-      source = source.replace(
-        /(\b(?:export\s+)?function\s+createTenantAppDbConnection\s*\([^)]*\)\s*(?::\s*NonOwnerDbConnection\s*)?\{)/u,
-        `$1
+          "required-migration-identity-loader",
+        );
+        return { ...loaded, source };
+      }
+      if (normalizedUrl.includes("/packages/db/src/client.")) {
+        source = replaceExactlyOnce(
+          source,
+          /(\b(?:export\s+)?function\s+createTenantAppDbConnection\s*\([^)]*\)\s*(?::\s*NonOwnerDbConnection\s*)?\{)/u,
+          `$1
   process.stderr.write("JOB_CONTROL_BOOTSTRAP_POOL_ALLOCATION:aoa_app\\n");
   if (process.env.AOA_JOB_CONTROL_MODULE_LOAD_SENTINEL === "bootstrap-allocation-deny") {
     throw new Error("JOB_CONTROL_BOOTSTRAP_POOL_ALLOCATION_DENIED:aoa_app");
   }`,
-      );
-      source = source.replace(
-        /(\b(?:export\s+)?function\s+createOperatorDbConnection\s*\([^)]*\)\s*(?::\s*NonOwnerDbConnection\s*)?\{)/u,
-        `$1
+          "tenant-app-pool-allocation",
+        );
+        source = replaceExactlyOnce(
+          source,
+          /(\b(?:export\s+)?function\s+createOperatorDbConnection\s*\([^)]*\)\s*(?::\s*NonOwnerDbConnection\s*)?\{)/u,
+          `$1
   process.stderr.write("JOB_CONTROL_BOOTSTRAP_POOL_ALLOCATION:aoa_operator\\n");
   if (process.env.AOA_JOB_CONTROL_MODULE_LOAD_SENTINEL === "bootstrap-allocation-deny") {
     throw new Error("JOB_CONTROL_BOOTSTRAP_POOL_ALLOCATION_DENIED:aoa_operator");
   }`,
-      );
-      return { ...loaded, source };
+          "operator-pool-allocation",
+        );
+        return { ...loaded, source };
+      }
     }
     if (process.env.AOA_JOB_CONTROL_MODULE_LOAD_SENTINEL !== "identity" ||
       loaded.format !== "module" || loaded.source === undefined || loaded.source === null) {

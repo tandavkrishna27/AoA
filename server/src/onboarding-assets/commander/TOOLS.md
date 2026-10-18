@@ -50,7 +50,7 @@ The 88 tools below are your complete set, generated from the live tool registry.
 | `create_artifact_version` | write | team_member | Create a new version of an existing artifact (Engineer iteration loop). |
 | `create_department` | write | founder | Create a new department. Founder-only. |
 | `create_goal` | write | team_lead | Create a new goal with optional department scope. |
-| `create_task` | write | team_lead | Create a new task with title, optional description, priority, department, goal, assignee, and responsible human. Assignee means who does the task; responsible human owns the outcome. |
+| `create_task` | write | team_lead | Create a new task with title, optional description, priority, department, goal, work mode, assignee, and responsible human. Planning tasks are saved for human curation and do not auto-dispatch. Assignee means who does the task; responsible human owns the outcome. |
 | `defer_inbox_to_human` | write | team_member | Finalize an inbound item you are UNSURE about: leave it in the Inbox for the founder to triage. Call this instead of returning silently when no thread is a confident home and a new thread isn't clearly warranted. |
 | `delegate_to_subagent` | write | founder | Delegate a task to a named AoA sub-agent by enqueuing a wakeup request. The sub-agent will be triggered asynchronously by the AoA dispatcher. |
 | `promote_inbox_to_thread` | write | team_member | Create a new thread from an inbound inbox item. At full_auto dial: auto-creates the thread. At auto_attach/suggest dial: records a 'suggest_new' decision surfaced to the founder. |

@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "supersedes": "docs/aoa/evidence/2026-10-17-f01-f05-live-retest-summary.json (F05 startup status only)",
+  "branch": "codex/replatform-baseline-w00-w04",
+  "testedCandidate": "64fbe0471579535c776df769ce471c46f2482f42",
+  "runtime": {
+    "node": "v24.19.0",
+    "pnpm": "9.15.4",
+    "platform": "win32",
+    "architecture": "x64",
+    "cli": "0.2.7"
+  },
+  "scope": "F05 built workspace startup only; no whole-suite, VPS rebuild, engine inference or packed-install onboarding",
+  "rootCause": "Scoped tsImport namespaces a canvas CommonJS node:os require; Node treats it as a missing file, so PDF initialization lacks DOMMatrix. Ordinary import and unscoped register plus import succeed in fresh processes.",
+  "fix": "Register tsx/esm/api with tsconfig:false only for built workspace execution, then ordinary import of server/dist/index.js. Keep registration alive for lazy source-exported dependencies. Source and installed entry selection are unchanged.",
+  "reproduction": {
+    "ordinaryPdfImportExit": 0,
+    "scopedPdfImportExit": 1,
+    "registeredPdfImportExit": 0,
+    "regressionRed": {
+      "base": "84d54388a52ac4c98ed63e3e1f9f02f98cc245a1",
+      "exit": 1,
+      "failed": 1,
+      "skipped": 11,
+      "error": "DOMMatrix is not defined",
+      "productionFixPresent": false
+    }
+  },
+  "targetedTests": {
+    "candidate": "64fbe0471579535c776df769ce471c46f2482f42",
+    "exit": 0,
+    "files": [
+      "cli/src/__tests__/run-entrypoint.test.ts",
+      "cli/src/__tests__/bundle-runtime.test.ts"
+    ],
+    "args": "run <two files> --maxWorkers=1 --minWorkers=1",
+    "nativeSummary": {
+      "filesPassed": 2,
+      "testsPassed": 13,
+      "testsFailed": 0,
+      "testsSkipped": 0
+    },
+    "genericCaptureUnhandledCounter": "unknown",
+    "rawUnhandledDiagnosticObserved": false,
+    "boundaries": [
+      "real PDF/native canvas startup",
+      "source-exported TypeScript relative .js imports",
+      "source development and UI overrides",
+      "installed package without tsx",
+      "missing build/dependency guidance",
+      "startup errors without fallback",
+      "strict bundle dependency links"
+    ]
+  },
+  "build": {
+    "cliTypecheck": {
+      "command": "pnpm --filter @armyofagents/cli typecheck",
+      "exit": 0
+    },
+    "cliBuild": {
+      "command": "pnpm --filter @armyofagents/cli build",
+      "exit": 0
+    },
+    "provenance": "Unchanged frozen workspace dependencies and authoritative server/UI build retained from the preceding 6ebc400d2 retest; only CLI rebuilt. No new full-root build or install claimed.",
+    "manifestsOrLockfileChanged": false
+  },
+  "onboarding": {
+    "result": "pass",
+    "startedAt": "2026-10-17T17:13:41.6159558Z",
+    "finishedAt": "2026-10-17T17:16:17.0874110Z",
+    "command": "node cli/dist/index.js onboard --yes --data-dir <fresh-owned-home>",
+    "externalLoader": false,
+    "configCreated": true,
+    "doctorChecksPassed": 9,
+    "freshDatabaseMigrations": 287,
+    "appPort": 3212,
+    "actualDatabasePort": 54330,
+    "doctorConfiguredDatabasePort": 54329,
+    "health": {
+      "status": "ok",
+      "revision": "64fbe0471579535c776df769ce471c46f2482f42",
+      "deploymentMode": "local_trusted",
+      "deploymentExposure": "private",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": true
+      }
+    },
+    "uiStatus": 200,
+    "company": {
+      "id": "52270e87-a248-46c1-8a9c-e0a12f501a8f",
+      "name": "F05 Startup QA",
+      "persistedCountObserved": 1,
+      "issueCounter": 0
+    },
+    "browser": {
+      "candidate": "64fbe0471579535c776df769ce471c46f2482f42",
+      "usableUi": true,
+      "observedAt": "2026-10-17T17:16:12.996Z",
+      "url": "http://127.0.0.1:3212/onboarding",
+      "completedSteps": [
+        "dummy operator profile",
+        "dummy organization",
+        "dummy company",
+        "owned workspace read/write verification"
+      ],
+      "persistedAfterReload": "Step 5 of 8: Bring your engine online",
+      "engineVerificationOrInferenceRequested": false,
+      "observation": "After company creation the wizard briefly returned to populated Step 1; Continue resumed Step 4 without re-creating the company."
+    },
+    "countCaveat": "Raw runner initialCompanyCount uses PowerShell array wrapping and is not evidence of a preexisting company; do not use it for before/after company counts.",
+    "limits": "Wizard reached Step 5 of 8 and retained progress after reload. Engine authentication/verification, Commander, crew completion and model inference were intentionally not requested.",
+    "observations": [
+      "Wizard briefly reset to populated Step 1 after company creation; Continue resumed Step 4 without another company creation.",
+      "No PDF/canvas or DOMMatrix startup warning after the fix.",
+      "Better Auth missing base URL and SIGINT/SIGTERM listener-count warnings retained; not investigated here.",
+      "Catalog intentionally pointed at loopback port 1 to avoid external network, so crew provisioning reported degraded offline/legacy roster. No full crew claim.",
+      "Normal dispatcher ticks reported zero reclaimed/drained/wakeups; no engine test was requested. No general zero-background-activity claim.",
+      "Runner stopped its owned database before terminating the server; ensuing worker database-shutdown errors are retained and are not a natural clean application exit."
+    ]
+  },
+  "cleanup": {
+    "databaseStopExit": 0,
+    "processStopExit": 0,
+    "operatorStoppedLongRunningServer": true,
+    "remainingListeners": [],
+    "remainingOwnedProcesses": [],
+    "ownedIdentityReceipt": "owned-processes-before-stop.json",
+    "retainedNativeHealth": {
+      "status": "ok",
+      "revision": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+      "deploymentMode": "local_trusted",
+      "deploymentExposure": "private",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": true
+      }
+    },
+    "privateHomePublished": false,
+    "vpsTouched": false
+  },
+  "status": {
+    "F05": "Bounded Windows built-workspace startup repaired and actual fresh-home setup/UI/owned cleanup verified",
+    "pending": [
+      "full clean reinstall/root rebuild repeat and real packed installation acceptance if required",
+      "engine-authenticated eight-step wizard/Commander/crew journey",
+      "F01 strict subprocess provenance and broader native acceptance",
+      "F02/F04 separately prerequisite-bound distributed/other-owner live cases",
+      "previous UI reconciliation observations",
+      "F06-F09 qualified investigations"
+    ]
+  },
+  "artifacts": [
+    {
+      "file": "cli/dist/index.js",
+      "bytes": 1565224,
+      "sha256": "3b17a84a8d68c35ed5e0bf24e4a35be9332d4133ee94276032f7d3ec5e277a8b"
+    },
+    {
+      "file": "server/dist/index.js",
+      "bytes": 126656,
+      "sha256": "6e1fda0be5f88f197adcf1cd70a9ff294de8b922f0a20be47a0798099f5ac118"
+    },
+    {
+      "file": "ui/dist/index.html",
+      "bytes": 3875,
+      "sha256": "1711acbada0454fe51fe662de5a1ad790cdf938d8ef932c677711e21fab5f1cf"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "bytes": 632582,
+      "sha256": "e9c006ffacd1cad388597c47cdb620f715149633794869ea2ed435db5f8cc753"
+    },
+    {
+      "file": "cli/src/commands/run.ts",
+      "bytes": 6593,
+      "sha256": "5a39020009fb2a75e172933c4cd2544e25cc41aa09997e99734130caa94e83f5"
+    },
+    {
+      "file": "cli/src/__tests__/run-entrypoint.test.ts",
+      "bytes": 11470,
+      "sha256": "99656f4a125039d52ed2198cbd8716ca2815b7031360ce9ce712383112c45e0a"
+    }
+  ],
+  "rawEvidenceLocation": "Sibling validation-2026-10-17-f05-fix on the test PC; receipts are portable but raw logs/screenshots/private home are not clone-accessible attachments",
+  "rawFiles": [
+    {
+      "file": "build.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "build.stdout.log",
+      "bytes": 233,
+      "sha256": "e3144d56da9b0e0fd77de5de11f42016170a1b32b862af758638174658a06ac9"
+    },
+    {
+      "file": "db-stop.log",
+      "bytes": 120,
+      "sha256": "90db3736059cd0bedb707c6ab323a54744c09b27a24390e5841d3ec27adca459"
+    },
+    {
+      "file": "f05-browser-proof.json",
+      "bytes": 587,
+      "sha256": "e6a95dd2849cd9ce7180c3dc597e255e659b8a296d5f637691b91d94071d888a"
+    },
+    {
+      "file": "onboard.ready.json",
+      "bytes": 959,
+      "sha256": "c8db08ccbd1212c3d7ab7c5ae883655b10f13c39c54c971fb8f7a283700aad99"
+    },
+    {
+      "file": "onboard.result.json",
+      "bytes": 2335,
+      "sha256": "519d430dff70285b2dd64f6d373581caf018b2036b5d36651f508f1a6ae6f6e9"
+    },
+    {
+      "file": "onboard.stderr.log",
+      "bytes": 721,
+      "sha256": "97b9d1a9db0492cd8624f05a69754deb4eb510ea5b30e397384968dcd5e7063c"
+    },
+    {
+      "file": "onboard.stdout.log",
+      "bytes": 93934,
+      "sha256": "e9041dc42a29a2a105a4d9fb5d133267275771d34f77ccb1601a801174e6c517"
+    },
+    {
+      "file": "onboarding-engine.dom.txt",
+      "bytes": 439,
+      "sha256": "a5fa6a63de5b662956ba5a4ab0375189cfc1a4eefe2c86d9fb661d83df8598da"
+    },
+    {
+      "file": "onboarding-engine.png",
+      "bytes": 23295,
+      "sha256": "a8d4e6e991cfa4bb60c80553c7744d83319bfd02fcc813bdf7be9d405c9a3a45"
+    },
+    {
+      "file": "onboarding-reloaded.dom.txt",
+      "bytes": 439,
+      "sha256": "a5fa6a63de5b662956ba5a4ab0375189cfc1a4eefe2c86d9fb661d83df8598da"
+    },
+    {
+      "file": "onboarding-reloaded.png",
+      "bytes": 23359,
+      "sha256": "5ee5178a45df9ce58693a844bc6e94c03434f07a4e8fb0be67bf7deb3b016da3"
+    },
+    {
+      "file": "owned-processes-before-stop.json",
+      "bytes": 8131,
+      "sha256": "de898d2b6a1a752a9ff132c9519c281fad25cb0faa010083d9ff5f786c118d34"
+    },
+    {
+      "file": "probe-loader.mjs",
+      "bytes": 830,
+      "sha256": "a4e692dc03b7a16dc9a95d2430f26745349f6953d41403870a1d267b9267d49a"
+    },
+    {
+      "file": "probe-ordinary.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "probe-ordinary.stdout.log",
+      "bytes": 40,
+      "sha256": "dff70116afcc63621c8d127e6451bbd58f25d6cad43292ca61b13f6c09f6a635"
+    },
+    {
+      "file": "probe-register.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "probe-register.stdout.log",
+      "bytes": 40,
+      "sha256": "e36dfb855353f3b1c49cbe8d05830f3768dc801bf937313591fe78435b79b8d6"
+    },
+    {
+      "file": "probe-scoped.stderr.log",
+      "bytes": 883,
+      "sha256": "96af9be0a44e8a20ef3121b27ae7d31c78b3242f5cd0e84a4721a0f4a11dbe7e"
+    },
+    {
+      "file": "probe-scoped.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "process-stop.log",
+      "bytes": 524,
+      "sha256": "46a56eed6dc9bd1ef14d49b1e2dd011c286a1c5fe24ea89cfb399a7938f14b5d"
+    },
+    {
+      "file": "retained-native-health.json",
+      "bytes": 269,
+      "sha256": "50ced5d212efa1b8b1e355e7ddf88dc3d838fc3e0d68ce1202dc7d79d7ef0819"
+    },
+    {
+      "file": "summarize.mjs",
+      "bytes": 6567,
+      "sha256": "25adbd13e6c72e76634515ecada4728fea652d4784b69b5b0ebe18a506e47b5f"
+    },
+    {
+      "file": "test-built-onboard.ps1",
+      "bytes": 7114,
+      "sha256": "9cd0f1eebcd12a29100b8d9b08955d3d64f2a245f3a011e139bcb66c67984d5b"
+    },
+    {
+      "file": "typecheck.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "typecheck.stdout.log",
+      "bytes": 91,
+      "sha256": "9658439e1bf5e6d21b4a4037b9a2a5be89d90064a00dad28dd1c78bf21ff558d"
+    },
+    {
+      "file": "red/result.json",
+      "bytes": 1292,
+      "sha256": "c226001a0a7b813c0da94f939175dce3b647ad3db74c29e982536d1e28c17a1f"
+    },
+    {
+      "file": "red/stderr.txt",
+      "bytes": 1309,
+      "sha256": "882b6da6b13b572f14c9dea0231284fa166ceb43b198c16a30589a2ed54ebf63"
+    },
+    {
+      "file": "red/stdout.txt",
+      "bytes": 2193,
+      "sha256": "5dcbd5e29dfdcd29b8a02bb76a59f226c2bb9b4eeba282a3e62ffec984fa080b"
+    },
+    {
+      "file": "green/result.json",
+      "bytes": 1309,
+      "sha256": "02214ad0b22fa6055a14eb47528d37a98af6443745e77cf8cbb665cf618737ca"
+    },
+    {
+      "file": "green/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "green/stdout.txt",
+      "bytes": 1886,
+      "sha256": "12922199f53936a92252fb3dc8c446a1a7e6c259746fdf315fa57f3c9d48ade0"
+    },
+    {
+      "file": "candidate-green/result.json",
+      "bytes": 1330,
+      "sha256": "090dc512a8f359d0223d87cef03b887a6c8b68763c4e24d31090076d18349b27"
+    },
+    {
+      "file": "candidate-green/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "candidate-green/stdout.txt",
+      "bytes": 1886,
+      "sha256": "7f919f671cd270a3f33451f99eddb42d47d95aee405a8ff35d3b0d507b6acb3a"
+    }
+  ]
+}

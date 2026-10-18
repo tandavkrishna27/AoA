@@ -31,6 +31,7 @@ import { randomUUID } from "node:crypto";
 import type { Db } from "@armyofagents/db";
 import { parseExtractedItems, type ExtractedItem } from "./extraction-parser.js";
 import { runCodexExecJson } from "./internal-agent/codex-exec.js";
+import { isOpenAiFamilyModel } from "./internal-agent/codex-model.js";
 import { tenantIsolationEnforced } from "../config/deployment-mode.js";
 import {
   appendCapped,
@@ -195,7 +196,7 @@ export async function extractViaCli(
   if (binary === "codex") {
     // codex one-shot has no separate system channel — prepend the system prompt.
     const prompt = `${systemPrompt}\n\n${content}`;
-    const result = await runCodexExecJson(prompt, { timeoutMs, codexModel });
+    const result = await runCodexExecJson(prompt, { timeoutMs, codexModel, companyId });
 
     // Capped output is a runaway/looping failure: killing the child makes `close`
     // report a null exit code, so without this a prompt-injected `[]` + spam that
@@ -329,6 +330,22 @@ async function extractViaCliSandbox(
     );
   }
 
+  // This exported boundary can be called directly, outside the normal
+  // credential resolver. Never send a malformed or cross-provider model to a
+  // Codex CLI authenticated with the company's OpenAI key. An empty model is
+  // intentional: leave it unset so the target-side account supplies its
+  // inherited default.
+  if (
+    binary === "codex" &&
+    opts.credential.model.trim() &&
+    !isOpenAiFamilyModel(opts.credential.model)
+  ) {
+    throw new CliExtractionError(
+      `The configured Codex model "${opts.credential.model.trim()}" is not an OpenAI/Codex model. Choose a Codex model or clear the model override to inherit the account default.`,
+      "nonzero_exit",
+    );
+  }
+
   const stagedFile = opts.stagedFile;
   const stdinContent = stagedFile ? undefined : `${systemPrompt}\n\n${content}`;
   const args = stagedFile
@@ -337,27 +354,33 @@ async function extractViaCliSandbox(
       // own argv value instead of being concatenated into stdinContent.
       binary === "codex"
       ? [
-          "exec",
-          "--json",
-          "--sandbox",
-          "read-only",
+          // Codex parses --ask-for-approval as a root option, before `exec`.
           "--ask-for-approval",
           "never",
-          "--model",
-          opts.credential.model,
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "read-only",
+          ...(opts.credential.model.trim()
+            ? ["--model", opts.credential.model.trim()]
+            : []),
           systemPrompt,
         ]
       : ["--print", "--tools", "", "--strict-mcp-config", "--system-prompt", systemPrompt, "--output-format", "text"]
     : binary === "codex"
       ? [
-          "exec",
-          "--json",
-          "--sandbox",
-          "read-only",
+          // Codex parses --ask-for-approval as a root option, before `exec`.
           "--ask-for-approval",
           "never",
-          "--model",
-          opts.credential.model,
+          "exec",
+          "--json",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "read-only",
+          ...(opts.credential.model.trim()
+            ? ["--model", opts.credential.model.trim()]
+            : []),
           "-",
         ]
       : ["--print", "--tools", "", "--strict-mcp-config", "--output-format", "text"];

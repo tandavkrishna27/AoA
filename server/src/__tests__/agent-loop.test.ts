@@ -199,6 +199,75 @@ describe("agentLoopService.chat — runtime attachment delivery (text)", () => {
 });
 
 describe("agentLoopService.chat — idempotent retry (clientSubmissionId)", () => {
+  it("saves the original replay payload and run link before a user-only failure", async () => {
+    scriptStream([{ type: "error", message: "Provider missing" }]);
+    const input = {
+      ...BASE_PARAMS,
+      conversationId: "conv-1",
+      clientSubmissionId: "saved-key",
+      runId: "run-original",
+      content: "Review Task id=task-original",
+      pageContext: "Original page",
+      departmentContext: null,
+      contextScope: { surface: "memory", route: "/original" },
+      attachmentAssetIds: ["11111111-1111-4111-8111-111111111111"],
+    };
+    const svc = agentLoopService(dbWithConfig({ cliTool: "codex" }));
+    for await (const _ of svc.chat(input as any)) {
+      void _;
+    }
+    const saved = appendMessage.mock.calls.find((call) => (call[1] as any).role === "user")?.[1];
+    expect(saved).toMatchObject({
+      runId: "run-original",
+      clientSubmissionId: "saved-key",
+      toolResults: {
+        kind: "commander_submission",
+        v: 1,
+        payload: {
+          message: input.content,
+          pageContext: input.pageContext,
+          departmentContext: null,
+          contextScope: input.contextScope,
+          attachmentAssetIds: input.attachmentAssetIds,
+        },
+      },
+    });
+  });
+
+  it("refuses a changed saved retry payload before reclaiming or executing the original turn", async () => {
+    getMessageByClientSubmissionId.mockResolvedValue({
+      id: "saved-user",
+      content: "Original",
+      toolResults: {
+        kind: "commander_submission",
+        v: 1,
+        payload: {
+          message: "Original",
+          pageContext: null,
+          departmentContext: null,
+          contextScope: null,
+          attachmentAssetIds: [],
+        },
+      },
+    });
+    const svc = agentLoopService(dbWithConfig({ cliTool: "codex" }));
+    const out: any[] = [];
+    for await (const chunk of svc.chat({
+      ...BASE_PARAMS,
+      conversationId: "conv-1",
+      clientSubmissionId: "saved-key",
+    } as any))
+      out.push(chunk);
+    expect(out).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringMatching(/original.*payload|different.*submission/i),
+      }),
+    );
+    expect(claimTurn).not.toHaveBeenCalled();
+    expect(cliChat).not.toHaveBeenCalled();
+  });
+
   async function drainWithKey(svc: ReturnType<typeof agentLoopService>, key: string) {
     const out: any[] = [];
     for await (const chunk of svc.chat({ ...BASE_PARAMS, conversationId: "conv-1", clientSubmissionId: key } as any)) {
@@ -206,6 +275,22 @@ describe("agentLoopService.chat — idempotent retry (clientSubmissionId)", () =
     }
     return out;
   }
+
+  it("refuses a tagged but incomplete saved payload rather than treating it as a legacy retry", async () => {
+    getMessageByClientSubmissionId.mockResolvedValue({
+      id: "corrupt-user",
+      content: "what is up",
+      toolResults: { kind: "commander_submission", v: 1, payload: { message: "what is up" } },
+    });
+    const svc = agentLoopService(dbWithConfig({ cliTool: "codex" }));
+    const out = await drainWithKey(svc, "corrupt-key");
+    expect(out).toContainEqual(expect.objectContaining({
+      type: "error",
+      message: expect.stringMatching(/original.*payload.*unavailable/i),
+    }));
+    expect(claimTurn).not.toHaveBeenCalled();
+    expect(cliChat).not.toHaveBeenCalled();
+  });
 
   it("replays the original assistant reply and does NOT persist a new message or run the CLI", async () => {
     // The key was already recorded → this is a retry.
@@ -222,6 +307,144 @@ describe("agentLoopService.chat — idempotent retry (clientSubmissionId)", () =
     expect(cliChat).not.toHaveBeenCalled();
     // C2: the replay is looked up by explicit user-turn linkage, not by timestamp.
     expect(getAssistantReplyForUserMessage).toHaveBeenCalledWith("conv-1", "user-orig");
+  });
+
+  it("persists a partial failure and replays it as failed without rerunning its tools", async () => {
+    getMessageByClientSubmissionId.mockResolvedValueOnce(null);
+    appendMessage.mockResolvedValueOnce({ id: "user-partial" }).mockResolvedValueOnce({ id: "assistant-partial" });
+    scriptStream([
+      { type: "tool_call", id: "tc-1", name: "create_task", input: { title: "Ship it" } },
+      { type: "tool_result", id: "tc-1", name: "create_task", result: { success: true, summary: "Created task T-1", data: { id: "t-1" } } },
+      { type: "text", delta: "The task was created. I could not finish the rest." },
+      { type: "error", message: "The CLI stopped before the turn completed." },
+      { type: "done", summary: { runId: "", toolsCalled: ["create_task"], durationMs: 0, costCents: 0, tokenUsage: { inputTokens: 10, outputTokens: 5 } } },
+    ]);
+
+    const svc = agentLoopService(dbWithConfig({ cliTool: "claude_cli", executionMode: "cli" }));
+    const firstAttempt = await drainWithKey(svc, "sub-partial-error");
+    const firstAssistant = appendMessage.mock.calls.find((call) => (call[1] as any).role === "assistant");
+    expect(firstAssistant?.[1]).toMatchObject({
+      content: "The task was created. I could not finish the rest.",
+      replyToUserMessageId: "user-partial",
+      turnStatus: "failed",
+      toolCalls: [expect.objectContaining({ name: "create_task", success: true, summary: "Created task T-1" })],
+    });
+    expect(firstAttempt.some((chunk) => chunk.type === "error")).toBe(true);
+    expect(finishTurn).toHaveBeenCalledWith("user-partial", "tok-1", "failed");
+
+    // A retry replays the durable partial assistant record and failure state.
+    // The create_task tool is rendered from saved activity; it is not executed again.
+    // The assistant-row marker is authoritative even in the short interval
+    // before the owning request updates the user row's turnStatus.
+    getMessageByClientSubmissionId.mockResolvedValue({ id: "user-partial", turnStatus: "running" });
+    getAssistantReplyForUserMessage.mockResolvedValue({
+      id: "assistant-partial",
+      content: "The task was created. I could not finish the rest.",
+      turnStatus: "failed",
+      toolCalls: [{ id: "tc-1", name: "create_task", input: { title: "Ship it" }, success: true, summary: "Created task T-1", result: { id: "t-1" } }],
+    });
+    cliChat.mockClear();
+    appendMessage.mockClear();
+    const retry = await drainWithKey(svc, "sub-partial-error");
+    expect(retry[0]).toEqual({ type: "run_skipped" });
+    expect(retry.some((chunk) => chunk.type === "text" && chunk.delta === "The task was created. I could not finish the rest.")).toBe(true);
+    expect(retry.some((chunk) => chunk.type === "tool_result" && chunk.name === "create_task")).toBe(true);
+    expect(retry.some((chunk) => chunk.type === "error" && /partial reply above may be incomplete/i.test(chunk.message))).toBe(true);
+    expect(cliChat).not.toHaveBeenCalled();
+    expect(appendMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not treat reasoning-only output as a completed reply", async () => {
+    appendMessage.mockResolvedValueOnce({ id: "user-reasoning" }).mockResolvedValueOnce({ id: "assistant-reasoning" });
+    scriptStream([
+      { type: "reasoning", delta: "I am considering the request." },
+      { type: "done", summary: { runId: "", toolsCalled: [], durationMs: 1, costCents: 0, tokenUsage: { inputTokens: 1, outputTokens: 0 } } },
+    ]);
+    const svc = agentLoopService(dbWithConfig({ cliTool: "claude_cli", executionMode: "cli" }));
+    await drainWithKey(svc, "sub-reasoning-only");
+
+    const assistant = appendMessage.mock.calls.find((call) => (call[1] as any).role === "assistant");
+    expect(assistant?.[1]).toMatchObject({ reasoning: "I am considering the request.", turnStatus: "failed" });
+    expect(finishTurn).toHaveBeenCalledWith("user-reasoning", "tok-1", "failed");
+  });
+
+  it("does not replay an unfinished failed tool call as a successful tool result", async () => {
+    appendMessage.mockResolvedValueOnce({ id: "user-tool-partial" }).mockResolvedValueOnce({ id: "assistant-tool-partial" });
+    scriptStream([
+      { type: "tool_call", id: "tc-incomplete", name: "create_task", input: { title: "Maybe created" } },
+      { type: "error", message: "The runtime stopped before the tool result arrived." },
+      { type: "done", summary: { runId: "", toolsCalled: ["create_task"], durationMs: 1, costCents: 0, tokenUsage: { inputTokens: 1, outputTokens: 0 } } },
+    ]);
+    const svc = agentLoopService(dbWithConfig({ cliTool: "claude_cli", executionMode: "cli" }));
+    await drainWithKey(svc, "sub-tool-partial");
+
+    const assistant = appendMessage.mock.calls.find((call) => (call[1] as any).role === "assistant");
+    expect(assistant?.[1]).toMatchObject({
+      turnStatus: "failed",
+      toolCalls: [{ id: "tc-incomplete", name: "create_task", input: { title: "Maybe created" } }],
+    });
+    getMessageByClientSubmissionId.mockResolvedValue({ id: "user-tool-partial", turnStatus: "running" });
+    getAssistantReplyForUserMessage.mockResolvedValue({
+      id: "assistant-tool-partial",
+      turnStatus: "failed",
+      toolCalls: [{ id: "tc-incomplete", name: "create_task", input: { title: "Maybe created" } }],
+    });
+    const retry = await drainWithKey(svc, "sub-tool-partial");
+    expect(retry.some((chunk) => chunk.type === "tool_call" && chunk.id === "tc-incomplete")).toBe(true);
+    expect(retry.some((chunk) => chunk.type === "tool_result" && chunk.name === "create_task")).toBe(false);
+    expect(retry.some((chunk) => chunk.type === "error")).toBe(true);
+    expect(cliChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists and replays options-only completion as a successful prompt", async () => {
+    appendMessage.mockResolvedValueOnce({ id: "user-options" }).mockResolvedValueOnce({ id: "assistant-options" });
+    scriptStream([
+      { type: "options_prompt", promptId: "options-1", question: "Which path?", options: ["A", "B"] },
+      { type: "done", summary: { runId: "", toolsCalled: [], durationMs: 1, costCents: 0, tokenUsage: { inputTokens: 1, outputTokens: 0 } } },
+    ]);
+    const svc = agentLoopService(dbWithConfig({ cliTool: "claude_cli", executionMode: "cli" }));
+    const initial = await drainWithKey(svc, "sub-options-only");
+    expect(appendMessage.mock.calls.find((call) => (call[1] as any).role === "assistant")?.[1]).toMatchObject({
+      content: "⚡OPTIONS:{\"question\":\"Which path?\",\"options\":[\"A\",\"B\"]}⚡",
+    });
+    expect(initial.some((chunk) => chunk.type === "options_prompt")).toBe(true);
+    expect(finishTurn).toHaveBeenCalledWith("user-options", "tok-1", "done");
+
+    getMessageByClientSubmissionId.mockResolvedValue({ id: "user-options", turnStatus: "done" });
+    getAssistantReplyForUserMessage.mockResolvedValue({
+      id: "assistant-options",
+      content: "⚡OPTIONS:{\"question\":\"Which path?\",\"options\":[\"A\",\"B\"]}⚡",
+    });
+    const replay = await drainWithKey(svc, "sub-options-only");
+    expect(replay.some((chunk) => chunk.type === "options_prompt" && chunk.question === "Which path?")).toBe(true);
+    expect(replay.some((chunk) => chunk.type === "text" && chunk.delta.includes("OPTIONS:"))).toBe(false);
+  });
+
+  it("retains action-confirmation success without persisting or replaying confirmation authority", async () => {
+    appendMessage.mockResolvedValueOnce({ id: "user-confirm" }).mockResolvedValueOnce({ id: "assistant-confirm" });
+    scriptStream([
+      { type: "action_confirmation", toolName: "create_task", params: { title: "Plan" }, runId: "pending-confirm-id" },
+      { type: "done", summary: { runId: "", toolsCalled: [], durationMs: 1, costCents: 0, tokenUsage: { inputTokens: 1, outputTokens: 0 } } },
+    ]);
+    const svc = agentLoopService(dbWithConfig({ cliTool: "claude_cli", executionMode: "cli" }));
+    const initial = await drainWithKey(svc, "sub-confirm-only");
+    expect(initial.some((chunk) => chunk.type === "action_confirmation" && chunk.runId === "pending-confirm-id")).toBe(true);
+    expect(finishTurn).toHaveBeenCalledWith("user-confirm", "tok-1", "done");
+    const assistant = appendMessage.mock.calls.find((call) => (call[1] as any).role === "assistant");
+    expect(assistant?.[1]).toMatchObject({ content: "Action requires approval for create_task. Complete the pending approval to proceed." });
+    expect(JSON.stringify(assistant?.[1])).not.toContain("pending-confirm-id");
+
+    getMessageByClientSubmissionId.mockResolvedValue({ id: "user-confirm", turnStatus: "done" });
+    getAssistantReplyForUserMessage.mockResolvedValue({
+      id: "assistant-confirm",
+      content: "Action requires approval for create_task. Complete the pending approval to proceed.",
+    });
+    cliChat.mockClear();
+    const replay = await drainWithKey(svc, "sub-confirm-only");
+    expect(replay.some((chunk) => chunk.type === "text" && /requires approval/i.test(chunk.delta))).toBe(true);
+    expect(replay.some((chunk) => chunk.type === "action_confirmation")).toBe(false);
+    expect(JSON.stringify(replay)).not.toContain("pending-confirm-id");
+    expect(cliChat).not.toHaveBeenCalled();
   });
 
   it("re-runs turn A (does NOT replay a later turn B's reply) when A's send died before replying — C2", async () => {
@@ -543,7 +766,7 @@ describe("agentLoopService.chat — assistant persistence (MX-chatpersist)", () 
     ]);
   });
 
-  it("does NOT persist a partial assistant message when the stream throws mid-way (catch yields error+done)", async () => {
+  it("persists partial assistant output as failed when the stream throws mid-way", async () => {
     cliChat.mockImplementation(async function* () {
       yield { type: "text", delta: "partial..." };
       throw new Error("stream blew up");
@@ -551,8 +774,12 @@ describe("agentLoopService.chat — assistant persistence (MX-chatpersist)", () 
     const svc = agentLoopService(dbWithConfig({ cliTool: "claude_cli", executionMode: "cli" }));
     const out = await drain(svc);
 
-    const roles = appendMessage.mock.calls.map((c) => (c[1] as any).role);
-    expect(roles).toEqual(["user"]); // user only — NO partial assistant
+    const assistantCall = appendMessage.mock.calls.find((c) => (c[1] as any).role === "assistant");
+    expect(assistantCall?.[1]).toMatchObject({
+      content: "partial...",
+      replyToUserMessageId: "msg",
+      turnStatus: "failed",
+    });
 
     // catch path: an error chunk then a done chunk.
     expect(out.some((c) => c.type === "error" && /stream blew up/.test(c.message))).toBe(true);

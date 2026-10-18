@@ -8,6 +8,8 @@ export interface ComposerSendFailedBannerProps {
   onEdit: () => void;
   onDiscard: () => void;
   retrying?: boolean;
+  message?: string;
+  retryUnavailableReason?: string | null;
 }
 
 export function ComposerSendFailedBanner({
@@ -15,6 +17,8 @@ export function ComposerSendFailedBanner({
   onEdit,
   onDiscard,
   retrying = false,
+  message,
+  retryUnavailableReason,
 }: ComposerSendFailedBannerProps) {
   return (
     <div
@@ -23,12 +27,12 @@ export function ComposerSendFailedBanner({
       className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
     >
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      <span className="min-w-0 flex-1">Failed to send. Your message is saved.</span>
+      <span className="min-w-0 flex-1">{message ?? "Failed to send. Your message is saved."}{retryUnavailableReason ? ` ${retryUnavailableReason}` : ""}</span>
       <span className="flex shrink-0 items-center gap-1.5">
         <button
           type="button"
           onClick={onRetry}
-          disabled={retrying}
+          disabled={retrying || Boolean(retryUnavailableReason)}
           className="rounded-md bg-brand px-2.5 py-1 font-semibold text-white disabled:opacity-40"
         >
           {retrying ? "Retrying…" : "Retry"}

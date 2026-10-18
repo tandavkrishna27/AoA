@@ -111,12 +111,47 @@ function maybeEnableUiDevMiddleware(entrypoint: string): void {
 }
 
 async function importServerEntry(): Promise<void> {
-  // Dev mode: try local workspace path (monorepo with tsx)
-  const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+  // Source commands live in cli/src/commands; esbuild bundles them into
+  // cli/dist/index.js. Source execution inherits tsx; built workspace execution
+  // opts into the workspace loader below.
+  const cliModulePath = fileURLToPath(import.meta.url);
+  const sourceCli = cliModulePath.endsWith(".ts");
+  const projectRoot = path.resolve(path.dirname(cliModulePath), sourceCli ? "../../.." : "../..");
   const devEntry = path.resolve(projectRoot, "server/src/index.ts");
-  if (fs.existsSync(devEntry)) {
-    maybeEnableUiDevMiddleware(devEntry);
-    await import(pathToFileURL(devEntry).href);
+  const workspaceEntry = sourceCli ? devEntry : path.resolve(projectRoot, "server/dist/index.js");
+  const isWorkspace =
+    fs.existsSync(path.resolve(projectRoot, "pnpm-workspace.yaml")) &&
+    fs.existsSync(path.resolve(projectRoot, "server/package.json"));
+  if (isWorkspace || (sourceCli && fs.existsSync(devEntry))) {
+    if (!fs.existsSync(workspaceEntry)) {
+      throw new Error(
+        sourceCli
+          ? `Could not locate the AoA server source entrypoint: ${workspaceEntry}`
+          : `Could not locate the built AoA server entrypoint: ${workspaceEntry}\n` +
+            `Run \`pnpm build\` from ${projectRoot}, then retry this command.`,
+      );
+    }
+    maybeEnableUiDevMiddleware(workspaceEntry);
+    if (sourceCli) {
+      await import(pathToFileURL(workspaceEntry).href);
+    } else {
+      let register: typeof import("tsx/esm/api").register;
+      try {
+        ({ register } = await import("tsx/esm/api"));
+      } catch (err) {
+        const missingSpecifier = getMissingModuleSpecifier(err);
+        if (isModuleNotFoundError(err) && (missingSpecifier === "tsx" || missingSpecifier === "tsx/esm/api")) {
+          throw new Error(
+            `The built workspace requires its development dependencies.\n` +
+            `Run \`pnpm install --frozen-lockfile\` (including dev dependencies) and \`pnpm build\` from ${projectRoot}, then retry.\n` +
+            formatError(err),
+          );
+        }
+        throw err;
+      }
+      register({ tsconfig: false });
+      await import(pathToFileURL(workspaceEntry).href);
+    }
     return;
   }
 
@@ -129,7 +164,7 @@ async function importServerEntry(): Promise<void> {
     if (isModuleNotFoundError(err) && missingServerEntrypoint) {
       throw new Error(
         `Could not locate an AoA server entrypoint.\n` +
-          `Tried: ${devEntry}, @armyofagents/server\n` +
+          `Tried: @armyofagents/server\n` +
           `${formatError(err)}`,
       );
     }

@@ -1496,10 +1496,11 @@ interface RunHistoryTabContentProps {
     id: string;
     triggerType: string;
     status: string;
-    costCents: number;
+    errorMessage?: string | null;
+    costCents: number | null;
     durationMs: number;
     createdAt: string;
-    tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number };
+    tokenUsage?: { inputTokens: number; outputTokens: number; cachedInputTokens?: number } | null;
   }>;
   runsAggregates: RunHistoryAggregates | undefined;
   hasNextPage: boolean | undefined;
@@ -1578,8 +1579,13 @@ export function RunHistoryTabContent({
                     >
                       {run.status}
                     </span>
+                    {run.errorMessage && (
+                      <p className="mt-1 max-w-xs text-xs text-red-700 dark:text-red-300" role="note">
+                        {run.errorMessage}
+                      </p>
+                    )}
                   </td>
-                  <td className="py-2">{formatCents(run.costCents)}</td>
+                  <td className="py-2">{run.costCents == null ? "—" : formatCents(run.costCents)}</td>
                   <td className="py-2 text-muted-foreground">
                     {run.tokenUsage
                       ? `${formatTokens(run.tokenUsage.inputTokens)} / ${formatTokens(run.tokenUsage.outputTokens)}`

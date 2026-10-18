@@ -86,7 +86,7 @@ describe("runCommanderAdapterTurn", () => {
 
   it("codex: buffers JSONL, parses on completion (host runCodexTurn parity), and passes mcpBridge (no --mcp-config in extraArgs)", async () => {
     const frames = [
-      JSON.stringify({ type: "item.completed", item: { type: "assistant_message", text: "codex reply" } }) + "\n",
+      JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: 'Before ⚡OPTIONS:{"question":"Choose","options":["Proceed","Cancel"]}⚡ After' } }) + "\n",
     ];
     const adapter = fakeAdapter(frames);
     const chunks: any[] = [];
@@ -123,5 +123,8 @@ describe("runCommanderAdapterTurn", () => {
     expect(extraArgs).not.toContain("--mcp-config");
     // A terminal done chunk is emitted from the parsed codex buffer.
     expect(chunks.some((c) => c.type === "done")).toBe(true);
+    expect(chunks.filter((c) => c.type === "options_prompt")).toEqual([expect.objectContaining({ question: "Choose", options: ["Proceed", "Cancel"] })]);
+    expect(chunks.filter((c) => c.type === "text").map((c) => c.delta).join("")).toBe("Before  After");
+    expect(chunks.some((c) => c.type === "action_confirmation")).toBe(false);
   });
 });

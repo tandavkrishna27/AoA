@@ -16,7 +16,9 @@ for (const link of BROWSER_DISPATCH_LINKS) {
       for (const file of new Set(BROWSER_DISPATCH_LINKS.map(item => item.file))) {
         const destination = path.join(fixture, file);
         mkdirSync(path.dirname(destination), { recursive: true });
-        let source = readFileSync(path.join(root, file), 'utf8');
+        // Mutation snippets use LF as their canonical form; normalize checkout CRLF
+        // before matching so the same negative controls run on Windows and POSIX.
+        let source = readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
         if (file === link.file) {
           assert.ok(source.includes(link.code), `mutation target exists: ${link.id}`);
           const template = link.code.replaceAll('\\', '\\\\').replaceAll('`', '\\`').replaceAll('${', '\\${');

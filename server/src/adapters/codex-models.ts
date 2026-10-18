@@ -1,104 +1,138 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { AdapterModel } from "./types.js";
-import { models as codexFallbackModels } from "@armyofagents/adapter-codex-local";
-import { readConfigFile } from "../config-file.js";
+import {
+  adapterExecutionTargetIsRemote,
+  readAdapterExecutionTarget,
+  type AdapterExecutionTarget,
+} from "@armyofagents/adapter-utils";
+import { buildScrubbedCliEnv } from "../services/cli-spawn-safety.js";
+import { tenantIsolationEnforced } from "../config/deployment-mode.js";
+import {
+  getCodexModelCatalog,
+  isCodexCompatibleModel,
+  isSafeCodexModelIdentifier,
+  resolveManagedCodexHomeDir,
+  type CodexModelCatalog,
+} from "@armyofagents/adapter-codex-local/server";
 
-const OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models";
-const OPENAI_MODELS_TIMEOUT_MS = 5000;
-const OPENAI_MODELS_CACHE_TTL_MS = 60_000;
-
-let cached: { keyFingerprint: string; expiresAt: number; models: AdapterModel[] } | null = null;
-
-function fingerprint(apiKey: string): string {
-  return `${apiKey.length}:${apiKey.slice(-6)}`;
+export interface CodexModelListAgentContext {
+  companyId: string;
+  agentId: string;
+  /** Resolved from this agent's persisted config by the server route. */
+  adapterConfig: Record<string, unknown>;
 }
 
-function dedupeModels(models: AdapterModel[]): AdapterModel[] {
-  const seen = new Set<string>();
-  const deduped: AdapterModel[] = [];
-  for (const model of models) {
-    const id = model.id.trim();
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    deduped.push({ id, label: model.label.trim() || id });
-  }
-  return deduped;
+export interface CodexModelListDeps {
+  getCatalog?: typeof getCodexModelCatalog;
+  stat?: typeof fs.stat;
+  env?: NodeJS.ProcessEnv;
 }
 
-function mergedWithFallback(models: AdapterModel[]): AdapterModel[] {
-  return dedupeModels([
-    ...models,
-    ...codexFallbackModels,
-  ]).sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true, sensitivity: "base" }));
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 }
 
-function resolveOpenAiApiKey(): string | null {
-  const envKey = process.env.OPENAI_API_KEY?.trim();
-  if (envKey) return envKey;
-
-  const config = readConfigFile();
-  if (config?.llm?.provider !== "openai") return null;
-  const configKey = config.llm.apiKey?.trim();
-  return configKey && configKey.length > 0 ? configKey : null;
+function isCodexCommand(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const command = value.trim();
+  if (!command || /[&|<>^`$;%'"\r\n()]/.test(command)) return false;
+  const basename = command.replace(/\\/g, "/").split("/").at(-1);
+  return typeof basename === "string" && /^codex(?:\.(?:cmd|exe))?$/i.test(basename);
 }
 
-async function fetchOpenAiModels(apiKey: string): Promise<AdapterModel[]> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OPENAI_MODELS_TIMEOUT_MS);
+async function hasRegularAuthFile(
+  authHome: string,
+  stat: typeof fs.stat,
+): Promise<boolean> {
   try {
-    const response = await fetch(OPENAI_MODELS_ENDPOINT, {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      signal: controller.signal,
+    return (await stat(path.join(authHome, "auth.json"))).isFile();
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw err;
+  }
+}
+
+/**
+ * Read model choices from one existing agent's managed CODEX_HOME. The public
+ * adapter registry has no agent context, so its unscoped catalog stays empty.
+ * This function never copies the operator's shared ~/.codex/auth.json into an
+ * agent home and never uses the host-global model config as a catalog.
+ */
+export async function listCodexModelsForAgent(
+  context: CodexModelListAgentContext,
+  deps: CodexModelListDeps = {},
+): Promise<AdapterModel[]> {
+  // Cloud and distributed targets do not own a local Codex process/account.
+  // Their model selection remains inherited or is validated on the target.
+  if (tenantIsolationEnforced()) return [];
+
+  const config = context.adapterConfig;
+  const command = typeof config.command === "string" && config.command.trim()
+    ? config.command.trim()
+    : "codex";
+  if (!isCodexCommand(command)) return [];
+  let configuredTarget: AdapterExecutionTarget;
+  try {
+    const rawTarget = config.executionTarget;
+    configuredTarget = readAdapterExecutionTarget({
+      executionTarget: rawTarget && typeof rawTarget === "object"
+        ? rawTarget as AdapterExecutionTarget
+        : undefined,
+      legacyRemoteExecution: config.remoteExecution,
     });
-    if (!response.ok) return [];
-
-    const payload = (await response.json()) as { data?: unknown };
-    const data = Array.isArray(payload.data) ? payload.data : [];
-    const models: AdapterModel[] = [];
-    for (const item of data) {
-      if (typeof item !== "object" || item === null) continue;
-      const id = (item as { id?: unknown }).id;
-      if (typeof id !== "string" || id.trim().length === 0) continue;
-      models.push({ id, label: id });
-    }
-    return dedupeModels(models);
   } catch {
+    // A malformed/unsupported target must never cause host-account discovery.
     return [];
-  } finally {
-    clearTimeout(timeout);
   }
+  if (adapterExecutionTargetIsRemote(configuredTarget)) return [];
+
+  const env = deps.env ?? process.env;
+  const authHome = resolveManagedCodexHomeDir(env, context.companyId, context.agentId);
+  const configEnv = asRecord(config.env);
+  const catalogEnv: Record<string, string> = {};
+  for (const [key, value] of Object.entries(buildScrubbedCliEnv())) {
+    if (typeof value === "string") catalogEnv[key] = value;
+  }
+  // Execution uses only the agent's resolved provider key. In particular, an
+  // ambient server OPENAI_API_KEY is not part of this catalog identity.
+  for (const key of ["OPENAI_API_KEY", "CODEX_API_KEY"] as const) {
+    const value = configEnv[key];
+    if (typeof value === "string" && value.trim()) catalogEnv[key] = value.trim();
+  }
+  catalogEnv.CODEX_HOME = authHome;
+
+  const hasExplicitApiKey = Boolean(
+    catalogEnv.OPENAI_API_KEY?.trim() || catalogEnv.CODEX_API_KEY?.trim(),
+  );
+  if (!hasExplicitApiKey && !(await hasRegularAuthFile(authHome, deps.stat ?? fs.stat))) {
+    // A first-run agent has not yet received its execution-scoped auth copy.
+    // Keep the inherited account-default choice available without reading or
+    // copying the host's shared credential from a model-list request.
+    return [];
+  }
+
+  const catalog: CodexModelCatalog = await (deps.getCatalog ?? getCodexModelCatalog)({
+    companyId: context.companyId,
+    authHome,
+    authMode: "auto",
+    command,
+    cwd: process.cwd(),
+    env: catalogEnv,
+  });
+  return catalog.models
+    .filter((model) => {
+      if (model.hidden || model.retired || !isSafeCodexModelIdentifier(model.id)) return false;
+      return catalog.identity.authMode === "apikey"
+        ? true
+        : isCodexCompatibleModel(model.id);
+    })
+    .map((model) => ({ id: model.id, label: model.displayName?.trim() || model.id }));
 }
 
+/** The generic registry cannot safely infer an account without an agent id. */
 export async function listCodexModels(): Promise<AdapterModel[]> {
-  const apiKey = resolveOpenAiApiKey();
-  const fallback = dedupeModels(codexFallbackModels);
-  if (!apiKey) return fallback;
-
-  const now = Date.now();
-  const keyFingerprint = fingerprint(apiKey);
-  if (cached && cached.keyFingerprint === keyFingerprint && cached.expiresAt > now) {
-    return cached.models;
-  }
-
-  const fetched = await fetchOpenAiModels(apiKey);
-  if (fetched.length > 0) {
-    const merged = mergedWithFallback(fetched);
-    cached = {
-      keyFingerprint,
-      expiresAt: now + OPENAI_MODELS_CACHE_TTL_MS,
-      models: merged,
-    };
-    return merged;
-  }
-
-  if (cached && cached.keyFingerprint === keyFingerprint && cached.models.length > 0) {
-    return cached.models;
-  }
-
-  return fallback;
-}
-
-export function resetCodexModelsCacheForTests() {
-  cached = null;
+  return [];
 }

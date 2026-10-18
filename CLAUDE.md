@@ -118,6 +118,13 @@ Registered in `server/src/adapters/registry.ts`. All agent execution is CLI-only
 | `process` | Generic shell process |
 | `http` | HTTP webhook |
 
+Codex local model defaults come from the active managed CLI account catalog, scoped to company,
+auth home/generation, auth mode and CLI version. Empty means inherit; explicit unavailable or
+incompatible selections refuse without an API billing fallback or automatic stored-config rewrite.
+The picker uses an authorized existing agent context (`agentId`), never a host-global API model list.
+Remote execution keeps target-local defaults and credentials. Catalog membership does not certify
+inference entitlement; native and distributed live journeys retain their separate validation gates.
+
 API-mode adapters (`claude_api`, `openai_api`, `gemini_api`) were removed per Decision #91 and must not be re-added. The Provider SDK utilities in `server/src/services/internal-agent/providers/` remain for **embeddings + Commander only** — extraction is **CLI-only** (Decision #104, amended 2026-06-27; see Discussion Pipeline below) and no longer reaches the provider SDK. Not in the adapter registry.
 
 ---

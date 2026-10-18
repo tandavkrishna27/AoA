@@ -37,6 +37,12 @@ async function sendMessage(page: Page, text: string): Promise<void> {
   await input.press("Enter");
 }
 
+function assistantErrorBubble(page: Page, message: string | RegExp) {
+  // The same failure also appears in the composer's recovery banner. Chat
+  // messages render as paragraphs; the banner deliberately uses a span.
+  return page.getByRole("paragraph").filter({ hasText: message });
+}
+
 /**
  * Wait for the turn to finish (Stop generation disappears → Send message
  * reappears). Confirms no perpetual spinner — the send button is restored
@@ -58,7 +64,7 @@ async function setCodexCliTool(
 ): Promise<void> {
   const res = await request.patch(
     `/api/companies/${companyId}/internal-agent/config`,
-    { data: { cliTool: "codex" } },
+    { data: { cliTool: "codex", model: null } },
   );
   if (!res.ok()) {
     const body = await res.text().catch(() => "(no body)");
@@ -95,9 +101,9 @@ test.describe("Commander error states", () => {
 
     // The error text must render. The exact message from detectCliTool:
     // "Unsupported CLI tool: 'phantom_cli_xyz'. Supported: …"
-    await expect(
-      page.getByText(/Unsupported CLI tool.*phantom_cli_xyz/i),
-    ).toBeVisible({ timeout: 20_000 });
+    const errorBubble = assistantErrorBubble(page, /Unsupported CLI tool.*phantom_cli_xyz/i);
+    await expect(errorBubble).toBeVisible({ timeout: 20_000 });
+    await expect(errorBubble).toHaveCount(1);
 
     // No perpetual "Thinking" state — Stop generation must disappear and
     // Send message must be restored once the error event fires.
@@ -129,9 +135,23 @@ test.describe("Commander error states", () => {
     await sendMessage(page, "What's the plan?");
 
     // The turn.failed error message must appear in the chat bubble.
-    await expect(
-      page.getByText(/gpt-5\.3-codex.*not supported|not supported.*gpt-5\.3-codex/i),
-    ).toBeVisible({ timeout: 20_000 });
+    const modelError =
+      "The 'gpt-5.3-codex' model is not supported when using Codex with a ChatGPT account.";
+    const errorBubble = assistantErrorBubble(page, modelError);
+    await expect(errorBubble).toBeVisible({ timeout: 20_000 });
+    await expect(errorBubble).toHaveCount(1);
+    await expect(errorBubble).toHaveText(modelError);
+
+    const failureBanner = page.getByTestId("composer-send-failed-banner");
+    await expect(failureBanner).toHaveCount(1);
+    await expect(failureBanner).toBeVisible();
+    await expect(failureBanner.getByText(modelError, { exact: true })).toBeVisible();
+    for (const name of ["Retry", "Edit", "Discard"]) {
+      const action = failureBanner.getByRole("button", { name, exact: true });
+      await expect(action).toHaveCount(1);
+      await expect(action).toBeVisible();
+      await expect(action).toBeEnabled();
+    }
 
     // No perpetual spinner — the turn settles on error.
     await waitForTurnEnd(page);

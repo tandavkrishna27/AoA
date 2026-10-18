@@ -21,6 +21,9 @@ export const FAKE_CODEX_CONTROL_PATH = path.join(
   "aoa-e2e-fake-codex-control.json",
 );
 
+/** The one synthetic model returned by the hermetic fake Codex account catalog. */
+export const FAKE_CODEX_ACCOUNT_DEFAULT_MODEL = "gpt-account-default";
+
 export interface FakeCodexControl {
   /** thread_id the shim echoes in thread.started; the resume turn reuses it. */
   sessionId?: string;

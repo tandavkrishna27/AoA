@@ -41,4 +41,24 @@ describe("RunHistoryTabContent", () => {
     );
     expect(screen.getByText("—")).toBeInTheDocument();
   });
+
+  it("shows the durable failure guidance and leaves cost blank when no run was completed", () => {
+    render(
+      <RunHistoryTabContent
+        allRuns={[{
+          ...runs[0],
+          status: "failed",
+          errorMessage: "No company provider key is configured. Add one in Settings → Providers, then retry.",
+          costCents: null,
+          tokenUsage: null,
+        }]}
+        runsAggregates={undefined}
+        hasNextPage={false}
+        isFetchingNextPage={false}
+        fetchNextPage={() => {}}
+      />,
+    );
+    expect(screen.getByRole("note")).toHaveTextContent("Add one in Settings → Providers, then retry.");
+    expect(screen.getAllByText("—")).toHaveLength(2);
+  });
 });

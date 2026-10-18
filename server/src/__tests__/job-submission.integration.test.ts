@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { setTimeout as delay } from "node:timers/promises";
+import { watch } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
@@ -187,12 +187,64 @@ function asCommander(source = SOURCE_CASES[1]) {
 
 async function flushCapturedLogs(): Promise<string> {
   await new Promise<void>((resolve) => logger.flush(() => resolve()));
-  await delay(300);
   try {
     return await readFile(join(capturedLogDir, "server.log"), "utf8");
-  } catch {
-    return "";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+    throw error;
   }
+}
+
+async function waitForCapturedLog(marker: string, afterLength: number): Promise<string> {
+  let logs = await flushCapturedLogs();
+  if (logs.slice(afterLength).includes(marker)) return logs;
+
+  return new Promise<string>((resolve, reject) => {
+    const watcher = watch(capturedLogDir, { persistent: false });
+    const timeout = setTimeout(() => {
+      finish(() => reject(new Error(
+        `Timed out waiting for captured server log marker ${JSON.stringify(marker)}; latest log length=${logs.length}`,
+      )));
+    }, 5_000);
+    let checking = false;
+    let checkAgain = false;
+    let settled = false;
+    const finish = (complete: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      watcher.close();
+      complete();
+    };
+    const check = async () => {
+      if (settled) return;
+      if (checking) {
+        checkAgain = true;
+        return;
+      }
+      checking = true;
+      try {
+        do {
+          checkAgain = false;
+          logs = await flushCapturedLogs();
+          if (logs.slice(afterLength).includes(marker)) {
+            finish(() => resolve(logs));
+            break;
+          }
+        } while (checkAgain && !settled);
+      } catch (error) {
+        finish(() => reject(error));
+      } finally {
+        checking = false;
+        if (checkAgain && !settled) void check();
+      }
+    };
+    watcher.on("change", () => { void check(); });
+    watcher.on("rename", () => { void check(); });
+    watcher.on("error", (error) => finish(() => reject(error)));
+    // Re-check after installing the watcher to close the read/watch race.
+    void check();
+  });
 }
 
 async function counts(key: string) {
@@ -804,7 +856,7 @@ describe.skipIf(process.platform === "win32" && process.env.AOA_RUN_WIN_INTEGRAT
       await installFailureTrigger("jobs");
       const response = await request(app).post(route()).set(asUser()).send(command("log-sanitize", SOURCE_CASES[0], marker));
       expect(response.status).toBe(500);
-      const emitted = (await flushCapturedLogs()).slice(before.length);
+      const emitted = (await waitForCapturedLog("job_submission_internal_error", before.length)).slice(before.length);
       expect(emitted).toContain("job_submission_internal_error");
       expect(emitted).toContain(ORG_A);
       expect(emitted).toContain(COMPANY_A);

@@ -41,14 +41,18 @@ test.describe("Commander tool transparency", () => {
     // Completed tool activity row renders (completedToolLabel for the mcp tool).
     await expect(page.getByText("Used mcp aoa create artifact")).toBeVisible({ timeout: 30_000 });
 
-    // Expandable — click the activity row by its visible label, the summary <pre> appears.
-    // Note: the live-turn entry has data-testid="commander-tool-activity-1" (toolCallIdRef
-    // starts at 0; first call gets ++ref = 1). We click by visible text as the more robust
-    // approach in case the ref value differs across sessions.
-    await page.getByText("Used mcp aoa create artifact").click();
-    await expect(page.getByTestId("commander-tool-summary")).toBeVisible({ timeout: 10_000 });
-
     await waitForTurnEnd(page);
+
+    // sendText replaces the local streaming assistant row with the persisted
+    // conversation row after the turn ends. Wait for that server-backed row
+    // before expanding, so the refetch cannot discard the open state.
+    const persistedToolButton = page.locator(
+      'button[data-testid^="commander-tool-activity-"][aria-controls^="tool-summary-"]:not([aria-controls*="local-assistant-"])',
+    ).filter({ hasText: "Used mcp aoa create artifact" });
+    await expect(persistedToolButton).toHaveAttribute("aria-expanded", "false");
+    await persistedToolButton.click();
+    await expect(persistedToolButton).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("commander-tool-summary")).toBeVisible();
 
     // "Worked for Xs" caption (fake-claude result emits duration_ms:60 → 0.1s).
     await expect(page.getByTestId("commander-worked-for")).toBeVisible({ timeout: 10_000 });

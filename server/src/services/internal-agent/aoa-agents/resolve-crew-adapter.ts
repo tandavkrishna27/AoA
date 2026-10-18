@@ -1,8 +1,8 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@armyofagents/db";
 import { internalAgentConfig } from "@armyofagents/db";
-import { readEnvBindingValue, cliToolToProvider } from "@armyofagents/shared";
-import { DEFAULT_CODEX_CHAT_MODEL, isCodexCompatibleModel, isShellSafeModel, SAFE_MODEL_RE } from "../codex-model.js";
+import { cliToolToProvider } from "@armyofagents/shared";
+import { isCodexCompatibleModel, isShellSafeModel, SAFE_MODEL_RE } from "../codex-model.js";
 
 /**
  * Resolves the right CLI adapter for AoA crew agents based on the company's
@@ -83,14 +83,10 @@ export function resolveCrewAdapterFor(
       return {
         adapterType: "codex_local",
         adapterConfig: {
-          // gpt-5.3-codex was an API-key-only model that 400s on ChatGPT
-          // subscription logins. Use DEFAULT_CODEX_CHAT_MODEL (gpt-5.5) which
-          // is verified-safe for subscription accounts (Test C in codex-model.ts).
-          //
-          // codex models must pass isCodexCompatibleModel (rejects *-codex ids and
-          // non-OpenAI-family models; gpt-4o IS accepted). At dispatch the value is
-          // re-validated by resolveModel — see the note after this task.
-          model: isCodexCompatibleModel(ov) ? ov : DEFAULT_CODEX_CHAT_MODEL,
+          // Preserve configured choices so the execution-time account catalog
+          // can either verify the exact selection or return an actionable error.
+          // An empty value inherits the signed-in Codex CLI account default.
+          ...(ov ? { model: ov } : {}),
           dangerouslyBypassApprovalsAndSandbox: true,
         },
       };
@@ -152,13 +148,10 @@ export async function resolveCommanderAdapterForCompany(db: Db, companyId: strin
  *    --print mode). Backfill upgrades existing rows on startup so we
  *    don't need to manually edit every agent's adapterConfig.
  *
- * 3) **codex_local crew agents pinned to a ChatGPT-incompatible model**
- *    (provider-switching fix): an API-key-only Codex model (e.g.
- *    `gpt-5.3-codex`) persisted on a row 400s on a ChatGPT/subscription
- *    login. Backfill rewrites it to the validated default (`gpt-5.5`) so
- *    existing rows self-heal on boot. An empty model on a ChatGPT/subscription
- *    run is treated identically (codex falls back to the incompatible
- *    gpt-5.3-codex without one).
+ * 3) `codex_local` model configuration is deliberately not auto-rewritten:
+ *    model provenance is not stored and account availability is checked at
+ *    execution. Preserving the configured value lets execution refuse with
+ *    an actionable error instead of silently selecting a different model.
  *
  * 4) **opencode_local crew agents pinned to the legacy bare codex model**
  *    (provider-switching fix): the previous opencode crew default seeded a
@@ -168,19 +161,6 @@ export async function resolveCommanderAdapterForCompany(db: Db, companyId: strin
  *    broken bare model after upgrade and never self-heal. Flag bare (no-slash)
  *    ChatGPT-incompatible models; leave valid slash-format / founder models be.
  */
-/**
- * Does the adapter config carry an agent-set OPENAI_API_KEY? The save path
- * normalizes env entries to binding objects, so accept a raw string (legacy),
- * a `{ type: "plain", value }` with a non-blank value, or a `{ type: "secret_ref",
- * secretId }`. A blank/absent value is NOT a key.
- */
-function hasOwnOpenAiKey(env: unknown): boolean {
-  if (typeof env !== "object" || env === null) return false;
-  // Binding-aware (string / {type:"plain"} / {type:"secret_ref"}) via the shared
-  // helper, the same one codex auth-mode detection uses (provider-status).
-  return readEnvBindingValue((env as Record<string, unknown>).OPENAI_API_KEY) != null;
-}
-
 export function needsAdapterBackfill(
   adapterType: string | null | undefined,
   adapterConfig: Record<string, unknown> | null | undefined,
@@ -196,28 +176,10 @@ export function needsAdapterBackfill(
   if (adapterType === "claude_local") {
     return adapterConfig?.dangerouslySkipPermissions !== true;
   }
-  // Case 3: codex_local rows with an incompatible model (e.g. gpt-5.3-codex,
-  // an API-key-only model that 400s on ChatGPT subscription accounts). The
-  // consumer rewrite path (resolveCrewAdapterForCompany + mergeAdapterConfig)
-  // now yields DEFAULT_CODEX_CHAT_MODEL (gpt-5.5) for codex rows.
+  // Case 3: no automatic Codex model rewrite. Persisted rows have no explicit
+  // versus inherited provenance; the execution-time catalog gate owns refusal.
   if (adapterType === "codex_local") {
-    // A founder may intentionally run codex_local in api-key mode, where models
-    // like gpt-5.3-codex / codex-mini-latest are valid (see resolveModel's apikey
-    // branch) — don't "self-heal" (rewrite) such rows. Api-key auth comes from
-    // EITHER a per-agent OPENAI_API_KEY (hasOwnOpenAiKey; persisted env is
-    // normalized to binding objects, handled) OR the shared ~/.codex/auth.json,
-    // which only the caller can detect via getProviderStatus → opts.isApiKeyAuth
-    // (Codex P2: shared-apikey codex models were wrongly rewritten to gpt-5.5).
-    if (opts?.isApiKeyAuth || hasOwnOpenAiKey(adapterConfig?.env)) return false;
-    const model = typeof adapterConfig?.model === "string" ? adapterConfig.model : "";
-    // A persisted codex model that a ChatGPT login would reject needs rewriting.
-    // An EMPTY model also needs healing on a ChatGPT/subscription run: with no
-    // model, codex 0.130 falls back to gpt-5.3-codex and 400s → empty turn
-    // (BUG-6). isCodexCompatibleModel("") is false, so dropping the length gate
-    // heals both the empty and the non-empty-incompatible case; a compatible
-    // model (gpt-5.5, gpt-4o) still returns false. api-key/own-key runs already
-    // returned above, so gpt-5.3-codex stays valid there.
-    return !isCodexCompatibleModel(model);
+    return false;
   }
   // Case 4: opencode_local rows pinned to the legacy BARE codex model. OpenCode
   // ids are slash-format `provider/model`; the previous crew default seeded a

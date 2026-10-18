@@ -76,7 +76,9 @@ const CODEX_HOME = WINDOWS_WITH_EMBEDDED_POSTGRES
   ? ""
   : fs.mkdtempSync(path.join(os.tmpdir(), "aoa-e2e-codex-home-"));
 if (CODEX_HOME) {
-  fs.writeFileSync(path.join(CODEX_HOME, "config.toml"), 'model = "gpt-5.5"\n', "utf8");
+  // No shared model override: E2E Codex behavior inherits the fake account's
+  // catalog default, and per-agent model lists remain agent-scoped.
+  fs.writeFileSync(path.join(CODEX_HOME, "config.toml"), "", "utf8");
 }
 
 // UNCONDITIONAL startup cleanup (eng-review fix 2): delete any leftover

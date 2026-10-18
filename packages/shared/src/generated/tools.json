@@ -152,7 +152,7 @@
       "category": "action",
       "readWrite": "write",
       "requiredRole": "team_lead",
-      "description": "Create a new task with title, optional description, priority, department, goal, assignee, and responsible human. Assignee means who does the task; responsible human owns the outcome.",
+      "description": "Create a new task with title, optional description, priority, department, goal, work mode, assignee, and responsible human. Planning tasks are saved for human curation and do not auto-dispatch. Assignee means who does the task; responsible human owns the outcome.",
       "mcpAlias": null
     },
     {

@@ -9,6 +9,7 @@ import {
 } from "./parse.js";
 import { appendWithCap, MAX_CAPTURE_BYTES } from "@armyofagents/adapter-utils/server-utils";
 import { execute } from "./execute.js";
+import { testModelCatalog } from "./__tests__/model-catalog-fixture.js";
 
 const THREAD_ID = "codex-session-head-only";
 
@@ -198,6 +199,11 @@ describe("execute resolves the live-captured session id when stdout exceeds the 
         runtimeCommandSpec: null,
         authToken: "secret-run-token",
         onLog: async () => {},
+      }, {
+        runAppServerTurn: async () => {
+          throw new Error("app-server path should not be used in this test");
+        },
+        getModelCatalog: async (request) => testModelCatalog(request),
       });
 
       expect(result.exitCode).toBe(0);

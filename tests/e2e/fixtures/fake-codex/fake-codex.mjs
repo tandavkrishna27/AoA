@@ -41,6 +41,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import readline from "node:readline";
 
 const CONTROL_PATH =
   process.env.AOA_E2E_FAKE_CODEX_CONTROL ||
@@ -68,139 +69,205 @@ function emit(obj) {
   process.stdout.write(JSON.stringify(obj) + "\n");
 }
 
-// Drain stdin (the prompt delivered via `-`) so the parent's writable end
-// closes cleanly; the content is captured for the invocation record but the
-// scripted turn is driven by the control file, not the prompt.
-let stdinContent = "";
-try {
-  stdinContent = fs.readFileSync(0, "utf8");
-} catch {
-  /* no stdin attached — fine */
-}
-
 const argv = process.argv.slice(2);
 
-// Record the invocation (plan-review fix #2/#3) so specs can assert the real
-// cli-mode contract. Best-effort, never fatal.
-try {
-  const codexHome = process.env.CODEX_HOME ?? null;
-  let configTomlExists = false;
-  if (codexHome) {
+// The model catalog preflight is a separate CLI interaction from a user turn.
+// Keep it hermetic: no real Codex executable, credentials, or provider calls.
+if (argv.length === 1 && argv[0] === "--version") {
+  process.stdout.write("codex-cli 0.145.0\n");
+  process.exit(0);
+}
+
+if (argv[0] === "login" && argv[1] === "status") {
+  process.stdout.write("Logged in using ChatGPT\n");
+  process.exit(0);
+}
+
+if (argv[0] === "app-server") {
+  const input = readline.createInterface({ input: process.stdin });
+  input.on("line", (line) => {
+    let request;
     try {
-      configTomlExists = fs.statSync(path.join(codexHome, "config.toml")).isFile();
+      request = JSON.parse(line);
     } catch {
-      configTomlExists = false;
+      return;
     }
-  }
-  fs.appendFileSync(
-    INVOCATIONS_PATH,
-    JSON.stringify({ argv, stdin: stdinContent, codexHome, configTomlExists }) + "\n",
-    "utf8",
-  );
-} catch {
-  /* recording is best-effort */
-}
+    if (!request || typeof request !== "object" || request.id === undefined)
+      return;
 
-function readControl() {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(CONTROL_PATH, "utf8"));
-    if (parsed && typeof parsed === "object") return parsed;
-  } catch {
-    // missing/corrupt control file — inert default so an unexpected spawn
-    // never crashes the parent turn.
-  }
-  return { text: "fake-codex: no control file found." };
-}
-
-const control = readControl();
-
-const resumeIdx = argv.indexOf("resume");
-const resumeId = resumeIdx >= 0 ? argv[resumeIdx + 1] : null;
-const threadId = resumeId || control.sessionId || "fake-codex-thread-1";
-
-emit({ type: "thread.started", thread_id: threadId });
-emit({ type: "turn.started" });
-
-if (control.fail) {
-  const message =
-    control.fail === "model-400"
-      ? "The 'gpt-5.3-codex' model is not supported when using Codex with a ChatGPT account."
-      : "fake-codex: forced generic failure";
-  emit({ type: "turn.failed", error: { message } });
-  process.exit(1);
-}
-
-if (typeof control.reasoning === "string" && control.reasoning.length > 0) {
-  emit({
-    type: "item.completed",
-    item: { id: "item_0", type: "reasoning", text: control.reasoning },
-  });
-}
-
-if (Array.isArray(control.toolCalls)) {
-  control.toolCalls.forEach((toolCall, idx) => {
-    if (!toolCall || typeof toolCall.name !== "string" || toolCall.name.length === 0) return;
-    const callId = `call_${idx + 1}`;
-    const input = toolCall.input && typeof toolCall.input === "object" ? toolCall.input : {};
-    const envelope = toolCall.envelope && typeof toolCall.envelope === "object"
-      ? toolCall.envelope
-      : { success: true, data: {}, summary: "" };
-
-    emit({
-      timestamp: new Date().toISOString(),
-      type: "response_item",
-      payload: {
-        type: "function_call",
-        name: toolCall.name,
-        namespace: "mcp__aoa__",
-        arguments: JSON.stringify(input),
-        call_id: callId,
-      },
-    });
-
-    emit({
-      timestamp: new Date().toISOString(),
-      type: "event_msg",
-      payload: {
-        type: "mcp_tool_call_end",
-        call_id: callId,
-        invocation: {
-          server: "aoa",
-          tool: toolCall.name,
-          arguments: input,
-        },
-        result: {
-          Ok: {
-            content: [
+    const result =
+      request.method === "model/list"
+        ? {
+            data: [
               {
-                type: "text",
-                text: JSON.stringify(envelope),
+                model: "gpt-account-default",
+                displayName: "Account default",
+                isDefault: true,
+                hidden: false,
               },
             ],
-            isError: envelope.success === false,
+            nextCursor: null,
+          }
+        : {};
+    process.stdout.write(
+      JSON.stringify({ jsonrpc: "2.0", id: request.id, result }) + "\n"
+    );
+  });
+  input.on("close", () => process.exit(0));
+} else {
+  // Drain stdin (the prompt delivered via `-`) only for turns. Catalog probes
+  // have open stdio pipes and must not block waiting for a prompt/EOF.
+  let stdinContent = "";
+  try {
+    stdinContent = fs.readFileSync(0, "utf8");
+  } catch {
+    /* no stdin attached — fine */
+  }
+
+  // Record the invocation (plan-review fix #2/#3) so specs can assert the real
+  // cli-mode contract. Best-effort, never fatal.
+  if (argv[0] === "exec") {
+    try {
+      // The exported invocation log intentionally contains turn invocations only.
+      // Existing E2E assertions read its first entry as the actual `exec` call;
+      // catalog probes (`--version`, `login status`, and `app-server`) are control
+      // traffic and would make those assertions order-dependent.
+      const codexHome = process.env.CODEX_HOME ?? null;
+      let configTomlExists = false;
+      if (codexHome) {
+        try {
+          configTomlExists = fs
+            .statSync(path.join(codexHome, "config.toml"))
+            .isFile();
+        } catch {
+          configTomlExists = false;
+        }
+      }
+      fs.appendFileSync(
+        INVOCATIONS_PATH,
+        JSON.stringify({
+          argv,
+          stdin: stdinContent,
+          codexHome,
+          configTomlExists,
+        }) + "\n",
+        "utf8"
+      );
+    } catch {
+      /* recording is best-effort */
+    }
+  }
+
+  function readControl() {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(CONTROL_PATH, "utf8"));
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      // missing/corrupt control file — inert default so an unexpected spawn
+      // never crashes the parent turn.
+    }
+    return { text: "fake-codex: no control file found." };
+  }
+
+  const control = readControl();
+
+  const resumeIdx = argv.indexOf("resume");
+  const resumeId = resumeIdx >= 0 ? argv[resumeIdx + 1] : null;
+  const threadId = resumeId || control.sessionId || "fake-codex-thread-1";
+
+  emit({ type: "thread.started", thread_id: threadId });
+  emit({ type: "turn.started" });
+
+  if (control.fail) {
+    const message =
+      control.fail === "model-400"
+        ? "The 'gpt-5.3-codex' model is not supported when using Codex with a ChatGPT account."
+        : "fake-codex: forced generic failure";
+    emit({ type: "turn.failed", error: { message } });
+    process.exit(1);
+  }
+
+  if (typeof control.reasoning === "string" && control.reasoning.length > 0) {
+    emit({
+      type: "item.completed",
+      item: { id: "item_0", type: "reasoning", text: control.reasoning },
+    });
+  }
+
+  if (Array.isArray(control.toolCalls)) {
+    control.toolCalls.forEach((toolCall, idx) => {
+      if (
+        !toolCall ||
+        typeof toolCall.name !== "string" ||
+        toolCall.name.length === 0
+      )
+        return;
+      const callId = `call_${idx + 1}`;
+      const input =
+        toolCall.input && typeof toolCall.input === "object"
+          ? toolCall.input
+          : {};
+      const envelope =
+        toolCall.envelope && typeof toolCall.envelope === "object"
+          ? toolCall.envelope
+          : { success: true, data: {}, summary: "" };
+
+      emit({
+        timestamp: new Date().toISOString(),
+        type: "response_item",
+        payload: {
+          type: "function_call",
+          name: toolCall.name,
+          namespace: "mcp__aoa__",
+          arguments: JSON.stringify(input),
+          call_id: callId,
+        },
+      });
+
+      emit({
+        timestamp: new Date().toISOString(),
+        type: "event_msg",
+        payload: {
+          type: "mcp_tool_call_end",
+          call_id: callId,
+          invocation: {
+            server: "aoa",
+            tool: toolCall.name,
+            arguments: input,
+          },
+          result: {
+            Ok: {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(envelope),
+                },
+              ],
+              isError: envelope.success === false,
+            },
           },
         },
-      },
+      });
     });
+  }
+
+  emit({
+    type: "item.completed",
+    item: {
+      id: "item_1",
+      type: "agent_message",
+      text: typeof control.text === "string" ? control.text : "",
+    },
   });
+
+  emit({
+    type: "turn.completed",
+    usage: {
+      input_tokens: control.usage?.input ?? 100,
+      cached_input_tokens: control.usage?.cached ?? 0,
+      output_tokens: control.usage?.output ?? 50,
+    },
+  });
+
+  process.exit(0);
 }
-
-emit({
-  type: "item.completed",
-  item: {
-    id: "item_1",
-    type: "agent_message",
-    text: typeof control.text === "string" ? control.text : "",
-  },
-});
-
-emit({
-  type: "turn.completed",
-  usage: {
-    input_tokens: control.usage?.input ?? 100,
-    cached_input_tokens: control.usage?.cached ?? 0,
-    output_tokens: control.usage?.output ?? 50,
-  },
-});
-
-process.exit(0);

@@ -8,9 +8,15 @@
  * We pin a subscription-supported model + effort=high (effort is required
  * for codex to emit reasoning summaries at all).
  */
+import {
+  CodexModelAvailabilityError,
+  resolveCodexChatModel as resolveFromCatalog,
+  type CodexModelCatalog,
+  type CodexModelCatalogIdentity,
+} from "@armyofagents/adapter-codex-local/server";
 
-/** Proven-on-this-account safe default (Test C). */
-export const DEFAULT_CODEX_CHAT_MODEL = "gpt-5.5";
+/** Empty is the inherited/default selection; the pinned CLI supplies the model. */
+export const DEFAULT_CODEX_CHAT_MODEL = "";
 
 /**
  * effort=high is REQUIRED for codex reasoning summaries (medium emits none —
@@ -78,21 +84,18 @@ export function isShellSafeModel(model: string | null | undefined): boolean {
 }
 
 /**
- * Layered, VALIDATED resolution (enterprise-grade — explicit product config
- * over ambient host state). Every source is run through
- * {@link isCodexCompatibleModel} so a claude default, a GPT-Codex model, or a
- * shell-unsafe string can never reach codex (REVIEW FIX C1):
- *   1. `internal_agent_config.model` when codex-compatible (it defaults to a
- *      claude string for every company, so validation is mandatory).
- *   2. the user's shared `~/.codex/config.toml` model, ALSO validated (it may
- *      hold a claude/OpenRouter alias or a GPT-Codex model).
- *   3. the safe default `gpt-5.5`, so it can NEVER 400 on an empty/bad config.
+ * Resolve an explicit choice or inherited default using the pinned CLI catalog.
+ * The first two arguments remain for existing callers, but a catalog is now
+ * required; without one this refuses instead of guessing a permanent slug.
  */
 export function resolveCodexChatModel(
   configModel: string | null | undefined,
   sharedModel: string | null | undefined,
+  catalog?: CodexModelCatalog | null,
+  expectedIdentity?: CodexModelCatalogIdentity,
 ): string {
-  if (isCodexCompatibleModel(configModel)) return configModel!.trim();
-  if (isCodexCompatibleModel(sharedModel)) return sharedModel!.trim();
-  return DEFAULT_CODEX_CHAT_MODEL;
+  return resolveFromCatalog(configModel, sharedModel, catalog, expectedIdentity);
 }
+
+export { CodexModelAvailabilityError };
+export type { CodexModelCatalog, CodexModelCatalogIdentity };

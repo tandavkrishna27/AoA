@@ -14,6 +14,7 @@ import { sql } from "drizzle-orm";
 import { applyPendingMigrations, type Db } from "@armyofagents/db";
 import * as dbSchema from "@armyofagents/db";
 import { allocateEmbeddedPgPort } from "./helpers/embedded-pg-port.js";
+import { aclFixtureSnapshot, sweepAclGrantOptions } from "./helpers/acl-mutation-sweep.js";
 import {
   provisionTenantAppRoleLoginSql,
   TENANT_APP_ROLE,
@@ -60,6 +61,11 @@ let otherOperatorUrl = "";
 let admin: Sql | null = null;
 let ownerClient: Sql | null = null;
 let ownerDb: Db | null = null;
+let aclAdmin: Sql | null = null;
+let aclOwnerClient: Sql | null = null;
+let aclOwnerDb: Db | null = null;
+let aclAppUrl = "";
+let aclOperatorUrl = "";
 let setupError: unknown = null;
 
 function guard(): void {
@@ -99,7 +105,11 @@ function assertClosedStartupLogs(logs: readonly unknown[][]): void {
 
 type RequiredMigrationIdentity = { orderedHashes: readonly string[]; ledgerSha256: string };
 
+// The checked-in migration bytes are immutable during this file. Rehashing every migration
+// for each ACL mutation adds thousands of synchronous filesystem reads on Windows.
+let cachedMigrationIdentity: RequiredMigrationIdentity | undefined;
 function checkedInMigrationIdentity(): RequiredMigrationIdentity {
+  if (cachedMigrationIdentity) return cachedMigrationIdentity;
   const journal = JSON.parse(readFileSync(
     new URL("../../../packages/db/src/migrations/meta/_journal.json", import.meta.url),
     "utf8",
@@ -107,10 +117,10 @@ function checkedInMigrationIdentity(): RequiredMigrationIdentity {
   const orderedHashes = (journal.entries ?? []).map((entry) => createHash("sha256").update(readFileSync(
       new URL(`../../../packages/db/src/migrations/${entry.tag}.sql`, import.meta.url),
     )).digest("hex"));
-  return {
-    orderedHashes,
+  return cachedMigrationIdentity = Object.freeze({
+    orderedHashes: Object.freeze(orderedHashes),
     ledgerSha256: createHash("sha256").update(JSON.stringify(orderedHashes)).digest("hex"),
-  };
+  });
 }
 
 const openFinalStartup = openDistributedExecutionDatabases as unknown as (input: {
@@ -134,13 +144,14 @@ function finalStartupInput(input: {
   };
 }
 
-async function captureFinalStartupFailure(): Promise<unknown> {
+async function captureFinalStartupFailure(aclFixture = false): Promise<unknown> {
   let accepted: Awaited<ReturnType<typeof openDistributedExecutionDatabases>> = null;
   try {
-    accepted = await openFinalStartup(finalStartupInput({
-      appDatabaseUrl: appUrl,
-      operatorDatabaseUrl: operatorUrl,
-    }));
+    const input = finalStartupInput({
+      appDatabaseUrl: aclFixture ? aclAppUrl : appUrl,
+      operatorDatabaseUrl: aclFixture ? aclOperatorUrl : operatorUrl,
+    });
+    accepted = await openFinalStartup(aclFixture ? { ...input, ownerDb: aclOwnerDb! } : input);
     return undefined;
   } catch (error) {
     return error;
@@ -196,6 +207,16 @@ beforeAll(async () => {
     }
     appUrl = adminUrl.replace("test:test", `aoa_app:${APP_PASSWORD}`);
     operatorUrl = adminUrl.replace("test:test", `aoa_operator:${OPERATOR_PASSWORD}`);
+    // The exhaustive ACL campaign never mutates the operator/child-server database.
+    // Even a failed cleanup is confined to this fresh disposable database.
+    await admin.unsafe(`CREATE DATABASE startup_acl_sweep`);
+    const aclAdminUrl = adminUrl.replace(/\/postgres$/, "/startup_acl_sweep");
+    await applyPendingMigrations(aclAdminUrl);
+    aclAdmin = postgres(aclAdminUrl, { max: 1 });
+    aclOwnerClient = postgres(aclAdminUrl, { max: 4 });
+    aclOwnerDb = drizzlePg(aclOwnerClient, { schema: dbSchema }) as unknown as Db;
+    aclAppUrl = aclAdminUrl.replace("test:test", `aoa_app:${APP_PASSWORD}`);
+    aclOperatorUrl = aclAdminUrl.replace("test:test", `aoa_operator:${OPERATOR_PASSWORD}`);
     await admin.unsafe(
       `CREATE ROLE "aoa_legacy_table_owner" LOGIN PASSWORD '${LEGACY_OWNER_PASSWORD}' ` +
         "NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION",
@@ -236,6 +257,8 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
+  try { await aclOwnerClient?.end(); } catch { /* ignore */ }
+  try { await aclAdmin?.end(); } catch { /* ignore */ }
   try { await ownerClient?.end(); } catch { /* ignore */ }
   try { await admin?.end(); } catch { /* ignore */ }
   try { await embedded?.stop(); } catch { /* ignore */ }
@@ -2364,7 +2387,7 @@ ${drifted.output}`)
           marker,
           flagOff.output.split(marker).length - 1,
         ])),
-      }).toEqual({
+      }, flagOff.output).toEqual({
         exited: false,
         markerCounts: Object.fromEntries(bootstrapMarkers.map((marker) => [marker, 0])),
       });
@@ -5251,112 +5274,77 @@ ${drifted.output}`)
 
     }, 120_000);
 
-    it("checks grant-option ACL tuples independently on every derived relation and non-dropped user column", async () => {
-      // The mutations preserve effective SELECT wherever it already exists. Only inspection of
-      // relacl/attacl nullness and aclexplode(...).is_grantable can reject those cases.
+    // Each relation owns a separate test deadline, while every derived relation and column
+    // still exercises the public production startup API. No growing whole-sweep deadline.
+    const aclSweepRelations = [...new Set([
+      ...legacyGrants.APP_SERVING_RELATIONS,
+      ...legacyGrants.OPERATOR_SERVING_RELATIONS,
+    ])].sort();
+
+    for (const relation of aclSweepRelations) {
+      it(`checks grant-option ACL tuples independently: ${relation}`, async (context) => {
+        guard();
+        const healthy = await aclFixtureSnapshot(aclAdmin!);
+        const cancellation = new AbortController();
+        const signal = AbortSignal.any([context.signal, cancellation.signal]);
+        const sweep = sweepAclGrantOptions({
+          admin: aclAdmin!, relations: [relation], signal, captureFailure: () => captureFinalStartupFailure(true),
+        });
+        // Vitest aborts the signal when the test times out but cannot cancel an async body.
+        // Await its finally blocks before another case may touch this shared fixture.
+        context.onTestFinished(async () => {
+          cancellation.abort();
+          await sweep.catch(() => {});
+          expect(await aclFixtureSnapshot(aclAdmin!)).toEqual(healthy);
+        });
+        expect(await sweep).toEqual([]);
+      });
+    }
+
+    it("settles an intentionally aborted ACL mutation and leaves the next startup healthy", async () => {
       guard();
-      const appTables = {
-        ...legacyGrants.JOB_CONTROL_LEGACY_GRANTS,
-        ...legacyGrants.JOB_CONTROL_NEW_PATH_GRANTS,
-        ...legacyGrants.JOB_SUBMISSION_LEGACY_GRANTS,
-        ...legacyGrants.JOB_SUBMISSION_NEW_PATH_GRANTS,
-        ...legacyGrants.WORKER_ENROLLMENT_APP_GRANTS,
-        ...legacyGrants.JOB_LEASING_NEW_PATH_GRANTS,
-        // REL-004 Lane C. `instance_settings` was swept while its grant lived in
-        // JOB_CONTROL_LEGACY_GRANTS; moving it to its own constant silently dropped it out of
-        // this list, and NOTHING went red — the assertion is `acceptedMutations` is empty, and a
-        // relation that is never probed contributes nothing. That is the "a check that nothing
-        // runs" class, caused by a fix for a different instance of the same class.
-        //
-        // NOTE FOR THE NEXT ADDITION: this spread is HAND-MAINTAINED and already omits ten other
-        // app serving relations (folder_grants, worker_admission_rate_limits, live_event_log,
-        // live_event_sequences, legacy_resource_reconciliation, job_events,
-        // job_projection_receipts, job_control_commands, distributed_cutover_markers,
-        // execution_target_revocations). Deriving it from `APP_SERVING_RELATIONS` would make it
-        // self-maintaining; it is not done here only because each relation costs a full server
-        // boot plus one per column, and this test already carries a 180s budget. Measured and
-        // recorded in REL-004-lane-C-result.md rather than absorbed.
-        ...legacyGrants.KILL_SWITCH_POLICY_APP_GRANTS,
-      } as Readonly<Record<string, readonly string[]>>;
-      const operatorTables = legacyGrants.WORKER_ENROLLMENT_OPERATOR_GRANTS as
-        Readonly<Record<string, readonly string[]>>;
-      const relations = [...new Set([
-        ...Object.keys(appTables),
-        ...Object.keys(operatorTables),
-        ...Object.keys(legacyGrants.OPERATOR_METADATA_COLUMN_GRANTS),
-        "mcp_api_keys",
-        "execution_targets",
-      ])].sort();
-      const quote = (value: string) => `"${value.replaceAll('"', '""')}"`;
-      const acceptedMutations: string[] = [];
+      const healthy = await aclFixtureSnapshot(aclAdmin!);
+      const cancellation = new AbortController();
+      let probes = 0;
+      await expect(sweepAclGrantOptions({
+        admin: aclAdmin!, relations: ["execution_targets", "workers"], signal: cancellation.signal,
+        captureFailure: async () => {
+          probes += 1;
+          const failure = await captureFinalStartupFailure(true);
+          expect(failure).toMatchObject({ message: "distributed_execution_app_authority" });
+          cancellation.abort(new Error("intentional ACL fixture abort"));
+          return failure;
+        },
+      })).rejects.toThrow("intentional ACL fixture abort");
+      expect(probes).toBe(1);
+      expect(await aclFixtureSnapshot(aclAdmin!)).toEqual(healthy);
+      expect(await captureFinalStartupFailure(true)).toBeUndefined();
+    });
 
-      for (const relation of relations) {
-        const [access] = await admin!<{ app: boolean; operator: boolean }[]>`
-          SELECT
-            has_table_privilege('aoa_app', ${`public.${relation}`}, 'SELECT') AS app,
-            has_table_privilege('aoa_operator', ${`public.${relation}`}, 'SELECT') AS operator`;
-        const role = access?.app ? "aoa_app" : access?.operator ? "aoa_operator" : null;
-        if (role) {
-          await admin!.unsafe(`GRANT SELECT ON TABLE ${quote(relation)} TO ${role} WITH GRANT OPTION`);
-          try {
-            if (await captureFinalStartupFailure() === undefined) acceptedMutations.push(`${relation}:relacl`);
-          } finally {
-            await admin!.unsafe(
-              `REVOKE GRANT OPTION FOR SELECT ON TABLE ${quote(relation)} FROM ${role}`,
-            );
-          }
-        }
+    it("starts with healthy serving roles after the aborted ACL sweep", async () => {
+      guard();
+      expect(await captureFinalStartupFailure(true)).toBeUndefined();
+    });
 
-        const columns = await admin!<{ column_name: string; app: boolean; operator: boolean }[]>`
-          SELECT attribute.attname AS column_name,
-            has_column_privilege('aoa_app', relation.oid, attribute.attnum, 'SELECT') AS app,
-            has_column_privilege('aoa_operator', relation.oid, attribute.attnum, 'SELECT') AS operator
-          FROM pg_class relation
-          JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
-          JOIN pg_attribute attribute ON attribute.attrelid = relation.oid
-          WHERE namespace.nspname = 'public' AND relation.relname = ${relation}
-            AND relation.relkind = 'r' AND attribute.attnum > 0 AND NOT attribute.attisdropped
-          ORDER BY attribute.attnum`;
-        for (const column of columns) {
-          const role = column.app ? "aoa_app" : column.operator ? "aoa_operator" : "aoa_app";
-          const [prior] = await admin!<{ explicit_select: boolean }[]>`
-            SELECT EXISTS (
-              SELECT 1 FROM pg_class relation
-              JOIN pg_namespace namespace ON namespace.oid = relation.relnamespace
-              JOIN pg_attribute attribute ON attribute.attrelid = relation.oid
-              CROSS JOIN LATERAL aclexplode(attribute.attacl) acl
-              LEFT JOIN pg_roles grantee ON grantee.oid = acl.grantee
-              WHERE namespace.nspname = 'public' AND relation.relname = ${relation}
-                AND attribute.attname = ${column.column_name}
-                AND grantee.rolname = ${role} AND acl.privilege_type = 'SELECT'
-            ) AS explicit_select`;
-          await admin!.unsafe(
-            `GRANT SELECT (${quote(column.column_name)}) ON ${quote(relation)} TO ${role} WITH GRANT OPTION`,
-          );
-          try {
-            if (await captureFinalStartupFailure() === undefined) {
-              acceptedMutations.push(`${relation}.${column.column_name}:attacl`);
-            }
-          } finally {
-            await admin!.unsafe(
-              `REVOKE SELECT (${quote(column.column_name)}) ON ${quote(relation)} FROM ${role}`,
-            );
-            if (prior?.explicit_select) {
-              await admin!.unsafe(
-                `GRANT SELECT (${quote(column.column_name)}) ON ${quote(relation)} TO ${role}`,
-              );
-            }
-          }
-        }
+    it("refuses a dirty ACL fixture before making any sweep mutation", async () => {
+      guard();
+      const healthy = await aclFixtureSnapshot(aclAdmin!);
+      const captureFailure = vi.fn(captureFinalStartupFailure);
+      try {
+        await aclAdmin!.unsafe(`GRANT SELECT (id) ON execution_targets TO aoa_app WITH GRANT OPTION`);
+        await expect(sweepAclGrantOptions({
+          admin: aclAdmin!, relations: ["execution_targets"],
+          signal: new AbortController().signal, captureFailure,
+        })).rejects.toThrow("ACL sweep requires a healthy fixture");
+        expect(captureFailure).not.toHaveBeenCalled();
+        const [stillGrantable] = await aclAdmin!<{ granted: boolean }[]>`
+          SELECT has_column_privilege('aoa_app', 'execution_targets', 'id', 'SELECT WITH GRANT OPTION') AS granted`;
+        expect(stillGrantable?.granted).toBe(true);
+      } finally {
+        await aclAdmin!.unsafe(`REVOKE GRANT OPTION FOR SELECT (id) ON execution_targets FROM aoa_app`);
       }
-      expect(acceptedMutations).toEqual([]);
-      // 180s -> 300s. Every relation in the list costs a full server-boot attempt, and every
-      // non-dropped column costs another; restoring `instance_settings` (7 columns) added eight.
-      // On Linux CI the whole file fits comfortably — the PR run at 4d5bcbead reported exactly
-      // two failures, both in a DIFFERENT file, so this test passed there WITH the relation
-      // covered. On a Windows local run it measured 192s against the old 180s budget. The extra
-      // headroom keeps the local run usable and changes nothing about what is asserted.
-    }, 300_000);
+      expect(await aclFixtureSnapshot(aclAdmin!)).toEqual(healthy);
+    });
 
     it("fails exact attacl tuples when an expected column gains a grant option", async () => {
       guard();

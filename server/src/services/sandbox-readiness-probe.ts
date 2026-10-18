@@ -99,7 +99,7 @@ export async function probeReadinessInSandbox(
   const prefix = command;
   const args =
     command === "codex"
-      ? ["exec", "--json", "--sandbox", "read-only", "--ask-for-approval", "never", "--model", credential.model, "-"]
+      ? ["--ask-for-approval", "never", "exec", "--json", "--sandbox", "read-only", "--model", credential.model, "-"]
       : ["--print", "--tools", "", "--strict-mcp-config", "--output-format", "text", "--model", credential.model];
 
   const testedAt = new Date().toISOString();

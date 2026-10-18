@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { normalizeCommanderOptions } from "@armyofagents/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -426,6 +427,22 @@ export interface LocalMessage {
 }
 
 function serverToLocal(m: AgentMessage): LocalMessage {
+  let optionsPrompt: LocalMessage["optionsPrompt"];
+  const originalContent = m.content ?? "";
+  const parsedContent = m.role !== "assistant" ? originalContent : originalContent.replace(/⚡OPTIONS:(.*?)⚡/g, (marker, json: string) => {
+    try {
+      const normalized = normalizeCommanderOptions(JSON.parse(json));
+      if (!normalized) return marker;
+      optionsPrompt = { ...normalized, promptId: `${m.id}-options`, dismissed: m.turnStatus === "failed" };
+      return "";
+    } catch {
+      return marker;
+    }
+  });
+  let content = optionsPrompt ? parsedContent.trim() : originalContent;
+  if (m.role === "assistant" && m.turnStatus === "failed") {
+    content += "\n\nThis reply is incomplete. See Run History for failure details before starting a new turn.";
+  }
   const calls = Array.isArray(m.toolCalls) ? m.toolCalls : [];
   const toolCalls: ToolCallEntry[] | undefined =
     calls.length > 0
@@ -440,7 +457,8 @@ function serverToLocal(m: AgentMessage): LocalMessage {
   return {
     id: m.id,
     role: m.role === "tool" ? "system" : m.role,
-    content: m.content ?? "",
+    content,
+    ...(optionsPrompt ? { optionsPrompt } : {}),
     streamingDone: true,
     outputRefs: m.outputRefs ?? undefined,
     ...(toolCalls ? { toolCalls } : {}),
@@ -455,6 +473,7 @@ export function mergeServerMessagesWithTransientLocal(
 ): LocalMessage[] {
   const localById = new Map(localMessages.map((m) => [m.id, m]));
   const serverIds = new Set(serverMessages.map((m) => m.id));
+  const reconciledLocalIds = new Set<string>();
   // Carry the live-only "Worked for Xs" durationMs from the streamed local
   // message onto its persisted server counterpart. The streamed message has a
   // client temp id (≠ the server id), so match by content. This keeps the
@@ -467,21 +486,45 @@ export function mergeServerMessagesWithTransientLocal(
       localDurationByContent.set(lm.content, lm.durationMs);
     }
   }
-  const merged = serverMessages.map((m) => {
+  const merged = serverMessages.map((m, index) => {
     const base = serverToLocal(m);
+    const answered = serverMessages.slice(index + 1).some((next) => next.role === "user");
+    // A streamed choice has a temporary message/prompt ID. Reconcile its
+    // presentation state with the saved marker instead of showing two cards.
+    // Text matching can reconcile choices, but cannot establish approval ownership.
+    const localByMessageId = localById.get(m.id);
+    const savedPrompt = base.optionsPrompt;
+    const local = localByMessageId ?? (savedPrompt && localMessages.find((candidate) => {
+      const prompt = candidate.optionsPrompt;
+      return (
+        !serverIds.has(candidate.id) &&
+        !reconciledLocalIds.has(candidate.id) &&
+        prompt &&
+        (prompt.dismissed || !answered) &&
+        prompt.question === savedPrompt.question &&
+        prompt.options.length === savedPrompt.options.length &&
+        prompt.options.every((option, i) => option === savedPrompt.options[i])
+      );
+    }));
+    if (local) reconciledLocalIds.add(local.id);
+    const optionsPrompt = local?.optionsPrompt ?? base.optionsPrompt;
     const carriedDuration =
       base.role === "assistant" ? localDurationByContent.get(base.content) : undefined;
     return {
       ...base,
       ...(carriedDuration !== undefined ? { durationMs: carriedDuration } : {}),
-      actionConfirm: localById.get(m.id)?.actionConfirm,
-      optionsPrompt: localById.get(m.id)?.optionsPrompt,
+      actionConfirm: localByMessageId?.actionConfirm,
+      optionsPrompt: optionsPrompt ? {
+        ...optionsPrompt,
+        dismissed: optionsPrompt.dismissed || Boolean(base.optionsPrompt?.dismissed) || answered,
+      } : undefined,
     };
   });
 
   const transientMessages = localMessages.filter(
     (m) =>
       !serverIds.has(m.id) &&
+      (!reconciledLocalIds.has(m.id) || m.actionConfirm !== undefined) &&
       (
         m.actionConfirm !== undefined ||
         m.optionsPrompt !== undefined ||
@@ -495,7 +538,11 @@ export function mergeServerMessagesWithTransientLocal(
           )
         )
       ),
-  );
+  ).map((m) => (
+    // A text-matched choice must not consume or relocate its live approval.
+    // Keep that original message and remove only its duplicated choice card.
+    reconciledLocalIds.has(m.id) ? { ...m, optionsPrompt: undefined } : m
+  ));
 
   return [...merged, ...transientMessages];
 }
@@ -565,7 +612,12 @@ interface CommanderSendAttempt {
   attachmentAssetIds: string[];
   refsForTurn: CommanderInputRef[];
   revision: number;
+  /** Only locally captured drafts belong to this attempt. History recovery
+   * must never consume a draft or refs already present in the composer. */
+  clearComposerOnSuccess: boolean;
+  recoveredFailureKey?: string;
   clientSubmissionId: string;
+  requestContext: { conversationId: string | null; pageContext: string | null; contextScope: CommanderContextScope | null; departmentContext: string | null };
 }
 
 export function AgentPanelContent({ conversationId, onSelectConversation, onOpenSessions, enableViewerPanel, cardChrome = false, sessionsCollapsed, onSetSessionsCollapsed }: AgentPanelContentProps = {}) {
@@ -579,6 +631,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   const queryClient = useQueryClient();
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const messagesScopeRef = useRef<string | null>(null);
   // The rich input is uncontrolled (the contenteditable DOM owns the live
   // text). We only track empty-ness here to drive the Send button + placeholder.
   const [inputEmpty, setInputEmpty] = useState(true);
@@ -595,7 +648,17 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   const [streaming, setStreamingLocal] = useState(false);
   // ─── Composer B-states (mock §5) ────────────────────────────────────────
   const [sendFailed, setSendFailed] = useState(false);
+  const [failureDetails, setFailureDetails] = useState<{ message: string; retryUnavailableReason: string | null } | null>(null);
+  const savedFailedMessageRef = useRef<string | null>(null);
   const lastAttemptRef = useRef<CommanderSendAttempt | null>(null);
+  const hydratedFailureKeyRef = useRef<string | null>(null);
+  const handledFailureKeysRef = useRef(new Set<string>());
+  const dismissSavedRecovery = useCallback(() => {
+    if (hydratedFailureKeyRef.current) {
+      handledFailureKeysRef.current.add(hydratedFailureKeyRef.current);
+      hydratedFailureKeyRef.current = null;
+    }
+  }, []);
   // Bumped on every draft-changing edit (typing, ref add/remove, Discard) so a
   // retry that succeeds AFTER the draft diverged skips the clears instead of
   // wiping the newer edits (peer pattern: CommentThread / WorkspaceTimeline).
@@ -936,9 +999,13 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     [allConversations, conversationId],
   );
 
-  // Reset messages when switching conversations
+  const messagesScope = JSON.stringify([
+    companyId, conversationId ?? null, currentUser?.userId ?? null,
+  ]);
+
+  // Reset messages when switching conversations or the authenticated owner.
   useEffect(() => {
-    if (!conversationId) return;
+    messagesScopeRef.current = messagesScope;
     setMessages([]);
     setStreamingLocal(false);
     inputRefsRef.current = [];
@@ -953,19 +1020,67 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     composerRevisionRef.current += 1;
     lastAttemptRef.current = null;
     setSendFailed(false);
-  }, [conversationId]);
+    setFailureDetails(null);
+    savedFailedMessageRef.current = null;
+    hydratedFailureKeyRef.current = null;
+  }, [messagesScope]);
 
   // Populate messages from history when historyData arrives.
   // conversationId is included so the effect re-fires when switching between
   // cached conversations (TanStack Query returns the same object reference on a
   // cache hit, so [historyData] alone would not trigger a re-run).
   useEffect(() => {
-    if (!historyData?.messages?.length) return;
-    const loaded: LocalMessage[] = historyData.messages
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .map(serverToLocal);
-    setMessages(loaded);
-  }, [historyData, conversationId]);
+    if (!historyData?.messages?.length || streamingRef.current) return;
+    const preserveTransient = messagesScopeRef.current === messagesScope;
+    messagesScopeRef.current = messagesScope;
+    setMessages((previous) => mergeServerMessagesWithTransientLocal(
+      historyData.messages.filter((m) => m.role === "user" || m.role === "assistant"),
+      preserveTransient ? previous : [],
+    ));
+  }, [historyData, messagesScope]);
+
+  // Both saved-chat and docked history restore the same durable failure. Only
+  // the selected surface's data can hydrate it. Unrelated active-chat refreshes
+  // and refetches of a locally handled failure must not re-arm recovery.
+  const recoveryMessages = conversationId ? historyData?.messages : conversation?.messages;
+  const recoveryConversationId = conversationId ?? conversation?.conversation?.id ?? null;
+  useEffect(() => {
+    if (streamingRef.current) return;
+    const latestUser = recoveryMessages?.filter((m) => m.role === "user").at(-1);
+    const failure = latestUser?.failure;
+    if (failure) {
+      const failureKey = JSON.stringify([companyId, recoveryConversationId, latestUser.id]);
+      if (
+        handledFailureKeysRef.current.has(failureKey) ||
+        hydratedFailureKeyRef.current === failureKey
+      ) return;
+      hydratedFailureKeyRef.current = failureKey;
+      savedFailedMessageRef.current = latestUser.content ?? "";
+      setFailureDetails(failure);
+      const retry = failure.retry;
+      lastAttemptRef.current = retry?.clientSubmissionId
+        ? {
+          rawText: retry.message,
+          message: retry.message,
+          attachmentAssetIds: retry.attachmentAssetIds,
+          refsForTurn: retry.attachmentAssetIds.map((id) => ({
+            v: 1, kind: "asset", id, label: "Saved attachment",
+          })),
+          revision: composerRevisionRef.current,
+          clearComposerOnSuccess: false,
+          recoveredFailureKey: failureKey,
+          clientSubmissionId: retry.clientSubmissionId,
+          requestContext: {
+            conversationId: recoveryConversationId,
+            pageContext: retry.pageContext,
+            contextScope: retry.contextScope,
+            departmentContext: retry.departmentContext,
+          },
+        }
+        : null;
+      setSendFailed(true);
+    }
+  }, [recoveryMessages, recoveryConversationId, companyId]);
 
   // Sync server messages into local state (only when not streaming AND no specific conversation is selected)
   useEffect(() => {
@@ -1033,7 +1148,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   );
 
   const sendText = useCallback(
-    async (text: string, attachmentAssetIds?: string[], clientSubmissionId?: string): Promise<boolean> => {
+    async (text: string, attachmentAssetIds?: string[], clientSubmissionId?: string, requestContext?: CommanderSendAttempt["requestContext"]): Promise<boolean> => {
       if (!text || !companyId || streaming) return false;
 
       // New user turn: allow exactly one auto-opened viewer tab for the refs
@@ -1078,7 +1193,7 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       let sawError = false;
 
       try {
-        const stream = streamAgentChat(companyId, text, pageContext, controller.signal, conversationId, contextScope, attachmentAssetIds, clientSubmissionId);
+        const stream = streamAgentChat(companyId, text, requestContext ? requestContext.pageContext : pageContext, controller.signal, requestContext ? requestContext.conversationId : conversationId, requestContext ? requestContext.contextScope : contextScope, attachmentAssetIds, clientSubmissionId, requestContext?.departmentContext);
 
         for await (const event of stream) {
           if (event.event === "error") sawError = true;
@@ -1111,6 +1226,10 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         abortRef.current = null;
         // Refresh conversation from server
         queryClient.invalidateQueries({ queryKey: queryKeys.agentConversation(companyId) });
+        const sentConversationId = requestContext ? requestContext.conversationId : conversationId;
+        if (sentConversationId) {
+          queryClient.invalidateQueries({ queryKey: ["conversation-messages", companyId, sentConversationId] });
+        }
         queryClient.invalidateQueries({ queryKey: ["commander-conversations"] });
       }
       return accepted;
@@ -1122,13 +1241,21 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
    *  banner's Retry replays the stored one (same clientSubmissionId). */
   const performCommanderSend = useCallback(
     async (attempt: CommanderSendAttempt) => {
-      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId);
+      const accepted = await sendText(attempt.message, attempt.attachmentAssetIds, attempt.clientSubmissionId, attempt.requestContext);
       if (accepted) {
+        if (attempt.recoveredFailureKey) {
+          handledFailureKeysRef.current.add(attempt.recoveredFailureKey);
+          if (hydratedFailureKeyRef.current === attempt.recoveredFailureKey) {
+            hydratedFailureKeyRef.current = null;
+          }
+        }
         setSendFailed(false);
+        setFailureDetails(null);
+        savedFailedMessageRef.current = null;
         lastAttemptRef.current = null;
         // Retry-success safety: only clear when the draft still matches the
         // snapshot — mid-flight edits/ref changes must survive the clear.
-        if (composerRevisionRef.current === attempt.revision) {
+        if (attempt.clearComposerOnSuccess && composerRevisionRef.current === attempt.revision) {
           inputRef.current?.clear();
           const remaining = settleCommanderInputRefsAfterSend(
             inputRefsRef.current,
@@ -1147,7 +1274,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         // suppressed while streaming), the snapshot is stale — a re-armed
         // banner's Retry would post it (e.g. a removed reference). Leave the
         // banner down; the user sends fresh with a NEW clientSubmissionId.
-        setSendFailed(composerRevisionRef.current === attempt.revision);
+        const unchanged = composerRevisionRef.current === attempt.revision;
+        if (!unchanged && attempt.recoveredFailureKey) {
+          handledFailureKeysRef.current.add(attempt.recoveredFailureKey);
+        }
+        setSendFailed(unchanged);
       }
     },
     [sendText],
@@ -1159,6 +1290,9 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
       const refsForTurn = inputRefsRef.current;
       if ((!trimmed && refsForTurn.length === 0) || uploadingFiles.length > 0 || isOffline) return;
       setSendFailed(false);
+      dismissSavedRecovery();
+      setFailureDetails(null);
+      savedFailedMessageRef.current = null;
       const baseText = trimmed || "Use the referenced context.";
       // Minted ONCE per submission and snapshotted BEFORE the await so the
       // banner's Retry re-sends the exact same attempt (same clientSubmissionId
@@ -1169,12 +1303,19 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
         attachmentAssetIds: refsForTurn.filter((r) => r.kind === "asset").map((r) => r.id),
         refsForTurn,
         revision: composerRevisionRef.current,
+        clearComposerOnSuccess: true,
         clientSubmissionId: createComposerSubmissionId(),
+        requestContext: {
+          conversationId: conversationId ?? conversation?.conversation?.id ?? null,
+          pageContext,
+          contextScope,
+          departmentContext: contextScope?.departmentId ?? null,
+        },
       };
       lastAttemptRef.current = attempt;
       await performCommanderSend(attempt);
     },
-    [performCommanderSend, uploadingFiles.length, isOffline],
+    [performCommanderSend, uploadingFiles.length, isOffline, pageContext, contextScope, conversationId, conversation?.conversation?.id, dismissSavedRecovery],
   );
 
   /** Banner Retry: re-send the IDENTICAL stored attempt (same clientSubmissionId). */
@@ -1185,18 +1326,31 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
   }, [performCommanderSend, isOffline]);
 
   const handleEditFailedSend = useCallback(() => {
+    dismissSavedRecovery();
+    if (savedFailedMessageRef.current !== null) {
+      inputRef.current?.clear();
+      inputRef.current?.insertText(savedFailedMessageRef.current);
+      const refs = lastAttemptRef.current?.refsForTurn ?? [];
+      inputRefsRef.current = refs;
+      setInputRefs(refs);
+      composerRevisionRef.current += 1;
+      inputRef.current?.focus();
+    }
     setSendFailed(false);
-  }, []);
+  }, [dismissSavedRecovery]);
 
   const handleDiscardFailedSend = useCallback(() => {
+    dismissSavedRecovery();
     lastAttemptRef.current = null;
     setSendFailed(false);
+    setFailureDetails(null);
+    savedFailedMessageRef.current = null;
     composerRevisionRef.current += 1;
     inputRef.current?.clear();
     inputRefsRef.current = [];
     setInputRefs([]);
     setAttachmentError(null);
-  }, []);
+  }, [dismissSavedRecovery]);
 
   // Stale-snapshot guard (mock §5: failure never eats your work): once the
   // draft diverges from the failed attempt, Retry would post stale content and
@@ -1206,9 +1360,10 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     composerRevisionRef.current += 1;
     const attempt = lastAttemptRef.current;
     if (attempt && !streamingRef.current && text.trim() !== attempt.rawText) {
+      dismissSavedRecovery();
       setSendFailed(false);
     }
-  }, []);
+  }, [dismissSavedRecovery]);
 
   const addInputRef = useCallback((ref: CommanderInputRef, suggestedPrompt?: string) => {
     const next = buildCommanderInputRefState(inputRefsRef.current, ref);
@@ -1221,13 +1376,16 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     // banner goes down and the next send mints a fresh submission.
     if (next.duplicateKey === null) {
       composerRevisionRef.current += 1;
-      if (!streamingRef.current) setSendFailed(false);
+      if (!streamingRef.current) {
+        dismissSavedRecovery();
+        setSendFailed(false);
+      }
     }
     if (suggestedPrompt && next.duplicateKey === null) {
       inputRef.current?.insertText(suggestedPrompt);
     }
     requestAnimationFrame(() => inputRef.current?.focus());
-  }, []);
+  }, [dismissSavedRecovery]);
 
   const uploadCommanderFiles = useCallback(async (files: File[], replacingFailedId?: number) => {
     if (!companyId || files.length === 0 || streaming) return;
@@ -1298,8 +1456,11 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
     setDuplicateInputRefKey((current) => (current === key ? null : current));
     // Retry must never post a removed (possibly sensitive) attachment.
     composerRevisionRef.current += 1;
-    if (!streamingRef.current) setSendFailed(false);
-  }, []);
+    if (!streamingRef.current) {
+      dismissSavedRecovery();
+      setSendFailed(false);
+    }
+  }, [dismissSavedRecovery]);
 
   const handleOpenInputRef = useCallback(
     (ref: CommanderInputRef) => {
@@ -1365,8 +1526,12 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
           "Commander hit an error. Please try again.";
         setMessages((prev) =>
           settleRunningToolCalls(prev, assistantId).map((m) =>
-            m.id === assistantId && !m.content
-              ? { ...m, content: message, streamingDone: true }
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: m.content ? `${m.content}\n\n${message}` : message,
+                  streamingDone: true,
+                }
               : m,
           ),
         );
@@ -2160,6 +2325,8 @@ export function AgentPanelContent({ conversationId, onSelectConversation, onOpen
                   onEdit={handleEditFailedSend}
                   onDiscard={handleDiscardFailedSend}
                   retrying={streaming}
+                  message={failureDetails?.message}
+                  retryUnavailableReason={failureDetails?.retryUnavailableReason}
                 />
               )}
             </div>

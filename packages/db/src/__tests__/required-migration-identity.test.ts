@@ -24,7 +24,7 @@ async function loadWithFixture(
     }),
   }));
   vi.resetModules();
-  return (await import("../client.js")).loadRequiredMigrationIdentity;
+  return (await import("../required-migration-identity.js")).loadRequiredMigrationIdentity;
 }
 
 describe("required migration identity", () => {
