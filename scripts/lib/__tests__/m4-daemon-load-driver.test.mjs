@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,readFileSync,rmSync,mkdirSync,symlinkSync,existsSync,readdirSync} from 'node:fs';
 import {createRequire} from 'node:module';
+import {spawnSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -42,6 +43,54 @@ test('fresh fixture renders separate identities, unchanged ceilings and real dae
     }
     assert.ok(overlay.services['control-plane'].volumes.some(v=>v.target==='/load/manifest.private.json'&&v.read_only));
   } finally {rmSync(parent,{recursive:true,force:true});}
+});
+
+test('historical64 preparation creates independent enrollment authority with unchanged arrivals/deadlines',async()=>{
+  const {prepareDaemonFixture}=await import('../m4-daemon-load-fixture.mjs');
+  const parent=mkdtempSync(path.join(tmpdir(),'m4-historical64-'));
+  try {
+    const first=prepareDaemonFixture(path.join(parent,'first'),{capacityProfile:'historical64'});
+    const second=prepareDaemonFixture(path.join(parent,'second'),{capacityProfile:'historical64'});
+    assert.equal(first.capacityProfile,'historical64');
+    assert.equal(first.durationMs,15000);assert.equal(first.drainMs,30000);
+    assert.deepEqual(first.tenants.map(t=>t.rate),[2,20]);
+    assert.notEqual(first.fixtureId,second.fixtureId);
+    const overlay=JSON.parse(readFileSync(path.join(parent,'first','compose.json'),'utf8'));
+    assert.equal(overlay.services['control-plane-b'].profiles,undefined);
+    for(let index=0;index<2;index++){
+      const t=first.tenants[index],other=second.tenants[index];
+      assert.notEqual(t.targetId,other.targetId);assert.notEqual(t.organizationId,other.organizationId);
+      assert.equal(overlay.services[t.service].environment.AOA_WORKER_CONCURRENCY_BATCH,'64');
+      const registered=JSON.parse(readFileSync(path.join(parent,'first',t.tenantKey+'.profile.json'),'utf8'));
+      assert.ok(registered.providerConstraints.profileId.startsWith('m4-historical64-'+first.fixtureId));
+      assert.notEqual(readFileSync(path.join(parent,'first',t.tenantKey+'.ticket'),'utf8'),readFileSync(path.join(parent,'second',t.tenantKey+'.ticket'),'utf8'));
+    }
+    assert.throws(()=>prepareDaemonFixture(path.join(parent,'invalid'),{capacityProfile:'128'}),/capacity/i);
+    assert.equal(existsSync(path.join(parent,'invalid')),false);
+  }finally{rmSync(parent,{recursive:true,force:true});}
+});
+
+test('selected capacity must match durable enrolled inventory, not just a preparation label',async()=>{
+  const {assertDaemonCapacityInventory}=await import('../../m4-daemon-load.mjs');
+  assert.doesNotThrow(()=>assertDaemonCapacityInventory(validInventory(),'default'));
+  assert.throws(()=>assertDaemonCapacityInventory(validInventory(),'historical64'),/capacity|inventory/i);
+  const historical=validInventory().map(row=>({...row,providerProfile:{...row.providerProfile,maxConcurrentOperations:64,
+    profileId:'m4-historical64-'+row.tenantKey},hello:{...row.hello,capacity:{batchSlots:64}}}));
+  assert.doesNotThrow(()=>assertDaemonCapacityInventory(historical,'historical64'));
+  assert.throws(()=>assertDaemonCapacityInventory(historical,'default'),/capacity|inventory/i);
+  assert.throws(()=>assertDaemonCapacityInventory(historical,'historical64','unrelated-fixture'),/capacity|inventory/i);
+});
+
+test('preparation CLI refuses unknown or incomplete selectors before writing a fixture',()=>{
+  const parent=mkdtempSync(path.join(tmpdir(),'m4-cli-'));
+  try {
+    const script=fileURLToPath(new URL('../../m4-daemon-load.mjs',import.meta.url));
+    for(const [index,args] of [['--capacity-profile'],['--capacity-profile','128'],['--capacity-profile','default','extra']].entries()) {
+      const dir=path.join(parent,'fresh-'+index);
+      const result=spawnSync(process.execPath,[script,'prepare',dir,...args],{encoding:'utf8'});
+      assert.equal(result.status,1);assert.equal(existsSync(dir),false);
+    }
+  }finally{rmSync(parent,{recursive:true,force:true});}
 });
 
 test('prepare refuses relative, existing, populated and junction-ancestor paths before credentials',async()=>{
@@ -130,6 +179,10 @@ test('project identity refuses foreign fixture labels or a different manifest bi
   const otherBind=structuredClone(containers);otherBind[0].Mounts[0].Source=path.join(directory,'other.private.json');
   assert.throws(()=>verifyDaemonProjectIdentity(otherBind,manifest,directory,project),/manifest|bind/i);
   assert.throws(()=>verifyDaemonProjectIdentity([],manifest,directory,project),/project|container/i);
+  const historical={...manifest,capacityProfile:'historical64'};
+  assert.throws(()=>verifyDaemonProjectIdentity(containers,historical,directory,project),/running/i);
+  const replica=structuredClone(containers[0]);replica.Config.Labels['com.docker.compose.service']='control-plane-b';
+  assert.doesNotThrow(()=>verifyDaemonProjectIdentity([...containers,replica],historical,directory,project));
 });
 
 test('a job timeout fails the bounded verdict even with successful request histograms',async()=>{

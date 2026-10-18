@@ -26,9 +26,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import * as engineering from "../../control-plane/seed-d1-worker-enrolment.mjs";
 
 import {
   ENROLLMENT_TICKET_PREFIX,
@@ -177,6 +178,47 @@ test("deriveRegisteredProfile substitutes ONLY the provider digest", () => {
     assert.deepEqual(derived[key], profile[key], `deriveRegisteredProfile altered ${key}`);
   }
   assert.deepEqual(Object.keys(derived).sort(), Object.keys(profile).sort());
+});
+
+test('engineering capacity selector preserves stock8 and admits only explicit historical64',()=>{
+  const baseline=engineering.buildProviderConstraintProfile('fixture',1);
+  assert.equal(baseline.maxConcurrentOperations,8);
+  assert.deepEqual(engineering.engineeringCapacityProfile(),{name:'default',batchSlots:1,maxConcurrentOperations:8,controlPlaneReplicas:1});
+  const historical=engineering.buildProviderConstraintProfile('fixture',1,'historical64');
+  assert.deepEqual(historical,{...baseline,maxConcurrentOperations:64});
+  assert.throws(()=>engineering.engineeringCapacityProfile('128'),/capacity/i);
+  assert.throws(()=>engineering.buildProviderConstraintProfile('fixture',1,'__proto__'),/capacity/i);
+});
+
+test('historical64 enrollment requires D1 opt-in and fresh organization profile identity',()=>{
+  const fresh={...profile,providerConstraints:{...profile.providerConstraints,profileId:'m4-historical64-fresh-quiet'}};
+  const env={AOA_D1_SEED_WORKER_CAPACITY_PROFILE:'historical64',AOA_D1_SEED_WORKER_ENROLMENT:'1'};
+  assert.equal(engineering.readEngineeringCapacityProfile({},profile),'default');
+  assert.equal(engineering.readEngineeringCapacityProfile(env,fresh),'historical64');
+  assert.throws(()=>engineering.readEngineeringCapacityProfile({...env,AOA_D1_SEED_WORKER_ENROLMENT:'0'},fresh),/D1/i);
+  assert.throws(()=>engineering.readEngineeringCapacityProfile(env,profile),/fresh|profile/i);
+  assert.throws(()=>engineering.readEngineeringCapacityProfile(env,{...fresh,scope:'platform'}),/organization/i);
+  assert.throws(()=>engineering.assertEngineeringTargetRegistration('historical64',[]),/fresh|existing/i);
+  assert.doesNotThrow(()=>engineering.assertEngineeringTargetRegistration('historical64',[{id:fresh.targetId}]));
+  assert.doesNotThrow(()=>engineering.assertEngineeringTargetRegistration('default',[]));
+});
+
+const protocolFile=process.env.AOA_M4_PROTOCOL_DIST||path.join(repoRoot,'packages/worker-protocol/dist/index.js');
+test('historical64 canonical digest binds fresh registered references and rejects an old8 digest',
+  {skip:!existsSync(protocolFile)?'requires built worker-protocol (AOA_M4_PROTOCOL_DIST)':false},async()=>{
+  const protocol=await import(pathToFileURL(protocolFile).href);
+  const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+  const p8=engineering.buildProviderConstraintProfile('m4-historical64-first',1);
+  const p64=engineering.buildProviderConstraintProfile('m4-historical64-first',1,'historical64');
+  const digest8=sha(protocol.canonicalProviderConstraintProfileDigestInputV1(p8));
+  const digest64=sha(protocol.canonicalProviderConstraintProfileDigestInputV1(p64));
+  assert.notEqual(digest8,digest64);
+  assert.equal(await protocol.verifyAndBrandProviderConstraintProfileV1({...p64,digest:digest8},sha),null);
+  assert.ok(await protocol.verifyAndBrandProviderConstraintProfileV1({...p64,digest:digest64},sha));
+  const registered=deriveRegisteredProfile({...profile,providerConstraints:{profileId:p64.profileId,version:1,digest:'0'.repeat(64)}},digest64);
+  assert.deepEqual(registered.providerConstraints,{profileId:p64.profileId,version:1,digest:digest64});
+  const other=engineering.buildProviderConstraintProfile('m4-historical64-second',1,'historical64');
+  assert.notEqual(sha(protocol.canonicalProviderConstraintProfileDigestInputV1(other)),digest64);
 });
 
 // === worker-a is the NEGATIVE CONTROL and must have no ticket ================

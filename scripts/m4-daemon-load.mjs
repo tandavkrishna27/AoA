@@ -7,6 +7,7 @@ import {prepareDaemonFixture} from './lib/m4-daemon-load-fixture.mjs';
 import {buildDaemonCampaignSource} from './lib/m4-daemon-load-runtime.mjs';
 import {summarizeLoadPhase,compareQuietTenants} from './lib/m4-load-measurements.mjs';
 import {assertUnaliasedAbsoluteDirectory} from './lib/m4-daemon-load-private-directory.mjs';
+import {engineeringCapacityProfile} from '../docker/control-plane/seed-d1-worker-enrolment.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const parseLines=text=>text.trim()?text.trim().split(/\r?\n/).map(JSON.parse):[];
@@ -35,6 +36,14 @@ export function assertMatchingDaemonInventory(baseline,loaded) {
   const sorted=rows=>[...rows].sort((a,b)=>a.tenantKey.localeCompare(b.tenantKey));
   if(JSON.stringify(sorted(baseline))!==JSON.stringify(sorted(loaded)))throw Error('Profile/worker inventory changed between phases');
 }
+export function assertDaemonCapacityInventory(inventory,selector='default',fixtureId) {
+  validateDaemonInventory(inventory);
+  const capacity=engineeringCapacityProfile(selector);
+  for(const row of inventory) {
+    if(row.hello.capacity.batchSlots!==capacity.batchSlots || row.providerProfile.maxConcurrentOperations!==capacity.maxConcurrentOperations
+      || (selector==='historical64' && !row.providerProfile.profileId.startsWith('m4-historical64-'+(fixtureId?fixtureId+'-':''))))throw Error('Selected capacity does not match durable enrolled inventory');
+  }
+}
 
 // Docker inspect only: no source executes until project ownership and the exact
 // private manifest bind agree with the newly generated fixture identity.
@@ -48,7 +57,8 @@ export function verifyDaemonProjectIdentity(containers,manifest,directory,projec
     if(!service||services.has(service))throw Error('Duplicate or missing project service identity');
     services.set(service,container);
   }
-  for(const service of ['control-plane',...manifest.tenants.map(t=>t.service)]) {
+  const capacity=engineeringCapacityProfile(manifest.capacityProfile);
+  for(const service of ['control-plane',...(capacity.controlPlaneReplicas===2?['control-plane-b']:[]),...manifest.tenants.map(t=>t.service)]) {
     if(!services.get(service)?.State?.Running)throw Error('Required fixture project container is not running');
   }
   const normalized=value=>{
@@ -105,23 +115,32 @@ export function boundedDaemonVerdict(raw,summary) {
 }
 
 async function main() {
-  const [mode,directoryArg,phaseArg]=process.argv.slice(2),directory=directoryArg;
+  const [mode,directoryArg,phaseArg,selectorArg,...extra]=process.argv.slice(2),directory=directoryArg;
   if(!directoryArg||!['prepare','run','compare'].includes(mode))throw Error('Usage: node scripts/m4-daemon-load.mjs prepare|run|compare ABSOLUTE_FIXTURE_DIR [baseline|loaded]');
   assertUnaliasedAbsoluteDirectory(directory);
-  if(mode==='prepare'){prepareDaemonFixture(directory);console.log(JSON.stringify({prepared:true,directory,privateManifest:'manifest.private.json',fullD5Satisfied:false}));return;}
+  if(mode==='prepare'){
+    if(extra.length || (phaseArg!==undefined && phaseArg!=='--capacity-profile') || (phaseArg && !selectorArg) || (!phaseArg && selectorArg))throw Error('Usage: prepare ABSOLUTE_FIXTURE_DIR [--capacity-profile default|historical64]');
+    const manifest=prepareDaemonFixture(directory,{capacityProfile:selectorArg});
+    console.log(JSON.stringify({prepared:true,directory,capacityProfile:manifest.capacityProfile,privateManifest:'manifest.private.json',fullD5Satisfied:false}));return;
+  }
+  if(selectorArg || extra.length)throw Error('Unexpected diagnostic arguments');
   if(mode==='compare') {
     const baseline=JSON.parse(readFileSync(path.join(directory,'baseline.report.json'),'utf8'));
     const loaded=JSON.parse(readFileSync(path.join(directory,'loaded.report.json'),'utf8'));
     assertMatchingDaemonInventory(baseline.inventory,loaded.inventory);
+    if(baseline.capacityProfile!==loaded.capacityProfile)throw Error('Capacity selector changed between phases');
+    assertDaemonCapacityInventory(baseline.inventory,baseline.capacityProfile,baseline.fixtureId);
+    assertDaemonCapacityInventory(loaded.inventory,loaded.capacityProfile,loaded.fixtureId);
     if(!uuid(baseline.fixtureId)||baseline.fixtureId!==loaded.fixtureId)throw Error('Comparison fixture identity mismatch');
     const fairness=compareQuietTenants(baseline.summary,loaded.summary,['quiet']);
     const report={result:baseline.result==='PASS'&&loaded.result==='PASS'&&fairness.every(f=>f.passed)?'PASS':'FAIL',fairness,
-      baseline:baseline.summary,loaded:loaded.summary,fullD5Satisfied:false,scope:loaded.scope,limits:loaded.limits};
+      baseline:baseline.summary,loaded:loaded.summary,capacityProfile:loaded.capacityProfile,fullD5Satisfied:false,scope:loaded.scope,limits:loaded.limits};
     writeJson(path.join(directory,'comparison.report.json'),report);console.log(JSON.stringify(report));if(report.result!=='PASS')process.exitCode=1;return;
   }
   if(process.env.AOA_D1_LIVE!=='1'||!/^aoa-m4-daemon-[a-z0-9-]+$/.test(process.env.AOA_E6F_COMPOSE_PROJECT||''))throw Error('AOA_D1_LIVE=1 and owned aoa-m4-daemon-* project required');
   if(!['baseline','loaded'].includes(phaseArg))throw Error('Explicit baseline or loaded phase required');
   const manifest=JSON.parse(readFileSync(path.join(directory,'manifest.private.json'),'utf8'));
+  const capacity=engineeringCapacityProfile(manifest.capacityProfile);
   if(manifest.durationMs!==15000||manifest.drainMs!==30000||manifest.tenants.length!==2||manifest.tenants[0].rate!==2||manifest.tenants[1].rate!==20)throw Error('Unchanged fixed 2/s, 20/s and deadlines required');
   const args=['compose','--project-name',process.env.AOA_E6F_COMPOSE_PROJECT,'--env-file',path.join(directory,'fixture.env'),'-f',path.join(repo,'docker-compose.d1.yml'),'-f',path.join(directory,'compose.json')];
   const found=spawnSync('docker',['ps','-a','--filter','label=com.docker.compose.project='+process.env.AOA_E6F_COMPOSE_PROJECT,'--format','{{.ID}}'],{encoding:'utf8',timeout:15000});
@@ -151,10 +170,13 @@ async function main() {
   if(journal.status!==0)throw Error('Control-plane journal unavailable; cannot reconstruct complete cohort');
   writeFileSync(path.join(directory,phaseArg+'.durable.ndjson'),journal.stdout,{flag:'wx',mode:0o600});
   const {raw,summary}=assembleDaemonPhase(parseLines(journal.stdout),workers,{streamRecords:records});
+  assertDaemonCapacityInventory(raw.inventory,capacity.name,manifest.fixtureId);
   const report={result:status===0&&boundedDaemonVerdict(raw,summary)?'PASS':'FAIL',scope:manifest.scope,summary,fixtureId:manifest.fixtureId,
-    inventory:raw.inventory,fullD5Satisfied:false,
-    limits:['15s load + 30s immutable drain; two organizations, one control plane, same host',
+    inventory:raw.inventory,capacityProfile:capacity.name,fullD5Satisfied:false,
+    limits:[`15s load + 30s immutable drain; two organizations, ${capacity.controlPlaneReplicas} control plane replica(s), all traffic to A, same host`,
       'Deterministic provider fixture, no paid provider; dummy company key and production-minted owner-bound handle',
+      'Provider scripts command success; no captured one-shot result or actual COV-01 readiness-result success is established',
+      'Fake provider declares output enumeration/export unsupported; best-effort export failure does not change command terminal',
       'Direct production placement service after authenticated API submit; no SQL job/attempt/placement writes',
       'Queue-to-ACK uses DB receipt transaction timestamp minus job creation; not response/commit timing',
       'Job/attempt completion uses first durable read observed before deadline (250ms sampling); no later rescue',

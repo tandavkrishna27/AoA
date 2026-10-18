@@ -145,24 +145,38 @@ export function hashEnrollmentCode(code) {
   return { locatorHash: sha256(match[1]), secretHash: sha256(match[2]) };
 }
 
-/**
- * The provider-constraint profile the seeded target ratifies.
- *
- * Copied in shape from `seedScenario` (`tests/d1/lib/e6f-harness.mjs`) because that exact
- * object is already known to pass `canonicalProviderConstraintProfileDigestInputV1` on the
- * live stack; only `profileId`/`version` come from the worker's own committed profile.
- * Placement consistency (locality tags against the profile's `dataLocalityCeiling`, etc.) is
- * deliberately out of scope: this ticket reaches ENROL, not dispatch, and the enrol response
- * reads only `target.capabilities.providerConstraints`.
- */
-export function buildProviderConstraintProfile(profileId, version) {
+/** Closed engineering cohorts; the ordinary D1 registration stays 1/8. */
+export function engineeringCapacityProfile(name = "default") {
+  if (name === "default") return { name, batchSlots: 1, maxConcurrentOperations: 8, controlPlaneReplicas: 1 };
+  if (name === "historical64") return { name, batchSlots: 64, maxConcurrentOperations: 64, controlPlaneReplicas: 2 };
+  throw new EnrolmentSeedError("unknown engineering capacity profile");
+}
+
+export function readEngineeringCapacityProfile(env, fileProfile) {
+  const name = engineeringCapacityProfile(env.AOA_D1_SEED_WORKER_CAPACITY_PROFILE).name;
+  if (name === "historical64") {
+    if (env.AOA_D1_SEED_WORKER_ENROLMENT !== "1") throw new EnrolmentSeedError("historical capacity requires D1 opt-in");
+    if (fileProfile.scope !== "organization" || !fileProfile.organizationId) throw new EnrolmentSeedError("historical capacity requires organization scope");
+    if (!fileProfile.providerConstraints?.profileId?.startsWith("m4-historical64-")) throw new EnrolmentSeedError("historical capacity requires fresh profile identity");
+  }
+  return name;
+}
+
+export function assertEngineeringTargetRegistration(name, inserted) {
+  engineeringCapacityProfile(name);
+  if (name === "historical64" && inserted.length !== 1) throw new EnrolmentSeedError("historical capacity requires a fresh target; existing target refused");
+}
+
+/** The ratified D1 provider profile, with only the explicit historical cohort's
+ * concurrency differing. The canonical digest below covers the selected value. */
+export function buildProviderConstraintProfile(profileId, version, capacityProfile = "default") {
   return {
     profileId,
     version,
     maxContinuousRuntimeSeconds: 3600,
     maxIdleSeconds: 300,
     resourceCeiling: { cpuMillis: 2000, memoryMiB: 4096, pids: 512, diskMiB: 8192 },
-    maxConcurrentOperations: 8,
+    maxConcurrentOperations: engineeringCapacityProfile(capacityProfile).maxConcurrentOperations,
     supportedOperations: [
       "create", "execute", "cancel", "kill", "destroy", "list", "inspect", "reconcile_cleanup",
     ],
@@ -237,6 +251,7 @@ async function main() {
     await import("@armyofagents/worker-protocol");
 
   const fileProfile = JSON.parse(readFileSync(profilePath, "utf8"));
+  const capacityProfile = readEngineeringCapacityProfile(process.env, fileProfile);
   const ticket = decodeEnrollmentTicket(trimTicketText(readFileSync(ticketPath, "utf8")));
   // The ticket and the profile must name the SAME target, or the seed would authorize a code
   // for one target while the worker presents a hello for another — which the server answers
@@ -250,6 +265,7 @@ async function main() {
   const provider = buildProviderConstraintProfile(
     fileProfile.providerConstraints.profileId,
     fileProfile.providerConstraints.version,
+    capacityProfile,
   );
   const providerDigest = sha256(Buffer.from(canonicalProviderConstraintProfileDigestInputV1(provider)));
   const providerProfile = { ...provider, digest: providerDigest };
@@ -277,7 +293,7 @@ async function main() {
         VALUES (${fileProfile.organizationId}, ${"D1 Worker Enrolment"}, ${"d1-worker-enrolment"})
         ON CONFLICT (id) DO NOTHING`;
     }
-    await sql`INSERT INTO execution_targets
+    const inserted = await sql`INSERT INTO execution_targets
       (id, organization_id, scope, target_authority_key, device_generation, slug, kind, trust_class,
        status, capabilities, registered_profile, registered_profile_hash, provider_constraint_profile,
        last_seen_at)
@@ -285,7 +301,8 @@ async function main() {
         ${authorityKey}, ${fileProfile.deviceGeneration}, ${"d1-enrolling-worker"},
         'dedicated_worker', 'dedicated_tenant', 'active', ${sql.json(capabilities)},
         ${sql.json(registeredProfile)}, ${registeredProfileHash}, ${sql.json(providerProfile)}, now())
-      ON CONFLICT (id) DO NOTHING`;
+      ON CONFLICT (id) DO NOTHING RETURNING id`;
+    assertEngineeringTargetRegistration(capacityProfile, inserted);
     await sql`INSERT INTO worker_enrollment_code_routes (locator_hash, candidate_organization_id, expires_at)
       VALUES (${code.locatorHash}, ${fileProfile.organizationId ?? null},
         now() + make_interval(mins => ${ttlMinutes}))
