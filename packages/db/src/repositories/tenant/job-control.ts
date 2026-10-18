@@ -2201,11 +2201,65 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
     return { lease: row.lease, attempt: row.attempt };
   }
 
+  // The caller already holds the active lease/attempt fence locks. Keep the
+  // authoritative terminal transition shared by accepted events and the guarded
+  // completeAttempt seam; neither may strand a finished attempt's capacity.
+  async function convergeAttemptTerminal(
+    fence: ActiveFenceRequest,
+    terminalStatus: TerminalCompletionStatus,
+    childCancellationReason = "parent_terminal",
+  ): Promise<JobAttempt | null> {
+    const [attempt] = await tx.update(jobAttempts).set({
+      status: terminalStatus,
+      updatedAt: sql`clock_timestamp()`,
+    }).where(and(
+      eq(jobAttempts.organizationId, fence.organizationId),
+      eq(jobAttempts.companyId, fence.companyId),
+      eq(jobAttempts.jobId, fence.jobId),
+      eq(jobAttempts.id, fence.attemptId),
+      notInArray(jobAttempts.status, [...TERMINAL_ATTEMPT_STATUSES]),
+    )).returning();
+    // An additional terminal in an already-accepted batch cannot overwrite its
+    // first winner or repeat browser/resource convergence.
+    if (!attempt) return null;
+    await cancelBrowserChildren(fence, childCancellationReason);
+    await finishBrowserRequest(fence, terminalStatus);
+    if (terminalStatus === "succeeded" || terminalStatus === "cancelled") {
+      await releaseAttemptCapacitySlot({ organizationId: fence.organizationId, attemptId: fence.attemptId });
+      // Lease -> attempt -> job is the cancellation/reaper lock order. Success
+      // and cancellation are final outcomes, not an instruction to wait for TTL.
+      await tx.update(jobs).set({ status: terminalStatus, updatedAt: sql`clock_timestamp()` }).where(and(
+        eq(jobs.organizationId, fence.organizationId),
+        eq(jobs.companyId, fence.companyId),
+        eq(jobs.id, fence.jobId),
+        notInArray(jobs.status, [...JOB_TERMINAL_STATUSES]),
+      ));
+      await tx.update(leases).set({
+        status: terminalStatus === "succeeded" ? "released" : "revoked",
+        releasedAt: sql`clock_timestamp()`,
+        updatedAt: sql`clock_timestamp()`,
+      }).where(and(
+        eq(leases.organizationId, fence.organizationId),
+        eq(leases.companyId, fence.companyId),
+        eq(leases.jobId, fence.jobId),
+        eq(leases.attemptId, fence.attemptId),
+        eq(leases.id, fence.leaseId),
+        eq(leases.fence, fence.fence),
+        eq(leases.status, "active"),
+      ));
+    }
+    // Failed/expired attempts retain their held capacity and live-lease reaper
+    // route. The reaper atomically transfers the held slot to a retry successor
+    // (or releases it on exhaustion); offer-time admission must not be assumed.
+    return attempt;
+  }
+
   // JOB-005 — apply ONE accepted event's job/attempt projection idempotently.
   // The caller has ALREADY passed the active-fence guard (which holds the attempt
   // row lock), so the transitions here are the legal, single-winner moves:
   //   * attempt_started → attempt leased->running + job queued->running.
-  //   * attempt_terminal → attempt (any non-terminal) -> the terminal status.
+  //   * attempt_terminal → terminal attempt; final success/cancellation releases
+  //     capacity and closes its job/lease, retryable outcomes retain their claim.
   // Every transition is CONDITIONAL on the current status, so a replay or an
   // in-batch attempt_started→terminal pair is a safe no-op. The projection receipt
   // (unique per (kind, source_identity)) records the applied projection; a replay
@@ -2236,18 +2290,7 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
         eq(jobs.status, "queued"),
       ));
     } else {
-      await tx.update(jobAttempts).set({
-        status: projection.transition.terminalStatus,
-        updatedAt: sql`clock_timestamp()`,
-      }).where(and(
-        eq(jobAttempts.organizationId, fence.organizationId),
-        eq(jobAttempts.companyId, fence.companyId),
-        eq(jobAttempts.jobId, fence.jobId),
-        eq(jobAttempts.id, fence.attemptId),
-        notInArray(jobAttempts.status, [...TERMINAL_ATTEMPT_STATUSES]),
-      ));
-      await cancelBrowserChildren(fence, "parent_terminal");
-      await finishBrowserRequest(fence, projection.transition.terminalStatus);
+      await convergeAttemptTerminal(fence, projection.transition.terminalStatus);
     }
     await tx.insert(jobProjectionReceipts).values({
       organizationId: fence.organizationId,
@@ -5155,24 +5198,9 @@ export function createJobControlRepository(tx: Db): JobControlRepository {
     },
 
     async completeAttempt(input) {
-      const { attempt } = await guardActiveFence(input);
-      // The guard proved the attempt is non-terminal and holds its row lock, so the
-      // conditional update pins the exact locked status (no double-complete race).
-      const [row] = await tx.update(jobAttempts).set({
-        status: input.terminalStatus,
-        updatedAt: sql`clock_timestamp()`,
-      }).where(and(
-        eq(jobAttempts.organizationId, input.organizationId),
-        eq(jobAttempts.companyId, input.companyId),
-        eq(jobAttempts.jobId, input.jobId),
-        eq(jobAttempts.id, input.attemptId),
-        eq(jobAttempts.status, attempt.status),
-      )).returning();
+      await guardActiveFence(input);
+      const row = await convergeAttemptTerminal(input, input.terminalStatus, "browser_parent_terminal");
       if (!row) throw new JobFenceError("attempt_terminal");
-      await cancelBrowserChildren(input, "browser_parent_terminal");
-      await finishBrowserRequest(input, input.terminalStatus);
-      // JOB-007: the attempt reached a terminal state — release its capacity slot.
-      await releaseAttemptCapacitySlot({ organizationId: input.organizationId, attemptId: input.attemptId });
       return row;
     },
 
