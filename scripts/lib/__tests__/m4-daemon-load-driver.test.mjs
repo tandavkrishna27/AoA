@@ -1,8 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,readFileSync,rmSync,mkdirSync,symlinkSync,existsSync,readdirSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
+import * as credentialRuntime from '../m4-daemon-load-runtime.mjs';
 
 const validInventory=()=>['quiet','noisy'].map((tenantKey,index)=>({tenantKey,
   workerId:`00000000-0000-4000-8000-00000000000${index+1}`,profileHash:'a'.repeat(64),
@@ -71,6 +74,7 @@ test('runtime source parses and uses actual HTTP submit plus production placemen
   assert.ok(source.includes('/companies/'));
   assert.ok(source.includes('createJobPlacementService'));
   assert.ok(!/INSERT INTO (jobs|job_attempts|leases)\b/.test(source));
+  assert.ok(!source.includes('INSERT INTO job_secret_handles'));
 });
 
 test('assembler joins lost worker starts and refuses a missing daemon journal',async()=>{
@@ -135,4 +139,68 @@ test('a job timeout fails the bounded verdict even with successful request histo
   assert.equal(boundedDaemonVerdict({failures:[]},summary),true);
   summary.tenants.quiet.jobs.deadlineMisses=1;
   assert.equal(boundedDaemonVerdict({failures:[]},summary),false);
+});
+
+test('credential setup initializes deployment mode and creates the catalog company key before authorizing mint',async()=>{
+  const calls=[],tenants=[{companyId:'quiet-company'},{companyId:'noisy-company'}];
+  const result=await credentialRuntime.prepareDaemonCredentialFixture({deploymentMode:'authenticated',tenants},{
+    setDeploymentMode:mode=>calls.push(['mode',mode]),
+    companyKeyTargetForAdapter:adapter=>{calls.push(['adapter',adapter]);return {secretName:'provider:fixture',envVar:'ANTHROPIC_API_KEY'};},
+    secretService:()=>({getByName:async(company,name)=>{calls.push(['get',company,name]);return null;},
+      create:async(company,value)=>{calls.push(['create',company,value.name]);assert.equal(value.value,'m4-deterministic-fixture-only');}}),
+  });
+  assert.deepEqual(calls[0],['mode','authenticated']);
+  assert.deepEqual(calls.filter(c=>c[0]==='create'),[['create','quiet-company','provider:fixture'],['create','noisy-company','provider:fixture']]);
+  assert.equal(result.mintCredentialAuthority,'company_api_key');
+});
+
+test('credential setup does not issue company authority after missing provider mapping or failed storage',async()=>{
+  const input={deploymentMode:'authenticated',tenants:[{companyId:'company'}]};
+  await assert.rejects(()=>credentialRuntime.prepareDaemonCredentialFixture(input,{setDeploymentMode:()=>{},companyKeyTargetForAdapter:()=>null}),/provider/i);
+  await assert.rejects(()=>credentialRuntime.prepareDaemonCredentialFixture(input,{setDeploymentMode:()=>{},
+    companyKeyTargetForAdapter:()=>({secretName:'provider:fixture',envVar:'ANTHROPIC_API_KEY'}),secretService:()=>({getByName:async()=>null,create:async()=>{throw Error('storage failed');}})}),/storage failed/);
+});
+
+const credentialServerDist=process.env.AOA_M4_SERVER_DIST||fileURLToPath(new URL('../../../server/dist',import.meta.url));
+test('real one-shot builder and required placement mint accept the fixture without a manually inserted handle',
+  {skip:!existsSync(path.join(credentialServerDist,'services/execution-secret-handle-mint-runner.js'))?'requires same-candidate built server dist (AOA_M4_SERVER_DIST)':false},async()=>{
+  // A workspace exports TS source; the packaged image exports built JS. Register
+  // the pinned workspace loader only for this real-module regression, no copies.
+  const unregister=createRequire(path.join(credentialServerDist,'m4-test.cjs'))('tsx/esm/api').register({tsconfig:false});
+  const load=rel=>import(pathToFileURL(path.join(credentialServerDist,rel)).href);
+  let mode,previous;
+  try {
+    mode=await load('config/deployment-mode.js');previous=mode.getDeploymentMode();mode.setDeploymentMode('local_trusted');
+    const invocations=await load('services/one-shot-distributed-invocation.js');
+    const secrets=await load('services/secrets.js');
+    const {mintExecutionSecretHandleForPlacement}=await load('services/execution-secret-handle-mint-runner.js');
+    const operationId='01234567-1234-4234-8234-012345678901',companyId='01234567-1234-4234-8234-012345678902';
+    const stored=[],inserted=[];
+    const repo={loadAgentAdapterBinding:async()=>{throw Error('one-shot must not load agent');},
+      insertExecutionSecretHandle:async value=>{inserted.push(value);return {handle:value.handle,minted:true};}};
+    const source={kind:'one_shot',operationKind:'readiness_probe',operationId};
+    const legacyInput={organizationId:'01234567-1234-4234-8234-012345678903',companyId,jobId:'01234567-1234-4234-8234-012345678904',
+      executorPrincipalKind:'worker',executorPrincipalId:operationId,placementOwner:'organization_dedicated',credentialKind:null,targetGeneration:1,
+      jobSource:{sourceKind:'one_shot',sourceIdentity:operationId,sourceIntent:source,
+        input:{command:'claude',args:[],stdinArtifactId:null,maxRuntimeSeconds:600}}};
+    assert.deepEqual(await mintExecutionSecretHandleForPlacement(repo,legacyInput),{minted:false,reason:'not_cloud_deployment'});
+    mode.setDeploymentMode('authenticated');
+    assert.deepEqual(await mintExecutionSecretHandleForPlacement(repo,legacyInput),{minted:false,reason:'adapter_not_v1_scope'});
+    mode.setDeploymentMode('local_trusted');
+    const prepared=await credentialRuntime.prepareDaemonCredentialFixture({deploymentMode:'authenticated',tenants:[{companyId}]},{
+      setDeploymentMode:mode.setDeploymentMode,companyKeyTargetForAdapter:secrets.companyKeyTargetForAdapter,
+      secretService:()=>({getByName:async()=>null,create:async(company,value)=>stored.push({company,...value})}),
+    });
+    const command=credentialRuntime.buildDaemonLoadCommand(operationId,invocations);
+    assert.equal(invocations.oneShotAdapterForWorkload(command.input),'claude_local');
+    assert.equal(command.input.maxRuntimeSeconds,600);
+    const recognized={...legacyInput,jobSource:{...legacyInput.jobSource,sourceIntent:command.source,input:command.input}};
+    assert.deepEqual(await mintExecutionSecretHandleForPlacement(repo,recognized),{minted:false,reason:'owner_authority_disagreement'});
+    const outcome=await mintExecutionSecretHandleForPlacement(repo,{...recognized,credentialKind:prepared.mintCredentialAuthority});
+    assert.equal(outcome.minted,true);
+    assert.equal(inserted.length,1);assert.equal(stored.length,1);
+    assert.equal(inserted[0].refId,stored[0].name);
+    assert.equal(inserted[0].ownerPrincipalId,operationId);
+    assert.equal(inserted[0].boundTargetGeneration,1);
+  } finally {if(mode)mode.setDeploymentMode(previous);await unregister();}
 });

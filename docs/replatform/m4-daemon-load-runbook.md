@@ -4,10 +4,18 @@ This disposable engineering fixture uses authenticated HTTP job submission, the
 production placement service, two separately enrolled networked worker daemons,
 and the shipped deterministic D1 provider through its gated wire. It requires no
 paid provider credential. SQL creates fixture organizations, companies, agent
-keys, target/enrollment authority and a harmless company secret handle; it never
-creates jobs, attempts, leases or placement snapshots. Submission and placement
-run in the built control-plane image. The handle allows the ordinary fenced
-secret redemption to deliver the owned-label capability to the networked host.
+keys and target/enrollment authority; it never creates jobs, attempts, leases,
+secret handles or placement snapshots. The existing secret service stores a dummy
+company provider key under the catalog-derived name. Submission and placement
+run in the built control-plane image. Production placement mints its required
+owner-bound handle, and ordinary fenced redemption delivers the owned-label
+capability to the networked host.
+
+The standalone placement process initializes the trusted deployment mode and
+uses the server's recognized one-shot invocation builder, with independently
+established fixture company-key authority. The deterministic provider scripts
+that invocation; this diagnostic does not execute capture files or prove usable
+one-shot output. The existing 600-second external workload ceiling is unchanged.
 
 Each phase has **15 seconds of fixed arrivals and an immutable 30-second drain**.
 Baseline schedules 30 quiet jobs at 2/s. Loaded schedules 30 quiet jobs at 2/s and
@@ -117,6 +125,14 @@ The original thresholds remain: quiet throughput ≥90% isolated baseline,
 queue-to-ACK p95 ≤2× baseline, 5xx ≤0.1%, submit/poll/event-ACK p95
 ≤750/1000/500 ms, and no failed/censored/timed-out/unresolved required work.
 The output always sets `fullD5Satisfied:false`.
+
+The real builder/mint regression is in the already registered
+`scripts/lib/__tests__/m4-daemon-load-driver.test.mjs`. It requires a built server
+at this checkout's `server/dist`, or explicit `AOA_M4_SERVER_DIST` pointing to the
+same candidate's build. It uses the pinned workspace `tsx` loader to resolve
+workspace source exports and verifies the three original mint refusals before
+the corrected positive control. A missing build is an explicit skip, not proof
+that credential setup passed.
 
 Inventory comes from the durable control-plane journal and must contain valid,
 distinct quiet/noisy worker, target, provider-profile and enrolled hello snapshots.

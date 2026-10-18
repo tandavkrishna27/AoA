@@ -154,7 +154,7 @@ async function main() {
   const report={result:status===0&&boundedDaemonVerdict(raw,summary)?'PASS':'FAIL',scope:manifest.scope,summary,fixtureId:manifest.fixtureId,
     inventory:raw.inventory,fullD5Satisfied:false,
     limits:['15s load + 30s immutable drain; two organizations, one control plane, same host',
-      'Deterministic provider fixture, no paid provider; fixture-only company secret handle',
+      'Deterministic provider fixture, no paid provider; dummy company key and production-minted owner-bound handle',
       'Direct production placement service after authenticated API submit; no SQL job/attempt/placement writes',
       'Queue-to-ACK uses DB receipt transaction timestamp minus job creation; not response/commit timing',
       'Job/attempt completion uses first durable read observed before deadline (250ms sampling); no later rescue',
