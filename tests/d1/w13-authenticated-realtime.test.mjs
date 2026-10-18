@@ -32,13 +32,14 @@ function launch(url) {
   const child = fork(fileURLToPath(new URL('./lib/w13-realtime-replica.mjs', import.meta.url)), [], {
     env: { ...process.env, AOA_W13_DATABASE_URL: url }, execArgv: ['--import', 'tsx'], silent: true,
   });
-  let serial = 0, stderr = '';
+  let serial = 0, stderr = ''; const observations = [];
   const pending = new Map();
   child.stdout.on('data', () => {});
   child.stderr.on('data', data => { stderr = (stderr + data).slice(-2000); });
   const ready = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(Error('Replica startup timed out: ' + stderr)), 60_000);
     child.on('message', m => {
+      if (m.observation) observations.push(m.observation);
       if (m.ready) { clearTimeout(timer); resolve(m.port); }
       else if (pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); clearTimeout(p.timer); m.error ? p.reject(Error(m.error)) : p.resolve(m.result); }
     });
@@ -54,7 +55,7 @@ function launch(url) {
       pending.set(id, { resolve, reject, timer }); child.send({ id, action, ...options });
     });
   }
-  return { child, ready, command };
+  return { child, ready, command, observations };
 }
 async function connect(port, companyId, token, sinceSeq) {
   const frames = [], raw = [];
@@ -126,17 +127,63 @@ test('W13 actual authenticated cross-process socket composition (bounded smoke u
       await until(() => durableFrames(t.client).some(f => f.eventId === appended.eventId), 'reconnect gap catchup');
       assert.deepEqual(durableFrames(t.client).map(f => f.seq), [appended.seq]);
     }
+    // A real PostgreSQL lock blocks an actual production drainer read. This
+    // makes a missing stop barrier fail deterministically, without mock work.
+    const stopB = await b.command('brokerStop');
+    let releaseLock, lockReady;
+    const released = new Promise(resolve => { releaseLock = resolve; });
+    const locked = new Promise(resolve => { lockReady = resolve; });
+    const blocker = db.$client.begin(async tx => {
+      await tx`LOCK TABLE live_event_log IN ACCESS EXCLUSIVE MODE`;
+      lockReady(); await released;
+    });
+    let stopA;
+    try {
+      await locked;
+      assert.ok((await a.command('drainStart', { companyId: tenants[0].company })).pending > 0);
+      const probeId = randomUUID();
+      const stopping = a.command('brokerStop', { probeId });
+      await until(() => a.observations.some(o => o.probeId === probeId), 'actual blocked-drain stop observation');
+      assert.ok(a.observations.find(o => o.probeId === probeId).pendingAtStop > 0);
+      releaseLock(); await blocker;
+      stopA = await stopping;
+      assert.equal(stopA.pending, 0, 'broker stop acknowledged while a real production drain was still in flight');
+      assert.equal(stopA.drainSettlements, stopA.drainStarts);
+    } finally { releaseLock(); await blocker; }
+    assert.equal(stopB.pending, 0);
+    assert.equal(stopB.drainSettlements, stopB.drainStarts);
+    const outageStopBarriers = [stopA, stopB];
     // Literal broker listener + poll shutdown, durable writes stay accepted.
-    await a.command('brokerStop'); await b.command('brokerStop');
     const outageStart = Date.now(); const outageWrites = [];
     for (const t of tenants) outageWrites.push(...await a.command('append', { records: Array.from({ length: 10 }, (_, i) => record(t.company, 'outage-' + i)), notify: false }));
+    const outageEventIds = new Set(outageWrites.map(w => w.eventId));
+    assert.equal(outageEventIds.size, 20);
+    const outageDeliveryChecks = [];
+    const assertNoOutageDelivery = () => {
+      const received = clients.flatMap(durableFrames).filter(f => outageEventIds.has(f.eventId));
+      outageDeliveryChecks.push({ at: new Date().toISOString(), received: received.length });
+      assert.equal(received.length, 0, 'accepted outage rows reached a socket before the actual broker restart');
+    };
     const outageMs = full ? FULL_OUTAGE_MS : 250;
-    while (Date.now() - outageStart < outageMs) await pause(Math.min(1000, outageMs - (Date.now() - outageStart)));
+    while (Date.now() - outageStart < outageMs) {
+      assertNoOutageDelivery();
+      await pause(Math.min(1000, outageMs - (Date.now() - outageStart)));
+    }
+    assertNoOutageDelivery();
     const measuredOutageMs = Date.now() - outageStart;
+    assert.ok(measuredOutageMs >= outageMs);
     const recoveryStart = Date.now(); await a.command('brokerStart'); await b.command('brokerStart');
     for (const t of tenants) await until(() => outageWrites.filter(w => w.companyId === t.company).every(w => durableFrames(t.client).some(f => f.eventId === w.eventId)), 'broker recovery catchup', MAX_CATCHUP_MS);
     const recoveryMs = Date.now() - recoveryStart;
     assert.ok(recoveryMs <= MAX_CATCHUP_MS);
+    let outageRecoveredWrites = 0;
+    for (const t of tenants) {
+      const recovered = durableFrames(t.client).filter(f => outageEventIds.has(f.eventId));
+      assert.deepEqual(recovered.map(f => ({ eventId: f.eventId, seq: f.seq })),
+        outageWrites.filter(w => w.companyId === t.company).map(w => ({ eventId: w.eventId, seq: w.seq })),
+        'outage recovery must deliver every accepted row exactly once and in order');
+      outageRecoveredWrites += recovered.length;
+    }
     // A real same-company private thread and a real foreign thread both refuse
     // subscription and live/replay payload visibility for the tenant-A agent.
     const privateThread = randomUUID(), foreignThread = randomUUID(), publicThread = randomUUID();
@@ -187,11 +234,12 @@ test('W13 actual authenticated cross-process socket composition (bounded smoke u
       candidate: process.env.AOA_W13_CANDIDATE ?? 'unattested_worktree', startedAt: new Date(started).toISOString(), endedAt: new Date().toISOString(), testBudgetMs: TEST_BUDGET_MS,
       organizations: 2, replicas: 2, authenticated: true, durableEvents: eventCount, reconnectGaps, duplicateInjections,
       outageAcceptedWrites: outageWrites.length, brokerOutageMs: measuredOutageMs, catchupMs: recoveryMs,
+      outageDeliveryChecks: outageDeliveryChecks.length, outageReceivedBeforeRestart: outageDeliveryChecks.at(-1).received, outageRecoveredWrites,
       actualNativeBackpressure: true, snapshotRequired: true, credentialCanaryRedaction: true, privateAndForeignThreadDenials: true, durationMs: Date.now() - started,
       limits: ['isolated owner boot pool; no production RLS certification', 'no provider service_reconcile journey', 'no D4 72-hour continuity or D5 topology'] };
     const reportPath = process.env.AOA_W13_REALTIME_EVIDENCE ?? process.env.AOA_W13_REPORT;
     if (reportPath) {
-      await writeFile(reportPath + '.raw.json', JSON.stringify({ accepted, outageWrites, subscriptionAuthorization, nativeBufferObservations: pressure,
+      await writeFile(reportPath + '.raw.json', JSON.stringify({ accepted, outageWrites, outageStopBarriers, outageDeliveryChecks, brokerRestartAt: new Date(recoveryStart).toISOString(), subscriptionAuthorization, nativeBufferObservations: pressure,
         connections: clients.map((c, index) => ({ index, frames: c.frames.map(f => ({ type: f.type, companyId: f.companyId, seq: f.seq, eventId: f.eventId,
           payloadSha256: createHash('sha256').update(JSON.stringify(f.payload)).digest('hex') })) })) }, null, 2) + '\n', { flag: 'wx' });
       await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });

@@ -42,12 +42,35 @@ const store = createLiveEventLogStore(db);
 setLiveEventLogStore(store);
 const server = createServer((_req, res) => { res.writeHead(404); res.end(); });
 const wss = setupLiveEventsWebSocketServer(server, db, { deploymentMode: 'authenticated' });
-const drainer = createBrokerDrainer({ store, fanout: (company, event) => wss.deliverDurableEvent(company, event), isLocallyPublished: wasLocallyPublished });
+const productionDrainer = createBrokerDrainer({ store, fanout: (company, event) => wss.deliverDurableEvent(company, event), isLocallyPublished: wasLocallyPublished });
+const pendingDrains = new Set();
+let drainStarts = 0, drainSettlements = 0;
+// Observe the actual production drain promises without replacing their reads,
+// fanout, coalescing, or per-company cursor behavior.
+const drainer = { drain(...args) {
+  const operation = productionDrainer.drain(...args);
+  drainStarts++; pendingDrains.add(operation);
+  const settled = () => { pendingDrains.delete(operation); drainSettlements++; };
+  operation.then(settled, settled);
+  return operation;
+} };
 let listener;
 async function startBroker() {
   listener = await attachLiveEventBrokerListener({ db, drainer, activeCompanies: () => wss.activeCompanies(), pollIntervalMs: 100 });
 }
 await startBroker();
+async function stopBroker(probeId) {
+  await listener?.stop(); listener = null;
+  const pendingAtStop = pendingDrains.size;
+  if (probeId) process.send({ observation: { probeId, pendingAtStop } });
+  // Listener.stop removes wake/poll producers, but does not join drains they
+  // already started. Join those real promises before admitting outage writes.
+  do {
+    await Promise.all([...pendingDrains]);
+    await new Promise(resolve => setImmediate(resolve));
+  } while (pendingDrains.size > 0);
+  return { stopped: true, pendingAtStop, pending: pendingDrains.size, drainStarts, drainSettlements, stoppedAt: new Date().toISOString() };
+}
 await new Promise(r => server.listen(0, '127.0.0.1', r));
 process.send({ ready: true, port: server.address().port });
 let chain = Promise.resolve();
@@ -62,8 +85,12 @@ process.on('message', message => {
         rows.push({ eventId: record.eventId, companyId: record.companyId, seq });
       }
       result = rows;
-    } else if (message.action === 'brokerStop') { await listener?.stop(); listener = null; result = true; }
+    } else if (message.action === 'brokerStop') { result = await stopBroker(message.probeId); }
     else if (message.action === 'brokerStart') { if (!listener) await startBroker(); result = true; }
+    else if (message.action === 'drainStart') {
+      void drainer.drain(message.companyId).catch(() => {});
+      result = { pending: pendingDrains.size };
+    }
     else if (message.action === 'redeliver') {
       const rows = await store.since(message.companyId, message.sinceSeq, message.limit);
       for (const row of rows) wss.deliverDurableEvent(message.companyId, row);
@@ -85,7 +112,7 @@ process.on('message', message => {
       result = { resolved: true, reads: authorizationReads.filter(r => [message.privateThread, message.foreignThread, message.publicThread].some(t => r.parameters.includes(t))) };
     } else if (message.action === 'trim') { result = await store.trimRetention(message.window, message.companies); }
     else if (message.action === 'stop') {
-      await listener?.stop();
+      await stopBroker();
       for (const socket of wss.clients) socket.terminate();
       await new Promise(r => wss.close(r));
       await new Promise(r => server.close(r));
