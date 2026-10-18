@@ -114,44 +114,94 @@ function subtract(a: Iv[], b: Iv[]): Iv[] {
 const cidrsOf = (rows: ReadonlyArray<readonly [string, number]>): string[] =>
   rows.map(([n, p]) => `${n}/${p}`);
 
+function expectExactIpv4Delta(beforeCidrs: readonly string[], afterCidrs: readonly string[]): void {
+  const before = normalize(beforeCidrs.map((cidr) => toIv(cidr, 32n)));
+  const after = normalize(afterCidrs.map((cidr) => toIv(cidr, 32n)));
+  expect(subtract(before, after)).toEqual([]);
+  expect(subtract(after, before)).toEqual([toIv("192.88.99.0/24", 32n)]);
+}
+
+function ipv4Bitmap(cidrs: readonly string[]): Uint8Array {
+  const bits = new Uint8Array(1 << 24);
+  for (const cidr of cidrs) {
+    const [network, prefixText] = cidr.split("/");
+    const prefix = Number(prefixText);
+    if (!Number.isInteger(prefix) || prefix < 0 || prefix > 24) throw new Error(`IPv4 cover is not /24-aligned: ${cidr}`);
+    const firstBlock = Number(v4ToInt(network!) >> 8n);
+    const blockCount = 2 ** (24 - prefix);
+    if (firstBlock % blockCount !== 0 || firstBlock + blockCount > bits.length) throw new Error(`IPv4 cover is not canonical: ${cidr}`);
+    bits.fill(1, firstBlock, firstBlock + blockCount);
+  }
+  return bits;
+}
+const ipv4BlockIndex = (ip: string): number => Number(v4ToInt(ip) >> 8n);
+
+it("IPv4 interval guard rejects an accidental public deny and a private allow", () => {
+  const before = PRE_W13_V4.map(([network, prefix]) => `${network}/${prefix}`);
+  const after = [...INTERNAL_RANGE_DENY_CIDRS_V4];
+  expect(() => expectExactIpv4Delta(before, [...after, "8.8.8.0/24"])).toThrow();
+  expect(() => expectExactIpv4Delta(before, after.filter((cidr) => cidr !== "10.0.0.0/8"))).toThrow();
+});
+
 // --- 1. IPv4: THE EXHAUSTIVE SUPERSET PROOF ----------------------------------
 
 describe("W13 OAuth deny table -- IPv4, swept exhaustively", () => {
   it("NOTHING moves denied -> allowed, and exactly ONE /24 moves allowed -> denied", () => {
-    // Every rule on either table is stated at /24 granularity or coarser, so one
-    // address per /24 block is exhaustive over the whole IPv4 space. (That the
-    // verdict really is constant across the fourth octet is asserted independently
-    // by w10c-internal-range-deny-set.test.ts.)
-    const unblocked: string[] = [];
+    // Prove the table delta by exact CIDR interval arithmetic over all 2^32 IPv4
+    // addresses. The separate W10C test re-derives the current cover from live
+    // isPrivateIP over every /24 and pins it to this same list.
+    expectExactIpv4Delta(
+      PRE_W13_V4.map(([network, prefix]) => `${network}/${prefix}`),
+      INTERNAL_RANGE_DENY_CIDRS_V4,
+    );
+
+    // Keep an exhaustive integration sweep of the actual live BlockList-backed
+    // OAuth predicate. Numeric CIDR bitmaps replace the duplicate per-address
+    // historical BlockList and isPrivateIP calls; W10C already proves that cover
+    // against the predicate independently.
+    const before = ipv4Bitmap(PRE_W13_V4.map(([network, prefix]) => `${network}/${prefix}`));
+    const expectedAfter = ipv4Bitmap(INTERNAL_RANGE_DENY_CIDRS_V4);
+    expect(before[ipv4BlockIndex("8.8.8.8")]).toBe(0);
+    expect(before[ipv4BlockIndex("10.0.0.1")]).toBe(1);
+    expect(expectedAfter[ipv4BlockIndex("8.8.8.8")]).toBe(0);
+    expect(expectedAfter[ipv4BlockIndex("10.0.0.1")]).toBe(1);
+    expect(expectedAfter[ipv4BlockIndex("192.88.99.1")]).toBe(1);
+    let visitedBlocks = 0;
+    let unblockedCount = 0;
+    let newlyBlockedCount = 0;
     const newlyBlocked = new Set<string>();
-    const predicatePrivateTableAllows: string[] = [];
-    const tableBlocksPredicateAllows: string[] = [];
-    for (let a = 0; a < 256; a++) {
-      for (let b = 0; b < 256; b++) {
-        for (let c = 0; c < 256; c++) {
-          const ip = `${a}.${b}.${c}.7`;
-          const before = blockedBefore(ip);
-          const after = isBlockedOAuthAddress(ip);
-          if (before && !after) unblocked.push(ip);
-          if (!before && after) newlyBlocked.add(`${a}.${b}.${c}.0/24`);
-          const priv = isPrivateIP(ip);
-          if (priv && !after && predicatePrivateTableAllows.length < 8) {
-            predicatePrivateTableAllows.push(ip);
-          }
-          if (!priv && after && tableBlocksPredicateAllows.length < 8) {
-            tableBlocksPredicateAllows.push(ip);
-          }
-        }
+    let tableCoverMismatchCount = 0;
+    const tableCoverMismatches: string[] = [];
+    for (let block = 0; block < 1 << 24; block++) {
+      visitedBlocks++;
+      const a = block >>> 16;
+      const b = (block >>> 8) & 255;
+      const c = block & 255;
+      const ip = `${a}.${b}.${c}.7`;
+      const wasBlocked = before[block] === 1;
+      const expectedBlocked = expectedAfter[block] === 1;
+      const isBlocked = isBlockedOAuthAddress(ip);
+      if (isBlocked !== expectedBlocked) {
+        tableCoverMismatchCount++;
+        if (tableCoverMismatches.length < 8) tableCoverMismatches.push(ip);
+      }
+      if (wasBlocked && !isBlocked) unblockedCount++;
+      if (!wasBlocked && isBlocked) {
+        newlyBlockedCount++;
+        if (newlyBlocked.size < 8) newlyBlocked.add(`${a}.${b}.${c}.0/24`);
       }
     }
+    expect(visitedBlocks).toBe(1 << 24);
     // (1) THE SAFETY ARGUMENT. If this is ever non-empty the change is a regression.
-    expect(unblocked).toEqual([]);
+    expect(unblockedCount).toBe(0);
     // (2) THE BLAST RADIUS, exactly. This is the anti-regression assertion: denying
     //     one extra /24 anywhere -- a public one included -- reds here, naming it.
+    expect(newlyBlockedCount).toBe(1);
     expect([...newlyBlocked].sort()).toEqual(["192.88.99.0/24"]);
-    // (3) The table and the reference predicate now agree in BOTH directions.
-    expect(predicatePrivateTableAllows).toEqual([]);
-    expect(tableBlocksPredicateAllows).toEqual([]);
+    // (3) The actual live BlockList agrees with the independently built cover at
+    // every /24 representative; W10C separately proves predicate-cover equality.
+    expect(tableCoverMismatchCount).toBe(0);
+    expect(tableCoverMismatches).toEqual([]);
   }, 180_000);
 });
 
