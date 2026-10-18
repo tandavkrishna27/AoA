@@ -1,0 +1,575 @@
+{
+  "schema": "aoa.w12-live-rehearsal/v1",
+  "recordedAt": "2026-10-18T02:11:47.803055+00:00",
+  "verdict": "BLOCKED_FULL_LIVE_ACCEPTANCE",
+  "baseCommit": "eed114e7c25fef2f7a34fb57a1d6df3150b90c69",
+  "applicationCommit": "0896c43961d2e19e2c7fd163f32c51c6e69d0889",
+  "applicationTree": "518e81d8abfd64d6d1d3d89884e9cd62e752e25e",
+  "branch": "codex/w12-live-rehearsal",
+  "runtimeProductSourceChanged": false,
+  "providerTemplate": {
+    "stage": "template-identity",
+    "result": "pass",
+    "identity": {
+      "requestedTemplate": "aoa-w12-live-20261018",
+      "templateId": "g31y4dxpd4c8ufmoum40",
+      "buildId": "9bad01cc-576f-46aa-88a8-62ce1a8253f3",
+      "buildStatus": "ready",
+      "envdVersion": "0.10.0"
+    },
+    "selector": "g31y4dxpd4c8ufmoum40:9bad01cc-576f-46aa-88a8-62ce1a8253f3",
+    "apiKeyPrinted": false
+  },
+  "templateBuildVersion": {
+    "sdk": "2.30.5",
+    "codexCli": "0.163.0",
+    "envd": "0.10.0"
+  },
+  "initialTemplateInventory": [],
+  "distributedJob": {
+    "phase": "observe",
+    "issueId": "1a372c33-f1d1-4387-9ce9-c503978a22aa",
+    "runIds": [
+      "ce704369-2329-4009-b625-312bdd816650"
+    ],
+    "executionOwners": [
+      "distributed"
+    ],
+    "jobId": "b5bbaccf-748f-412d-8de2-15ab43b41327",
+    "jobStatus": "cancelled",
+    "attempts": [
+      {
+        "id": "f420c6f7-fa69-4ae1-b7a0-0b8a098945a6",
+        "status": "failed"
+      },
+      {
+        "id": "9a366353-6496-4c3e-a34e-464bc098b101",
+        "status": "failed"
+      }
+    ],
+    "leases": [
+      {
+        "id": "c11b5d71-4bcd-478b-be83-9b36ca7ddf3d",
+        "status": "expired"
+      },
+      {
+        "id": "fadd0431-3127-4ec3-9d76-c90532a5d94c",
+        "status": "revoked"
+      }
+    ],
+    "committedOutputs": [],
+    "projectedOutputIds": []
+  },
+  "sandboxBinding": {
+    "pass": true,
+    "violations": []
+  },
+  "workerLifecycle": {
+    "sandboxes": [
+      {
+        "leaseId": "c11b5d71-4bcd-478b-be83-9b36ca7ddf3d",
+        "sandboxId": "iwir7tvxz9xrrgkk6sy6p",
+        "cleanupStatus": "success",
+        "msg": "supervisor: run complete"
+      },
+      {
+        "leaseId": "fadd0431-3127-4ec3-9d76-c90532a5d94c",
+        "sandboxId": "i8vizw6qfsmgg986xz0no",
+        "cleanupStatus": "success",
+        "msg": "supervisor: run complete"
+      }
+    ],
+    "workerEnrollments": [
+      {
+        "workerId": "9cce2001-8f6a-454f-a7aa-430d3ffc7ba7",
+        "targetId": "d7741160-3314-4579-8517-77b0c355517c",
+        "deviceGeneration": 1,
+        "deviceThumbprint": "eba693f451c290e9c53560ab50e41ca4e9f24501e154af42d5511bd201fd954d"
+      },
+      {
+        "workerId": "517dd69a-9f65-4e2e-8cf2-b6e4ba6e35ee",
+        "targetId": "45ca62df-c6cb-4d9e-b3e6-19addb9f23c2",
+        "deviceGeneration": 1,
+        "deviceThumbprint": "61daf722c1df5ce302bb854eaa48f1657d34ad6da9fda9933f007fc30d04735a"
+      }
+    ]
+  },
+  "authenticationDiagnostic": {
+    "sameTemplateBareEnvironment": {
+      "exitCode": 1,
+      "httpStatus": 401,
+      "errorClass": "missing_bearer_or_basic_authentication"
+    },
+    "stdinLoginPositiveControl": {
+      "exitCode": 0,
+      "response": "W12_OK",
+      "usage": {
+        "input_tokens": 13197,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 13194,
+        "output_tokens": 7,
+        "reasoning_output_tokens": 0
+      }
+    },
+    "positiveControlIsGovernedAcceptance": false,
+    "actualModelIdentityRecorded": false
+  },
+  "databaseBackup": {
+    "receiptId": "39aa84fe-7888-4045-9439-8caa08abb78b",
+    "recordedAt": "2026-10-18T02:02:03.934Z",
+    "event": "database_backup",
+    "database": "aoa",
+    "databaseHost": "127.0.0.1",
+    "databasePort": "25432",
+    "backupFile": "/opt/aoa-w12-live-20261018/backups/w12-live-pre-restore-20261018-020203.sql.gz",
+    "sha256": "4905880302667e4b0879ec29f2354541e6775ec31a60171f85f82be745bb3671",
+    "sizeBytes": 187791,
+    "engine": "pg_dump",
+    "nativeHeaderVerified": true
+  },
+  "objectSnapshot": {
+    "at": "2026-10-18T02:02:17.018519+00:00",
+    "reference": "minio-volume-20261018T020216Z.tar",
+    "sha256": "5f5be3c89e9589e4cc19b78bfca8d9f359907f5b2d30ba2a589ea85a2bf4d53f",
+    "sizeBytes": 79872,
+    "source": "aoa-w12-live-20261018-minio-1:/data",
+    "minioStopped": true
+  },
+  "databaseRestore": {
+    "receiptId": "6f469c9d-2864-4693-abb5-136619a68cfe",
+    "recordedAt": "2026-10-18T02:02:45.681Z",
+    "event": "database_restored",
+    "database": "aoa",
+    "databaseHost": "127.0.0.1",
+    "databasePort": "25432",
+    "backupFile": "/opt/aoa-w12-live-20261018/backups/w12-live-pre-restore-20261018-020203.sql.gz",
+    "backupSha256": "4905880302667e4b0879ec29f2354541e6775ec31a60171f85f82be745bb3671",
+    "restoreCommand": "aoa db:restore --file <recorded SQL backup>",
+    "restoreRole": "aoa",
+    "migrationsForwardRequired": true
+  },
+  "objectRestore": {
+    "result": "object_snapshot_restored",
+    "snapshotSha256": "5f5be3c89e9589e4cc19b78bfca8d9f359907f5b2d30ba2a589ea85a2bf4d53f",
+    "sourceContainerId": "5b3d70dc78c80916822091655bf12095948a9e487c5ab3448c909c2af1d008b2",
+    "restoredContainerId": "527af979ca2c6d0596287b8a88fb098b541bb7d6e7e47f7041bfd64c9d75e540",
+    "restoredVolume": "aoa-w12-live-20261018-minio-restored-data",
+    "priorVolumeRetained": true,
+    "servingStopped": true,
+    "governedOutputsInSnapshot": 0
+  },
+  "cutoff": {
+    "receiptId": "ce5c9a42-9020-42fe-b378-00c1c612be55",
+    "recordedAt": "2026-10-18T02:03:25.200Z",
+    "event": "authority_cutoff",
+    "database": "aoa",
+    "organizationId": "e1aed02b-9f77-4df0-b893-b7e3208996f9",
+    "targetId": "d7741160-3314-4579-8517-77b0c355517c",
+    "serviceOutcome": {
+      "revoked": true,
+      "revokedGeneration": 1,
+      "targetScope": "organization",
+      "organizationId": "e1aed02b-9f77-4df0-b893-b7e3208996f9"
+    },
+    "targetStatus": "disabled",
+    "targetGeneration": 2,
+    "revokedGeneration": 1,
+    "fanoutStatus": "pending",
+    "durableCutoffVerified": true,
+    "oldWorkerProbeRequired": true
+  },
+  "fanout": {
+    "receiptId": "6333ac71-0a03-4541-8419-f0671240fc70",
+    "recordedAt": "2026-10-18T02:03:37.318Z",
+    "event": "fanout_tick",
+    "database": "aoa",
+    "organizationId": "e1aed02b-9f77-4df0-b893-b7e3208996f9",
+    "targetId": "d7741160-3314-4579-8517-77b0c355517c",
+    "revokedGeneration": 1,
+    "records": 1,
+    "organizations": 1,
+    "leasesRevoked": 1,
+    "cancellations": 1,
+    "completed": 1,
+    "status": "completed",
+    "servicesRemainStopped": true
+  },
+  "convergence": {
+    "receiptId": "7cfe53db-accb-4236-a6a4-2e4ff3be2909",
+    "recordedAt": "2026-10-18T02:03:40.294Z",
+    "event": "lease_convergence",
+    "database": "aoa",
+    "organizationId": "e1aed02b-9f77-4df0-b893-b7e3208996f9",
+    "targetId": "d7741160-3314-4579-8517-77b0c355517c",
+    "revokedGeneration": 1,
+    "status": "completed",
+    "completed": true
+  },
+  "artifactReconciliation": {
+    "receiptId": "1acafc33-3879-41a9-89e3-e6611e7eecb2",
+    "recordedAt": "2026-10-18T02:03:45.166Z",
+    "event": "artifact_reconciliation",
+    "database": "aoa",
+    "organizationId": "e1aed02b-9f77-4df0-b893-b7e3208996f9",
+    "companyId": "f0cbb6d6-7d02-48fb-9c85-594486c47422",
+    "verdict": "recovered",
+    "inspected": 2,
+    "verified": 2,
+    "blockedCount": 0,
+    "servicesRemainStopped": true
+  },
+  "restoredArtifactKind": "two committed staged inputs; zero useful outputs",
+  "unassistedStartup": {
+    "result": "refused",
+    "code": "distributed_execution_app_authority",
+    "failedCheck": "catalog certificate drift: relation ACL",
+    "relationAclNull": [
+      {
+        "relname": "execution_targets",
+        "acl_is_null": true,
+        "relacl": null
+      },
+      {
+        "relname": "mcp_api_keys",
+        "acl_is_null": true,
+        "relacl": null
+      }
+    ],
+    "nonOwnerCheck": "pass",
+    "effectiveServingAuthorityCheck": "pass",
+    "definerManifestCheck": "pass"
+  },
+  "manualDiagnosticNormalization": {
+    "result": "manual_catalog_normalization_committed",
+    "operation": "REVOKE ALL ON TABLE public.execution_targets, public.mcp_api_keys FROM PUBLIC",
+    "fullExactCatalogCertificate": "pass",
+    "servingRoleColumnGrantsUntouched": true,
+    "nativeUnassistedRestore": "blocked",
+    "notAGeneralRecoveryFix": true
+  },
+  "afterNormalizationChecks": [
+    {
+      "name": "nonOwner",
+      "result": "pass"
+    },
+    {
+      "name": "servingRoleAuthority",
+      "result": "pass"
+    },
+    {
+      "name": "catalogCertificate",
+      "result": "pass"
+    },
+    {
+      "name": "definerManifest",
+      "result": "pass"
+    }
+  ],
+  "replacementSlug": {
+    "duplicateSlugStatus": 409,
+    "unexpectedSuccess": false
+  },
+  "replacementRouting": {
+    "binding": {
+      "credentialId": null,
+      "credentialKind": null,
+      "executionTargetSlug": "aoa-canary-e2b",
+      "pinnedTargetId": null
+    },
+    "targets": [
+      {
+        "id": "d7741160-3314-4579-8517-77b0c355517c",
+        "slug": "aoa-canary-e2b",
+        "kind": "dedicated_worker",
+        "status": "disabled",
+        "deviceGeneration": 2
+      },
+      {
+        "id": "45ca62df-c6cb-4d9e-b3e6-19addb9f23c2",
+        "slug": "w12-replacement-e2b",
+        "kind": "dedicated_worker",
+        "status": "active",
+        "deviceGeneration": 1
+      }
+    ],
+    "selectedTargetId": null,
+    "sourceChooserReadOnly": true,
+    "placementWritten": false
+  },
+  "oldLiveSessionProbe": {
+    "beforeCutoffCaptureHttpStatus": 401,
+    "reason": "enrollment code-route expired before capture",
+    "validOldSessionRetained": false,
+    "postRestoreRenewalOrCommitDenialProven": false
+  },
+  "tests": {
+    "windows": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "vpsArm64": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "scope": "mock board HTTP helper tests only",
+    "fullRepositorySuiteRun": false,
+    "rootBuildRun": false
+  },
+  "isolation": {
+    "time": "2026-10-18T02:09:29.473844+00:00",
+    "removedContainers": [
+      {
+        "name": "aoa-w12-live-20261018-postgres-1",
+        "id": "31052e63e13daa188ddce724aacf840db5a2a767feedfb073bcf624d14b73669"
+      },
+      {
+        "name": "aoa-w12-live-20261018-minio-1",
+        "id": "527af979ca2c6d0596287b8a88fb098b541bb7d6e7e47f7041bfd64c9d75e540"
+      }
+    ],
+    "ownedContainersRemaining": 0,
+    "ownedProcessesRemaining": [],
+    "ownedListeningPortsRemaining": [],
+    "sharedUnitSame": true,
+    "sharedDatabaseSame": true,
+    "sharedHealthStatus": 200,
+    "retainedOwnedVolumes": [
+      "aoa-w12-live-20261018-minio-data",
+      "aoa-w12-live-20261018-minio-restored-data",
+      "aoa-w12-live-20261018-pg-data"
+    ],
+    "privateConfigAndSnapshotsRetained": true
+  },
+  "providerCleanup": {
+    "ownedTemplateId": "g31y4dxpd4c8ufmoum40",
+    "ownedActiveOrPausedSandboxes": 0,
+    "unrelatedSandboxesUntouched": true,
+    "templateRetainedForFollowup": true
+  },
+  "sourceHashes": [
+    {
+      "path": "server/src/index.ts",
+      "sha256": "fe4db3f589f4ecfb7587186796e63ec2219ac07319988a7fa18ef9c28ba527c1",
+      "sha256LfNormalized": "d4442a4a492bcda44be5bb45389670e064689ac81f17e0629be6abbc848205c1",
+      "containsCrlf": true
+    },
+    {
+      "path": "server/src/services/heartbeat.ts",
+      "sha256": "af09473d46b4842e1d25b5699385ac16748e9c235b4a2f822d53b82a1ec6f324",
+      "sha256LfNormalized": "5d1472fed0683ca4e640e92527c8fff92ea7c5e0dc89991db3bad1f06d355fe1",
+      "containsCrlf": true
+    },
+    {
+      "path": "server/src/services/task-run-sandbox-invocation.ts",
+      "sha256": "4cbee0a8b768c2f6422858b13d584cf6cb3c2dd7d254abc241e0ee578cb56a92",
+      "sha256LfNormalized": "d196ea1a49eec5bc8264aa3acb50b520e2b305f8f0f398840d71d07ce1379f25",
+      "containsCrlf": true
+    },
+    {
+      "path": "server/src/services/canary-credential-binding.ts",
+      "sha256": "b4892daff616ddfef3b0252c1f2a5f94e411f52f9ff3de81feed05e0d73e6523",
+      "sha256LfNormalized": "4be48e46645a1caf150c6403c43a838af9f2bea975c23c791c9e9aa0378f1127",
+      "containsCrlf": true
+    },
+    {
+      "path": "server/src/services/execution-target-resolver.ts",
+      "sha256": "c1fab5e1d86bfae7109a1d9a459c7460b1ffa6dcc6ae86e339683c74aabeec05",
+      "sha256LfNormalized": "381262dab87b88d67381a6f38cb5a73fdf92ff86aa340645f14d7201dcdb586d",
+      "containsCrlf": true
+    },
+    {
+      "path": "server/src/db/distributed-execution-databases.ts",
+      "sha256": "aed40755e9637fdd743a3e3f6a09bf67be397cd9016fad8306e0281b844719ff",
+      "sha256LfNormalized": "e8bb793f24696d586f69369fba3dc34feb4bb25970ab298b88a5b8792b76c62d",
+      "containsCrlf": true
+    },
+    {
+      "path": "packages/db/src/backup-lib.ts",
+      "sha256": "d43a8369c1ae4963898c74618ff256fc93c5c2b560a1bff793bb5557f8a9ca90",
+      "sha256LfNormalized": "aa2f471fb0452d7262a2db825482deca3b991c2cae577c87aafdd9b4d8fa798f",
+      "containsCrlf": true
+    },
+    {
+      "path": "packages/adapter-manager/src/bin/adapter-manager.ts",
+      "sha256": "9bd1ecc60b6f741e7cbbd19853e4311388b1a442e47e215ea6120d0b86373309",
+      "sha256LfNormalized": "4a8576a332812b0916beb56d0d554a0acc18be4063ba21e829560c87e9667e33",
+      "containsCrlf": true
+    },
+    {
+      "path": "packages/adapter-manager/src/server.ts",
+      "sha256": "8f0cf36d5e4428c1cb5d70791ad9ed8468ed799d268dc7c5b1201a7eefc2834b",
+      "sha256LfNormalized": "e14c213ea65b1e3efa1c2d8c563e20c9d12b1a62da3a9c05d5057fae7f8c6fe1",
+      "containsCrlf": true
+    },
+    {
+      "path": "packages/worker-networked-host/src/bin/networked-host.ts",
+      "sha256": "fe9a678a5e602c499ea695040f0575ef2273b09c35105f68ef84b9ee32cdac16",
+      "sha256LfNormalized": "37e79d5c855771646b0d5a0f367a8d045b0335375b9d63b006ee703418e2f2cf",
+      "containsCrlf": true
+    },
+    {
+      "path": "packages/worker-daemon/src/identity/slot-binding.ts",
+      "sha256": "e1646e28700b29d4fab5e5fd9bb78a433cdbc85f8a19f9e246ab82619f83ba5b",
+      "sha256LfNormalized": "f80d6d520081b1e05960acddb0ae198f4696388103a9b48c74db5365b5f3ff01",
+      "containsCrlf": true
+    },
+    {
+      "path": "scripts/w12-live-rehearsal/api.mjs",
+      "sha256": "76b9ecb65627398a824c12df79eed6df8b4913c3e4dd9f94b4ee049589ea0c3a",
+      "sha256LfNormalized": "76b9ecb65627398a824c12df79eed6df8b4913c3e4dd9f94b4ee049589ea0c3a",
+      "containsCrlf": false
+    },
+    {
+      "path": "scripts/w12-live-rehearsal/api.test.mjs",
+      "sha256": "b5afd0059b5558f09b205f7adbb5458e407f88aa51aab2212dfac0967bd5481a",
+      "sha256LfNormalized": "b5afd0059b5558f09b205f7adbb5458e407f88aa51aab2212dfac0967bd5481a",
+      "containsCrlf": false
+    },
+    {
+      "path": "e2b/e2b.Dockerfile",
+      "sha256": "985e37757b90af7ff40e7b94ac6fb65c05671aaeba88b9396cd0a9574fd2f510",
+      "sha256LfNormalized": "c9157e9c3b9ca20c2d4ed71a4e070e87dc450d1635fb4759fe87851676b902d8",
+      "containsCrlf": true
+    }
+  ],
+  "rawReceiptRoot": "/opt/aoa-w12-live-20261018/evidence",
+  "rawReceipts": [
+    {
+      "path": "provider-preflight.json",
+      "sha256": "bea7df546dda0eed3d292676d3afb66de0298c2764dacf617e170ed478a03084",
+      "sizeBytes": 380
+    },
+    {
+      "path": "template-inventory.json",
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "sizeBytes": 2
+    },
+    {
+      "path": "template-build.json",
+      "sha256": "0afedb6091b7f1536ebe5c0f5afb8ada730eb90fd33a8782922496608201a93f",
+      "sizeBytes": 179
+    },
+    {
+      "path": "template-build.log",
+      "sha256": "c739e11072877056f231e098702afbd086e71588168ad05437fb3eff488afe2e",
+      "sizeBytes": 104892
+    },
+    {
+      "path": "sandbox-build-binding.json",
+      "sha256": "7f0718ae5c21383f577fadfadd2fd773abb7e6758858139b98fd04b1ddf169d1",
+      "sizeBytes": 2135
+    },
+    {
+      "path": "legacy-reconcile.log",
+      "sha256": "0ba84b16f8c32e7a2fc275827d9ca38c7bc9c0c7f1defdaf9cb3360b08682dd7",
+      "sizeBytes": 511
+    },
+    {
+      "path": "distributed-attempt.json",
+      "sha256": "ff3455e250384c0aa0b3f76035be9482d4e40d435870e4c3e8be3ac0f81c7ff1",
+      "sizeBytes": 420
+    },
+    {
+      "path": "post-restore-job.json",
+      "sha256": "f7aa885a119b5a0c19ac3b42c50539c923fcd21d738d60a984e13c12a5d3def7",
+      "sizeBytes": 552
+    },
+    {
+      "path": "worker-lifecycle-observations.json",
+      "sha256": "3d9216ee09fabec49984d441ead124143e1877b003a1f7e782f6270ca46d1f3f",
+      "sizeBytes": 930
+    },
+    {
+      "path": "recovery-live.jsonl",
+      "sha256": "202353fa64e87424c2fd076c46304e05d0b79be9f063ff4e1721a6658775126a",
+      "sizeBytes": 3802
+    },
+    {
+      "path": "native-backup.log",
+      "sha256": "ecfc98990c9ebfd7049394c108a1e6c8f032f0d8d7aaacb11de6bedde68bd159",
+      "sizeBytes": 229
+    },
+    {
+      "path": "native-restore.log",
+      "sha256": "9a91307fa8614be203887f50e7d9b16d2ceee8e3a94c77f025705f3b056d4ae7",
+      "sizeBytes": 197
+    },
+    {
+      "path": "post-restore-migrate.log",
+      "sha256": "de05d5d019aaeca86a3ad4b091966b2992ca979d94d4cf621aca877f5474cf4c",
+      "sizeBytes": 224
+    },
+    {
+      "path": "object-snapshots.jsonl",
+      "sha256": "25e934ad5184594e467de20cd513f588525705bc62d97262f92b71ed13d10ad1",
+      "sizeBytes": 262
+    },
+    {
+      "path": "object-restore.json",
+      "sha256": "2ef6f10f0fb37b1bdb7b07a5b82cbe2192d4a4003a0423edc052d66b0f58ca9f",
+      "sizeBytes": 470
+    },
+    {
+      "path": "restore-acl-detail.json",
+      "sha256": "d0198316802dc131d09a1a8d87793d515ec6a85b2361bd77d3507a267ca3261b",
+      "sizeBytes": 175
+    },
+    {
+      "path": "manual-acl-normalization.json",
+      "sha256": "21d775e702a5366ce2c2272b19ba524f973fa0a1ea6c404c33adda1f163ba911",
+      "sizeBytes": 311
+    },
+    {
+      "path": "post-restore-authority-diagnostic.json",
+      "sha256": "ecf32d6b00e477d2a62a01e78979931b1fe593096112ac51eab5ed3642570edc",
+      "sizeBytes": 247
+    },
+    {
+      "path": "replacement-slug-probe.json",
+      "sha256": "41d3d6691d5e79c99edaf8631bf8ce6e895f9c5bebcfe3aa985b45e57376766d",
+      "sizeBytes": 56
+    },
+    {
+      "path": "replacement-routing.json",
+      "sha256": "960934b77ede9af839bb542e41a1bd13581d2622d90bb2751ac3b44f818ae01f",
+      "sizeBytes": 634
+    },
+    {
+      "path": "final-isolation.json",
+      "sha256": "51636f0dcb07bd4cf07a36fae07203ac3de7bab6d0dc89347d068f8ab420bd1c",
+      "sizeBytes": 750
+    },
+    {
+      "path": "provider-cleanup.json",
+      "sha256": "21a61e1ff4bf2cd641da6811be6c06b2b65daa0bf1d89a9affbe4cbc52b7493e",
+      "sizeBytes": 162
+    },
+    {
+      "path": "api-tests.tap",
+      "sha256": "8d5f7f94fd67f4958c1d0586c90a20fb73fd4ebbed472076b8598aa20da9ab0c",
+      "sizeBytes": 493
+    }
+  ],
+  "remaining": [
+    "Codex authentication bootstrap through governed distributed invocation",
+    "native restore preserves exact ACL certificate without manual normalization",
+    "supported same-organization successor canary routing",
+    "valid pre-cutoff session and stale lease/effect/ordinary commit probes",
+    "useful governed output and exact-byte download before/after restore",
+    "orphan/missing/corrupt output quarantine in continuous live journey"
+  ],
+  "sourceHashVerification": {
+    "result": "pass",
+    "trackedRuntimeComparedTo": "Git blobs at eed114e7c25fef2f7a34fb57a1d6df3150b90c69 after CRLF-to-LF normalization of archive bytes",
+    "newHelperComparedTo": "exact Windows and VPS executed bytes",
+    "checked": 14,
+    "rawExecutedHashesAlsoRetained": true
+  },
+  "localTestReceipt": {
+    "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-w12-live-2026-10-18\\api-tests-local.tap",
+    "sha256": "0c0b99ef8c9fee405538681efecf1dc396adfbd1c7b370246f9f509f7efa4f07",
+    "sizeBytes": 495
+  }
+}
