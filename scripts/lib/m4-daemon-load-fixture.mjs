@@ -29,6 +29,7 @@ export function prepareDaemonFixture(directory) {
       environment:{AOA_D1_SEED_WORKER_ENROLMENT:'0'},volumes:[bind('seed.mjs','/cp-app/m4-seed.mjs'),bind('manifest.private.json','/load/manifest.private.json')]},
     'control-plane':{environment:common,volumes:[bind('signing-key.pem','/keys/signing-key.pem')]},
     'control-plane-b':{profiles:['m4-not-started'],environment:common,volumes:[bind('signing-key.pem','/keys/signing-key.pem')]},
+    'test-runner':{depends_on:{'control-plane-b':{condition:'service_healthy',required:false}}},
     'fake-provider':{environment:{AOA_FAKE_PROVIDER_WIRE_PORT:'8082',AOA_FAKE_PROVIDER_CONTROL_PLANE_PUBLIC_KEY_FILE:'/keys/public-key.pem',
       AOA_FAKE_PROVIDER_CTL_ALLOW:'worker-a,worker-b,test-runner'},volumes:[bind('public-key.pem','/keys/public-key.pem')]},
   },volumes:{}};
