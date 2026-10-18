@@ -150,7 +150,7 @@ export interface ComposeDispatchRuntimeDeps {
   /** The host capacity probes; defaults to the real node:os/node:fs readers over `workDir`. */
   readonly probes?: CapacityProbes;
   readonly openStore?: typeof openEventOutboxStore;
-  readonly makeSink?: (deps: { store: DurableEventStore; kek: Buffer }) => DurableWorkerEventSink;
+  readonly makeSink?: (deps: { store: DurableEventStore; kek: Buffer; onPersisted?: () => void }) => DurableWorkerEventSink;
   readonly makeDrain?: typeof createEventOutboxDrain;
   readonly makeSupervisor?: typeof createSupervisor;
   readonly makeDriver?: typeof createLeaseRenewalDriver;
@@ -198,7 +198,7 @@ export async function composeDispatchRuntime(deps: ComposeDispatchRuntimeDeps): 
   // (1) Store opens FIRST. (4) KEK from the DEVICE KEY. (3) ONE sink instance for both consumers.
   const store = await openStore({ path: deps.eventOutboxPath });
   const kek = deriveKekFromDeviceKey(deps.key);
-  const eventSink = makeSink({ store, kek });
+  const eventSink = makeSink({ store, kek, onPersisted: () => drain.wake() });
   const drain = makeDrain({ store, client: deps.client, session, key: deps.key, kek, logger: deps.logger });
 
   // (1) RECOVER before the supervisor can emit into the store.

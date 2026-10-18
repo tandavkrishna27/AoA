@@ -34,6 +34,8 @@ export interface DurableWorkerEventSinkDeps {
   /** The 32-byte KEK (from `MountedSecretKekStore` / `deriveKekFromDeviceKey`). */
   readonly kek: Buffer;
   readonly now?: () => number;
+  /** Best-effort scheduling hint AFTER durable commit; never performs upload inline. */
+  readonly onPersisted?: () => void;
 }
 
 /** Pull the delivery identity out of the event's OWN fields (never re-derived). */
@@ -53,11 +55,13 @@ export class DurableWorkerEventSink implements WorkerEventSink {
   readonly #store: DurableEventStore;
   readonly #kek: Buffer;
   readonly #now: () => number;
+  readonly #onPersisted?: () => void;
 
   constructor(deps: DurableWorkerEventSinkDeps) {
     this.#store = deps.store;
     this.#kek = deps.kek;
     this.#now = deps.now ?? (() => Date.now());
+    this.#onPersisted = deps.onPersisted;
   }
 
   /**
@@ -82,6 +86,12 @@ export class DurableWorkerEventSink implements WorkerEventSink {
       encrypted,
       nowMs: this.#now(),
     });
+    try {
+      this.#onPersisted?.();
+    } catch {
+      // The append has committed. A lost scheduling hint cannot turn that into
+      // a producer failure; the unchanged periodic drain remains a safety net.
+    }
   }
 }
 

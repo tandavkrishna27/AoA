@@ -90,6 +90,23 @@ describe("durable-event-sink — verbatim persist + fsync-before-return (D3/D4)"
     expect(rows.map((r) => r.seq)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it("notifies only after SQLite commit, and a notification throw cannot retract or report failure for the committed append", async () => {
+    const second = await openEventOutboxStore({ path: dbPath, now: () => 1000 });
+    let notified = 0;
+    const notifying = new DurableWorkerEventSink({ store, kek: KEK, onPersisted: () => {
+      expect(second.getRow(STREAM_KEY, 1)?.status).toBe("pending");
+      notified += 1;
+      throw new Error("wake scheduler unavailable");
+    } });
+    try {
+      expect(() => notifying.emit(stampEvent(IDENTITY, 1, "terminal", samplePayloadFor("terminal")))).not.toThrow();
+      expect(notified).toBe(1);
+      expect(second.countPending()).toBe(1);
+      expect(() => notifying.emit(stampEvent(IDENTITY, 1, "terminal", samplePayloadFor("terminal")))).toThrow(SeqCollisionError);
+      expect(notified).toBe(1); // failed append never wakes
+    } finally { second.close(); }
+  });
+
   it("FAILS CLOSED on a producer seq-collision (D2) — surfaces SeqCollisionError to the producer", () => {
     sink.emit(stampEvent(IDENTITY, 1, "log", samplePayloadFor("log")));
     // A second producer stamps the SAME seq for the same delivery identity.
