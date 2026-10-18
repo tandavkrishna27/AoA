@@ -1,16 +1,17 @@
 // Generates private, disposable D1 engineering inputs; performs no Docker action.
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import {generateKeyPairSync,randomBytes,randomUUID,createHash} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createPrivateFixtureDirectory} from './m4-daemon-load-private-directory.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 export function prepareDaemonFixture(directory) {
-  mkdirSync(directory,{recursive:true});
+  createPrivateFixtureDirectory(directory);
   const write=(name,value)=>writeFileSync(path.join(directory,name),typeof value==='string'?value:JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
   const template=JSON.parse(readFileSync(path.join(repo,'docker/d1/m1-spine-worker.profile.json'),'utf8'));
   const hash=createHash('sha256').update('{"policyId":"job-submission-default","sourceKind":"one_shot","version":1}').digest('hex');
-  const manifest={version:1,durationMs:15000,drainMs:30000,requestTimeoutMs:10000,
+  const manifest={version:1,fixtureId:randomUUID(),durationMs:15000,drainMs:30000,requestTimeoutMs:10000,
     scope:'API submission and real networked daemons, deterministic provider fixture; not actual provider D5',
     tenants:['quiet','noisy'].map((tenantKey,index)=>({tenantKey,service:index?'worker-a':'worker-b',rate:index?20:2,
       organizationId:randomUUID(),companyId:randomUUID(),agentId:randomUUID(),targetId:randomUUID(),
@@ -27,7 +28,7 @@ export function prepareDaemonFixture(directory) {
   const overlay={services:{
     migrate:{entrypoint:['sh','-c','/usr/local/bin/migrate-entrypoint.sh && node /cp-app/m4-seed.mjs'],
       environment:{AOA_D1_SEED_WORKER_ENROLMENT:'0'},volumes:[bind('seed.mjs','/cp-app/m4-seed.mjs'),bind('manifest.private.json','/load/manifest.private.json')]},
-    'control-plane':{environment:common,volumes:[bind('signing-key.pem','/keys/signing-key.pem')]},
+    'control-plane':{environment:common,volumes:[bind('signing-key.pem','/keys/signing-key.pem'),bind('manifest.private.json','/load/manifest.private.json')]},
     'control-plane-b':{profiles:['m4-not-started'],environment:common,volumes:[bind('signing-key.pem','/keys/signing-key.pem')]},
     'test-runner':{depends_on:{'control-plane-b':{condition:'service_healthy',required:false}}},
     'fake-provider':{environment:{AOA_FAKE_PROVIDER_WIRE_PORT:'8082',AOA_FAKE_PROVIDER_CONTROL_PLANE_PUBLIC_KEY_FILE:'/keys/public-key.pem',
@@ -46,6 +47,10 @@ export function prepareDaemonFixture(directory) {
         AOA_WORKER_PROVIDER_URL:'http://fake-provider:8082',AOA_M4_PROBE_LOG:'/worker/m4-requests.ndjson',AOA_M4_PROBE_TENANT:key},
       volumes:[{type:'volume',source:'m4-'+key+'-state',target:'/worker'},bind(key+'.profile.json','/profile.json'),bind(key+'.ticket','/enrollment-code'),bind('probe.mjs','/load/probe.mjs')]};
     overlay.volumes['m4-'+key+'-state']={};
+  }
+  for(const service of ['postgres','minio','toxiproxy',...Object.keys(overlay.services)]) {
+    overlay.services[service]??={};
+    overlay.services[service].labels={'com.aoa.m4.fixture-id':manifest.fixtureId};
   }
   write('probe.mjs',readFileSync(path.join(repo,'scripts/lib/m4-daemon-fetch-probe.mjs'),'utf8'));
   write('compose.json',overlay);
