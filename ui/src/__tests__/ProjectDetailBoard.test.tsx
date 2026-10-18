@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, fireEvent, act } from "@testing-library/react";
 
 // These tests render a multi-query page; give enough headroom for slow CI runs.
 vi.setConfig({ testTimeout: 15000 });
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   mockCompanyContext,
@@ -11,6 +11,7 @@ import {
   mockDialogContext,
 } from "./test-utils";
 import { ProjectDetail } from "../pages/ProjectDetail";
+import { queryKeys } from "../lib/queryKeys";
 
 // --- Mock TaskSlideOver ---
 
@@ -178,6 +179,11 @@ vi.mock("../lib/utils", async (importOriginal) => {
 
 // --- Render helper ---
 
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+}
+
 function renderProjectDetail(initialPath: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -186,7 +192,7 @@ function renderProjectDetail(initialPath: string) {
     },
   });
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -199,9 +205,29 @@ function renderProjectDetail(initialPath: string) {
           <Route path="projects/:projectId/discussions" element={<ProjectDetail />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
         </Routes>
+        <LocationDisplay />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...view, queryClient };
+}
+
+async function openTaskAfterCanonicalization() {
+  // Exercise the real UUID -> ENG view replacement before interacting, rather
+  // than allowing that transition to race a node returned by findByTestId.
+  projectsApiMock.get.mockResolvedValueOnce({ ...mockProject, simpleId: null });
+  const { queryClient } = renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/issues");
+  const beforeCanonicalization = await screen.findByTestId("task-card-TC-1", {}, { timeout: 5000 });
+  expect(beforeCanonicalization.isConnected).toBe(true);
+  await act(async () => {
+    queryClient.setQueryData([...queryKeys.projects.detail(mockProject.id), "comp-1"], mockProject);
+  });
+  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/projects/ENG/issues"));
+  await screen.findByTestId("task-card-TC-1", {}, { timeout: 5000 });
+  expect(beforeCanonicalization.isConnected, "canonical project lookup remounts the task cards").toBe(false);
+  const card = screen.getByTestId("task-card-TC-1");
+  expect(card.isConnected).toBe(true);
+  fireEvent.click(card);
 }
 
 beforeEach(() => {
@@ -248,27 +274,20 @@ describe("ProjectDetail — Board tab TaskSlideOver", () => {
   });
 
   it("clicking a task in the Board tab opens the TaskSlideOver", async () => {
-    renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/issues");
-
-    fireEvent.click(await screen.findByTestId("task-card-TC-1", {}, { timeout: 5000 }));
+    await openTaskAfterCanonicalization();
 
     await screen.findByTestId("task-slide-over", {}, { timeout: 5000 });
   });
 
   it("TaskSlideOver receives the clicked task identifier as issueId", async () => {
-    renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/issues");
-
-    fireEvent.click(await screen.findByTestId("task-card-TC-1", {}, { timeout: 5000 }));
+    await openTaskAfterCanonicalization();
 
     const slideOver = await screen.findByTestId("task-slide-over", {}, { timeout: 5000 });
     expect(slideOver).toHaveAttribute("data-issue-id", "TC-1");
   });
 
   it("closing the TaskSlideOver hides it", async () => {
-    renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/issues");
-
-    // Open the slide-over
-    fireEvent.click(await screen.findByTestId("task-card-TC-1", {}, { timeout: 5000 }));
+    await openTaskAfterCanonicalization();
     await screen.findByTestId("task-slide-over", {}, { timeout: 5000 });
 
     // Close it

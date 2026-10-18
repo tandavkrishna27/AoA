@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, act } from "@testing-library/react";
 
 // These tests render a multi-query page; give enough headroom for slow CI runs.
 vi.setConfig({ testTimeout: 15000 });
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -12,6 +12,7 @@ import {
   mockDialogContext,
 } from "./test-utils";
 import { ProjectDetail } from "../pages/ProjectDetail";
+import { queryKeys } from "../lib/queryKeys";
 
 // --- Mock data ---
 
@@ -144,6 +145,11 @@ vi.mock("../lib/utils", async (importOriginal) => {
   };
 });
 
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+}
+
 function renderProjectDetail(initialPath: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -152,7 +158,7 @@ function renderProjectDetail(initialPath: string) {
     },
   });
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
@@ -165,9 +171,11 @@ function renderProjectDetail(initialPath: string) {
           <Route path="projects/:projectId/budget" element={<ProjectDetail />} />
           <Route path="projects/:projectId" element={<ProjectDetail />} />
         </Routes>
+        <LocationDisplay />
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...view, queryClient };
 }
 
 beforeEach(() => {
@@ -213,11 +221,24 @@ describe("ProjectDetail — Discussions tab", () => {
 
   it("shows New Discussion button that opens capture modal pre-scoped", async () => {
     const user = userEvent.setup();
-    renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/discussions");
+    // Control the canonical-route transition that can detach a button returned
+    // by findByRole before userEvent starts its interaction sequence.
+    projectsApiMock.get.mockResolvedValueOnce({ ...mockProject, simpleId: null });
+    const { queryClient } = renderProjectDetail("/projects/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/discussions");
 
     await screen.findByText("Sprint Planning Notes", {}, { timeout: 5000 });
 
-    await user.click(await screen.findByRole("button", { name: /new discussion/i }, { timeout: 5000 }));
+    const beforeCanonicalization = await screen.findByRole("button", { name: /new discussion/i }, { timeout: 5000 });
+    expect(beforeCanonicalization.isConnected).toBe(true);
+    await act(async () => {
+      queryClient.setQueryData([...queryKeys.projects.detail(mockProject.id), "comp-1"], mockProject);
+    });
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/projects/ENG/discussions"));
+    await screen.findByRole("button", { name: /new discussion/i }, { timeout: 5000 });
+    expect(beforeCanonicalization.isConnected, "canonical project lookup remounts the discussion controls").toBe(false);
+    const button = screen.getByRole("button", { name: /new discussion/i });
+    expect(button.isConnected).toBe(true);
+    await user.click(button);
     await waitFor(() => {
       expect(mockDialogContext.openDiscussionCapture).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -226,6 +247,7 @@ describe("ProjectDetail — Discussions tab", () => {
         }),
       );
     });
+    expect(mockDialogContext.openDiscussionCapture).toHaveBeenCalledTimes(1);
   });
 
   it("shows pending badge count on discussions", async () => {
