@@ -13,6 +13,7 @@ import { filterAuthorizedToolsForContext } from "./tool-registry.js";
 export { filterAuthorizedToolsForContext };
 import { runtimeApprovalService } from "./runtime-approvals.js";
 import { createInFlightCounter, startParentWatchdog } from "./bridge-lifecycle.js";
+import { refreshCrewToolContext } from "./crew-tool-authority.js";
 
 export function parseCommanderContextScopeEnv() {
   return parseCommanderContextScopeJson(process.env.AOA_COMMANDER_CONTEXT_SCOPE);
@@ -66,6 +67,7 @@ interface ToolCallHandlerDeps {
   tools: AgentTool[];
   executeTool: (tool: AgentTool, params: unknown, ctx: ToolContext) => Promise<ToolResult>;
   toolContext: ToolContext;
+  resolveToolContext?: () => Promise<ToolContext>;
   runtimeApprovals?: Pick<
     ReturnType<typeof runtimeApprovalService>,
     "createPending" | "findTrustedExact"
@@ -146,6 +148,12 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
     args: unknown,
     producerInvocationId?: string,
   ): Promise<McpToolResult> {
+    let toolContext = deps.toolContext;
+    try {
+      if (deps.resolveToolContext) toolContext = await deps.resolveToolContext();
+    } catch {
+      return { content: [{ type: "text", text: "Tool authorization denied" }], isError: true };
+    }
     const tool = deps.tools.find((t) => t.name === name);
     if (!tool) {
       return {
@@ -161,13 +169,13 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
     // 'aoa', org) is judged by the base gate (allowlist + role + capability)
     // alone. Crew has no confirm route, so a Commander approval marker would
     // strand the tool; the base gate is exactly the enforcement crew needs.
-    const policy = deps.toolContext.actorType === "commander"
-      ? resolveCommanderToolPolicy(tool, deps.toolContext)
+    const policy = toolContext.actorType === "commander"
+      ? resolveCommanderToolPolicy(tool, toolContext)
       : authorizeToolInvocation(
           tool,
-          deps.toolContext.userRole,
-          deps.toolContext.enabledCapabilities,
-          { agentKind: deps.toolContext.agentKind, toolAllowlist: deps.toolContext.toolAllowlist },
+          toolContext.userRole,
+          toolContext.enabledCapabilities,
+          { agentKind: toolContext.agentKind, toolAllowlist: toolContext.toolAllowlist },
         );
     if (!policy.allowed) {
       // Include both the error code (e.g., NOT_IN_ALLOWLIST, FORBIDDEN_ROLE,
@@ -185,8 +193,8 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
     }
 
     const invocationContext = producerInvocationId
-      ? { ...deps.toolContext, producerInvocationId }
-      : deps.toolContext;
+      ? { ...toolContext, producerInvocationId }
+      : toolContext;
 
     // Runtime approval is a Commander-only path — key it on the SAME actor
     // discriminator as the gate selection above (and the two gates in
@@ -196,7 +204,7 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
     // ToolAuthDecision, an `in`-only check would silently re-strand crew tools
     // with no compile error and no failing test.
     const requiresApproval =
-      deps.toolContext.actorType === "commander" &&
+      toolContext.actorType === "commander" &&
       "requiresApproval" in policy &&
       policy.requiresApproval;
     if (!requiresApproval) {
@@ -204,10 +212,10 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
     }
 
     const params = normalizeToolArgs(args);
-    const approvalSvc = deps.runtimeApprovals ?? runtimeApprovalService(deps.toolContext.db);
+    const approvalSvc = deps.runtimeApprovals ?? runtimeApprovalService(toolContext.db);
     const trusted = await approvalSvc.findTrustedExact({
-      companyId: deps.toolContext.companyId,
-      userId: deps.toolContext.userId,
+      companyId: toolContext.companyId,
+      userId: toolContext.userId,
       toolName: name,
       params,
     });
@@ -217,7 +225,7 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
     }
 
     const approval = await approvalSvc.createPending({
-      companyId: deps.toolContext.companyId,
+      companyId: toolContext.companyId,
       // The Commander conversation id lives on contextScope (same source the
       // non-gated emission uses for provenance at L107). The ToolContext has no
       // top-level `conversationId`, so reading it directly stored null — which
@@ -225,11 +233,11 @@ export function createToolCallHandler(deps: ToolCallHandlerDeps) {
       // refs to (the confirm route guards on a non-null conversationId), so
       // approval-gated writes emitted no viewer nav chip.
       conversationId:
-        deps.toolContext.contextScope?.conversationId ??
-        deps.toolContext.conversationId ??
+        toolContext.contextScope?.conversationId ??
+        toolContext.conversationId ??
         null,
-      runId: deps.toolContext.runId ?? null,
-      userId: deps.toolContext.userId,
+      runId: toolContext.runId ?? null,
+      userId: toolContext.userId,
       toolName: name,
       params,
     });
@@ -375,7 +383,10 @@ export async function startBridge(): Promise<void> {
     db,
     services,
   };
-  const handleToolCall = createToolCallHandler({ tools, executeTool, toolContext });
+  const resolveToolContext = toolContext.actorType === "agent" && toolContext.agentKind === "aoa"
+    ? () => refreshCrewToolContext(toolContext, tools)
+    : undefined;
+  const handleToolCall = createToolCallHandler({ tools, executeTool, toolContext, resolveToolContext });
 
   const inFlight = createInFlightCounter();
 
@@ -391,7 +402,8 @@ export async function startBridge(): Promise<void> {
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const visibleTools = filterAuthorizedToolsForContext(tools, toolContext);
+    const currentContext = resolveToolContext ? await resolveToolContext() : toolContext;
+    const visibleTools = filterAuthorizedToolsForContext(tools, currentContext);
     return { tools: buildToolListResponse(visibleTools) };
   });
 

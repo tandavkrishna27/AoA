@@ -40,6 +40,7 @@ import { maybeExecuteFakeCrewTurn } from "./fake-crew-llm.js";
 import { getRunLogStore } from "../../run-log-store.js";
 import type { RunLogHandle } from "../../run-log-store.js";
 import { createCrewRunLogSink } from "./crew-run-log.js";
+import { createNativeCrewToolCapture } from "./native-crew-tool-capture.js";
 import type { CrewRunLogSink } from "./crew-run-log.js";
 import { getProviderStatus } from "../../../adapters/provider-status.js";
 import type { ProviderStatus } from "../../../adapters/provider-status.js";
@@ -179,6 +180,7 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
   // on exactly one finalize without a per-exit call site.
   let runLogHandle: RunLogHandle | null = null;
   let crewLogSink: CrewRunLogSink | null = null;
+  let nativeToolCapture: ReturnType<typeof createNativeCrewToolCapture> = null;
   // W3a (P1 fix): `const agent` is scoped INSIDE the try, so the catch block
   // cannot read `agent.name`/`agent.runtimeConfig` (TS2304). Capture the two
   // fields the FAILURE loopback needs into function-scope locals right after the
@@ -191,6 +193,8 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
   // inside the try and out of scope in the catch — same pattern as
   // outcomeAgentName/outcomeAgentRuntimeConfig above (the P1 fix).
   let outcomeProviderId: string | null = null;
+  let reportedProvider: string | null = null;
+  let reportedModel: string | null = null;
   // FIX 1 (Wave 2 adversarial review, HIGH — cloud VM/lease leak): the U4
   // sandbox-lease acquire result, captured at FUNCTION scope so the `finally`
   // below can see it and release the lease on every exit. The `acquired` const
@@ -777,6 +781,12 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
       extraMcpServers = resolved.extraMcpServers;
       connectorEnv = resolved.connectorEnv;
     }
+    nativeToolCapture = createNativeCrewToolCapture(
+      agent.adapterType,
+      toolAllowlistFromConfig,
+      TOOL_REGISTRY_FOR_CAPABILITY_DERIVATION.map((tool) => tool.name),
+      Object.keys(extraMcpServers ?? {}),
+    );
 
     // A29 — do NOT scrub: connector tokens merge ON TOP of the already
     // secret-bound env. `resolvedBaseConfig` is post provider-credential
@@ -1277,11 +1287,18 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
         // T1: stream the CLI transcript + one redacted adapter.invoke event into
         // the run log (was: two literal no-ops that discarded everything). Both
         // sink callbacks swallow store failures internally.
-        onLog: crewLogSink ? crewLogSink.onLog : async () => {},
+        onLog: async (stream, chunk) => {
+          if (stream === "stdout") nativeToolCapture?.push(chunk);
+          if (crewLogSink) await crewLogSink.onLog(stream, chunk);
+        },
         onMeta: crewLogSink ? crewLogSink.onMeta : async () => {},
         authToken: crewAuthToken ?? undefined, onSpawn: () => {},
       });
     }
+
+    nativeToolCapture?.flush();
+    reportedProvider = adapterResult.provider ?? null;
+    reportedModel = adapterResult.model ?? null;
 
     // Silent-failure guard: a CLI agent can finish its run WITHOUT calling
     // submit_extracted_items (codex/opencode have no MCP-bridge wiring yet — see
@@ -1523,6 +1540,9 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
       const terminalRows = await db.update(internalAgentRuns)
         .set({
           status: runResult.status === "failed" ? "failed" : "completed",
+          provider: reportedProvider,
+          model: reportedModel,
+          ...(nativeToolCapture ? { toolsCalled: nativeToolCapture.names() } : {}),
           errorMessage: runResult.errorMessage ?? null,
           tokenUsage: adapterUsage ? {
             inputTokens: adapterUsage.inputTokens,
@@ -1674,23 +1694,29 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     // Plan 3 Task 6 + T1.1: real cost accounting from adapter result.
     // Previously hardcoded to 0 tokens / $0 even when the adapter reported
     // real usage. Now uses the values returned in AdapterExecutionResult.
-    // Providers without per-run billing (CLI subscriptions) still report
-    // zero — that's correct and intentional.
+    // Included subscription usage has no per-run budget charge, even when
+    // the CLI reports a list-price cost estimate.
     await costService(db).createEvent(payload.companyId, {
       agentId,
       provider: adapterResult.provider ?? "anthropic",
       model: adapterResult.model ?? process.env.EXTRACTION_MODEL ?? "claude-sonnet-4-20250514",
+      billingType: adapterResult.billingType ?? undefined,
       inputTokens: adapterUsage?.inputTokens ?? 0,
+      cachedInputTokens: adapterUsage?.cachedInputTokens ?? 0,
       outputTokens: adapterUsage?.outputTokens ?? 0,
-      // Prefer the adapter's authoritative cost. Fall back to model-based
+      // For billable usage prefer reported cost. Fall back to model-based
       // computation only when the adapter doesn't report cost (e.g. legacy
       // adapter returning UsageSummary without costUsd).
-      costCents: costCents ?? computeCostCents(
-        adapterResult.provider ?? "anthropic",
-        adapterResult.model ?? process.env.EXTRACTION_MODEL ?? "claude-sonnet-4-20250514",
-        adapterUsage?.inputTokens ?? 0,
-        adapterUsage?.outputTokens ?? 0,
-      ),
+      costCents:
+        adapterResult.billingType === "subscription" || adapterResult.billingType === "subscription_included"
+          ? 0
+          : costCents ?? computeCostCents(
+              adapterResult.provider ?? "anthropic",
+              adapterResult.model ?? process.env.EXTRACTION_MODEL ?? "claude-sonnet-4-20250514",
+              adapterUsage?.inputTokens ?? 0,
+              adapterUsage?.outputTokens ?? 0,
+            ),
+      sourceIdempotencyKey: runId ? `crew_run:${runId}` : null,
       occurredAt: new Date(),
     });
 
@@ -1713,12 +1739,16 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     });
     const surfaced = mappedKeyError ?? err;
     const errMessage = surfaced instanceof Error ? surfaced.message : String(surfaced);
+    nativeToolCapture?.flush();
     if (runId) {
       try {
         const activeExecutionMs = Date.now() - startedAt;
         await db.update(internalAgentRuns)
           .set({
             status: "failed",
+            provider: reportedProvider,
+            model: reportedModel,
+            ...(nativeToolCapture ? { toolsCalled: nativeToolCapture.names() } : {}),
             // False-green fix (U12): this used to re-materialize the message
             // from the RAW `err` (String((err as Error)?.message ?? err)),
             // bypassing the mapper above — the DB failure row carried the raw
@@ -1877,6 +1907,21 @@ export async function runAoaAgent(db: Db, agentId: string, payload: AoaTriggerPa
     // exception — masking every crew failure as a successful wakeup.
     return { status: "failed", errorMessage: errMessage, runId };
   } finally {
+    nativeToolCapture?.flush();
+    const observedToolNames = nativeToolCapture?.names() ?? [];
+    if (runId && observedToolNames.length > 0) {
+      try {
+        await db.update(internalAgentRuns)
+          .set({ toolsCalled: observedToolNames })
+          .where(and(
+            eq(internalAgentRuns.companyId, payload.companyId),
+            eq(internalAgentRuns.id, runId),
+            eq(internalAgentRuns.status, "cancelled"),
+          ));
+      } catch (auditErr) {
+        log.warn({ err: auditErr, runId }, "aoa-runner: cancelled run tool audit update failed (best-effort, ignored)");
+      }
+    }
     // T1 (crew observability): seal the run transcript on EVERY exit — success,
     // adapter-reported failure, thrown failure, and the benign early returns
     // (entry not claimable / task checkout conflict) that return before the

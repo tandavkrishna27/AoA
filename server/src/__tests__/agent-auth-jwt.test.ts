@@ -71,6 +71,14 @@ describe("agent local JWT", () => {
     expect(verifyLocalAgentJwt(token!)).toBeNull();
   });
 
+  it("rejects a token at its exact expiration second", () => {
+    process.env[ttlEnv] = "1";
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    const token = createLocalAgentJwt("agent-1", "company-1", "claude_local", "run-1");
+    vi.setSystemTime(new Date("2026-01-01T00:00:01.000Z"));
+    expect(verifyLocalAgentJwt(token!)).toBeNull();
+  });
+
   it("accepts legacy paperclip issuer/audience for backward compatibility", () => {
     // Simulate an in-flight token created before the rename (iss: "paperclip")
     process.env[issuerEnv] = "paperclip";

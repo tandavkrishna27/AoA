@@ -27,6 +27,8 @@ export interface ShutdownLogger {
 
 export interface ProcessShutdownOptions {
   getPluginSubsystem(): ShutdownPluginSubsystem | undefined;
+  stopAcceptingWork?(): void;
+  localProcesses?: { closeAdmission(): void; drain(): Promise<void> };
   jobControlRuntime?: JobControlRuntime | null;
   boundedDatabases?: BoundedDatabases | null;
   ownedEmbeddedPostgres?: OwnedEmbeddedPostgres | null;
@@ -50,6 +52,23 @@ export function createProcessShutdownHandler(opts: ProcessShutdownOptions) {
     if (inFlight) return inFlight;
 
     inFlight = (async () => {
+      let exitCode = 0;
+      try {
+        opts.localProcesses?.closeAdmission();
+        opts.stopAcceptingWork?.();
+      } catch (err) {
+        exitCode = 1;
+        opts.logger.error({ err }, "Local work admission shutdown failed");
+      }
+      let localDrain: Promise<{ error: unknown } | null> | null = null;
+      if (opts.localProcesses) {
+        opts.logger.info("Stopping tracked local processes");
+        try {
+          localDrain = opts.localProcesses.drain().then(() => null, (error: unknown) => ({ error }));
+        } catch (error) {
+          localDrain = Promise.resolve({ error });
+        }
+      }
       const pluginSubsystem = opts.getPluginSubsystem();
       if (pluginSubsystem) {
         opts.logger.info("Stopping plugin subsystem");
@@ -78,6 +97,14 @@ export function createProcessShutdownHandler(opts: ProcessShutdownOptions) {
         }
       }
 
+      if (localDrain) {
+        const failure = await localDrain;
+        if (failure) {
+          exitCode = 1;
+          opts.logger.error({ err: failure.error }, "Tracked local process shutdown failed");
+        }
+      }
+
       if (opts.boundedDatabases) {
         opts.logger.info("Stopping bounded distributed database pools");
         try {
@@ -102,7 +129,7 @@ export function createProcessShutdownHandler(opts: ProcessShutdownOptions) {
         }
       }
 
-      opts.exit(0);
+      opts.exit(exitCode);
     })();
 
     return inFlight;

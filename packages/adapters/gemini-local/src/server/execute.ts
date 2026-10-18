@@ -457,6 +457,11 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
         timedOut: true,
         errorMessage: `Timed out after ${timeoutSec}s`,
         errorCode: authMeta.requiresAuth ? "gemini_auth_required" : null,
+        usage: attempt.parsed.usage,
+        provider: "google",
+        model: attempt.parsed.model || model,
+        billingType,
+        costUsd: attempt.parsed.costUsd,
         clearSession: clearSessionOnMissingSession,
         executionCwd: sessionCwd,
       };
@@ -494,7 +499,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       exitCode: attempt.proc.exitCode,
       signal: attempt.proc.signal,
       timedOut: false,
-      errorMessage: (attempt.proc.exitCode ?? 0) === 0 ? null : fallbackErrorMessage,
+      errorMessage: (attempt.proc.exitCode ?? 0) === 0 && !attempt.parsed.failed ? null : fallbackErrorMessage,
       errorCode: clearSessionForTurnLimit
         ? "max_turns_exhausted"
         : (attempt.proc.exitCode ?? 0) !== 0 && authMeta.requiresAuth
@@ -505,7 +510,7 @@ export async function execute(ctx: AdapterExecutionContext): Promise<AdapterExec
       sessionParams: resolvedSessionParams,
       sessionDisplayId: resolvedSessionId,
       provider: "google",
-      model,
+      model: attempt.parsed.model || model,
       billingType,
       costUsd: attempt.parsed.costUsd,
       executionCwd: sessionCwd,

@@ -1,0 +1,1331 @@
+{
+  "schemaVersion": 1,
+  "reportDate": "2026-10-18",
+  "timezone": "Asia/Calcutta",
+  "branch": "codex/replatform-w02-w05",
+  "baseCommit": "1e1ec04c0d2705cfc6d29dd6216eb956fa7f3e56",
+  "applicationCandidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+  "documentationPublication": "Separate later commit; application/source tested and deployed at the candidate above",
+  "scope": {
+    "targetedOnly": true,
+    "wholeSuiteRun": false,
+    "liveJourneySkipped": true,
+    "externalProviderCredentialsUsed": false,
+    "vendorCliInvoked": false,
+    "vendorCliInstalledByThisFollowup": false,
+    "personalAuthCopied": false,
+    "databaseReset": false,
+    "distributedRolloutEnabled": false,
+    "w12ResourcesTouched": false
+  },
+  "selectedTests": [
+    "server/src/__tests__/native-crew-tool-capture.test.ts",
+    "server/src/__tests__/codex-crew-tool-capture.test.ts",
+    "server/src/__tests__/aoa-runner.test.ts",
+    "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+    "server/src/__tests__/crew-tool-authority.test.ts",
+    "server/src/__tests__/crew-cancellation.test.ts",
+    "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+    "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+    "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+    "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+    "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+    "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+    "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+    "server/src/__tests__/task-outputs-routes.test.ts",
+    "server/src/__tests__/artifact-size-ceiling.test.ts"
+  ],
+  "providerLane": {
+    "root": "packages/sandbox-e2b-provider",
+    "config": "vitest.config.ts",
+    "files": [
+      "src/__tests__/artifact-operation-cancellation.test.ts",
+      "src/__tests__/enumerate-and-bounded-read.test.ts",
+      "src/__tests__/artifact-export.test.ts"
+    ]
+  },
+  "dbLane": {
+    "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+    "testNamePattern": "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+    "windowsOptIn": "AOA_RUN_WIN_INTEGRATION=1",
+    "selectedCases": 16,
+    "filterSkipsAreNotPasses": true,
+    "storage": "Stubbed grant/commit object storage; real embedded PostgreSQL and non-owner roles"
+  },
+  "printedCountsSource": "Final printed native stdout totals, separate from structured capture summary/unhandled counters which retain unknown values",
+  "affectedPackageChecks": [
+    "@armyofagents/adapter-utils",
+    "@armyofagents/worker-daemon",
+    "@armyofagents/sandbox-e2b-provider",
+    "@armyofagents/adapter-manager",
+    "@armyofagents/server"
+  ],
+  "local": {
+    "stages": {
+      "build": {
+        "stage": "build",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "build"
+          ]
+        },
+        "startedAt": "2026-10-17T20:14:17.328Z",
+        "finishedAt": "2026-10-17T20:15:04.956Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "typecheck": {
+        "stage": "typecheck",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "typecheck"
+          ]
+        },
+        "startedAt": "2026-10-17T20:15:04.958Z",
+        "finishedAt": "2026-10-17T20:15:46.040Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "fast": {
+        "stage": "fast",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-w02-w05-audit-artifacts-2026-10-18\\evidence\\local-published-fast",
+            "--",
+            "run",
+            "server/src/__tests__/native-crew-tool-capture.test.ts",
+            "server/src/__tests__/codex-crew-tool-capture.test.ts",
+            "server/src/__tests__/aoa-runner.test.ts",
+            "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+            "server/src/__tests__/crew-tool-authority.test.ts",
+            "server/src/__tests__/crew-cancellation.test.ts",
+            "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+            "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+            "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+            "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+            "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+            "server/src/__tests__/task-outputs-routes.test.ts",
+            "server/src/__tests__/artifact-size-ceiling.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1"
+          ]
+        },
+        "startedAt": "2026-10-17T20:15:46.042Z",
+        "finishedAt": "2026-10-17T20:15:55.326Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "provider": {
+        "stage": "provider",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-w02-w05-audit-artifacts-2026-10-18\\evidence\\local-published-provider",
+            "--",
+            "run",
+            "src/__tests__/artifact-operation-cancellation.test.ts",
+            "src/__tests__/enumerate-and-bounded-read.test.ts",
+            "src/__tests__/artifact-export.test.ts",
+            "--config",
+            "vitest.config.ts",
+            "--root",
+            "packages/sandbox-e2b-provider",
+            "--maxWorkers=1",
+            "--minWorkers=1"
+          ]
+        },
+        "startedAt": "2026-10-17T20:15:55.327Z",
+        "finishedAt": "2026-10-17T20:15:59.434Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "db": {
+        "stage": "db",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "C:\\Users\\Dell\\Desktop\\aoa\\validation-w02-w05-audit-artifacts-2026-10-18\\evidence\\local-published-db",
+            "--",
+            "run",
+            "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+            "--testNamePattern",
+            "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+            "--maxWorkers=1",
+            "--minWorkers=1"
+          ]
+        },
+        "startedAt": "2026-10-17T20:15:59.435Z",
+        "finishedAt": "2026-10-17T20:16:13.087Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      }
+    },
+    "tests": {
+      "fast": {
+        "printedCounts": {
+          "filesPassed": 15,
+          "filesFailed": 0,
+          "testsPassed": 294,
+          "testsFailed": 0,
+          "testsSkipped": 0
+        },
+        "nativeCapture": {
+          "exitCode": 0,
+          "signal": null,
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "durationMs": 9207.41
+        },
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 20000,
+          "gitSha": "74ab555f42dd02a43e448e6480a6b62b1a3caf00"
+        }
+      },
+      "provider": {
+        "printedCounts": {
+          "filesPassed": 3,
+          "filesFailed": 0,
+          "testsPassed": 56,
+          "testsFailed": 0,
+          "testsSkipped": 0
+        },
+        "nativeCapture": {
+          "exitCode": 0,
+          "signal": null,
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "durationMs": 4038.15
+        },
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 20488,
+          "gitSha": "74ab555f42dd02a43e448e6480a6b62b1a3caf00"
+        }
+      },
+      "db": {
+        "printedCounts": {
+          "filesPassed": 1,
+          "filesFailed": 0,
+          "testsPassed": 16,
+          "testsFailed": 0,
+          "testsSkipped": 23
+        },
+        "nativeCapture": {
+          "exitCode": 0,
+          "signal": null,
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "durationMs": 13589.83
+        },
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "win32",
+          "architecture": "x64",
+          "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\AoA",
+          "pid": 28688,
+          "gitSha": "74ab555f42dd02a43e448e6480a6b62b1a3caf00"
+        }
+      }
+    }
+  },
+  "vps": {
+    "stages": {
+      "build": {
+        "stage": "build",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "build"
+          ]
+        },
+        "startedAt": "2026-10-17T20:14:32.550Z",
+        "finishedAt": "2026-10-17T20:16:15.807Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "typecheck": {
+        "stage": "typecheck",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+            "-r",
+            "--filter",
+            "@armyofagents/adapter-utils",
+            "--filter",
+            "@armyofagents/worker-daemon",
+            "--filter",
+            "@armyofagents/sandbox-e2b-provider",
+            "--filter",
+            "@armyofagents/adapter-manager",
+            "--filter",
+            "@armyofagents/server",
+            "typecheck"
+          ]
+        },
+        "startedAt": "2026-10-17T20:16:15.808Z",
+        "finishedAt": "2026-10-17T20:17:48.984Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "fast": {
+        "stage": "fast",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "/opt/aoa-w02-w05-audit-artifacts-20261018/evidence/published-fast",
+            "--",
+            "run",
+            "server/src/__tests__/native-crew-tool-capture.test.ts",
+            "server/src/__tests__/codex-crew-tool-capture.test.ts",
+            "server/src/__tests__/aoa-runner.test.ts",
+            "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+            "server/src/__tests__/crew-tool-authority.test.ts",
+            "server/src/__tests__/crew-cancellation.test.ts",
+            "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+            "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+            "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+            "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+            "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+            "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+            "server/src/__tests__/task-outputs-routes.test.ts",
+            "server/src/__tests__/artifact-size-ceiling.test.ts",
+            "--maxWorkers=1",
+            "--minWorkers=1"
+          ]
+        },
+        "startedAt": "2026-10-17T20:17:48.984Z",
+        "finishedAt": "2026-10-17T20:18:08.623Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "provider": {
+        "stage": "provider",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "/opt/aoa-w02-w05-audit-artifacts-20261018/evidence/published-provider",
+            "--",
+            "run",
+            "src/__tests__/artifact-operation-cancellation.test.ts",
+            "src/__tests__/enumerate-and-bounded-read.test.ts",
+            "src/__tests__/artifact-export.test.ts",
+            "--config",
+            "vitest.config.ts",
+            "--root",
+            "packages/sandbox-e2b-provider",
+            "--maxWorkers=1",
+            "--minWorkers=1"
+          ]
+        },
+        "startedAt": "2026-10-17T20:18:08.624Z",
+        "finishedAt": "2026-10-17T20:18:14.267Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      },
+      "db": {
+        "stage": "db",
+        "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+        "dirtyFiles": [],
+        "command": {
+          "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+          "args": [
+            "scripts/run-vitest-captured.mjs",
+            "--capture-dir",
+            "/opt/aoa-w02-w05-audit-artifacts-20261018/evidence/published-db",
+            "--",
+            "run",
+            "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+            "--testNamePattern",
+            "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+            "--maxWorkers=1",
+            "--minWorkers=1"
+          ]
+        },
+        "startedAt": "2026-10-17T20:18:14.268Z",
+        "finishedAt": "2026-10-17T20:18:31.927Z",
+        "exitCode": 0,
+        "signal": null,
+        "spawnError": null
+      }
+    },
+    "tests": {
+      "fast": {
+        "printedCounts": {
+          "filesPassed": 15,
+          "filesFailed": 0,
+          "testsPassed": 294,
+          "testsFailed": 0,
+          "testsSkipped": 0
+        },
+        "nativeCapture": {
+          "exitCode": 0,
+          "signal": null,
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "durationMs": 19576.95
+        },
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "architecture": "arm64",
+          "cwd": "/opt/aoa-w02-w05-audit-artifacts-20261018/source",
+          "pid": 272685,
+          "gitSha": "74ab555f42dd02a43e448e6480a6b62b1a3caf00"
+        }
+      },
+      "provider": {
+        "printedCounts": {
+          "filesPassed": 3,
+          "filesFailed": 0,
+          "testsPassed": 56,
+          "testsFailed": 0,
+          "testsSkipped": 0
+        },
+        "nativeCapture": {
+          "exitCode": 0,
+          "signal": null,
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "durationMs": 5574.62
+        },
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "architecture": "arm64",
+          "cwd": "/opt/aoa-w02-w05-audit-artifacts-20261018/source",
+          "pid": 273427,
+          "gitSha": "74ab555f42dd02a43e448e6480a6b62b1a3caf00"
+        }
+      },
+      "db": {
+        "printedCounts": {
+          "filesPassed": 1,
+          "filesFailed": 0,
+          "testsPassed": 16,
+          "testsFailed": 0,
+          "testsSkipped": 23
+        },
+        "nativeCapture": {
+          "exitCode": 0,
+          "signal": null,
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "durationMs": 17585.18
+        },
+        "identity": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "architecture": "arm64",
+          "cwd": "/opt/aoa-w02-w05-audit-artifacts-20261018/source",
+          "pid": 273623,
+          "gitSha": "74ab555f42dd02a43e448e6480a6b62b1a3caf00"
+        }
+      }
+    },
+    "install": {
+      "stage": "install",
+      "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+      "dirtyFiles": [],
+      "command": {
+        "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+        "args": [
+          "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+          "install",
+          "--frozen-lockfile"
+        ]
+      },
+      "startedAt": "2026-10-17T20:14:24.182Z",
+      "finishedAt": "2026-10-17T20:14:32.548Z",
+      "exitCode": 0,
+      "signal": null,
+      "spawnError": null
+    }
+  },
+  "w02": {
+    "qualifiedProtocolSources": {
+      "claude": {
+        "version": "@anthropic-ai/claude-code@2.1.81",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-2.1.81.tgz",
+        "sha256": "875acc67241a94a6220b559712aff0b2c226458507648c308c73c9788bc45b2f",
+        "integrity": "sha512-CyQmbrsCccqx7kNgg7/4+L9GcUG6VaTZYtB51zPHy85z1VvbPrnRP+jFP4seyR9L/c3XHSDU1LVHzKKyd1IcGQ==",
+        "namespaceEvidence": "package/cli.js: q$(A) replaces [^a-zA-Z0-9_-] with underscore; IC(server) returns mcp__${q$(server)}__; va8(server,tool) appends q$(tool).",
+        "protocolEvidence": "Repo packages/adapters/claude-local/src/ui/parse-stdout.ts assistant.message.content tool_use IDs and user.message.content tool_result tool_use_id/is_error/content; official https://code.claude.com/docs/en/mcp documents MCP namespace.",
+        "qualifiedShape": "Top-level assistant tool_use correlated once to top-level user tool_result; exact AoA JSON success envelope in one text block or string; explicit/malformed is_error denied; nested parent_tool_use_id ignored."
+      },
+      "gemini": {
+        "sha": "ed96faedfd5571f055c44f2c9509d62321d1138d",
+        "additionalVersion": "v0.34.0 at 04b86e81acc738e47c50ee6d615059b38e4d873b",
+        "namespaceSource": "https://github.com/google-gemini/gemini-cli/blob/ed96faedfd5571f055c44f2c9509d62321d1138d/packages/core/src/tools/mcp-tool.ts",
+        "namespaceSourceSha256": "e272bbe11fd1bc952076b1e5bd196554f22199ad247c7cff13b62a1e3b698f20",
+        "resultSource": "https://github.com/google-gemini/gemini-cli/blob/ed96faedfd5571f055c44f2c9509d62321d1138d/packages/cli/src/nonInteractiveCli.ts",
+        "resultSourceSha256": "fe569c4ac3436a851c991e0e916554b63bd9b9eb0bf5dee644f9258fad5ba298",
+        "qualifiedShape": "tool_use(tool_id,tool_name mcp_aoa_<canonical-name>,dots preserved); tool_result(tool_id,status success,error absent,output string exact AoA JSON envelope). Output is joined MCP text, not structuredContent. Aliases over63 characters undercount instead of reverse guessing truncated names."
+      },
+      "opencode": {
+        "version": "v1.2.27",
+        "sha": "4ee426ba549131c4903a71dfb6259200467aca81",
+        "namespaceSource": "https://github.com/anomalyco/opencode/blob/4ee426ba549131c4903a71dfb6259200467aca81/packages/opencode/src/mcp/index.ts#L642",
+        "namespaceSourceSha256": "2105c34cd079afa8dde7477b93c48763bf06d289773b8ea1024da1b52741580e",
+        "resultSource": "https://github.com/anomalyco/opencode/blob/4ee426ba549131c4903a71dfb6259200467aca81/packages/opencode/src/session/prompt.ts#L838",
+        "resultSourceSha256": "4c13fea470c7418d53b688fb976770d16ae843e66ba6c7238d9c1f960251c6be",
+        "terminalEmitSource": "https://github.com/anomalyco/opencode/blob/4ee426ba549131c4903a71dfb6259200467aca81/packages/opencode/src/cli/cmd/run.ts#L460",
+        "terminalEmitSourceSha256": "75eff441f80944c515789f8ee0a130d0a0f65e5c5049ae48305fb69ccb5ff755",
+        "qualifiedShape": "run JSON emits tool_use only for terminal part.type tool/state completed or error, never pending/running. part.tool aoa_<canonical sanitized [^a-zA-Z0-9_-] to underscore>; completed state.output flattened MCP text exact AoA JSON success envelope; metadata.truncated is emitted boolean and must be false.",
+        "limitation": "OpenCode strips raw MCP isError while flattening content. Bridge emits success:false or plain denial/error text for failed/denied calls; those are rejected. No claim for arbitrary inconsistent raw MCP result whose content says success:true but stripped isError says true, nor unverified OpenCode versions."
+      }
+    },
+    "auditBounds": {
+      "lineCharacters": 65536,
+      "pendingCalls": 128,
+      "lifetimeSeenCallIds": 1024,
+      "maximumCallIdCharacters": 256,
+      "uniqueCanonicalNames": 128,
+      "collisionPolicy": "Use full AoA registry plus allowlist, reject ambiguous sanitized aliases and any alias whose prefix could belong to delivered connector server. No raw arguments/results/URLs copied to toolsCalled."
+    },
+    "regressionReceipts": {
+      "red-runner": "39 cases:27 passed,12 expected missing-non-Codex-tool-name failures before production changes.",
+      "green-runner": "Intermediate attempt failed28 because Object.keys(undefined) for process adapter shifted later queued mocks. Fixed nullish connector-server fallback.",
+      "green-runner-2": "45 passed across runner39 and unchanged Codex helper6.",
+      "red-hostile": "48 cases:46 passed, malformed-Claude-is_error false positive plus invalid Gemini collision fixture. Tightened is_error optional bool and corrected fixture to actual colliding underscore name.",
+      "green-focused": "93 passed across native capture48, runner39 and Codex helper6.",
+      "red-gemini-prefix": "49 cases:48 passed,1 failure for a foreign server named mcp_aoa colliding because upstream avoids re-adding the mcp_ prefix. Fixed exact verified normalization.",
+      "green-focused-final": "94 passed across native capture49, runner39 and Codex helper6."
+    },
+    "preserved": [
+      "Original Codex capture",
+      "Company/run and cancelled-state guards; no lifecycle/reason/timestamp changes from late tool audit",
+      "Names only, no arguments/results/URLs; no authority widening"
+    ],
+    "limitation": "All tests use controlled protocol fixtures and mocked runner execution; no native CLI/provider/auth entitlement or useful vendor-tool effects claimed; no all-version qualification; no durable abrupt-crash custody work."
+  },
+  "w05": {
+    "repair": "Compose caller abort with mandatory timeout for enumerate/digest/export; refuse pre-abort; guard late stat before byte read",
+    "regression": "Controlled transport read/list/stat/scan/upload; real native HTTP socket disconnect observes provider/upload abort then normal sandbox destroy",
+    "realFileDownload": "Actual local-disk provider and Express HTTP/integrity streaming with UTF-8/binary bytes and same-size corrupted file refusal; injected actor/company lookup and content metadata",
+    "historicProductionAttribution": "TST-012/TST-013 causes remain unproven; current reproduced abort defect does not retroactively establish those historical incidents",
+    "limits": [
+      "Provider transport and storage upload are controlled doubles in cancellation cases; the HTTP disconnect and local-disk download tests use actual sockets/files",
+      "Aborts deny later stages and request cancellation; already-admitted side effects cannot be undone",
+      "RealE2bTransport does not pass caller signal into SDK connect itself; the following file operation receives the aborted signal, while boundedBySignal releases the waiting operation",
+      "Real DB grant/commit and HTTP/filesystem download checks are distinct fixtures, not one ordinary app-to-PC journey"
+    ]
+  },
+  "developmentEvidence": {
+    "beforeFixHead": "1e1ec04c0",
+    "beforeFixTree": "Uncommitted feature/test states; captured HEAD alone is not a pristine before-fix tree certificate",
+    "initialCombined": "local-initial passed 15 files/294 and provider3/56 plus builds/types on frozen dirty source; exact clean accepted repeat is local-published",
+    "intermediateFailuresRetained": [
+      "W02 initial missing non-Codex names",
+      "W02 undefined connector fixture fallback and invalid Gemini collision fixture corrected",
+      "W02 malformed Claude flag and existing-mcp-prefix collision",
+      "W05 ignored caller abort, late stat continuation and HTTP disconnect on old compiled provider",
+      "Download characterization initially hit pnpm no-TTY dependency-management refusal; direct installed runner passed without dependency change"
+    ]
+  },
+  "deployment": {
+    "candidate": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+    "startedAt": "2026-10-17T20:19:04.409344+00:00",
+    "databaseBefore": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "result": "pass",
+    "externalCredentialsUsed": false,
+    "liveJourneySkipped": true,
+    "w12ResourcesTouched": false,
+    "health": {
+      "status": "ok",
+      "revision": "74ab555f42dd02a43e448e6480a6b62b1a3caf00",
+      "deploymentMode": "cloud_auth",
+      "deploymentExposure": "public",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": false
+      }
+    },
+    "uiHttpStatus": 200,
+    "databaseAfter": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "serviceActive": "active",
+    "distributedRolloutEnabled": false,
+    "oauthConfigurationRetained": true,
+    "finishedAt": "2026-10-17T20:19:25.648110+00:00"
+  },
+  "cleanup": {
+    "local": {
+      "platform": "win32",
+      "capturedAt": "2026-10-17T20:18:58.959Z",
+      "result": "pass",
+      "namedPostgresProcessesRemaining": [],
+      "scope": "Independent scan for accessible PostgreSQL command lines naming the selected aoa-dat002 fixture. Not a certificate for unrelated processes, inaccessible owners, escaped descendants or durable crash custody."
+    },
+    "vps": {
+      "platform": "linux",
+      "capturedAt": "2026-10-17T20:19:04.257Z",
+      "result": "pass",
+      "namedPostgresProcessesRemaining": [],
+      "scope": "Independent scan for accessible PostgreSQL command lines naming the selected aoa-dat002 fixture. Not a certificate for unrelated processes, inaccessible owners, escaped descendants or durable crash custody."
+    },
+    "noGlobalProcessCustodyClaim": true
+  },
+  "reviews": {
+    "scope": "Read-only component and final nine-file increment review by Sol/high and Luna/high agents",
+    "result": "No actionable findings after the Gemini existing-mcp-prefix collision regression and malformed-Claude-boolean regression were repaired",
+    "w02Limits": [
+      "Qualified pinned native output schemas and synthetic runner callbacks, not actual authenticated vendor execution",
+      "Unknown, ambiguous, oversized, truncated and over-cap output deliberately undercounts",
+      "OpenCode v1.2.27 drops raw MCP isError; require the exact AoA successful envelope and do not claim reconstruction of discarded contradictory metadata",
+      "Only canonical successful tool names persist; no arguments, results, URLs or new authorization decision"
+    ],
+    "w05Limits": [
+      "Provider transport and storage upload are controlled doubles in cancellation cases; the HTTP disconnect and local-disk download tests use actual sockets/files",
+      "Aborts deny later stages and request cancellation; already-admitted side effects cannot be undone",
+      "RealE2bTransport does not pass caller signal into SDK connect itself; the following file operation receives the aborted signal, while boundedBySignal releases the waiting operation",
+      "Real DB grant/commit and HTTP/filesystem download checks are distinct fixtures, not one ordinary app-to-PC journey"
+    ],
+    "userDirection": "Credential-free targeted local/VPS verification only; live journey remains skipped even after the user supplied a model key",
+    "credentials": "No key values are copied here, to Git, to subagents, to W12 or to the VPS"
+  },
+  "credentialPickup": {
+    "suppliedButNotValidatedOrUsed": [
+      "OpenAI project API key",
+      "Previously supplied E2B project key"
+    ],
+    "firstCloudCohort": [
+      "One supported company model credential: OpenAI OR Anthropic, not both required",
+      "E2B project access and explicit verified CLI-bearing template",
+      "Reachable S3/MinIO bucket/endpoints/HTTPS trust and service credential or role",
+      "Supported composed worker/backend, admitted profile/placement, app-issued enrollment and active lease/fence"
+    ],
+    "optionalProviderMatrix": [
+      "Anthropic credential for additional Claude API-key cohort",
+      "Google/Gemini credential for separately supported Gemini qualification; current worker secret-redemption allowlist lacks Gemini targets"
+    ],
+    "keyValuesPublished": false,
+    "keysAloneDoNotCompleteW05": true
+  },
+  "pending": [
+    "Actual installed vendor CLI/auth/model/useful tool/cancellation acceptance and unverified native formats",
+    "Ordinary VPS-authority to PC-worker output/export/commit/UI-download journey: skipped by explicit user instruction",
+    "Supported backend/template/storage/execution-secret composition; W06/W07 device-local path remains separate",
+    "Durable abrupt-crash/host-restart process custody remains explicitly deferred",
+    "Whole required lanes, release CI and baseline/follow-up integration not performed"
+  ],
+  "rawEvidence": {
+    "localDirectory": "C:/Users/Dell/Desktop/aoa/validation-w02-w05-audit-artifacts-2026-10-18",
+    "vpsDirectory": "/opt/aoa-w02-w05-audit-artifacts-20261018/evidence",
+    "availability": "Retained private receipts/harnesses outside Git, not clone-accessible attachments; this summary contains safe facts and hashes only",
+    "receipts": [
+      {
+        "path": "check-fixture-cleanup.mjs",
+        "bytes": 1632,
+        "sha256": "eb8b71824aaf216ae4569e4d24b211cda1b4fffdd3c87a204382f496c109683c"
+      },
+      {
+        "path": "db-test-pattern.txt",
+        "bytes": 717,
+        "sha256": "534848371266864334e48663fc0194f730923c32078e78b3d62be1eaf50abdb0"
+      },
+      {
+        "path": "deploy-vps.py",
+        "bytes": 4840,
+        "sha256": "dd48c781675712235851d39831ece70f55db18f9e0b4775020692d2e4acc8f54"
+      },
+      {
+        "path": "evidence/local-fixture-cleanup.json",
+        "bytes": 352,
+        "sha256": "d5eba33a033cf8bda0b78b2ba0f4f867a884f92eed255d936061398f8c6c680d"
+      },
+      {
+        "path": "evidence/local-initial-build.log",
+        "bytes": 493,
+        "sha256": "a2ea7c6dd6671359a57ba4e3e4ea5490aaedf00ad63e438ea8c78d66c3b9c7bb"
+      },
+      {
+        "path": "evidence/local-initial-build.result.json",
+        "bytes": 1443,
+        "sha256": "e6245ef5492dcd4e660552f39b9b1de38f9012525d1678fe88ebc8e706ef30df"
+      },
+      {
+        "path": "evidence/local-initial-fast.log",
+        "bytes": 9610,
+        "sha256": "e46e2920a7a8671874dfcfd23cf45558f662b30ea2d6efdb0cc348913a72e3f9"
+      },
+      {
+        "path": "evidence/local-initial-fast.result.json",
+        "bytes": 2288,
+        "sha256": "6f09a0fab05ac21a8d4c554e4a77218eb588bd445763de98f8e8bcb5085e45dc"
+      },
+      {
+        "path": "evidence/local-initial-fast/result.json",
+        "bytes": 2296,
+        "sha256": "5e4b7f46b9c82084c24c56bd64c449245ef48e5e6fe9f0b4caeaafdd07321fe3"
+      },
+      {
+        "path": "evidence/local-initial-fast/stderr.txt",
+        "bytes": 7689,
+        "sha256": "9756e13599af979f5d9ccc619be9876de5b7228f2887ca8f6086f81ef7158e03"
+      },
+      {
+        "path": "evidence/local-initial-fast/stdout.txt",
+        "bytes": 1921,
+        "sha256": "1b78ad6836f98ffac5808c9bb780ccc8dcd6a05fc6f81b92f76c87b92bce9b09"
+      },
+      {
+        "path": "evidence/local-initial-provider.log",
+        "bytes": 467,
+        "sha256": "c5ba9d578c1fe08aba4b51b06c9ae1c91f619cca1cc2e0bccc4688487f611090"
+      },
+      {
+        "path": "evidence/local-initial-provider.result.json",
+        "bytes": 1554,
+        "sha256": "263fe646ca3270aa37e0cf06961bdecb546336918c5c49d6bedb763160eea9e6"
+      },
+      {
+        "path": "evidence/local-initial-provider/result.json",
+        "bytes": 1562,
+        "sha256": "5844239d72d8d7427198741dc43b0efd5d35a6d9c8b540336515fa5d82734c5c"
+      },
+      {
+        "path": "evidence/local-initial-provider/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/local-initial-provider/stdout.txt",
+        "bytes": 467,
+        "sha256": "c5ba9d578c1fe08aba4b51b06c9ae1c91f619cca1cc2e0bccc4688487f611090"
+      },
+      {
+        "path": "evidence/local-initial-typecheck.log",
+        "bytes": 450,
+        "sha256": "a517ec50fe9ae25c6e74d04b3c4d191770067aa5fd3af01ddaa127be528aa03b"
+      },
+      {
+        "path": "evidence/local-initial-typecheck.result.json",
+        "bytes": 1451,
+        "sha256": "2bc1b6ed5860ba6892be62a4842ccdf49879a0dcca29e9cb7d09d288ddb95f7e"
+      },
+      {
+        "path": "evidence/local-published-build.log",
+        "bytes": 493,
+        "sha256": "a2ea7c6dd6671359a57ba4e3e4ea5490aaedf00ad63e438ea8c78d66c3b9c7bb"
+      },
+      {
+        "path": "evidence/local-published-build.result.json",
+        "bytes": 817,
+        "sha256": "93add4cc92e60e7a533ce23d275973a19ddbb3d1517cae1e1139a9ec3b6134f4"
+      },
+      {
+        "path": "evidence/local-published-db.log",
+        "bytes": 79666,
+        "sha256": "3b5dec9e9a20275c19d9a8e2e96d4a33bde3db3320676ba0cded297d32af2f75"
+      },
+      {
+        "path": "evidence/local-published-db.result.json",
+        "bytes": 1479,
+        "sha256": "4f35a1bf77f236e9adb391f1d747f94212ba7f7536e441f549bcfbea615cbc4b"
+      },
+      {
+        "path": "evidence/local-published-db/result.json",
+        "bytes": 2116,
+        "sha256": "29da562c7907f092f22ac9a274846aee24978d4fbf165d0e60226a0d01d19104"
+      },
+      {
+        "path": "evidence/local-published-db/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/local-published-db/stdout.txt",
+        "bytes": 79666,
+        "sha256": "3b5dec9e9a20275c19d9a8e2e96d4a33bde3db3320676ba0cded297d32af2f75"
+      },
+      {
+        "path": "evidence/local-published-fast.log",
+        "bytes": 9606,
+        "sha256": "e2fa48c1069c3100d87ef92cec7aa1207613869a650eb86127dce55bf5fbf131"
+      },
+      {
+        "path": "evidence/local-published-fast.result.json",
+        "bytes": 1664,
+        "sha256": "9f470cbe27b3b45890ffaf15845c133a16d5f1c6771df8bc081824281b4dc3fc"
+      },
+      {
+        "path": "evidence/local-published-fast/result.json",
+        "bytes": 2300,
+        "sha256": "0381d63d3dc7d2ee8b8d7f89923922614b02fc85e19851059a094886aef72ece"
+      },
+      {
+        "path": "evidence/local-published-fast/stderr.txt",
+        "bytes": 7689,
+        "sha256": "9756e13599af979f5d9ccc619be9876de5b7228f2887ca8f6086f81ef7158e03"
+      },
+      {
+        "path": "evidence/local-published-fast/stdout.txt",
+        "bytes": 1917,
+        "sha256": "6bf3e6f625afaf55a267fbe6e336e39b051e2de3998b0be9e4bfcdc538f7fcde"
+      },
+      {
+        "path": "evidence/local-published-provider.log",
+        "bytes": 467,
+        "sha256": "603e30d5f791cde64bd89be034f20c9a014027b796f030eca7c3cb755bdcb8b9"
+      },
+      {
+        "path": "evidence/local-published-provider.result.json",
+        "bytes": 930,
+        "sha256": "23476953e57655a274398bd47f41eae2e9717a7421b6bddd36430da644ff795d"
+      },
+      {
+        "path": "evidence/local-published-provider/result.json",
+        "bytes": 1566,
+        "sha256": "8f647d2f395dd82aa1df03236f88ba3927718c118ebd42e6b4369988a875e0fd"
+      },
+      {
+        "path": "evidence/local-published-provider/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "evidence/local-published-provider/stdout.txt",
+        "bytes": 467,
+        "sha256": "603e30d5f791cde64bd89be034f20c9a014027b796f030eca7c3cb755bdcb8b9"
+      },
+      {
+        "path": "evidence/local-published-typecheck.log",
+        "bytes": 450,
+        "sha256": "a517ec50fe9ae25c6e74d04b3c4d191770067aa5fd3af01ddaa127be528aa03b"
+      },
+      {
+        "path": "evidence/local-published-typecheck.result.json",
+        "bytes": 825,
+        "sha256": "511a3913e2f6ed5481c65ac53ede46e22775361c63050d6013c9349f574eb270"
+      },
+      {
+        "path": "evidence/original-local-review-health.json",
+        "bytes": 269,
+        "sha256": "50ced5d212efa1b8b1e355e7ddf88dc3d838fc3e0d68ce1202dc7d79d7ef0819"
+      },
+      {
+        "path": "prepare-run-vps.sh",
+        "bytes": 658,
+        "sha256": "b5e91fbbb4ee0523faf8f914feb673308d0dab38b55f52821793f50fbc35f18a"
+      },
+      {
+        "path": "provider-tests.txt",
+        "bytes": 141,
+        "sha256": "ae85d21f00140efecb9ef93c0b089be65f5427645bff4cdff311911997a5db24"
+      },
+      {
+        "path": "publish-evidence.mjs",
+        "bytes": 9710,
+        "sha256": "ac1446b81dd89971041db7b7420f4cf66038c89421fad8a187a923ccb1dde538"
+      },
+      {
+        "path": "review-summary.json",
+        "bytes": 1601,
+        "sha256": "923af33c027cd6772de9ef1619e49d50939c89848255bf8bbc5261db6037b85e"
+      },
+      {
+        "path": "run-checks.mjs",
+        "bytes": 4093,
+        "sha256": "aec4963be111a0b8f81f09b08513aee506f140d755da51e856741f22a22af8b6"
+      },
+      {
+        "path": "selected-tests.txt",
+        "bytes": 874,
+        "sha256": "5ba68f49be5ec0b0340a1d7368b5db86880c6cd8a193a6adf9aca9cfb0ee7d99"
+      },
+      {
+        "path": "vps-evidence/deployment-published.json",
+        "bytes": 884,
+        "sha256": "12ec728bc8d497b91b0a2c11bcc39eb427b978ac25a71a470368d45c0a086515"
+      },
+      {
+        "path": "vps-evidence/fixture-cleanup.json",
+        "bytes": 352,
+        "sha256": "43e40acaf8391ff65fbfcd9eac915941618aa2d5c41395707e30c16b33ee9efb"
+      },
+      {
+        "path": "vps-evidence/published-build.log",
+        "bytes": 493,
+        "sha256": "a2ea7c6dd6671359a57ba4e3e4ea5490aaedf00ad63e438ea8c78d66c3b9c7bb"
+      },
+      {
+        "path": "vps-evidence/published-build.result.json",
+        "bytes": 768,
+        "sha256": "614399a9d7160054d1900d43fb25fd1a653801b80592bbe541bbc5a55f00c999"
+      },
+      {
+        "path": "vps-evidence/published-db.log",
+        "bytes": 99427,
+        "sha256": "3ab6c6a40b33b0b30ac9d7cc857118872506adf0793a7825ac0ba333eeca3637"
+      },
+      {
+        "path": "vps-evidence/published-db.result.json",
+        "bytes": 1415,
+        "sha256": "67188ee98925957f4ddf9032a169409901351379f813de6790ed21fb9579f515"
+      },
+      {
+        "path": "vps-evidence/published-db/result.json",
+        "bytes": 2032,
+        "sha256": "26cc161743f63bc044a162eb5c528902c74b8e4ad220a6a810d44efdc3d94c1c"
+      },
+      {
+        "path": "vps-evidence/published-db/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/published-db/stdout.txt",
+        "bytes": 99427,
+        "sha256": "3ab6c6a40b33b0b30ac9d7cc857118872506adf0793a7825ac0ba333eeca3637"
+      },
+      {
+        "path": "vps-evidence/published-fast.log",
+        "bytes": 13054,
+        "sha256": "859364383123237ad7cc5dcde4522e8d68adb12efb9b583719717ac7357df766"
+      },
+      {
+        "path": "vps-evidence/published-fast.result.json",
+        "bytes": 1600,
+        "sha256": "1fdb734a777013a3c039cac7788436ce1ba686802fa67db9ce21248c597860dd"
+      },
+      {
+        "path": "vps-evidence/published-fast/result.json",
+        "bytes": 2217,
+        "sha256": "91a5ca81dac18703c59413c2075242fbb1c0a17718104bc3ec198046f6453739"
+      },
+      {
+        "path": "vps-evidence/published-fast/stderr.txt",
+        "bytes": 9735,
+        "sha256": "5f628c22000101fbf459248c0839ec5e75e53d495837378e38930d7b4d0d9902"
+      },
+      {
+        "path": "vps-evidence/published-fast/stdout.txt",
+        "bytes": 3319,
+        "sha256": "ee8c2796e634a156434d5effb2e83e613af0b4925ab2fdc58162a0fd0d9d8379"
+      },
+      {
+        "path": "vps-evidence/published-install.log",
+        "bytes": 117,
+        "sha256": "5ff8fe8a993a41bfe4c69b9df5cc9eb76da7b0e6d92e38e55344e738c0879d6f"
+      },
+      {
+        "path": "vps-evidence/published-install.result.json",
+        "bytes": 510,
+        "sha256": "3823f6d57f8a8908cc1201ff55e5cecf0547ad0dea6c66235c903ddec40ee634"
+      },
+      {
+        "path": "vps-evidence/published-provider.log",
+        "bytes": 796,
+        "sha256": "8ecf13e0dfdbd857fb14519413c8455621c5a412c83034ad3257db5e6059d8bd"
+      },
+      {
+        "path": "vps-evidence/published-provider.result.json",
+        "bytes": 866,
+        "sha256": "7c1f5a59c840f7fb3f03d0a507750cf2b21610c1d7c43c11d5862e325634b5e1"
+      },
+      {
+        "path": "vps-evidence/published-provider/result.json",
+        "bytes": 1482,
+        "sha256": "7ee354706e546b85aeed4cdae0b3d3fa2625647637ce00da709ce6142f1dc097"
+      },
+      {
+        "path": "vps-evidence/published-provider/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "vps-evidence/published-provider/stdout.txt",
+        "bytes": 796,
+        "sha256": "8ecf13e0dfdbd857fb14519413c8455621c5a412c83034ad3257db5e6059d8bd"
+      },
+      {
+        "path": "vps-evidence/published-typecheck.log",
+        "bytes": 450,
+        "sha256": "a517ec50fe9ae25c6e74d04b3c4d191770067aa5fd3af01ddaa127be528aa03b"
+      },
+      {
+        "path": "vps-evidence/published-typecheck.result.json",
+        "bytes": 776,
+        "sha256": "6bff84cce3a3951715a2d222ac118b37c15774cdf1f0a663dcc1d98ea82d4e09"
+      },
+      {
+        "path": "w02/green-focused-final/result.json",
+        "bytes": 1453,
+        "sha256": "3ff2ee906d089fed6a8f93d3078ac1117a3393985007ce0825168240a9e32a4c"
+      },
+      {
+        "path": "w02/green-focused-final/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "w02/green-focused-final/stdout.txt",
+        "bytes": 489,
+        "sha256": "cfe3e5f9d3ccd627eabf3024edb9a0adfd6eb8207d9d302e23aa7c1f9b23c740"
+      },
+      {
+        "path": "w02/green-focused/result.json",
+        "bytes": 1441,
+        "sha256": "8f1f53416595378f832ab10d96d1cac11abe4d41493868bdc601f6ea0841910b"
+      },
+      {
+        "path": "w02/green-focused/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "w02/green-focused/stdout.txt",
+        "bytes": 488,
+        "sha256": "0294550c4b85f3a494fedcfbfd25bb78551e223347564f9ace731f82f979e575"
+      },
+      {
+        "path": "w02/green-runner-2/result.json",
+        "bytes": 1380,
+        "sha256": "72f387d8e7f6ca4a2d6cb8ca41a47574f67a62a965928908ad244aef7520424e"
+      },
+      {
+        "path": "w02/green-runner-2/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "w02/green-runner-2/stdout.txt",
+        "bytes": 397,
+        "sha256": "462ee856ffd14a29a01a74d3554e4b303a7e938b0f1990e7c63285ba54612c44"
+      },
+      {
+        "path": "w02/green-runner/result.json",
+        "bytes": 1375,
+        "sha256": "c2122c800ec8e4f2364b5243887d6524bd04a3024800a23e49c0cc240ebf3f5d"
+      },
+      {
+        "path": "w02/green-runner/stderr.txt",
+        "bytes": 12450,
+        "sha256": "2ea275c20dcc44d44cf3519ea608c75c40bf020fd0bfc616ad622a76d4e48152"
+      },
+      {
+        "path": "w02/green-runner/stdout.txt",
+        "bytes": 7327,
+        "sha256": "82ba95fa563031a0f74c794882db26478e3e432191eec1935910ef12c4dc6661"
+      },
+      {
+        "path": "w02/red-gemini-prefix/result.json",
+        "bytes": 1338,
+        "sha256": "2edd6b1da9bc56ea0559082663465080454ad5b8e6880dbf63d19d347031ddb6"
+      },
+      {
+        "path": "w02/red-gemini-prefix/stderr.txt",
+        "bytes": 757,
+        "sha256": "72b58fa8ac3ef1091dac8bf4d63428807bf411357b90a97cefd5968a62c63e14"
+      },
+      {
+        "path": "w02/red-gemini-prefix/stdout.txt",
+        "bytes": 6030,
+        "sha256": "bfff70dc25e607f17207ec26e0a863aa348efeb026e9eedf80e30ec28b0f5bdc"
+      },
+      {
+        "path": "w02/red-hostile/result.json",
+        "bytes": 1325,
+        "sha256": "d5bafbb93a54e2d8e643c04d4d7c812dba474c7d13245468d66b3e9ea893ef24"
+      },
+      {
+        "path": "w02/red-hostile/stderr.txt",
+        "bytes": 1358,
+        "sha256": "bdb6b80cc47528106879fbbff32c6a0bc7b76f43f66ef4db098a255c45de09b0"
+      },
+      {
+        "path": "w02/red-hostile/stdout.txt",
+        "bytes": 5994,
+        "sha256": "01c91d4e3420867d8f4a97a26fcf0ead90bfb9588e53314d98b9b49f94889c91"
+      },
+      {
+        "path": "w02/red-runner/result.json",
+        "bytes": 1309,
+        "sha256": "5653dec5ddb73b002145cb694a4a92d8c7c5f68a8eb768abdc2d2701b5167f02"
+      },
+      {
+        "path": "w02/red-runner/stderr.txt",
+        "bytes": 6313,
+        "sha256": "c449d2846679fd96efdef78914c85215f48b23b041db98058c2964cdda1dfe9d"
+      },
+      {
+        "path": "w02/red-runner/stdout.txt",
+        "bytes": 5873,
+        "sha256": "e7d0454e827a07a232e7ca194bac139008911b278b5413c020a383b7bbb7a160"
+      },
+      {
+        "path": "w02/upstream/schema-notes.json",
+        "bytes": 5269,
+        "sha256": "eacbdb35016a7806d4afae08f441ca94e6ddf9839ba4afc1dda397cf8ff8d528"
+      },
+      {
+        "path": "w05-download/task-outputs-routes-direct-node.txt",
+        "bytes": 312,
+        "sha256": "1ae87cb40c2c2e3220399d25acf975e48e23c421c982a655bcf7344f625d7289"
+      },
+      {
+        "path": "w05-download/task-outputs-routes.txt",
+        "bytes": 2758,
+        "sha256": "f81bdf9a4ebd27a6cda7b4d8e8920cd0a8986cbed9169bc6548d2ea065917a0a"
+      },
+      {
+        "path": "w05/http-disconnect-red/result.json",
+        "bytes": 1413,
+        "sha256": "b3c0be88b700007af1bfd7b27f0077818574e0fa8a03157840e5899bbf5a6a85"
+      },
+      {
+        "path": "w05/http-disconnect-red/stderr.txt",
+        "bytes": 812,
+        "sha256": "0924ec88c5980c394ccad6374e46de09465d65ed9c52c9e927847debfff204b6"
+      },
+      {
+        "path": "w05/http-disconnect-red/stdout.txt",
+        "bytes": 6989,
+        "sha256": "4071a3ad3301a4cb408226c8ef96d69d47d204ea030187ac6a11008e9f5485f6"
+      },
+      {
+        "path": "w05/manager-worker-final-green/result.json",
+        "bytes": 1828,
+        "sha256": "2c3bdd0616521513482e23c0ff2d4af4dd20b56bf57cb38a328317ace9e4cb30"
+      },
+      {
+        "path": "w05/manager-worker-final-green/stderr.txt",
+        "bytes": 7689,
+        "sha256": "9756e13599af979f5d9ccc619be9876de5b7228f2887ca8f6086f81ef7158e03"
+      },
+      {
+        "path": "w05/manager-worker-final-green/stdout.txt",
+        "bytes": 1373,
+        "sha256": "248f2e97c3b15c2359a4f8e40ab54658f26252aa2e4b8dab142d5926945e7ce3"
+      },
+      {
+        "path": "w05/manager-worker-native-http-final-green/result.json",
+        "bytes": 1851,
+        "sha256": "c5456990cffe2741e595f873e497bc2b866e3e4bcdf301c421d6894b5bb2ba3d"
+      },
+      {
+        "path": "w05/manager-worker-native-http-final-green/stderr.txt",
+        "bytes": 7689,
+        "sha256": "9756e13599af979f5d9ccc619be9876de5b7228f2887ca8f6086f81ef7158e03"
+      },
+      {
+        "path": "w05/manager-worker-native-http-final-green/stdout.txt",
+        "bytes": 1218,
+        "sha256": "5765f2594f3bb32873999af131b5f6d3cf1a1b95917cae5141f7a92a4bac5bca"
+      },
+      {
+        "path": "w05/manager-worker-targeted-green/result.json",
+        "bytes": 1833,
+        "sha256": "9a9a2a183dd87d7ec0ca967f3b8dcc40753303346d42201d3396a8fa129a31fd"
+      },
+      {
+        "path": "w05/manager-worker-targeted-green/stderr.txt",
+        "bytes": 7689,
+        "sha256": "9756e13599af979f5d9ccc619be9876de5b7228f2887ca8f6086f81ef7158e03"
+      },
+      {
+        "path": "w05/manager-worker-targeted-green/stdout.txt",
+        "bytes": 1218,
+        "sha256": "b813e932b6de05cca7098db780cdb736de477a70a406b153d7afb5191ce2b07b"
+      },
+      {
+        "path": "w05/provider-cancellation-green/result.json",
+        "bytes": 1515,
+        "sha256": "5852db9ba82d712d50de90d015f9634f95674e79e9f8a380f788ef9c004d4a2e"
+      },
+      {
+        "path": "w05/provider-cancellation-green/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "w05/provider-cancellation-green/stdout.txt",
+        "bytes": 406,
+        "sha256": "3692c373655161b550b121c82c8c110c1b09bb7dcc7b833560e218a3600bb577"
+      },
+      {
+        "path": "w05/provider-cancellation-red/result.json",
+        "bytes": 1453,
+        "sha256": "0e864ca34c5391b2f3dca437b17db15dff124fec4341ac643278d88a5a5d259c"
+      },
+      {
+        "path": "w05/provider-cancellation-red/stderr.txt",
+        "bytes": 4371,
+        "sha256": "69d26d391006e1f70145082eb5dfbf705b8d33e9300f4f1b9e151e7fffb3781c"
+      },
+      {
+        "path": "w05/provider-cancellation-red/stdout.txt",
+        "bytes": 2090,
+        "sha256": "198e2045c10f529dc3d0fe51148102c4e43e2fade0a2865be51edba774a25560"
+      },
+      {
+        "path": "w05/provider-final-green/result.json",
+        "bytes": 1548,
+        "sha256": "f79c5b6ad0d74bf2b8843a9252d030abab582740f1cb3b02439e59319cc5fc6b"
+      },
+      {
+        "path": "w05/provider-final-green/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "w05/provider-final-green/stdout.txt",
+        "bytes": 467,
+        "sha256": "e14d33a44432b3b7b0f9fc370ee7838f72a2a0a7cdcf1f1dd7197bd68976057d"
+      },
+      {
+        "path": "w05/provider-targeted-green/result.json",
+        "bytes": 1554,
+        "sha256": "da19d9f7e4100f710c1944a0ccd861574e6d3e093e80262233034f412dc0c9a3"
+      },
+      {
+        "path": "w05/provider-targeted-green/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "w05/provider-targeted-green/stdout.txt",
+        "bytes": 467,
+        "sha256": "2cfa6dce0e2b3900a9d62533a97139ebf4d0ee17cbac1d39b396e1000f3c6e96"
+      },
+      {
+        "path": "w05/stat-completion-cancellation-red/result.json",
+        "bytes": 1467,
+        "sha256": "b1bd84ad523f0bad85408bb5090a0f8cf3e2d44a6efc78288a993f8cc92c7213"
+      },
+      {
+        "path": "w05/stat-completion-cancellation-red/stderr.txt",
+        "bytes": 1155,
+        "sha256": "9ae84acb573a58e91ece412e2b79ad9280f8991f2d60264a334b1b8fc96a827f"
+      },
+      {
+        "path": "w05/stat-completion-cancellation-red/stdout.txt",
+        "bytes": 2649,
+        "sha256": "af0cadefb3a27bbf36cabfaba6660f71cd061872ecb13e55580525abdb7e5297"
+      }
+    ]
+  }
+}

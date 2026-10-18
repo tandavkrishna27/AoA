@@ -243,5 +243,10 @@ export async function runAppServerTurn(
     } catch {
       // close must never throw into the caller.
     }
+    try {
+      spawned.terminate();
+    } catch {
+      onWarn?.("[aoa] codex app-server child termination failed.");
+    }
   }
 }

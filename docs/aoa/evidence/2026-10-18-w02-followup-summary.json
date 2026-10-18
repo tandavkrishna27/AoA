@@ -1,0 +1,1012 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-17T19:22:15.841Z",
+  "userFacingDate": "2026-10-18",
+  "timezone": "Asia/Calcutta",
+  "branch": "codex/replatform-w02-w05",
+  "base": "e86f4638d211f24f41f7dd94f55bb268419f1f8e",
+  "applicationCandidate": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+  "documentationPublicationSeparate": true,
+  "wholeSuiteRun": false,
+  "approvedScope": "Per-call crew authority, transactional curation audit, graceful tracked-child shutdown; durable abrupt-crash custody explicitly deferred by user.",
+  "commits": {
+    "authority": "714933f43",
+    "gracefulShutdown": "3606bfef0",
+    "curationAudit": "4282a6b33"
+  },
+  "selectedFiles": [
+    "server/src/__tests__/crew-tool-authority.test.ts",
+    "server/src/__tests__/auth-crew-run-boundary.test.ts",
+    "server/src/__tests__/agent-auth-jwt.test.ts",
+    "server/src/__tests__/auth-commander-jwt.test.ts",
+    "server/src/__tests__/mcp-agent-actor.test.ts",
+    "server/src/__tests__/mcp-run-currency-gate.test.ts",
+    "server/src/__tests__/broker-tool-context.unit.test.ts",
+    "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+    "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+    "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+    "server/src/__tests__/mcp-bridge-role-check.test.ts",
+    "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+    "server/src/__tests__/authorize-tool.test.ts",
+    "server/src/__tests__/hub-curation.test.ts",
+    "server/src/__tests__/hub-curation-tools.test.ts",
+    "server/src/__tests__/hub-curation.integration.test.ts",
+    "server/src/__tests__/sweep-steward.test.ts",
+    "server/src/__tests__/server-shutdown.test.ts",
+    "server/src/__tests__/crew-cancellation.test.ts",
+    "server/src/__tests__/aoa-runner.test.ts",
+    "server/src/__tests__/costs-service.test.ts",
+    "server/src/__tests__/costs-idempotency.integration.test.ts",
+    "server/src/__tests__/mcp-server.test.ts",
+    "server/src/__tests__/crew-run-jwt.test.ts",
+    "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+    "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+    "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts"
+  ],
+  "targeted": {
+    "windows": {
+      "candidate": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+      "node": "v24.19.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "pnpm": "9.15.4",
+      "exitCode": 0,
+      "printedFilesPassed": 27,
+      "printedTestsPassed": 247,
+      "printedTestsSkipped": 2,
+      "skipReason": "POSIX-only tracked-child tests",
+      "windowsIntegrationOptIn": true,
+      "captureSummary": {
+        "testFiles": "unknown",
+        "tests": "unknown",
+        "passed": "unknown",
+        "failed": "unknown",
+        "skipped": "unknown"
+      },
+      "captureUnhandledErrors": "unknown"
+    },
+    "vps": {
+      "candidate": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+      "node": "v24.19.0",
+      "platform": "linux",
+      "architecture": "arm64",
+      "pnpm": "9.15.4",
+      "exitCode": 0,
+      "printedFilesPassed": 27,
+      "printedTestsPassed": 249,
+      "printedTestsSkipped": 0,
+      "captureSummary": {
+        "testFiles": "unknown",
+        "tests": "unknown",
+        "passed": "unknown",
+        "failed": "unknown",
+        "skipped": "unknown"
+      },
+      "captureUnhandledErrors": "unknown"
+    },
+    "affectedPackages": [
+      "@armyofagents/adapter-utils",
+      "@armyofagents/server"
+    ],
+    "buildsAndTypechecksPassed": true,
+    "compatibility": "Existing organization/static-key/Commander policy and scheduling-only crewPaused preserved; Commander JWT verifier unchanged.",
+    "auditRedObservation": {
+      "source": "Author tool trace and prior live missing-audit observation",
+      "failed": 2,
+      "passed": 1,
+      "standaloneRawRedFile": null,
+      "note": "Do not invent a standalone raw receipt for this initial red. Green integration, rollback, conflict and identity evidence is retained."
+    },
+    "initialRootCombined": {
+      "verdict": "superseded",
+      "failed": 1,
+      "reason": "Overlapped intentional immediate-drain red-to-green edit; coherent frozen and exact-commit selections pass."
+    }
+  },
+  "liveBoundaryFixtures": {
+    "local": {
+      "startedAt": "2026-10-17T19:08:17.687Z",
+      "origin": "http://127.0.0.1:3214",
+      "fixtureKind": "Explicitly seeded disposable auth/run rows; no model invocation, source task, or provider execution",
+      "organizationId": "c0a5578f-5a46-4f44-be9d-0ccaaf4a91f3",
+      "companyId": "5ed5cd13-0dd5-48cc-8887-872a7a1eb915",
+      "foreignCompanyId": "926113bf-0254-404e-9ffd-a5279067bed0",
+      "runId": "d5905fe5-ec7f-42f0-be9b-0bef6205a7e4",
+      "checks": [
+        {
+          "name": "active signed crew run lists permitted tools despite scheduling-only crewPaused",
+          "result": "pass"
+        },
+        {
+          "name": "header override cannot replace signed crew run attribution",
+          "result": "pass"
+        },
+        {
+          "name": "foreign company URL denied",
+          "result": "pass"
+        },
+        {
+          "name": "signed run belonging to another agent denied",
+          "result": "pass"
+        },
+        {
+          "name": "signed run belonging to another company denied",
+          "result": "pass"
+        },
+        {
+          "name": "unknown signed run denied",
+          "result": "pass"
+        },
+        {
+          "name": "outbound memory mutation outside crew allowlist denied",
+          "result": "pass"
+        },
+        {
+          "name": "terminal completed run denied",
+          "result": "pass"
+        },
+        {
+          "name": "terminal failed run denied",
+          "result": "pass"
+        },
+        {
+          "name": "terminal cancelled run denied",
+          "result": "pass"
+        },
+        {
+          "name": "paused crew agent denied",
+          "result": "pass"
+        },
+        {
+          "name": "current HTTP allowlist revocation prevents the next write",
+          "result": "pass"
+        },
+        {
+          "name": "explicit invalid bearer has no implicit board fallback",
+          "result": "pass"
+        },
+        {
+          "name": "expired real signed JWT denied",
+          "result": "pass"
+        },
+        {
+          "name": "native stdio live process lists the permitted tool",
+          "result": "pass"
+        },
+        {
+          "name": "native stdio current allowlist revocation denies next call",
+          "result": "pass"
+        },
+        {
+          "name": "native stdio cancelled run denies the next otherwise-allowed read",
+          "result": "pass"
+        }
+      ],
+      "health": {
+        "status": "ok",
+        "revision": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+        "deploymentMode": "local_trusted",
+        "deploymentExposure": "private",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": true
+        }
+      },
+      "auditRows": 1,
+      "costEvents": 0,
+      "result": "pass",
+      "fixtureOrganizationAbsent": true,
+      "finishedAt": "2026-10-17T19:08:26.357Z"
+    },
+    "vps": {
+      "startedAt": "2026-10-17T19:10:26.691Z",
+      "origin": "https://testing.armyofagents.org",
+      "fixtureKind": "Explicitly seeded disposable auth/run rows; no model invocation, source task, or provider execution",
+      "organizationId": "1945f34f-53e7-471d-8b29-247f275e1e5d",
+      "companyId": "bf8c5500-3753-4dc6-8ad5-b7ba0ba75ad4",
+      "foreignCompanyId": "aedddce0-db70-4da0-99c8-ec78301cf764",
+      "runId": "9ae5a7cb-4d7c-4784-b775-49792fb3f578",
+      "checks": [
+        {
+          "name": "active signed crew run lists permitted tools despite scheduling-only crewPaused",
+          "result": "pass"
+        },
+        {
+          "name": "header override cannot replace signed crew run attribution",
+          "result": "pass"
+        },
+        {
+          "name": "foreign company URL denied",
+          "result": "pass"
+        },
+        {
+          "name": "signed run belonging to another agent denied",
+          "result": "pass"
+        },
+        {
+          "name": "signed run belonging to another company denied",
+          "result": "pass"
+        },
+        {
+          "name": "unknown signed run denied",
+          "result": "pass"
+        },
+        {
+          "name": "outbound memory mutation outside crew allowlist denied",
+          "result": "pass"
+        },
+        {
+          "name": "terminal completed run denied",
+          "result": "pass"
+        },
+        {
+          "name": "terminal failed run denied",
+          "result": "pass"
+        },
+        {
+          "name": "terminal cancelled run denied",
+          "result": "pass"
+        },
+        {
+          "name": "paused crew agent denied",
+          "result": "pass"
+        },
+        {
+          "name": "current HTTP allowlist revocation prevents the next write",
+          "result": "pass"
+        },
+        {
+          "name": "explicit invalid bearer has no implicit board fallback",
+          "result": "pass"
+        },
+        {
+          "name": "expired real signed JWT denied",
+          "result": "pass"
+        }
+      ],
+      "health": {
+        "status": "ok",
+        "revision": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+        "deploymentMode": "cloud_auth",
+        "deploymentExposure": "public",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": false
+        }
+      },
+      "auditRows": 1,
+      "costEvents": 0,
+      "result": "pass",
+      "fixtureOrganizationAbsent": true,
+      "finishedAt": "2026-10-17T19:10:29.829Z"
+    },
+    "scope": "Real JWT/DB and actual running HTTP application; explicitly seeded non-model run fixtures. Local adds actual stdio process. Synthetic fixture data removed."
+  },
+  "nativeModelRun": {
+    "health": {
+      "status": "ok",
+      "revision": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+      "deploymentMode": "local_trusted",
+      "deploymentExposure": "private",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": true
+      }
+    },
+    "run": {
+      "id": "d14aaca4-4b33-4266-baab-5ccc78cf2d15",
+      "status": "completed",
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "toolsCalled": [
+        "hub.readCurationContext",
+        "hub.updateCurationSummary"
+      ],
+      "tokenUsage": {
+        "inputTokens": 60248,
+        "outputTokens": 379,
+        "cachedInputTokens": 55296
+      },
+      "costCents": null,
+      "errorMessage": null
+    },
+    "companyId": "2a923be3-151f-41e0-b72e-e30ce4ee64c8",
+    "stewardId": "c0f7e0f8-b274-487e-a2ac-4f0880ce52ee",
+    "cli": "Codex 0.145.0",
+    "savedModelSelections": null,
+    "credentialMode": "Owner-local ChatGPT subscription, provider keys unset; no personal auth transferred to VPS.",
+    "curationAudit": [
+      {
+        "id": "1c1981ff-c82a-4f3e-a24e-192a60a423d8",
+        "actorType": "system",
+        "actorId": "steward_sweep",
+        "agentId": null,
+        "runId": null,
+        "action": "hub_item.curation_updated",
+        "entityId": "e5c22716-d006-415a-8304-e6cf9a8f586e",
+        "details": {
+          "source": "system_sweep",
+          "changedFields": [
+            "curationGroupLabel",
+            "curationGroupSummary",
+            "curationReason",
+            "curationPriorityReason"
+          ],
+          "curationRevision": 1,
+          "previousRevision": 0
+        }
+      },
+      {
+        "id": "97839cba-9c4a-426a-bf49-b7fc1d0ed865",
+        "actorType": "agent",
+        "actorId": "c0f7e0f8-b274-487e-a2ac-4f0880ce52ee",
+        "agentId": "c0f7e0f8-b274-487e-a2ac-4f0880ce52ee",
+        "runId": null,
+        "action": "hub_item.curation_updated",
+        "entityId": "e5c22716-d006-415a-8304-e6cf9a8f586e",
+        "details": {
+          "source": "agent_tool",
+          "changedFields": [
+            "curationGroupSummary"
+          ],
+          "curationRevision": 2,
+          "previousRevision": 1,
+          "internalAgentRunId": "d14aaca4-4b33-4266-baab-5ccc78cf2d15"
+        }
+      }
+    ],
+    "costs": [
+      {
+        "id": "59afb021-e3bc-4af3-aa5d-db1a6ad3a653",
+        "billingType": "subscription",
+        "costCents": 0,
+        "sourceIdempotencyKey": "crew_run:d14aaca4-4b33-4266-baab-5ccc78cf2d15"
+      }
+    ],
+    "hub": [
+      {
+        "id": "e5c22716-d006-415a-8304-e6cf9a8f586e",
+        "curationRevision": 2,
+        "curatedByAgentId": "c0f7e0f8-b274-487e-a2ac-4f0880ce52ee",
+        "status": "open"
+      }
+    ],
+    "approval": {
+      "id": "17468fc5-a19e-4f22-b99f-1d837b1b3513",
+      "status": "pending"
+    },
+    "scope": "Actual normal app-originated Steward run, not protocol fixture. Curation display-only; no task dispatch or approval. One system and one agent audit; no audit text copying.",
+    "cleanup": {
+      "databaseAlreadyExitedWithApp": true,
+      "reviewBefore": {
+        "status": "ok",
+        "revision": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "deploymentMode": "local_trusted",
+        "deploymentExposure": "private",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": true
+        }
+      },
+      "result": "pass",
+      "appProcesses": [
+        {
+          "ProcessId": 20308,
+          "ParentProcessId": 21712,
+          "Name": "node.exe",
+          "createdAt": "2026-10-17T19:04:41.3854790Z"
+        },
+        {
+          "ProcessId": 7228,
+          "ParentProcessId": 20308,
+          "Name": "conhost.exe",
+          "createdAt": "2026-10-17T19:04:41.3946410Z"
+        },
+        {
+          "ProcessId": 21212,
+          "ParentProcessId": 20308,
+          "Name": "node.exe",
+          "createdAt": "2026-10-17T19:04:41.5184210Z"
+        },
+        {
+          "ProcessId": 17324,
+          "ParentProcessId": 21212,
+          "Name": "esbuild.exe",
+          "createdAt": "2026-10-17T19:04:43.8245590Z"
+        }
+      ],
+      "remainingOwnedAppProcesses": 0,
+      "startedAt": "2026-10-17T19:09:25.8331253Z",
+      "reviewAfter": {
+        "status": "ok",
+        "revision": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "deploymentMode": "local_trusted",
+        "deploymentExposure": "private",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": true
+        }
+      },
+      "remainingOwnedListeners": 0,
+      "scope": "Only disposable .aqw26 app and database; explicit forced Windows teardown, not graceful-signal qualification",
+      "ownedDatabaseStillRunning": false,
+      "databaseCreatedAt": "2026-10-17T19:04:57.1615380Z",
+      "temporaryAuthCopyRemoved": true,
+      "databasePid": 23352,
+      "finishedAt": "2026-10-17T19:09:29.5827658Z"
+    }
+  },
+  "custody": {
+    "beforeFix": {
+      "node": "v24.19.0",
+      "platform": "linux",
+      "sourceSha": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+      "observations": [
+        {
+          "schedule": "abrupt-parent-exit",
+          "nonce": "owned-custody-d6834e52-05b7-45ea-bf43-e3e1b7db4c6b",
+          "parentPid": 262440,
+          "childPid": 262459,
+          "originalIdentity": {
+            "state": "R",
+            "pgrp": 262459,
+            "startTicks": "11216940",
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "command": [
+              "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+              "/opt/aoa-w02-followup-20261018/lifecycle/linux-owned-probe.mjs",
+              "child",
+              "/opt/aoa-w02-w05-20261017/source",
+              "/opt/aoa-w02-followup-20261018/lifecycle/attempt-03/abrupt-parent-exit",
+              "owned-custody-d6834e52-05b7-45ea-bf43-e3e1b7db4c6b",
+              ""
+            ]
+          },
+          "parentTerminal": {
+            "code": null,
+            "signal": "SIGKILL"
+          },
+          "beforeExit": null,
+          "heartbeatBefore": 3,
+          "heartbeatAfterParent": 7,
+          "heartbeatAfterFreshRecovery": 21,
+          "freshRecovery": {
+            "registered": false,
+            "reportsExited": true
+          },
+          "childStillRunningWithOriginalIdentity": true
+        },
+        {
+          "schedule": "graceful-shutdown-helper",
+          "nonce": "owned-custody-f7cf6fd3-9c40-4bff-ae36-171875eedfe5",
+          "parentPid": 262477,
+          "childPid": 262484,
+          "originalIdentity": {
+            "state": "R",
+            "pgrp": 262484,
+            "startTicks": "11217093",
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "command": [
+              "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+              "/opt/aoa-w02-followup-20261018/lifecycle/linux-owned-probe.mjs",
+              "child",
+              "/opt/aoa-w02-w05-20261017/source",
+              "/opt/aoa-w02-followup-20261018/lifecycle/attempt-03/graceful-shutdown-helper",
+              "owned-custody-f7cf6fd3-9c40-4bff-ae36-171875eedfe5",
+              ""
+            ]
+          },
+          "parentTerminal": {
+            "code": 0,
+            "signal": null
+          },
+          "beforeExit": {
+            "code": 0,
+            "childRegistered": true
+          },
+          "heartbeatBefore": 3,
+          "heartbeatAfterParent": 7,
+          "heartbeatAfterFreshRecovery": 21,
+          "freshRecovery": {
+            "registered": false,
+            "reportsExited": true
+          },
+          "childStillRunningWithOriginalIdentity": true
+        }
+      ]
+    },
+    "fixed": "Graceful existing tracked registry drain with actual close before database teardown, immediate rejection observation and new-spawn denial; POSIX TERM-to-KILL escalation verified.",
+    "notFixed": "Abrupt parent/host crash custody; process-local registry cannot safely recover old children. Needs separately reviewed host/start identity and pre-execution custody/supervisor design.",
+    "windowsQualification": "No surviving child reproduced after old Windows parent exit in this environment; do not generalize POSIX survivor evidence to Windows.",
+    "effectBoundary": "Subsequent revoked/cancelled calls denied; no rollback of already accepted effects or guarantee for intentionally escaped descendants. Unrelated subsystem waits remain separately unbounded."
+  },
+  "vpsDeployment": {
+    "candidate": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+    "startedAt": "2026-10-17T19:09:04.122883+00:00",
+    "databaseBefore": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "result": "pass",
+    "health": {
+      "status": "ok",
+      "revision": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+      "deploymentMode": "cloud_auth",
+      "deploymentExposure": "public",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": false
+      }
+    },
+    "uiHttpStatus": 200,
+    "databaseAfter": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "serviceActive": "active",
+    "distributedRolloutEnabled": false,
+    "retainedOAuthConfiguration": true,
+    "finishedAt": "2026-10-17T19:09:26.202936+00:00"
+  },
+  "chrome": {
+    "observedAt": "2026-10-17T19:13:24.077Z",
+    "candidate": "4282a6b33ee3d2edce55db4a2f2f014eac0388fe",
+    "browser": "Chrome",
+    "url": "https://testing.armyofagents.org/QAC/home",
+    "result": "pass",
+    "scope": "Existing authenticated session, original QA company, open then reload after rebuild; no new OAuth permission grant"
+  },
+  "pending": [
+    "Durable abrupt-crash/host-restart custody explicitly deferred to a separately reviewed design.",
+    "Live Claude/Gemini/OpenCode and Codex app-server/provider-specific variants not covered; no blanket all-adapter W02 closure.",
+    "W05 supported-cohort VPSauthority-PCworker real file/export/commit/UI-download acceptance unchanged; W06/W07 prerequisites unchanged.",
+    "Integration, whole required lane, PR/release approval and rollout changes not performed."
+  ],
+  "harnessDiagnostics": [
+    "Early Linux probe inherited inaccessible /root cwd; corrected only owned test cwd/runtime copy, not retained source permissions.",
+    "Legacy curation fixture WIN1252 could not load existing UTF-8 migrations; used existing migrated-database helper and Windows opt-in.",
+    "First local protocol cleanup failed on organization RESTRICT and then owned activity FK/check constraints; ownership-checked fixture recovery removed only synthetic data. That incomplete attempt is not counted as a pass.",
+    "Initial non-root VPS launcher could not read root-protected env; root launcher now reads it and executes the child under existing aoatest without weakening permissions or publishing secrets."
+  ],
+  "rawEvidence": {
+    "localDirectory": "C:/Users/Dell/Desktop/aoa/validation-w02-followup-2026-10-18",
+    "vpsDirectory": "/opt/aoa-w02-followup-20261018/evidence",
+    "availability": "Raw files stay on test hosts, not clone-accessible attachments; raw transcripts/config/auth/database contents are not published.",
+    "captureCounterPolicy": "Unknown stays unknown; printed counters recorded separately.",
+    "receiptCount": 72,
+    "receipts": [
+      {
+        "path": "selected-tests.txt",
+        "bytes": 1454,
+        "sha256": "9c24778a3bf57c08bf6a96eda2b2446bb98ad80dd1520c6763e63e2795178c96",
+        "modifiedAt": "2026-10-17T19:04:40.269Z"
+      },
+      {
+        "path": "progress.md",
+        "bytes": 4092,
+        "sha256": "2c9d33348a2502301043c6ddf015035055f06dcdeb99d90fd5bfa5f46b77234f",
+        "modifiedAt": "2026-10-17T19:22:15.481Z"
+      },
+      {
+        "path": "local-published/result.json",
+        "bytes": 2935,
+        "sha256": "f2944ce2c6f620b000dfb88ab95fa47124a30eb9372750be56bd4d718435f5dc",
+        "modifiedAt": "2026-10-17T19:05:01.945Z"
+      },
+      {
+        "path": "local-published/stdout.txt",
+        "bytes": 151837,
+        "sha256": "62f2ac44acc17d068f8244f096359e0e8b4d354f4a220684c571b4c375c4fa15",
+        "modifiedAt": "2026-10-17T19:05:01.707Z"
+      },
+      {
+        "path": "local-published/stderr.txt",
+        "bytes": 542,
+        "sha256": "de3fbb45c79dfc4a206c8a779f2887004a0c397a6c9ca5e71ff3528240d40c06",
+        "modifiedAt": "2026-10-17T19:04:51.369Z"
+      },
+      {
+        "path": "local-integration-initial/result.json",
+        "bytes": 2957,
+        "sha256": "ba28f28097cc36aa4d5a6ef9157cbbb1370adc94280cd7165ad7ffaa472e852d",
+        "modifiedAt": "2026-10-17T18:56:41.807Z"
+      },
+      {
+        "path": "local-integration-initial/stdout.txt",
+        "bytes": 152074,
+        "sha256": "a4772b9f341d8fa42481996164da63f9193ccd7f37bce92564eccc4837a2d2f0",
+        "modifiedAt": "2026-10-17T18:56:41.616Z"
+      },
+      {
+        "path": "local-integration-initial/stderr.txt",
+        "bytes": 1402,
+        "sha256": "72faa5df23a617fe6302b095816fb2f5dd75b6a38c0d28090cb5c22bb970d628",
+        "modifiedAt": "2026-10-17T18:56:41.614Z"
+      },
+      {
+        "path": "local-build.result.json",
+        "bytes": 172,
+        "sha256": "2c1bbe78c5483d030260c3c36f27fdc8ef564bd3fe1bc5549a56052711dec7d8",
+        "modifiedAt": "2026-10-17T19:01:42.983Z"
+      },
+      {
+        "path": "local-adapter-utils-build.log",
+        "bytes": 107,
+        "sha256": "bd4f4299b725cb182442d463324b18670ed4a37468a8d55ca16e630cee0b95c7",
+        "modifiedAt": "2026-10-17T19:01:01.520Z"
+      },
+      {
+        "path": "local-server-build.log",
+        "bytes": 212,
+        "sha256": "04d35036a8584f98ed4039c91126f5736d4bff6bfe8f3123ee6d6bfc35bc5039",
+        "modifiedAt": "2026-10-17T19:01:06.230Z"
+      },
+      {
+        "path": "auth/verification-summary.json",
+        "bytes": 3035,
+        "sha256": "3de7b523a097fe6984e1f3dba6f0e1b62ad20d181ca5d4cad7d6bf5d8ab4aac6",
+        "modifiedAt": "2026-10-17T19:01:54.054Z"
+      },
+      {
+        "path": "auth/typecheck.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T18:59:39.118Z"
+      },
+      {
+        "path": "auth/red/result.json",
+        "bytes": 1346,
+        "sha256": "fb24bd38035fd6e469ba2899d50a38b4b9b4937f4e61541b34bcbcf3aaba8c37",
+        "modifiedAt": "2026-10-17T18:49:22.790Z"
+      },
+      {
+        "path": "auth/red/stdout.txt",
+        "bytes": 5656,
+        "sha256": "02d49ac44e2f5952357b1d4aeb4620530b7a4057932478f7a789600bdddd170b",
+        "modifiedAt": "2026-10-17T18:49:22.615Z"
+      },
+      {
+        "path": "auth/red/stderr.txt",
+        "bytes": 10433,
+        "sha256": "a1d33a40d3c9487da11f89a5886369f044b1baaaa5fd94113ffe39a11e961735",
+        "modifiedAt": "2026-10-17T18:49:22.613Z"
+      },
+      {
+        "path": "auth/green/result.json",
+        "bytes": 1350,
+        "sha256": "2b99eaac02cf8270f9bc094f788e47af5da367b62f018692b32cb2f43a5b74f8",
+        "modifiedAt": "2026-10-17T18:51:15.408Z"
+      },
+      {
+        "path": "auth/green/stdout.txt",
+        "bytes": 407,
+        "sha256": "843cdd1f85fd96f82e7793eb2aab807b14da6582a2fc4763c1a0d0cd429f75f6",
+        "modifiedAt": "2026-10-17T18:51:15.192Z"
+      },
+      {
+        "path": "auth/green/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T18:51:06.458Z"
+      },
+      {
+        "path": "auth/outbound-red/result.json",
+        "bytes": 1305,
+        "sha256": "f104e1664d2d709399827452bf3db11de942f2bccd9872bfbbad032ff77dd5ec",
+        "modifiedAt": "2026-10-17T18:58:10.131Z"
+      },
+      {
+        "path": "auth/outbound-red/stdout.txt",
+        "bytes": 3117,
+        "sha256": "cba881bbb34d991b0c63f12c047eb51239e45ac6fc0d154b70ba51a53c881a45",
+        "modifiedAt": "2026-10-17T18:58:09.953Z"
+      },
+      {
+        "path": "auth/outbound-red/stderr.txt",
+        "bytes": 1707,
+        "sha256": "a72315ea76b950534df9657e7c8bb40ea473514e27e4a55bda724ec8ac4a2816",
+        "modifiedAt": "2026-10-17T18:58:09.951Z"
+      },
+      {
+        "path": "auth/outbound-green/result.json",
+        "bytes": 1310,
+        "sha256": "7126567e5957d2a181d18fde5565b1acec38107b0358dc149cacc98ccb4b5280",
+        "modifiedAt": "2026-10-17T18:58:54.626Z"
+      },
+      {
+        "path": "auth/outbound-green/stdout.txt",
+        "bytes": 321,
+        "sha256": "dd7ad61b6d636f94f37387cfc0830cb183a8acf24f56372301e57697fd546aed",
+        "modifiedAt": "2026-10-17T18:58:54.449Z"
+      },
+      {
+        "path": "auth/expiry-red/result.json",
+        "bytes": 1294,
+        "sha256": "7a7ee8ba4ee0bed62e4bd33a82bebbb3f5f1a08b99b2a579a7d8dc78ce0359f5",
+        "modifiedAt": "2026-10-17T18:59:24.434Z"
+      },
+      {
+        "path": "auth/expiry-red/stdout.txt",
+        "bytes": 1182,
+        "sha256": "fba03dd2f5667a8c98e0677e90b8a837b601963df87eef9027de18998d7eaa51",
+        "modifiedAt": "2026-10-17T18:59:24.288Z"
+      },
+      {
+        "path": "auth/expiry-green/result.json",
+        "bytes": 1298,
+        "sha256": "fb007d3cdacd30b5307e54620561aabddba677363832b3060fc72f490f279e13",
+        "modifiedAt": "2026-10-17T18:59:39.078Z"
+      },
+      {
+        "path": "auth/expiry-green/stdout.txt",
+        "bytes": 309,
+        "sha256": "63406439d44dd446579ad90d80e6d42b84f739e8477fe93d4fbe2d4423523a86",
+        "modifiedAt": "2026-10-17T18:59:38.930Z"
+      },
+      {
+        "path": "audit/curation-green-final.log",
+        "bytes": 70970,
+        "sha256": "ef320f8f3771ddd0f6ea54437716822954fa9904d1f5fa5da0be32dc4aed41d4",
+        "modifiedAt": "2026-10-17T18:47:37.071Z"
+      },
+      {
+        "path": "audit/curation-backcompat.log",
+        "bytes": 485,
+        "sha256": "deeef8dc7e1390057b928579d16b51f99d0f5fcf008ac9e7cceaf2f87e679d57",
+        "modifiedAt": "2026-10-17T18:51:47.709Z"
+      },
+      {
+        "path": "audit/curation-realdb-final.log",
+        "bytes": 70983,
+        "sha256": "5475428697444cc71d26ae76ad20dda4931c779fca436b681ea2cfa3a05db9cc",
+        "modifiedAt": "2026-10-17T18:52:04.906Z"
+      },
+      {
+        "path": "audit/curation-legacy-unit-red.log",
+        "bytes": 3422,
+        "sha256": "89c588ea3052a906bd75b738e4edc62756faa84355010259aee4686c81a49ff9",
+        "modifiedAt": "2026-10-17T18:48:55.447Z"
+      },
+      {
+        "path": "audit/curation-typecheck-final.log",
+        "bytes": 97,
+        "sha256": "11aca9525700da9e8acd191d11835d075f494a51da8b60306576130f1f8c4157",
+        "modifiedAt": "2026-10-17T18:52:08.188Z"
+      },
+      {
+        "path": "lifecycle/investigation.md",
+        "bytes": 6170,
+        "sha256": "1e7d8adc5a4c5bb2e88287444f1a6ef4b6f348e2cd3ed6a25ec9f952002b66cb",
+        "modifiedAt": "2026-10-17T18:56:28.889Z"
+      },
+      {
+        "path": "lifecycle/summary.json",
+        "bytes": 1475,
+        "sha256": "c5c17291a660a43680ab2e0d1baa3073b1585b89eb8a6fb8c973da979892a788",
+        "modifiedAt": "2026-10-17T18:47:09.622Z"
+      },
+      {
+        "path": "lifecycle/shutdown-red/result.json",
+        "bytes": 1385,
+        "sha256": "4062f776e294efdf6c2ae4837ab500f8ea9130705db5fa3ee33a43570d9b93e1",
+        "modifiedAt": "2026-10-17T18:46:28.062Z"
+      },
+      {
+        "path": "lifecycle/shutdown-red/stdout.txt",
+        "bytes": 1646,
+        "sha256": "8ba6dac3b54a33672f4301e536c28e3884736dabad8e4de97d4db45c1610ee48",
+        "modifiedAt": "2026-10-17T18:46:27.874Z"
+      },
+      {
+        "path": "lifecycle/shutdown-red/stderr.txt",
+        "bytes": 3122,
+        "sha256": "7a2054b4e0b358be90118e32e48283b1f9cb4e0f5bd3b19784b900ef13955439",
+        "modifiedAt": "2026-10-17T18:46:27.872Z"
+      },
+      {
+        "path": "lifecycle/immediate-drain-red/result.json",
+        "bytes": 1323,
+        "sha256": "d4610fb5d94dec3e0f35df67fe0c4b99758c45874a4435514a33c0e1b184aa64",
+        "modifiedAt": "2026-10-17T18:55:55.235Z"
+      },
+      {
+        "path": "lifecycle/immediate-drain-red/stdout.txt",
+        "bytes": 1146,
+        "sha256": "797ad381d49e6b87b29fda69b77fcbc97415f9e8fd8620ecf6e5d20a8be18443",
+        "modifiedAt": "2026-10-17T18:55:55.082Z"
+      },
+      {
+        "path": "lifecycle/immediate-drain-green/result.json",
+        "bytes": 1622,
+        "sha256": "cef7a176efe399bd79b93faa40a7e90002e03c15a92be8ead4b8e67323f4b90e",
+        "modifiedAt": "2026-10-17T18:56:28.805Z"
+      },
+      {
+        "path": "lifecycle/immediate-drain-green/stdout.txt",
+        "bytes": 940,
+        "sha256": "a03e33495f6ba0fafa9b871b42afdc735a39a618cea0a204bc3de9b8c4dc9783",
+        "modifiedAt": "2026-10-17T18:56:28.598Z"
+      },
+      {
+        "path": "lifecycle/adapter-utils-typecheck.log.json",
+        "bytes": 271,
+        "sha256": "72683b6af9369978e6ec8bc2925b774c9b5d2fa5db1c18f9fde77eee5e81b06b",
+        "modifiedAt": "2026-10-17T18:50:19.703Z"
+      },
+      {
+        "path": "lifecycle/server-typecheck-immediate-drain.log.json",
+        "bytes": 255,
+        "sha256": "db320ab1cae17ef10dd4bf4ab41e871fa465c34b827b34f1523123c9ddb212bf",
+        "modifiedAt": "2026-10-17T18:57:21.240Z"
+      },
+      {
+        "path": "lifecycle/vps-before-fix/summary.json",
+        "bytes": 2528,
+        "sha256": "2e6e78fdf8be6a2c0b6dc8aa9086f02be8d982c89a36cea02f3b00b50068c7ed",
+        "modifiedAt": "2026-10-17T18:52:16.378Z"
+      },
+      {
+        "path": "lifecycle/vps-before-fix/abrupt-parent-exit/cleanup.json",
+        "bytes": 28,
+        "sha256": "2f441a793eac27f6908914fb0d9dd66d203c52c46bf0277d1a46a5d0d6a32ddc",
+        "modifiedAt": "2026-10-17T18:52:21.446Z"
+      },
+      {
+        "path": "lifecycle/vps-before-fix/graceful-shutdown-helper/cleanup.json",
+        "bytes": 28,
+        "sha256": "2f441a793eac27f6908914fb0d9dd66d203c52c46bf0277d1a46a5d0d6a32ddc",
+        "modifiedAt": "2026-10-17T18:52:17.546Z"
+      },
+      {
+        "path": "native-health.json",
+        "bytes": 323,
+        "sha256": "18d8ecf71fa42aeff83d4d912bc79cf25496d23423283c3776ee6fa515c25983",
+        "modifiedAt": "2026-10-17T19:05:01.775Z"
+      },
+      {
+        "path": "native-process.json",
+        "bytes": 382,
+        "sha256": "848c5c5527fb4edf427b05b427c0eac555b704d5e2f754bf50d43724d06c476b",
+        "modifiedAt": "2026-10-17T19:04:41.448Z"
+      },
+      {
+        "path": "native-setup.json",
+        "bytes": 431,
+        "sha256": "4c1073b1adb19aa889756efd5c6404c6a40ea78f74bee42315d3b87ee2c6331e",
+        "modifiedAt": "2026-10-17T19:05:52.321Z"
+      },
+      {
+        "path": "native-run.json",
+        "bytes": 850,
+        "sha256": "06e279f331bd467f33121031481d083b7e1500eefd58611ee4554662a7bf8c29",
+        "modifiedAt": "2026-10-17T19:07:33.486Z"
+      },
+      {
+        "path": "native-audit.json",
+        "bytes": 9583,
+        "sha256": "6597c7df8a0e32e12d402c0445f2705f4c9512472b555a4e1ffcf8dac067bbe4",
+        "modifiedAt": "2026-10-17T19:07:35.046Z"
+      },
+      {
+        "path": "native-cleanup-before.json",
+        "bytes": 2042,
+        "sha256": "540825a132fa4758ff39c842f1106a577429f542eb00dca6ee6ca3ba053c2d4a",
+        "modifiedAt": "2026-10-17T19:09:25.843Z"
+      },
+      {
+        "path": "native-cleanup.result.json",
+        "bytes": 2863,
+        "sha256": "6abae332333409421ee836704c48feb9aad06246e6f5848bd14dfbaed1ff0e4d",
+        "modifiedAt": "2026-10-17T19:09:29.584Z"
+      },
+      {
+        "path": "local-protocol-retry.json",
+        "bytes": 2549,
+        "sha256": "bdf1ce457b8e1cbf45a9daa60a787b0e1dc23512a4ef4b4061c10f9a91ce1986",
+        "modifiedAt": "2026-10-17T19:08:26.359Z"
+      },
+      {
+        "path": "protocol-attempt01-cleanup.json",
+        "bytes": 704,
+        "sha256": "d5feb54de440b4d1080324a1956388485f9d285593e706b7955f50147ca1b7e2",
+        "modifiedAt": "2026-10-17T19:08:16.167Z"
+      },
+      {
+        "path": "vps-evidence/install.result.json",
+        "bytes": 88,
+        "sha256": "0a748320c9480be211da867eea46c304332e5a8d1f9249926f1e7bc56e6f06cf",
+        "modifiedAt": "2026-10-17T19:12:16.943Z"
+      },
+      {
+        "path": "vps-evidence/install.log",
+        "bytes": 928,
+        "sha256": "2dd3c6cfec66e5f2d914da7450bc6b70778e1cc0c6b1f3931bd408e3f8147e77",
+        "modifiedAt": "2026-10-17T19:12:16.352Z"
+      },
+      {
+        "path": "vps-evidence/final/result.json",
+        "bytes": 2843,
+        "sha256": "9af6b94343982b45ba300f1fb2e03b162c6cf00852f5952a2cdeac5667cd4f6c",
+        "modifiedAt": "2026-10-17T19:12:24.453Z"
+      },
+      {
+        "path": "vps-evidence/final/stdout.txt",
+        "bytes": 189807,
+        "sha256": "4522113bfea8744b89c118503c6cfaf72918e9272207d7eefcf09c6957539df5",
+        "modifiedAt": "2026-10-17T19:12:25.944Z"
+      },
+      {
+        "path": "vps-evidence/final/stderr.txt",
+        "bytes": 671,
+        "sha256": "e3b20d4e0cff715ff6c049174172acac0ab5984b4da61c1565de31f392ae4b99",
+        "modifiedAt": "2026-10-17T19:12:25.050Z"
+      },
+      {
+        "path": "vps-evidence/final-build.result.json",
+        "bytes": 86,
+        "sha256": "f91b3980ccff9f3ddd0a529ecd297da07b1e93a3e3494b3a48b440fc258776cc",
+        "modifiedAt": "2026-10-17T19:12:20.337Z"
+      },
+      {
+        "path": "vps-evidence/final-build.log",
+        "bytes": 268,
+        "sha256": "d5e7cf8f229397b75de2171ca2bd16f4fbf11cc35426b623256a25ff5967bdf0",
+        "modifiedAt": "2026-10-17T19:12:21.517Z"
+      },
+      {
+        "path": "vps-evidence/final-typecheck.result.json",
+        "bytes": 90,
+        "sha256": "e6caa6a3dc5ada5c430702e21f58e07479825055887d7acf74d1f9bd7afd694e",
+        "modifiedAt": "2026-10-17T19:12:22.695Z"
+      },
+      {
+        "path": "vps-evidence/final-typecheck.log",
+        "bytes": 174,
+        "sha256": "50b42561693aa011186ea8c5fcab577e38d5efcbfd340d7f1a637999e956dd12",
+        "modifiedAt": "2026-10-17T19:12:23.281Z"
+      },
+      {
+        "path": "vps-evidence/deployment-final.json",
+        "bytes": 786,
+        "sha256": "896f94d04c3296dd1a70b3c267b9afaef4131774b8ebc3455fdc8a5f5ab24653",
+        "modifiedAt": "2026-10-17T19:12:19.162Z"
+      },
+      {
+        "path": "vps-evidence/public-protocol.json",
+        "bytes": 2222,
+        "sha256": "5ffda6b74c8705407b57240d95b179db09e918df3aeb5d16c929e73f52fca045",
+        "modifiedAt": "2026-10-17T19:12:22.104Z"
+      },
+      {
+        "path": "vps-evidence/public-protocol.stdout.txt",
+        "bytes": 1741,
+        "sha256": "a92c1899dc623e415f50389a7fa830d56b519bfa6ea1cdb40bd9ca7d708d12ef",
+        "modifiedAt": "2026-10-17T19:12:19.749Z"
+      },
+      {
+        "path": "vps-evidence/public-protocol.stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T19:12:17.385Z"
+      },
+      {
+        "path": "vps-browser.json",
+        "bytes": 331,
+        "sha256": "68b7bc1635f6001cfb7fccd936eb4701cdeca64142fd8ee2807e798fed40b425",
+        "modifiedAt": "2026-10-17T19:13:24.077Z"
+      },
+      {
+        "path": "vps-home.dom.txt",
+        "bytes": 3126,
+        "sha256": "fc735a9f03b8948ea76ce9938490b2f66b69c374b0beb08feb2f2ed994cfd378",
+        "modifiedAt": "2026-10-17T19:13:22.650Z"
+      },
+      {
+        "path": "vps-home.png",
+        "bytes": 62443,
+        "sha256": "6194d7ad6c6c6d7c6fe2576a857d12261db9fe184a18594df694c7485bee7f51",
+        "modifiedAt": "2026-10-17T19:13:24.077Z"
+      }
+    ]
+  }
+}

@@ -204,6 +204,14 @@ test("real staging compose parses to exactly the DEP-006 service set", () => {
   assert.deepEqual(names, [...STAGING_SERVICES].sort());
 });
 
+test("real staging compose passes the optional explicit artifact upload origins to adapter-manager", () => {
+  const compose = parseYaml(readFileSync(composePath, "utf8"));
+  assert.equal(
+    compose.services["adapter-manager"].environment.AOA_ADAPTER_MANAGER_ARTIFACT_UPLOAD_ORIGINS,
+    "${AOA_STAGING_ARTIFACT_UPLOAD_ORIGINS:-}",
+  );
+});
+
 // === Layer 2a: the hand-built valid baseline passes ===========================
 
 test("hand-built valid staging compose passes with zero violations", () => {

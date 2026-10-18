@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const publishLiveEventMock = vi.hoisted(() => vi.fn());
+const auditHelpers = vi.hoisted(() => ({
+  insertActivityLog: vi.fn(),
+  publishActivityLogged: vi.fn(),
+}));
 
 vi.mock("../services/live-events.js", () => ({
   publishLiveEvent: publishLiveEventMock,
 }));
+vi.mock("../services/activity-log.js", () => auditHelpers);
 
 import {
   deriveCurationForHubItem,
@@ -30,7 +35,36 @@ const baseItem: HubCurationSourceItem = {
 describe("hub curation", () => {
   beforeEach(() => {
     publishLiveEventMock.mockClear();
+    auditHelpers.insertActivityLog.mockReset().mockResolvedValue({ id: "activity-1" });
+    auditHelpers.publishActivityLogged.mockClear();
   });
+
+  function makeDb(returnedRow: Record<string, unknown> = {
+    id: "hub-1",
+    companyId: "company-1",
+    semanticType: "run_failed",
+    status: "open",
+    version: 4,
+    curationRevision: 3,
+  }) {
+    const returning = vi.fn().mockResolvedValue([returnedRow]);
+    const where = vi.fn(() => ({ returning }));
+    const set = vi.fn(() => ({ where }));
+    const update = vi.fn(() => ({ set }));
+    const agentLimit = vi.fn().mockResolvedValue([{ id: "11111111-1111-4111-8111-111111111111" }]);
+    const agentWhere = vi.fn(() => ({ limit: agentLimit }));
+    const from = vi.fn(() => ({ where: agentWhere }));
+    const select = vi.fn(() => ({ from }));
+    const tx = { update, select };
+    const transaction = vi.fn(async (callback: (tx: typeof tx) => Promise<unknown>) => callback(tx));
+    return {
+      db: { transaction } as any,
+      transaction,
+      update,
+      set,
+      returning,
+    };
+  }
 
   it("keeps an explicit group key stable", () => {
     const result = deriveCurationForHubItem({
@@ -90,19 +124,7 @@ describe("hub curation", () => {
   });
 
   it("updates curation metadata by curation revision and publishes a metadata refresh without changing lifecycle version", async () => {
-    const returning = vi.fn().mockResolvedValue([
-      {
-        id: "hub-1",
-        companyId: "company-1",
-        semanticType: "run_failed",
-        status: "open",
-        version: 4,
-      },
-    ]);
-    const where = vi.fn(() => ({ returning }));
-    const set = vi.fn(() => ({ where }));
-    const update = vi.fn(() => ({ set }));
-    const db = { update } as any;
+    const { db, set, transaction } = makeDb();
 
     const result = await hubCurationService(db, {
       now: () => new Date("2026-07-01T10:00:00.000Z"),
@@ -122,6 +144,19 @@ describe("hub curation", () => {
         curationGroupLabel: "Failed runs",
         curationRevision: 3,
         curatedByAgentId: "11111111-1111-4111-8111-111111111111",
+      }),
+    );
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(auditHelpers.insertActivityLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "hub_item.curation_updated",
+        details: expect.objectContaining({
+          source: "agent_tool",
+          previousRevision: 2,
+          curationRevision: 3,
+          changedFields: ["curationGroupLabel", "curationGroupSummary", "curationReason", "curationPriorityReason"],
+        }),
       }),
     );
     expect(result.version).toBe(4);
@@ -159,19 +194,7 @@ describe("hub curation", () => {
   });
 
   it("redacts secret-looking curation text before persisting", async () => {
-    const returning = vi.fn().mockResolvedValue([
-      {
-        id: "hub-1",
-        companyId: "company-1",
-        semanticType: "run_failed",
-        status: "open",
-        version: 4,
-      },
-    ]);
-    const where = vi.fn(() => ({ returning }));
-    const set = vi.fn(() => ({ where }));
-    const update = vi.fn(() => ({ set }));
-    const db = { update } as any;
+    const { db, set } = makeDb();
 
     await hubCurationService(db).updateSummary({
       companyId: "company-1",
@@ -188,19 +211,7 @@ describe("hub curation", () => {
   });
 
   it("preserves omitted curation fields when Steward writes only a group summary", async () => {
-    const returning = vi.fn().mockResolvedValue([
-      {
-        id: "hub-1",
-        companyId: "company-1",
-        semanticType: "run_failed",
-        status: "open",
-        version: 4,
-      },
-    ]);
-    const where = vi.fn(() => ({ returning }));
-    const set = vi.fn(() => ({ where }));
-    const update = vi.fn(() => ({ set }));
-    const db = { update } as any;
+    const { db, set } = makeDb();
 
     await hubCurationService(db).updateSummary({
       companyId: "company-1",

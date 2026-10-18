@@ -971,6 +971,7 @@ export class E2bSandboxProvider implements SandboxProvider {
       if (err instanceof E2bTransportNotFoundError) throw new SandboxNotFoundError();
       throw err;
     }
+    if (signal?.aborted) throw new Error("artifact read aborted before reading bytes");
     if (entry.symlink) throw new E2bSymlinkRefusedError(path);
     try {
       // ★ `E5-F009` — BOUNDED. The read stops and refuses at the cap rather than materialising
@@ -1002,9 +1003,11 @@ export class E2bSandboxProvider implements SandboxProvider {
   async enumerateOutputs(sandboxId: string, root: string, ctx: ProviderOpContext): Promise<EnumerateOutputsResult> {
     if (this.sandboxEnumerationMode === "none") throw new UnsupportedProviderOperation("enumerate_outputs");
     if (!(ctx.deadlineMs > 0)) throw new Error("output enumeration budget exhausted before the listing");
+    if (ctx.signal?.aborted) throw new Error("output enumeration aborted before the listing");
     let entries;
     try {
-      const listSignal = AbortSignal.timeout(ctx.deadlineMs);
+      const deadlineSignal = AbortSignal.timeout(ctx.deadlineMs);
+      const listSignal = ctx.signal ? AbortSignal.any([deadlineSignal, ctx.signal]) : deadlineSignal;
       entries = await boundedBySignal(
         this.#transport.listDir(sandboxId, root, { signal: listSignal }),
         listSignal,
@@ -1054,7 +1057,9 @@ export class E2bSandboxProvider implements SandboxProvider {
     // DAT-009-3e (Codex P1, PR #557) — the READ is bounded too. A stalled sandbox read would
     // otherwise hold the adapter-manager's per-sandbox lock for as long as the transport hangs.
     if (!(ctx.deadlineMs > 0)) throw new Error("artifact digest budget exhausted before the read");
-    const digestSignal = AbortSignal.timeout(ctx.deadlineMs);
+    if (ctx.signal?.aborted) throw new Error("artifact digest aborted before the read");
+    const deadlineSignal = AbortSignal.timeout(ctx.deadlineMs);
+    const digestSignal = ctx.signal ? AbortSignal.any([deadlineSignal, ctx.signal]) : deadlineSignal;
     const bytes = await boundedBySignal(
       this.#readArtifactBytes(sandboxId, path, digestSignal),
       digestSignal,
@@ -1111,7 +1116,9 @@ export class E2bSandboxProvider implements SandboxProvider {
     // budget uploads nothing; otherwise the PUT is aborted at `ctx.deadlineMs`, and the call
     // settles then even if an injected uploader ignores the signal.
     if (!(ctx.deadlineMs > 0)) throw new Error("artifact export budget exhausted before the upload");
-    const signal = AbortSignal.timeout(ctx.deadlineMs);
+    if (ctx.signal?.aborted) throw new Error("artifact export aborted before the read");
+    const deadlineSignal = AbortSignal.timeout(ctx.deadlineMs);
+    const signal = ctx.signal ? AbortSignal.any([deadlineSignal, ctx.signal]) : deadlineSignal;
     // The READ is inside the budget too (Codex P1, PR #557): the adapter-manager holds its
     // per-sandbox lock across this whole call, so a hung read would strand the run's destroy
     // exactly as a hung upload would.

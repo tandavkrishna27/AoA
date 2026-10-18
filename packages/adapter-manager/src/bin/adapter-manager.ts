@@ -60,6 +60,7 @@ export const TEMPLATE_ENV = "AOA_ADAPTER_MANAGER_E2B_TEMPLATE";
 /** Path to the ed25519 control-plane PUBLIC key (PEM SPKI). Unset/empty/unloadable ⇒
  * REFUSE — a missing key would boot an UNGATED server (the primary security guarantee). */
 export const CONTROL_PLANE_PUBLIC_KEY_FILE_ENV = "AOA_ADAPTER_MANAGER_CONTROL_PLANE_PUBLIC_KEY_FILE";
+export const ARTIFACT_UPLOAD_ORIGINS_ENV = "AOA_ADAPTER_MANAGER_ARTIFACT_UPLOAD_ORIGINS";
 /** Directory the β1 durable idempotency ledger persists into. A configured out-of-tree
  * volume in a real deployment; when unset the server defaults to a fresh OS temp dir. */
 export const IDEMPOTENCY_LEDGER_DIR_ENV = "AOA_ADAPTER_MANAGER_IDEMPOTENCY_LEDGER_DIR";
@@ -123,6 +124,23 @@ function refused(reason: string): AdapterManagerBootResult {
   return { kind: "refused", reason };
 }
 
+function parseArtifactUploadOrigins(configured: string | undefined): string[] {
+  if (configured === undefined || configured.trim() === "") return [];
+  const origins = configured.split(",").map((entry) => {
+    const value = entry.trim();
+    if (!/^https:\/\/[^/?#]+\/?$/i.test(value) || value.includes("*") || value.includes("\\")) {
+      throw new Error("invalid artifact upload origin");
+    }
+    const url = new URL(value);
+    const authority = value.slice(value.indexOf("//") + 2).split("/", 1)[0];
+    if (url.protocol !== "https:" || !url.hostname || authority.includes("@") || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error("invalid artifact upload origin");
+    }
+    return url.origin;
+  });
+  return [...new Set(origins)];
+}
+
 /**
  * Boot the adapter-manager provider host, or REFUSE — never guess, never degrade.
  *
@@ -132,6 +150,12 @@ function refused(reason: string): AdapterManagerBootResult {
  */
 export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<AdapterManagerBootResult> {
   const { env } = deps;
+  let artifactUploadOrigins: string[];
+  try {
+    artifactUploadOrigins = parseArtifactUploadOrigins(env[ARTIFACT_UPLOAD_ORIGINS_ENV]);
+  } catch {
+    return refused(`${ARTIFACT_UPLOAD_ORIGINS_ENV} must contain comma-separated HTTPS origins without paths, credentials, query strings, fragments, or wildcards`);
+  }
   const load = deps.loadProviderModule ?? loadProviderModule;
   const readKeyFileBytes = deps.readKeyFileBytes ?? ((p: string) => readFileSync(p));
   const startServer = deps.createProviderServer ?? createProviderServer;
@@ -242,7 +266,7 @@ export async function bootAdapterManager(deps: AdapterManagerDeps): Promise<Adap
     return refused("warm execution requires actual checkpoint and restore support");
   }
   const warmJournal = warmEnabled ? new WarmCleanupJournal(join(idempotencyLedgerDir!, "warm-cleanup")) : undefined;
-  const server = startServer({ provider, controlPlanePublicKey, idempotencyLedgerDir, reaperMetrics,
+  const server = startServer({ provider, controlPlanePublicKey, idempotencyLedgerDir, reaperMetrics, artifactUploadOrigins,
     ...(warmJournal ? { warmCleanupJournal: warmJournal, isWarmEnabled: () => env[COMMANDER_WARM_ENABLED_ENV]?.trim() === "1" } : {}) });
   // The staging compose pins PORT (=8090) + a :8090/healthz check; unset ⇒ an ephemeral port.
   server.listen(env.PORT);

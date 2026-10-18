@@ -1,23 +1,18 @@
 /**
- * W4 curation metadata real-DB integration. Skipped on Windows to match the
- * existing embedded-postgres integration harness; Linux CI is authoritative.
+ * W4 curation metadata real-DB integration. Windows runs require
+ * AOA_RUN_WIN_INTEGRATION=1; Linux CI remains authoritative.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
-import { applyPendingMigrations, createDb, type Db } from "@armyofagents/db";
+import { createDb, type Db } from "@armyofagents/db";
 import { hubCurationService } from "../services/hub-curation.js";
 import { hubItemsService } from "../services/hub-items.js";
+import { startMigratedDatabase, type MigratedDatabase } from "./helpers/migrated-database.js";
 
-type Pg = { initialise(): Promise<void>; start(): Promise<void>; stop(): Promise<void> };
-
-let pg: Pg | null = null;
-let dataDir = "";
+const RUN = process.platform !== "win32" || process.env.AOA_RUN_WIN_INTEGRATION === "1";
+let database: MigratedDatabase | undefined;
 let db: Db;
-let setupError: unknown = null;
-const PORT = 59400 + Math.floor(Math.random() * 1000);
 
 function firstId(result: unknown): string {
   const id = Array.isArray(result)
@@ -28,39 +23,15 @@ function firstId(result: unknown): string {
 }
 
 beforeAll(async () => {
-  try {
-    dataDir = await mkdtemp(join(tmpdir(), "aoa-hub-curation-test-"));
-    const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as {
-      default: new (options: object) => Pg;
-    };
-    pg = new EmbeddedPostgres({
-      databaseDir: join(dataDir, "db"),
-      user: "test",
-      password: "test",
-      port: PORT,
-      persistent: false,
-    });
-    await pg.initialise();
-    await pg.start();
-    const connectionString = `postgres://test:test@localhost:${PORT}/postgres`;
-    await applyPendingMigrations(connectionString);
-    db = createDb(connectionString);
-  } catch (err) {
-    setupError = err;
-    console.error("[hub-curation-integration] setup failed:", err);
-  }
+  database = await startMigratedDatabase({ label: "aoa-hub-curation-" });
+  db = createDb(database.adminUrl);
 }, 180_000);
 
 afterAll(async () => {
   try {
-    if (pg) await pg.stop();
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
-  } catch {
-    /* ignore */
+    await db?.$client.end({ timeout: 5 });
+  } finally {
+    await database?.teardown();
   }
 }, 60_000);
 
@@ -72,7 +43,7 @@ async function seedCompanyWithFounder(): Promise<{ companyId: string; founderId:
   );
   const founderId = firstId(
     await db.execute(
-      sql`INSERT INTO "user" (id, email, name, email_verified, created_at, updated_at) VALUES (gen_random_uuid()::text, ${`f-${PORT}-${Math.random()}@hub-curation.test`}, 'Founder', false, now(), now()) RETURNING id`,
+      sql`INSERT INTO "user" (id, email, name, email_verified, created_at, updated_at) VALUES (gen_random_uuid()::text, ${`f-${randomUUID()}@hub-curation.test`}, 'Founder', false, now(), now()) RETURNING id`,
     ),
   );
   await db.execute(
@@ -82,9 +53,8 @@ async function seedCompanyWithFounder(): Promise<{ companyId: string; founderId:
   return { companyId, founderId };
 }
 
-describe.skipIf(process.platform === "win32")("hub curation service - real DB", () => {
+describe.skipIf(!RUN)("hub curation service - real DB", () => {
   it("updates display-only curation metadata without changing lifecycle version", async () => {
-    if (setupError) throw new Error(String(setupError));
     const { companyId, founderId } = await seedCompanyWithFounder();
     const item = await hubItemsService(db).emit({
       companyId,
@@ -130,5 +100,200 @@ describe.skipIf(process.platform === "win32")("hub curation service - real DB", 
     expect(row.curation_group_label).toBe("Failed runs");
     expect(row.curation_group_summary).toBe("Provider rejected ***REDACTED***.");
     expect(row.curation_reason).toBe("SLA is due in 20 minutes.");
+
+    const audits = await db.execute(sql`
+      SELECT actor_type, actor_id, action, entity_type, entity_id, agent_id, run_id, details
+      FROM activity_log
+      WHERE company_id = ${companyId} AND entity_id = ${item.id}
+    `);
+    const audit = Array.isArray(audits)
+      ? (audits[0] as Record<string, unknown>)
+      : (audits as { rows: Record<string, unknown>[] }).rows[0];
+    expect(audit).toMatchObject({
+      actor_type: "system",
+      actor_id: "steward_sweep",
+      action: "hub_item.curation_updated",
+      entity_type: "hub_item",
+      entity_id: item.id,
+      agent_id: null,
+      run_id: null,
+      details: {
+        source: "system_sweep",
+        previousRevision: 0,
+        curationRevision: 1,
+        changedFields: ["curationGroupLabel", "curationGroupSummary", "curationReason"],
+      },
+    });
+    expect(JSON.stringify(audit.details)).not.toContain("SLA is due");
+  });
+
+  it("audits agent writes with trusted run attribution and rolls back if the audit insert fails", async () => {
+    const { companyId } = await seedCompanyWithFounder();
+    const agentId = firstId(await db.execute(sql`
+      INSERT INTO agents (company_id, name, kind) VALUES (${companyId}, 'Curation Agent', 'aoa') RETURNING id
+    `));
+    const runId = firstId(await db.execute(sql`
+      INSERT INTO internal_agent_runs (company_id, agent_id, trigger_type, trigger_source)
+      VALUES (${companyId}, ${agentId}, 'event', 'test') RETURNING id
+    `));
+    const item = await hubItemsService(db).emit({
+      companyId,
+      semanticType: "run_failed",
+      sourceType: "heartbeat_run",
+      sourceId: "curation-agent-real-db",
+      title: "failed run",
+    });
+    const publishSpy = vi.spyOn(await import("../services/live-events.js"), "publishLiveEvent");
+    publishSpy.mockClear();
+
+    await hubCurationService(db).updateSummary({
+      companyId,
+      hubItemId: item.id,
+      expectedCurationRevision: 0,
+      curationGroupSummary: "Private summary text",
+      curatedByAgentId: agentId,
+      internalAgentRunId: runId,
+    });
+
+    const auditRows = await db.execute(sql`
+      SELECT actor_type, actor_id, agent_id, run_id, details
+      FROM activity_log
+      WHERE company_id = ${companyId} AND entity_id = ${item.id}
+    `);
+    const audit = Array.isArray(auditRows)
+      ? (auditRows[0] as Record<string, unknown>)
+      : (auditRows as { rows: Record<string, unknown>[] }).rows[0];
+    expect(audit).toMatchObject({
+      actor_type: "agent",
+      actor_id: agentId,
+      agent_id: agentId,
+      run_id: null,
+      details: {
+        source: "agent_tool",
+        internalAgentRunId: runId,
+        previousRevision: 0,
+        curationRevision: 1,
+        changedFields: ["curationGroupSummary"],
+      },
+    });
+    expect(JSON.stringify(audit.details)).not.toContain("Private summary text");
+    expect(publishSpy.mock.calls.map(([event]) => event.type)).toEqual([
+      "activity.logged",
+      "hub.item.changed",
+    ]);
+
+    publishSpy.mockClear();
+    const otherAgentId = firstId(await db.execute(sql`
+      INSERT INTO agents (company_id, name, kind) VALUES (${companyId}, 'Other Curation Agent', 'aoa') RETURNING id
+    `));
+    const otherRunId = firstId(await db.execute(sql`
+      INSERT INTO internal_agent_runs (company_id, agent_id, trigger_type, trigger_source)
+      VALUES (${companyId}, ${otherAgentId}, 'event', 'test') RETURNING id
+    `));
+    await expect(hubCurationService(db).updateSummary({
+      companyId,
+      hubItemId: item.id,
+      expectedCurationRevision: 1,
+      curationGroupSummary: "Should not persist",
+      curatedByAgentId: agentId,
+      internalAgentRunId: otherRunId,
+    })).rejects.toMatchObject({ status: 422 });
+    const unchanged = await db.execute(sql`SELECT curation_revision, curation_group_summary FROM notifications WHERE id = ${item.id}`);
+    const unchangedRow = Array.isArray(unchanged)
+      ? (unchanged[0] as Record<string, unknown>)
+      : (unchanged as { rows: Record<string, unknown>[] }).rows[0];
+    expect(unchangedRow).toMatchObject({ curation_revision: 1, curation_group_summary: "Private summary text" });
+    expect(publishSpy).not.toHaveBeenCalled();
+
+    await db.execute(sql`DELETE FROM activity_log WHERE action = 'hub_item.curation_updated'`);
+    await db.execute(sql`ALTER TABLE activity_log ADD CONSTRAINT hub_curation_audit_failure CHECK (action <> 'hub_item.curation_updated')`);
+    try {
+      await expect(hubCurationService(db).updateSummary({
+        companyId,
+        hubItemId: item.id,
+        expectedCurationRevision: 1,
+        curationGroupLabel: "Must roll back",
+        curatedByAgentId: agentId,
+        internalAgentRunId: runId,
+      })).rejects.toThrow();
+    } finally {
+      await db.execute(sql`ALTER TABLE activity_log DROP CONSTRAINT hub_curation_audit_failure`);
+    }
+
+    const current = await db.execute(sql`SELECT curation_revision, curation_group_label FROM notifications WHERE id = ${item.id}`);
+    const currentRow = Array.isArray(current)
+      ? (current[0] as Record<string, unknown>)
+      : (current as { rows: Record<string, unknown>[] }).rows[0];
+    expect(currentRow).toMatchObject({ curation_revision: 1, curation_group_label: null });
+    expect(publishSpy).not.toHaveBeenCalled();
+    publishSpy.mockRestore();
+  });
+
+  it("does not audit or publish a stale revision conflict", async () => {
+    const { companyId, founderId } = await seedCompanyWithFounder();
+    const item = await hubItemsService(db).emit({
+      companyId,
+      semanticType: "run_failed",
+      sourceType: "heartbeat_run",
+      sourceId: "curation-stale-real-db",
+      title: "failed run",
+      ownerUserId: founderId,
+    });
+    const publishSpy = vi.spyOn(await import("../services/live-events.js"), "publishLiveEvent");
+    publishSpy.mockClear();
+
+    await expect(hubCurationService(db).updateSummary({
+      companyId,
+      hubItemId: item.id,
+      expectedCurationRevision: 1,
+      curationGroupLabel: "Stale",
+    })).rejects.toMatchObject({ status: 409 });
+
+    const audits = await db.execute(sql`SELECT id FROM activity_log WHERE company_id = ${companyId} AND entity_id = ${item.id}`);
+    expect(Array.isArray(audits) ? audits : (audits as { rows: unknown[] }).rows).toHaveLength(0);
+    expect(publishSpy).not.toHaveBeenCalled();
+    publishSpy.mockRestore();
+  });
+
+  it("records Commander curation as the authenticated user without an agent or run foreign key", async () => {
+    const { companyId, founderId } = await seedCompanyWithFounder();
+    const item = await hubItemsService(db).emit({
+      companyId,
+      semanticType: "run_failed",
+      sourceType: "heartbeat_run",
+      sourceId: "curation-commander-real-db",
+      title: "failed run",
+      ownerUserId: founderId,
+    });
+
+    await hubCurationService(db).updateSummary({
+      companyId,
+      hubItemId: item.id,
+      expectedCurationRevision: 0,
+      curationGroupSummary: "Founder-authored summary.",
+      auditActor: { actorType: "user", actorId: founderId, source: "commander_tool" },
+    });
+
+    const audits = await db.execute(sql`
+      SELECT actor_type, actor_id, action, agent_id, run_id, details
+      FROM activity_log
+      WHERE company_id = ${companyId} AND entity_id = ${item.id}
+    `);
+    const audit = Array.isArray(audits)
+      ? (audits[0] as Record<string, unknown>)
+      : (audits as { rows: Record<string, unknown>[] }).rows[0];
+    expect(audit).toMatchObject({
+      actor_type: "user",
+      actor_id: founderId,
+      action: "hub_item.curation_updated",
+      agent_id: null,
+      run_id: null,
+      details: {
+        source: "commander_tool",
+        previousRevision: 0,
+        curationRevision: 1,
+        changedFields: ["curationGroupSummary"],
+      },
+    });
   });
 });

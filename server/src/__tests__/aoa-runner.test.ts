@@ -88,6 +88,9 @@ vi.mock("../services/mcp-connectors-loader.js", () => ({
   loadConnectorEgressHosts: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("../services/run-log-store.js", () => ({ getRunLogStore: () => runLogStoreMock }));
+vi.mock("../adapters/provider-status.js", () => ({
+  getProviderStatus: vi.fn().mockResolvedValue({ installed: true, authenticated: true, authMode: "subscription", defaultModelResolved: null }),
+}));
 vi.mock("../middleware/logger.js", () => ({ logger:{ child:()=>({info:vi.fn(),warn:vi.fn(),error:vi.fn()}) } }));
 // T5: crew workspace resolution reads the instance experimental flags. Without
 // this stub the access THROWS and the resolver's tolerant catch absorbs it —
@@ -99,8 +102,9 @@ vi.mock("../services/instance-settings.js", () => ({
   })),
 }));
 
-import { discussionEntries } from "@armyofagents/db";
+import { discussionEntries, internalAgentRuns } from "@armyofagents/db";
 import { runAoaAgent } from "../services/internal-agent/aoa-agents/runner.js";
+import { nativeCrewAdapterTypes, successfulCrewToolEvents } from "./helpers/native-crew-tool-fixtures.js";
 function ch(ret:unknown[]){const c:any={};c.values=()=>c;c.set=()=>c;c.where=()=>c;c.from=()=>c;c.returning=()=>Promise.resolve(ret);c.then=(r:(v:unknown[])=>unknown)=>Promise.resolve(ret).then(r);return c;}
 it("happy: bridge attached via adapterConfig.args, run completed, cost emitted, agentId stamped", async () => {
   const insertedRuns:any[]=[];
@@ -402,4 +406,143 @@ it("NON-connector-capable crew (process): the connector DB read is skipped entir
   // for a connector lookup (wasted I/O + a needless per-run failure surface).
   expect(resolveConnectorsMock).not.toHaveBeenCalled();
   expect(execMock.mock.calls[0][0].mcpServers).toBeUndefined();
+});
+
+function createAttributedRunDb(adapterType = "process", toolAllowlist: string[] = []) {
+  const patches: Record<string, unknown>[] = [];
+  const db: any = {
+    select: () => ch([{ id: "billing-agent", companyId: "co-1", name: "Steward", adapterType, adapterConfig: {}, runtimeConfig: { aoa: { toolAllowlist } } }]),
+    insert: () => ch([{ id: "billing-run" }]),
+    update: (table: unknown) => {
+      const chain = ch([{ id: "billing-run", status: "completed" }]);
+      chain.set = (patch: Record<string, unknown>) => {
+        if (table === internalAgentRuns) patches.push(patch);
+        return chain;
+      };
+      return chain;
+    },
+  };
+  return { db, patches };
+}
+
+it.each([0, 1])("persists adapter-reported crew provider and model for exit %s", async (exitCode) => {
+  execMock.mockResolvedValueOnce({ exitCode, provider: "openai", model: "fixture-model", costUsd: 0 });
+  const { db, patches } = createAttributedRunDb();
+
+  const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(result.status).toBe(exitCode === 0 ? "succeeded" : "failed");
+  expect(patches.find((patch) => patch.status === (exitCode === 0 ? "completed" : "failed"))).toMatchObject({
+    provider: "openai", model: "fixture-model",
+  });
+});
+
+it("keeps crew provider and model unknown when setup fails before execution", async () => {
+  execMock.mockClear();
+  buildBridgeSpecMock.mockImplementationOnce(() => { throw new Error("fixture bridge setup failed"); });
+  const { db, patches } = createAttributedRunDb();
+
+  const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(result.status).toBe("failed");
+  expect(execMock).not.toHaveBeenCalled();
+  expect(patches.find((patch) => patch.status === "failed")).toMatchObject({ provider: null, model: null });
+});
+
+it.each([
+  { billingType: "subscription", costUsd: null, expectedCents: 0 },
+  { billingType: "subscription_included", costUsd: null, expectedCents: 0 },
+  { billingType: "subscription", costUsd: 1.25, expectedCents: 0 },
+  { billingType: "subscription_included", costUsd: 0.75, expectedCents: 0 },
+  { billingType: "api", costUsd: 1.25, expectedCents: 125 },
+  { billingType: "metered_api", costUsd: 0.75, expectedCents: 75 },
+  { billingType: "api", costUsd: null, expectedCents: 23 },
+])("attributes crew $billingType cost with reported cost $costUsd", async ({ billingType, costUsd, expectedCents }) => {
+  createEventMock.mockClear();
+  execMock.mockResolvedValueOnce({
+    exitCode: 0, provider: "openai", model: "fixture-model", billingType, costUsd,
+    usage: { inputTokens: 73937, outputTokens: 298, cachedInputTokens: 65280 },
+  });
+  const { db } = createAttributedRunDb();
+
+  await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(createEventMock).toHaveBeenCalledExactlyOnceWith("co-1", expect.objectContaining({
+    agentId: "billing-agent", provider: "openai", model: "fixture-model", billingType,
+    inputTokens: 73937, outputTokens: 298, cachedInputTokens: 65280,
+    costCents: expectedCents, sourceIdempotencyKey: "crew_run:billing-run",
+  }));
+});
+
+it.each(nativeCrewAdapterTypes.flatMap((adapterType) => [false, true].map((throwsAfterTool) => ({ adapterType, throwsAfterTool }))))("persists successful $adapterType callback tool names when later execution throws=$throwsAfterTool", async ({ adapterType, throwsAfterTool }) => {
+  runLogStoreMock.append.mockClear();
+  const toolName = "hub.updateCurationSummary";
+  const event = successfulCrewToolEvents(adapterType, toolName).map((value) => JSON.stringify(value)).join("\n");
+  const chunks = [event.slice(0, 81), `${event.slice(81)}\n`];
+  execMock.mockImplementationOnce(async (context: any) => {
+    for (const chunk of chunks) await context.onLog("stdout", chunk);
+    await context.onLog("stderr", `${event}\n`);
+    if (throwsAfterTool) throw new Error("failure after observed tool completion");
+    return { exitCode: 0 };
+  });
+  const { db, patches } = createAttributedRunDb(adapterType, [toolName]);
+
+  const result = await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(result.status).toBe(throwsAfterTool ? "failed" : "succeeded");
+  expect(patches.find((patch) => patch.status === (throwsAfterTool ? "failed" : "completed"))).toMatchObject({ toolsCalled: [toolName] });
+  const forwarded = runLogStoreMock.append.mock.calls.map((call) => call[1]);
+  for (const chunk of chunks) expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stdout", chunk }));
+  expect(forwarded).toContainEqual(expect.objectContaining({ stream: "stderr", chunk: `${event}\n` }));
+});
+
+it.each(nativeCrewAdapterTypes.flatMap((adapterType) => [false, true].map((throwsAfterCancel) => ({ adapterType, throwsAfterCancel }))))("retains $adapterType tools when cancellation wins before execute settles, throws=$throwsAfterCancel", async ({ adapterType, throwsAfterCancel }) => {
+  const toolName = "hub.updateCurationSummary";
+  const cancelledAt = new Date("2026-10-17T18:30:00Z");
+  const state: Record<string, unknown> = {
+    id: "cancelled-run", companyId: "co-1", agentId: "billing-agent", status: "running", toolsCalled: [],
+  };
+  const auditPatches: Record<string, unknown>[] = [];
+  const agent = { id: "billing-agent", companyId: "co-1", name: "Steward", adapterType, adapterConfig: {}, runtimeConfig: { aoa: { toolAllowlist: [toolName] } } };
+  const matches = (condition: any): boolean => {
+    if (condition?.and) return condition.and.every(matches);
+    const [column, value] = condition.eq as [symbol, unknown];
+    return state[column.description!.split(".").at(-1)!] === value;
+  };
+  const db: any = {
+    select: () => {
+      const chain = ch([agent]);
+      chain.from = (table: unknown) => table === internalAgentRuns ? ch([state]) : chain;
+      return chain;
+    },
+    insert: () => ch([{ id: "cancelled-run" }]),
+    update: (table: unknown) => {
+      let patch: Record<string, unknown> = {};
+      let predicate: unknown;
+      const apply = () => {
+        if (table !== internalAgentRuns || !matches(predicate)) return [];
+        Object.assign(state, patch);
+        if (patch.toolsCalled && !patch.status) auditPatches.push(patch);
+        return [state];
+      };
+      const chain: any = {
+        set: (values: Record<string, unknown>) => { patch = values; return chain; },
+        where: (condition: unknown) => { predicate = condition; return chain; },
+        returning: () => Promise.resolve(apply()),
+        then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve(apply()).then(resolve),
+      };
+      return chain;
+    },
+  };
+  execMock.mockImplementationOnce(async (context: any) => {
+    await context.onLog("stdout", successfulCrewToolEvents(adapterType, toolName).map((value) => JSON.stringify(value)).join("\n"));
+    Object.assign(state, { status: "cancelled", completedAt: cancelledAt, errorMessage: "Cancelled due to agent pause" });
+    if (throwsAfterCancel) throw new Error("execution ended after cancellation");
+    return { exitCode: 0 };
+  });
+
+  await runAoaAgent(db, "billing-agent", { companyId: "co-1", source: "sweep.steward" });
+
+  expect(state).toMatchObject({ status: "cancelled", completedAt: cancelledAt, errorMessage: "Cancelled due to agent pause", toolsCalled: [toolName] });
+  expect(auditPatches).toEqual([{ toolsCalled: [toolName] }]);
 });

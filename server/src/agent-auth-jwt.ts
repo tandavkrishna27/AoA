@@ -120,7 +120,7 @@ export function verifyLocalAgentJwt(token: string): LocalAgentJwtClaims | null {
   if (!sub || !companyId || !adapterType || !runId || !iat || !exp) return null;
 
   const now = Math.floor(Date.now() / 1000);
-  if (exp < now) return null;
+  if (exp <= now) return null;
 
   const issuer = typeof claims.iss === "string" ? claims.iss : undefined;
   const audience = typeof claims.aud === "string" ? claims.aud : undefined;

@@ -16,6 +16,7 @@
 // -----------------------------------------------------------------------------
 
 import type { AddressInfo } from "node:net";
+import { request as httpRequest } from "node:http";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -32,6 +33,7 @@ import {
 import type { ArtifactUploadGrantV1 } from "@armyofagents/worker-protocol";
 import { E2bSandboxProvider } from "@armyofagents/sandbox-e2b-provider/e2b-provider.js";
 import { MockE2bTransport } from "@armyofagents/sandbox-e2b-provider/mock-transport.js";
+import { METADATA_KEYS } from "@armyofagents/sandbox-e2b-provider";
 
 import { UPLOAD_REDEMPTION_RETENTION_MS, createProviderServer } from "../server.js";
 
@@ -82,6 +84,17 @@ const BODY = new TextEncoder().encode("result bytes ✓ é\n");
 const BODY_SHA = createHash("sha256").update(BODY).digest("hex");
 const STORE_ORIGIN = "https://store.example";
 const SIGNATURE = "X-Amz-Signature=deadbeefsecret";
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((resolvePromise) => { resolve = resolvePromise; });
+  return { promise, resolve };
+}
+
+function observed<Result>(promise: Promise<Result>): Promise<Result> {
+  void promise.catch(() => undefined);
+  return promise;
+}
 /** A presigned-PUT url that targets `objectKey` on the configured store (path-style bucket). */
 function urlFor(objectKey: string, origin: string = STORE_ORIGIN): string {
   return `${origin}/aoa-artifacts/${objectKey}?${SIGNATURE}`;
@@ -114,6 +127,11 @@ function grant(labels: ResourceLabels, overrides: Partial<ArtifactUploadGrantV1>
 class RecordingMockTransport extends MockE2bTransport {
   readFileCalls = 0;
   stallReads = false;
+  onStalledRead?: () => void;
+  onStalledInfo?: () => void;
+  onInfoResolved?: () => void;
+  infoLabelsOverride?: ResourceLabels;
+  resumeInfo?: Promise<void>;
   /** How many further `getInfo` calls must hang — the ownership inspection the gate runs UNDER the
    * per-sandbox lock (Codex P1, fourth round). A counter, not a flag, so a later op can succeed and
    * prove the lock was actually released. */
@@ -124,15 +142,25 @@ class RecordingMockTransport extends MockE2bTransport {
   override async getInfo(...args: Parameters<MockE2bTransport["getInfo"]>): ReturnType<MockE2bTransport["getInfo"]> {
     if (this.stallInfoCalls > 0) {
       this.stallInfoCalls -= 1;
+      this.onStalledInfo?.();
       const delay = this.stallInfoResolveAfterMs;
-      if (delay === null) return new Promise(() => undefined) as ReturnType<MockE2bTransport["getInfo"]>;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      if (this.resumeInfo) await this.resumeInfo;
+      else if (delay === null) return new Promise(() => undefined) as ReturnType<MockE2bTransport["getInfo"]>;
+      else await new Promise((resolve) => setTimeout(resolve, delay));
     }
-    return super.getInfo(...args);
+    const detail = await super.getInfo(...args);
+    this.onInfoResolved?.();
+    return this.infoLabelsOverride === undefined ? detail : {
+      ...detail,
+      metadata: { ...detail.metadata, [METADATA_KEYS.labels]: JSON.stringify(this.infoLabelsOverride) },
+    };
   }
   override async readFile(...args: Parameters<MockE2bTransport["readFile"]>): ReturnType<MockE2bTransport["readFile"]> {
     this.readFileCalls += 1;
-    if (this.stallReads) return new Promise<Uint8Array>(() => undefined);
+    if (this.stallReads) {
+      this.onStalledRead?.();
+      return new Promise<Uint8Array>(() => undefined);
+    }
     return super.readFile(...args);
   }
 }
@@ -143,6 +171,9 @@ let uploads: { objectKey: string; bytes: Uint8Array }[];
 let stallUploads = false;
 /** Or: stall only the next N uploads, so a LATER upload can still prove a point. */
 let stallUploadCalls = 0;
+let onStalledUpload: (() => void) | undefined;
+let uploadSignal: AbortSignal | undefined;
+let exportRequestSignal: AbortSignal | undefined;
 let exportCtxDeadlines: number[];
 let digestCtxDeadlines: number[];
 let server: ReturnType<typeof createProviderServer>;
@@ -152,6 +183,8 @@ let baseUrl: string;
  * server started. The real-time term matters: the gate measures a queued request's remaining budget
  * after it acquires the mutex, and a frozen clock could not express that wait at all. */
 let opFailures: { op: string; errorClass: string; cause: string }[] = [];
+let unhandledRejections: unknown[] = [];
+const onUnhandledRejection = (reason: unknown): void => { unhandledRejections.push(reason); };
 let clockNow = NOW;
 let clockRealStart = Date.now();
 const serverNow = (): number => clockNow + (Date.now() - clockRealStart);
@@ -176,8 +209,10 @@ async function startServer(
   exportCtxDeadlines = [];
   digestCtxDeadlines = [];
   const performUploadGrant = async (g: ArtifactUploadGrantV1, bytes: Uint8Array, signal?: AbortSignal): Promise<void> => {
+    uploadSignal = signal;
     if (stallUploads || stallUploadCalls > 0) {
       if (stallUploadCalls > 0) stallUploadCalls -= 1;
+      onStalledUpload?.();
       await new Promise<void>((_resolve, reject) => {
         if (signal === undefined) return; // an unbounded upload: never settles
         signal.addEventListener("abort", () => reject(new Error("aborted")));
@@ -206,6 +241,7 @@ async function startServer(
       }
       if (prop === "exportArtifact") {
         return (sandboxId: string, path: string, g: ArtifactUploadGrantV1, c: ProviderOpContext) => {
+          exportRequestSignal = c.signal;
           exportCtxDeadlines.push(c.deadlineMs);
           return target.exportArtifact(sandboxId, path, g, c);
         };
@@ -235,6 +271,10 @@ async function stopServer(): Promise<void> {
 }
 
 beforeEach(() => {
+  uploadSignal = undefined;
+  exportRequestSignal = undefined;
+  unhandledRejections = [];
+  process.on("unhandledRejection", onUnhandledRejection);
   clockNow = NOW;
   clockRealStart = Date.now();
   return startServer();
@@ -242,7 +282,14 @@ beforeEach(() => {
 afterEach(async () => {
   stallUploads = false;
   stallUploadCalls = 0;
-  await stopServer();
+  onStalledUpload = undefined;
+  try {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(unhandledRejections).toEqual([]);
+  } finally {
+    process.off("unhandledRejection", onUnhandledRejection);
+    await stopServer();
+  }
 });
 
 function ctx(idempotencyKey: string): ProviderOpContext {
@@ -272,6 +319,29 @@ async function rawOp(op: string, body: unknown): Promise<string> {
 }
 
 describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)", () => {
+  it("aborts the provider upload signal when the HTTP caller disconnects", async () => {
+    const sandboxId = await sandboxWithOutput(ORG_A);
+    const uploadStarted = deferred();
+    onStalledUpload = uploadStarted.resolve;
+    stallUploads = true;
+    const request = httpRequest(`${baseUrl}/op/export_artifact`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    }, (response) => response.resume());
+    request.on("error", () => undefined);
+    const requestClosed = new Promise<void>((resolve) => request.once("close", () => resolve()));
+    request.end(JSON.stringify({ args: { sandboxId, path: OUT_PATH, grant: grant(ORG_A) }, ctx: ctx("disconnect-export"), capability: mint(ORG_A) }));
+    await uploadStarted.promise;
+    expect(exportRequestSignal).toBeInstanceOf(AbortSignal);
+    const disconnected = new Promise<void>((resolve) => exportRequestSignal!.addEventListener("abort", () => resolve(), { once: true }));
+    request.destroy();
+    await disconnected;
+    await requestClosed;
+    expect(uploadSignal?.aborted).toBe(true);
+    expect(uploads).toEqual([]);
+    await driverFor(ORG_A).destroy(sandboxId, ctx("destroy-after-disconnect"));
+  });
+
   it("SAME-TENANT POSITIVE CONTROL: Organization A digests + exports its OWN sandbox's output", async () => {
     const sandboxId = await sandboxWithOutput(ORG_A);
     const driver = driverFor(ORG_A);
@@ -479,11 +549,14 @@ describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)
   it("★ a STALLED upload releases the sandbox lock at its budget, so the run's destroy is not stranded", async () => {
     const sandboxId = await sandboxWithOutput(ORG_A);
     stallUploads = true;
+    const entered = deferred();
+    onStalledUpload = entered.resolve;
     // 200 ms of budget left before the teardown reserve.
     const cap = mint(ORG_A, NOW + EXPORT_TEARDOWN_RESERVE_MS + 200);
     const driver = new NetworkedProviderDriver({ baseUrl, capability: cap });
-    const exporting = driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-stall" });
-    const destroyed = driver.destroy(sandboxId, ctx("destroy-after-stall"));
+    const exporting = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-stall" }));
+    await entered.promise;
+    const destroyed = observed(driver.destroy(sandboxId, ctx("destroy-after-stall")));
     await expect(exporting).rejects.toBeInstanceOf(WireProtocolError);
     const result = await Promise.race([
       destroyed,
@@ -496,10 +569,13 @@ describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)
   it("★ a STALLED sandbox READ also releases the lock at its budget, so destroy is not stranded", async () => {
     const sandboxId = await sandboxWithOutput(ORG_A);
     transport.stallReads = true;
+    const entered = deferred();
+    transport.onStalledRead = entered.resolve;
     const cap = mint(ORG_A, NOW + EXPORT_TEARDOWN_RESERVE_MS + 200);
     const driver = new NetworkedProviderDriver({ baseUrl, capability: cap });
-    const exporting = driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-read-stall" });
-    const destroyed = driver.destroy(sandboxId, ctx("destroy-after-read-stall"));
+    const exporting = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-read-stall" }));
+    await entered.promise;
+    const destroyed = observed(driver.destroy(sandboxId, ctx("destroy-after-read-stall")));
     await expect(exporting).rejects.toBeInstanceOf(WireProtocolError);
     const result = await Promise.race([
       destroyed,
@@ -507,6 +583,38 @@ describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)
     ]);
     expect(result).not.toBe("stranded");
     expect(uploads).toHaveLength(0);
+  });
+
+  it("destroy before export admission returns the uniform ownership refusal without reading output", async () => {
+    const sandboxId = await sandboxWithOutput(ORG_A);
+    const driver = driverFor(ORG_A);
+    await driver.destroy(sandboxId, ctx("destroy-before-export"));
+    const reads = transport.readFileCalls;
+    await expect(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), ctx("export-after-destroy"))).rejects.toBeInstanceOf(ResourceNotAvailableError);
+    expect(transport.readFileCalls).toBe(reads);
+    expect(exportCtxDeadlines).toEqual([]);
+    expect(uploads).toEqual([]);
+  });
+
+  it("ownership replaced before export inspection completes refuses the previous attempt", async () => {
+    const sandboxId = await sandboxWithOutput(ORG_A);
+    const entered = deferred();
+    const resume = deferred();
+    transport.stallInfoCalls = 1;
+    transport.onStalledInfo = entered.resolve;
+    transport.resumeInfo = resume.promise;
+    const exporting = observed(driverFor(ORG_A).exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), ctx("export-replaced-fence")));
+    try {
+      await entered.promise;
+      transport.infoLabelsOverride = ORG_A_OTHER_LEASE;
+      resume.resolve();
+      await expect(exporting).rejects.toBeInstanceOf(ResourceNotAvailableError);
+      expect(transport.readFileCalls).toBe(0);
+      expect(exportCtxDeadlines).toEqual([]);
+      expect(uploads).toEqual([]);
+    } finally {
+      resume.resolve();
+    }
   });
 
   it("★ digest carries the CLAMPED budget to the provider, and is refused inside the reserve", async () => {
@@ -578,10 +686,13 @@ describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)
   it("★ a STALLED ownership inspection releases the lock at the op budget, so the next op is not stranded", async () => {
     const sandboxId = await sandboxWithOutput(ORG_A);
     transport.stallInfoCalls = 1; // only the export's own inspect hangs
+    const entered = deferred();
+    transport.onStalledInfo = entered.resolve;
     const cap = mint(ORG_A, NOW + EXPORT_TEARDOWN_RESERVE_MS + 200);
     const driver = new NetworkedProviderDriver({ baseUrl, capability: cap });
-    const exporting = driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-inspect-stall" });
-    const destroyed = driver.destroy(sandboxId, ctx("destroy-after-inspect-stall"));
+    const exporting = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-inspect-stall" }));
+    await entered.promise;
+    const destroyed = observed(driver.destroy(sandboxId, ctx("destroy-after-inspect-stall")));
     await expect(exporting).rejects.toBeInstanceOf(WireProtocolError);
     const result = await Promise.race([
       destroyed,
@@ -632,17 +743,27 @@ describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)
   // and PUTting after teardown already took the lock, which is the reserve defeated from behind.
   it("★ a detached locked section does NOT dispatch after its budget fired", async () => {
     const sandboxId = await sandboxWithOutput(ORG_A);
+    const entered = deferred();
+    const resume = deferred();
+    const resolved = deferred();
     transport.stallInfoCalls = 1;
-    transport.stallInfoResolveAfterMs = 400; // resolves well after the 200 ms budget
+    transport.onStalledInfo = entered.resolve;
+    transport.resumeInfo = resume.promise;
+    transport.onInfoResolved = resolved.resolve;
     const driver = new NetworkedProviderDriver({ baseUrl, capability: mint(ORG_A, NOW + EXPORT_TEARDOWN_RESERVE_MS + 200) });
-    await expect(
-      driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-detached" }),
-    ).rejects.toBeInstanceOf(WireProtocolError);
-    const readsAtTimeout = transport.readFileCalls;
-    // Give the abandoned inspection time to resolve and (wrongly) continue.
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-    expect(transport.readFileCalls).toBe(readsAtTimeout);
-    expect(uploads).toHaveLength(0);
+    const exporting = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "e-detached" }));
+    try {
+      await entered.promise;
+      await expect(exporting).rejects.toBeInstanceOf(WireProtocolError);
+      const readsAtTimeout = transport.readFileCalls;
+      resume.resolve();
+      await resolved.promise;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(transport.readFileCalls).toBe(readsAtTimeout);
+      expect(uploads).toHaveLength(0);
+    } finally {
+      resume.resolve();
+    }
   });
 
   it("★ an EXPIRED upload grant is refused, and the redemption record outlives the grant's OWN claimed expiry", async () => {
@@ -689,20 +810,57 @@ describe("DAT-009-3e — digest/export over the networked wire (gated owned ops)
     // The predecessor holds the lock by stalling its upload until its own budget aborts it. ONLY
     // the first upload stalls, so if the queued request were handed a fresh window it would upload.
     stallUploadCalls = 1;
-    const first = driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "q-1" });
+    const entered = deferred();
+    onStalledUpload = entered.resolve;
+    const first = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "q-1" }));
+    await entered.promise;
     // The queued one targets a second key, so the redemption ledger cannot be what refuses it.
     const secondKey = `${objectKeyFor(ORG_A)}-queued`;
-    const queued = driver.exportArtifact(
+    const queued = observed(driver.exportArtifact(
       sandboxId,
       OUT_PATH,
       grant(ORG_A, { objectKey: secondKey, url: urlFor(secondKey) }),
       { deadlineMs: 600_000, idempotencyKey: "q-2" },
-    );
-    await expect(first).rejects.toBeInstanceOf(WireProtocolError);
+    ));
     // By the time it acquires the lock the window is spent, so it must be refused, not granted a
     // fresh 400 ms — and nothing may be uploaded.
-    await expect(queued).rejects.toBeInstanceOf(WireProtocolError);
+    await Promise.all([
+      expect(first).rejects.toBeInstanceOf(WireProtocolError),
+      expect(queued).rejects.toBeInstanceOf(WireProtocolError),
+    ]);
     expect(uploads).toHaveLength(0);
+  });
+
+  it("observes a queued deadline rejection before delivering the predecessor response", async () => {
+    const sandboxId = await sandboxWithOutput(ORG_A);
+    const entered = deferred();
+    const releaseFirstResponse = deferred();
+    const cap = mint(ORG_A, NOW + EXPORT_TEARDOWN_RESERVE_MS + 400);
+    const driver = new NetworkedProviderDriver({
+      baseUrl,
+      capability: cap,
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        const envelope = JSON.parse(String(init?.body)) as { ctx: { idempotencyKey: string } };
+        if (envelope.ctx.idempotencyKey === "queued-observation-first") await releaseFirstResponse.promise;
+        return response;
+      },
+    });
+    stallUploadCalls = 1;
+    onStalledUpload = entered.resolve;
+    const first = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A), { deadlineMs: 600_000, idempotencyKey: "queued-observation-first" }));
+    await entered.promise;
+    const secondKey = `${objectKeyFor(ORG_A)}-observed`;
+    const queued = observed(driver.exportArtifact(sandboxId, OUT_PATH, grant(ORG_A, { objectKey: secondKey, url: urlFor(secondKey) }), { deadlineMs: 600_000, idempotencyKey: "queued-observation-second" }));
+    try {
+      await expect(queued).rejects.toBeInstanceOf(WireProtocolError);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(unhandledRejections).toEqual([]);
+      expect(uploads).toEqual([]);
+    } finally {
+      releaseFirstResponse.resolve();
+    }
+    await expect(first).rejects.toBeInstanceOf(WireProtocolError);
   });
 
   // ★ Codex P1 (seventh round): the budget handed to the PROVIDER must be what is left after the

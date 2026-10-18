@@ -64,17 +64,34 @@ export function costService(db: Db) {
         throw unprocessable("Agent does not belong to company");
       }
 
-      const event = await db.transaction(async (tx) => {
-        const event = await tx
+      const { event, created } = await db.transaction(async (tx) => {
+        const write = tx
           .insert(costEvents)
           .values({
             ...data,
             companyId,
             biller: data.biller ?? data.provider,
             billingType: data.billingType ?? inferBillingType(data.provider),
-          })
-          .returning()
-          .then((rows) => rows[0]);
+          });
+        const [event] = data.sourceIdempotencyKey
+          ? await write.onConflictDoNothing({
+              target: [costEvents.companyId, costEvents.sourceIdempotencyKey],
+              where: sql`${costEvents.sourceIdempotencyKey} IS NOT NULL`,
+            }).returning()
+          : await write.returning();
+        if (!event && data.sourceIdempotencyKey) {
+          const [existing] = await tx.select().from(costEvents).where(and(
+            eq(costEvents.companyId, companyId),
+            eq(costEvents.sourceIdempotencyKey, data.sourceIdempotencyKey),
+          )).limit(1);
+          if (existing) {
+            if (existing.companyId !== companyId || existing.agentId !== agent.id) {
+              throw unprocessable("Cost identity does not match the company and agent");
+            }
+            return { event: existing, created: false };
+          }
+        }
+        if (!event) throw new Error("Cost write produced no event");
 
         await tx
           .update(agents)
@@ -111,12 +128,12 @@ export function costService(db: Db) {
             .where(eq(agents.id, updatedAgent.id));
         }
 
-        return event;
+        return { event, created: true };
       });
 
       // Fire-and-forget budget evaluation (skipped when the caller drives it
       // synchronously — JOB-012 authoritative-cost bridge).
-      if (!options?.deferBudgetEvaluation) {
+      if (created && !options?.deferBudgetEvaluation) {
         budgetService(db).evaluateCostEvent(agent.id, companyId).catch((err) =>
           logger.error({ err }, "budget evaluation failed after cost event")
         );

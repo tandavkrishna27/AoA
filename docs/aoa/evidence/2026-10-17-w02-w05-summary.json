@@ -1,0 +1,844 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-17T18:34:53.368Z",
+  "branch": "codex/replatform-w02-w05",
+  "base": "e3a6afaac52e6ec7df2b9cb5733591d3b2adbc41",
+  "applicationCandidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+  "documentationPublicationSeparate": true,
+  "wholeSuiteRun": false,
+  "selectedFiles": [
+    "server/src/__tests__/aoa-runner.test.ts",
+    "server/src/__tests__/costs-service.test.ts",
+    "server/src/__tests__/agent-auth-jwt.test.ts",
+    "server/src/__tests__/crew-run-jwt.test.ts",
+    "server/src/__tests__/sweep-steward.test.ts",
+    "server/src/__tests__/hub-curation-tools.test.ts",
+    "server/src/__tests__/aoa-run-result.test.ts",
+    "server/src/__tests__/crew-cancellation.test.ts",
+    "server/src/__tests__/aoa-dispatcher.test.ts",
+    "server/src/__tests__/broker-tool-context.test.ts",
+    "server/src/__tests__/costs-idempotency.integration.test.ts",
+    "server/src/__tests__/aoa-trigger-prompt.test.ts",
+    "server/src/__tests__/codex-crew-tool-capture.test.ts",
+    "packages/adapter-manager/src/__tests__/bin-adapter-manager.test.ts",
+    "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+    "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+    "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+    "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+    "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+    "packages/worker-daemon/src/__tests__/supervisor-cancel-escalation.test.ts",
+    "packages/worker-daemon/src/__tests__/supervisor-shutdown.test.ts"
+  ],
+  "targeted": {
+    "local": {
+      "candidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+      "platform": "Windows x64",
+      "node": "v24.19.0",
+      "pnpm": "9.15.4",
+      "exitCode": 0,
+      "printedTestFilesPassed": 21,
+      "printedTestsPassed": 359,
+      "windowsIntegrationOptIn": true,
+      "captureSummary": {
+        "testFiles": "unknown",
+        "tests": "unknown",
+        "passed": "unknown",
+        "failed": "unknown",
+        "skipped": "unknown"
+      },
+      "captureUnhandledErrors": "unknown"
+    },
+    "vps": {
+      "candidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+      "platform": "Linux ARM64",
+      "node": "v24.19.0",
+      "pnpm": "9.15.4",
+      "exitCode": 0,
+      "printedTestFilesPassed": 21,
+      "printedTestsPassed": 359,
+      "captureSummary": {
+        "testFiles": "unknown",
+        "tests": "unknown",
+        "passed": "unknown",
+        "failed": "unknown",
+        "skipped": "unknown"
+      },
+      "captureUnhandledErrors": "unknown"
+    },
+    "providerIntegrity": {
+      "candidate": "8ec0394537e7e6183e4d6348003cea9bdb814e0a",
+      "eachHost": {
+        "files": 2,
+        "passed": 40,
+        "exitCode": 0
+      },
+      "laterChangesServerOnly": true,
+      "realE2BAcceptance": false
+    },
+    "trackedProcessPrimitives": {
+      "windows": {
+        "files": 2,
+        "passed": 10,
+        "skipped": 1,
+        "skipReason": "POSIX-only test"
+      },
+      "vps": {
+        "files": 2,
+        "passed": 11,
+        "skipped": 0
+      },
+      "note": "Crew cancellation also exercises actual Node children inside the selected six-case cancellation file."
+    },
+    "stagingManifest": {
+      "eachHost": {
+        "passed": 67,
+        "checkerExitCode": 0
+      },
+      "executableOriginTestsIncludedInSelection": 44
+    },
+    "builds": {
+      "frozenVpsInstallAndRootBuildCandidate": "8ec0394537e7e6183e4d6348003cea9bdb814e0a",
+      "laterServerRebuildCandidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+      "serverAndAdapterManagerTypechecksPassed": true,
+      "schemaOrDependencyChanges": false
+    }
+  },
+  "native": {
+    "companyId": "f5a3dc0e-0663-4b5d-b1c0-624e9100225d",
+    "stewardId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+    "cliVersion": "0.145.0",
+    "savedModelSelections": null,
+    "credentialScope": "Owner-local ChatGPT login, isolated short home; no provider API fallback and no personal auth transferred to VPS. Not W06 credential isolation or default-long-path qualification.",
+    "runs": [
+      {
+        "id": "c717cb4f-9625-4b23-9619-d29ff8142f09",
+        "status": "completed",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "toolsCalled": [],
+        "tokenUsage": {
+          "inputTokens": 28809,
+          "outputTokens": 167,
+          "cachedInputTokens": 25088
+        },
+        "costCents": null
+      },
+      {
+        "id": "a6f4fefb-e8aa-4293-b4a8-5d21603ae72e",
+        "status": "completed",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "toolsCalled": [],
+        "tokenUsage": {
+          "inputTokens": 60192,
+          "outputTokens": 369,
+          "cachedInputTokens": 55168
+        },
+        "costCents": null
+      },
+      {
+        "id": "14e83889-9cdc-4f81-84dd-2a9d65e62430",
+        "status": "completed",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "toolsCalled": [
+          "hub.readCurationContext",
+          "hub.updateCurationSummary"
+        ],
+        "tokenUsage": {
+          "inputTokens": 60582,
+          "outputTokens": 486,
+          "cachedInputTokens": 55296
+        },
+        "costCents": null
+      },
+      {
+        "id": "90f7a155-e116-4b60-89ef-ee08660af4b3",
+        "status": "cancelled",
+        "provider": null,
+        "model": null,
+        "toolsCalled": [],
+        "tokenUsage": null,
+        "costCents": null
+      }
+    ],
+    "costs": [
+      {
+        "id": "1e39a080-8ec7-419d-8d57-04be18234d8d",
+        "agentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "billingType": "subscription",
+        "inputTokens": 28809,
+        "cachedInputTokens": 25088,
+        "outputTokens": 167,
+        "costCents": 0,
+        "sourceIdempotencyKey": "crew_run:c717cb4f-9625-4b23-9619-d29ff8142f09"
+      },
+      {
+        "id": "6685c4e5-5293-4f0d-a125-b0341b6a9b39",
+        "agentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "billingType": "subscription",
+        "inputTokens": 60192,
+        "cachedInputTokens": 55168,
+        "outputTokens": 369,
+        "costCents": 0,
+        "sourceIdempotencyKey": "crew_run:a6f4fefb-e8aa-4293-b4a8-5d21603ae72e"
+      },
+      {
+        "id": "2c8458a0-dea4-4bbd-a6ff-4afd30163718",
+        "agentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "billingType": "subscription",
+        "inputTokens": 60582,
+        "cachedInputTokens": 55296,
+        "outputTokens": 486,
+        "costCents": 0,
+        "sourceIdempotencyKey": "crew_run:14e83889-9cdc-4f81-84dd-2a9d65e62430"
+      },
+      {
+        "id": "4f3ee928-ca8e-48cb-9bdc-4cf53e2e6bab",
+        "agentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "provider": "openai",
+        "model": "gpt-5.6-sol",
+        "billingType": "subscription",
+        "inputTokens": 60574,
+        "cachedInputTokens": 55424,
+        "outputTokens": 393,
+        "costCents": 0,
+        "sourceIdempotencyKey": "crew_run:90f7a155-e116-4b60-89ef-ee08660af4b3"
+      }
+    ],
+    "hub": [
+      {
+        "id": "fe9c292c-e17c-4034-a531-af0df9d859c4",
+        "curationRevision": 3,
+        "curationGroupSummary": "Two normal-priority CEO strategy approval requests are awaiting board review; neither has an SLA deadline.",
+        "curatedByAgentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "status": "open"
+      },
+      {
+        "id": "83e7aa49-1504-4b85-8ae4-69cb1bb341dc",
+        "curationRevision": 2,
+        "curationGroupSummary": "Two normal-priority CEO strategy approval requests are awaiting board review; neither has an SLA deadline.",
+        "curatedByAgentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "status": "open"
+      },
+      {
+        "id": "760c96a4-36da-4818-99bb-071947783802",
+        "curationRevision": 2,
+        "curationGroupSummary": "Three normal-priority CEO strategy approval requests await board review.",
+        "curatedByAgentId": "a3204d55-afd3-4b38-9812-bce3ee706237",
+        "status": "open"
+      }
+    ],
+    "approvals": [
+      {
+        "id": "c9c20272-9a5d-4641-97a9-ade1295a5c9e",
+        "status": "pending"
+      },
+      {
+        "id": "d76df287-10db-492d-b0fc-2d0473421f96",
+        "status": "pending"
+      },
+      {
+        "id": "ab91c235-4ed7-4a99-a533-5bd9295928ab",
+        "status": "pending"
+      }
+    ],
+    "usefulCompletedRun": {
+      "candidate": "ab1f4e49617b2f3b41c8de1ec763d8a35e3c97e4",
+      "runId": "14e83889-9cdc-4f81-84dd-2a9d65e62430",
+      "toolsCalled": [
+        "hub.readCurationContext",
+        "hub.updateCurationSummary"
+      ],
+      "exactCostEventCount": 1,
+      "billingType": "subscription",
+      "costCents": 0
+    },
+    "cancellation": {
+      "companyId": "f5a3dc0e-0663-4b5d-b1c0-624e9100225d",
+      "runId": "90f7a155-e116-4b60-89ef-ee08660af4b3",
+      "finishedAt": "2026-10-17T18:25:11.2867359Z",
+      "startedAt": "2026-10-17T18:23:46.1410802Z",
+      "observedChildrenStillRunning": 0,
+      "agentStatus": "paused",
+      "candidate": "ab1f4e49617b2f3b41c8de1ec763d8a35e3c97e4",
+      "errorMessage": "Cancelled due to agent pause",
+      "childrenBefore": [
+        {
+          "ProcessId": 23808,
+          "ParentProcessId": 17000,
+          "Name": "codex.exe",
+          "createdAt": "2026-10-17T18:25:08.7905180Z"
+        }
+      ],
+      "result": "pass",
+      "persistedRunStatus": "cancelled"
+    },
+    "cancellationLimit": "A curation effect had already occurred; termination requests cannot undo accepted tool effects or certify abrupt-crash cleanup.",
+    "cancelledAuditRepair": {
+      "candidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+      "retainedTranscriptObservedNames": [
+        "hub.readCurationContext",
+        "hub.updateCurationSummary"
+      ],
+      "originalCancelledRowRetainedUnchanged": true,
+      "regressionRedFailed": 2,
+      "regressionGreenSelectedPassed": 39,
+      "repeatLiveNativeCancellationRun": false,
+      "writesOnly": "toolsCalled on matching company/run/cancelled row; lifecycle/reason/timestamp unchanged"
+    },
+    "quiescentRestartSigningFileUnchanged": true,
+    "abruptCrashRestartQualified": false,
+    "globalCurationMutationAudit": "Not independently established: selected activity_log observation contained no curation-specific record; per-run tool names and cost events are not that global audit.",
+    "cleanup": {
+      "ownedListeners": 0,
+      "wrapperPidAbsent": true,
+      "reviewHealth": {
+        "status": "ok",
+        "revision": "6ebc400d2fd4c4cf26b90d2c1d6466171d08f3e9",
+        "deploymentMode": "local_trusted",
+        "deploymentExposure": "private",
+        "authReady": true,
+        "bootstrapStatus": "ready",
+        "features": {
+          "companyDeletionEnabled": true
+        }
+      },
+      "scope": "Observed wrapper24892/server25064/database22416 and app/DB listeners; no recursive data deletion",
+      "databasePidAbsent": true,
+      "priorStopCommand": "pg_ctl reported process already absent after owned app tree stopped; retained native-pg-stop.log",
+      "serverPidAbsent": true,
+      "matchingOwnedPostgresProcesses": 0,
+      "result": "pass",
+      "observedAt": "2026-10-17T18:32:02.5273777Z"
+    }
+  },
+  "vpsDeployment": {
+    "candidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+    "startedAt": "2026-10-17T18:33:19.939563+00:00",
+    "databaseBefore": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "result": "pass",
+    "health": {
+      "status": "ok",
+      "revision": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+      "deploymentMode": "cloud_auth",
+      "deploymentExposure": "public",
+      "authReady": true,
+      "bootstrapStatus": "ready",
+      "features": {
+        "companyDeletionEnabled": false
+      }
+    },
+    "uiHttpStatus": 200,
+    "databaseAfter": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 true",
+    "serviceActive": "active",
+    "distributedRolloutEnabled": false,
+    "retainedOAuthConfiguration": true,
+    "finishedAt": "2026-10-17T18:33:29.842181+00:00"
+  },
+  "chrome": {
+    "observedAt": "2026-10-17T18:34:16.710Z",
+    "candidate": "919967f3cd1c14a8eef92717a7e186c715f14f7c",
+    "browser": "Chrome",
+    "url": "https://testing.armyofagents.org/QAC/home",
+    "result": "pass",
+    "scope": "Authenticated retained QA company Home after exact-candidate deployment/reload; prior Google sign-in succeeded; no credential transfer",
+    "priorHarnessResult": "First receipt expected evening greeting, but local midnight correctly changed it to morning. DOM and screenshot unchanged, corrected this test expectation only."
+  },
+  "pending": [
+    "Complete W02 live wrong-company/expired/stale JWT/revocation matrix and other supported adapter/transport variants.",
+    "Abrupt crash/restart child custody and permission-revocation fencing; process-local cancellation is not crash recovery.",
+    "Reconcile exactly-once global curation mutation audit versus observed per-run names/cost events.",
+    "Select supported execution-secret/backend/storage cohort, then actual VPSauthority-PCworker generated-file/export/commit/UI-download bytes/digest/size/denial/cleanup journey.",
+    "Historical TST012/TST013 production attribution remains unproven. Broader lane, rollout and baseline/followup integration need separate scope."
+  ],
+  "rawEvidence": {
+    "localDirectory": "C:/Users/Dell/Desktop/aoa/validation-w02-w05-investigation",
+    "vpsDirectory": "/opt/aoa-w02-w05-20261017/evidence",
+    "availability": "Raw files stay on test hosts; not clone-accessible attachments. No raw transcripts, signed URLs, auth/config homes or databases published.",
+    "captureCounterPolicy": "Unknown means unknown; printed Vitest counters are separately recorded observations.",
+    "receiptCount": 79,
+    "receipts": [
+      {
+        "path": "source-state.json",
+        "bytes": 436,
+        "sha256": "94f98407eb62e6a39138bbc18fcb4705b3230d2375f9d54a28170591291e0a18",
+        "modifiedAt": "2026-10-17T17:49:58.538Z"
+      },
+      {
+        "path": "selected-tests.txt",
+        "bytes": 1157,
+        "sha256": "cc891c55f96424f99bfe0c41e7ae6fd13c53202d9ebed237eca3284838c4aa41",
+        "modifiedAt": "2026-10-17T18:20:14.906Z"
+      },
+      {
+        "path": "local-published-final/result.json",
+        "bytes": 2594,
+        "sha256": "acf65b3096d4ecae59ae27235b4f941e01037224145b995401162dda1f23dbff",
+        "modifiedAt": "2026-10-17T18:31:47.340Z"
+      },
+      {
+        "path": "local-published-final/stdout.txt",
+        "bytes": 158355,
+        "sha256": "a37c0646ccc00e7a3a9b780dad1a2a6166ba8bf91e4109dec436d7e3863f90e8",
+        "modifiedAt": "2026-10-17T18:31:47.150Z"
+      },
+      {
+        "path": "local-published-final/stderr.txt",
+        "bytes": 7689,
+        "sha256": "9756e13599af979f5d9ccc619be9876de5b7228f2887ca8f6086f81ef7158e03",
+        "modifiedAt": "2026-10-17T18:31:35.838Z"
+      },
+      {
+        "path": "local-provider/result.json",
+        "bytes": 1437,
+        "sha256": "23a632e95535c409be477f7f2f73933f02479b5a7d5f4d6fbb77d006e01eb0ca",
+        "modifiedAt": "2026-10-17T17:57:22.686Z"
+      },
+      {
+        "path": "local-provider/stdout.txt",
+        "bytes": 391,
+        "sha256": "35c476dff414ab890e3a2587acc2ed516e84870b46af9bd233fb3c0506d4da12",
+        "modifiedAt": "2026-10-17T17:57:22.507Z"
+      },
+      {
+        "path": "local-provider/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T17:57:19.302Z"
+      },
+      {
+        "path": "local-final-typecheck.log",
+        "bytes": 97,
+        "sha256": "11aca9525700da9e8acd191d11835d075f494a51da8b60306576130f1f8c4157",
+        "modifiedAt": "2026-10-17T18:18:32.305Z"
+      },
+      {
+        "path": "staging-config/attempt-02/manifest-test.log",
+        "bytes": 6470,
+        "sha256": "73ba9bd3a9741c9028959b3ffdc200f6b2f0f8c50da6f98e3c9d0e2fbc653835",
+        "modifiedAt": "2026-10-17T17:43:08.504Z"
+      },
+      {
+        "path": "staging-config/attempt-02/manifest-test.exit",
+        "bytes": 3,
+        "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354",
+        "modifiedAt": "2026-10-17T17:43:08.516Z"
+      },
+      {
+        "path": "staging-config/attempt-02/manifest-check.log",
+        "bytes": 1171,
+        "sha256": "2aee6216c438fb7f5bdbb3a47af4b36358cda227b1ec62c3fc225f5e561b7a22",
+        "modifiedAt": "2026-10-17T17:43:08.588Z"
+      },
+      {
+        "path": "staging-config/attempt-02/manifest-check.exit",
+        "bytes": 3,
+        "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354",
+        "modifiedAt": "2026-10-17T17:43:08.596Z"
+      },
+      {
+        "path": "boot-wiring/attempt-06/green.log",
+        "bytes": 355,
+        "sha256": "cceb0a887720a483a3b31dce550cc70586947642a1490cf67d083080c0f8b8d7",
+        "modifiedAt": "2026-10-17T17:44:56.817Z"
+      },
+      {
+        "path": "boot-wiring/attempt-06/green.exit",
+        "bytes": 3,
+        "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354",
+        "modifiedAt": "2026-10-17T17:44:57.003Z"
+      },
+      {
+        "path": "boot-wiring/attempt-06/typecheck.log",
+        "bytes": 124,
+        "sha256": "43fa61b7e9a2f599194fcd6f0f36ed81c3097d29c0affeb80118120f5c25b387",
+        "modifiedAt": "2026-10-17T17:44:57.535Z"
+      },
+      {
+        "path": "boot-wiring/attempt-06/typecheck.exit",
+        "bytes": 3,
+        "sha256": "13bf7b3039c63bf5a50491fa3cfd8eb4e699d1ba1436315aef9cbe5711530354",
+        "modifiedAt": "2026-10-17T17:44:59.044Z"
+      },
+      {
+        "path": "w05/adapter-artifact-focused-after.log",
+        "bytes": 2928,
+        "sha256": "b7ee1e6e44f1c832309d68417e13f8821903d371f8b82729b6479e4c5cd84b7d",
+        "modifiedAt": "2026-10-17T17:41:25.240Z"
+      },
+      {
+        "path": "w05/adapter-artifact-focused-after.log.json",
+        "bytes": 352,
+        "sha256": "41fcd693652e2e0f2747b5bab028df67e8b4dbf4b5272ee7ea1de8a6fa9dc8d6",
+        "modifiedAt": "2026-10-17T17:41:25.387Z"
+      },
+      {
+        "path": "w05/adapter-artifact-focused-after-import-fix.log",
+        "bytes": 838,
+        "sha256": "4706f830227ea11252512021f11f90bd99591926b5157db5886d42f8d00728e3",
+        "modifiedAt": "2026-10-17T17:41:49.640Z"
+      },
+      {
+        "path": "w05/adapter-artifact-focused-after-import-fix.log.json",
+        "bytes": 352,
+        "sha256": "61868f1b345220b6993fda37d4bd318580625c965ae3ae7e5ce9ae0fd90ac884",
+        "modifiedAt": "2026-10-17T17:41:49.811Z"
+      },
+      {
+        "path": "w05/w05-artifact-boundaries.log",
+        "bytes": 8920,
+        "sha256": "0288d2ce9390e131ca5df2842e545508c31ce298838e5043f1a7a03881a48412",
+        "modifiedAt": "2026-10-17T17:42:16.172Z"
+      },
+      {
+        "path": "w05/w05-artifact-boundaries.log.json",
+        "bytes": 1058,
+        "sha256": "253184502366a0e22413a6ede28819d0199b44de87c51329d6ccdf2ee9eb2503",
+        "modifiedAt": "2026-10-17T17:42:16.343Z"
+      },
+      {
+        "path": "w05/crew-cancel/crew-cancellation-red.log",
+        "bytes": 3961,
+        "sha256": "decdf05c8e213a10510670f8406be60c51d716c448fa09b141ace31ad0b67876",
+        "modifiedAt": "2026-10-17T18:10:12.265Z"
+      },
+      {
+        "path": "w05/crew-cancel/crew-cancellation-red.log.json",
+        "bytes": 348,
+        "sha256": "54e652857dc40da9eb879fdc45924438cd18d86ac075c72bdf1f8f4f33952dcf",
+        "modifiedAt": "2026-10-17T18:10:12.404Z"
+      },
+      {
+        "path": "w05/crew-cancel/crew-cancellation-green.log",
+        "bytes": 297,
+        "sha256": "52bbba6b1815691849e3fc32e1ef9d482e6c3ae8ba760cf5ec8f2e88a400170d",
+        "modifiedAt": "2026-10-17T18:10:34.433Z"
+      },
+      {
+        "path": "w05/crew-cancel/crew-cancellation-green.log.json",
+        "bytes": 348,
+        "sha256": "262fa937fd1df746a3a824ae3a8dc58f2652ab771af7e1ca27f37216dbea701b",
+        "modifiedAt": "2026-10-17T18:10:34.587Z"
+      },
+      {
+        "path": "w05/crew-cancel/tracked-process-primitives.log",
+        "bytes": 467,
+        "sha256": "59b1e125fab1ecb5d8aba0c1a2ee75fb8b4866484f927c0e54561103882593be",
+        "modifiedAt": "2026-10-17T18:10:47.155Z"
+      },
+      {
+        "path": "w05/crew-cancel/tracked-process-primitives.log.json",
+        "bytes": 430,
+        "sha256": "85fdfb9456d43bd81a5e71ae311c8bd18e8695338eaf64cd42343071abda6a71",
+        "modifiedAt": "2026-10-17T18:10:47.310Z"
+      },
+      {
+        "path": "w02/investigation.txt",
+        "bytes": 10049,
+        "sha256": "fb0923aac52ef8292b2e5a6705aedae2cd999e43be5145c3c705b0af4160c038",
+        "modifiedAt": "2026-10-17T17:39:14.785Z"
+      },
+      {
+        "path": "w02/steward-prompt-finding.txt",
+        "bytes": 2324,
+        "sha256": "ab5577630fbbb6bf19318da1214daae0abffd81770dfb8c9bc29244e8a767a6a",
+        "modifiedAt": "2026-10-17T18:00:22.579Z"
+      },
+      {
+        "path": "w02/red.stdout.log",
+        "bytes": 8970,
+        "sha256": "b2ff8d311c9a7c481059d564f1a1b279e99729b4dfeb72a9fd3047f02758cb5f",
+        "modifiedAt": "2026-10-17T17:43:35.515Z"
+      },
+      {
+        "path": "w02/green.stdout.log",
+        "bytes": 389,
+        "sha256": "5efd9b288848238d3284afa72d8139b0a6510261d9f3959ca407ca4408067b7e",
+        "modifiedAt": "2026-10-17T17:44:49.303Z"
+      },
+      {
+        "path": "w02/subscription-red.stdout.log",
+        "bytes": 3857,
+        "sha256": "4c95db5d0a3c96b3bb52bac7304ff05763428675c5d2e4b23cfaf94a529731eb",
+        "modifiedAt": "2026-10-17T17:47:56.472Z"
+      },
+      {
+        "path": "w02/subscription-green.stdout.log",
+        "bytes": 389,
+        "sha256": "d911ca5a02c65d6c4a6ce684deb05c30110c54668dc8395ec964054c22d4321e",
+        "modifiedAt": "2026-10-17T17:48:10.344Z"
+      },
+      {
+        "path": "w02/steward-prompt-red.stdout.log",
+        "bytes": 7705,
+        "sha256": "9b3b56e6f38faaf8f63e0936609be005d88b40be3d5ea6b917bcf7a176fa069c",
+        "modifiedAt": "2026-10-17T17:59:12.097Z"
+      },
+      {
+        "path": "w02/steward-prompt-green.stdout.log",
+        "bytes": 479,
+        "sha256": "50ef8542a68175404b022a4fa315d5f45ee6c052dbc87b31792b358eb34d2801",
+        "modifiedAt": "2026-10-17T17:59:39.967Z"
+      },
+      {
+        "path": "w02/tool-capture-red.stdout.log",
+        "bytes": 4268,
+        "sha256": "640cba4e3c0282486ce08ce1633b718a5f0b456075218c0bcf11ff4d900af7bd",
+        "modifiedAt": "2026-10-17T18:09:47.806Z"
+      },
+      {
+        "path": "w02/tool-capture-green.stdout.log",
+        "bytes": 397,
+        "sha256": "8badbd00915a164851d595cdb4e0e0a7db964999c9b80e9692b057e33ecdfa6a",
+        "modifiedAt": "2026-10-17T18:11:18.574Z"
+      },
+      {
+        "path": "w02/tool-capture-retained-replay.json",
+        "bytes": 140,
+        "sha256": "718a34347ad709588a1c0f54974bb6ae2b1e232f0655bf2a49c75183946f12cc",
+        "modifiedAt": "2026-10-17T18:13:09.907Z"
+      },
+      {
+        "path": "w02/tool-capture-native-event-schema.json",
+        "bytes": 1225,
+        "sha256": "78789eea6b09bc3c6e711185e05dd32d6e12823c3b730a949439b5d49e3f2af7",
+        "modifiedAt": "2026-10-17T18:18:55.641Z"
+      },
+      {
+        "path": "w02/tool-capture-cancelled-replay.json",
+        "bytes": 140,
+        "sha256": "df40f9637686d4b5022bf656416b9421bd2a3d11d78160e00cfe9b2a535026ed",
+        "modifiedAt": "2026-10-17T18:26:14.354Z"
+      },
+      {
+        "path": "w02/cancelled-audit-red.stdout.log",
+        "bytes": 3292,
+        "sha256": "e93465d16d81c8058f3e83c35c47b6d05721a238e9b916ff2e78c34468d35eee",
+        "modifiedAt": "2026-10-17T18:27:55.509Z"
+      },
+      {
+        "path": "w02/cancelled-audit-green.stdout.log",
+        "bytes": 481,
+        "sha256": "f1baec59c3a6b714b12ed4bd1dda6db930461e0632944051092b92df427c044d",
+        "modifiedAt": "2026-10-17T18:28:19.420Z"
+      },
+      {
+        "path": "w02/cancelled-audit-typecheck.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T18:28:45.522Z"
+      },
+      {
+        "path": "w02/cancelled-audit-typecheck.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T18:28:45.565Z"
+      },
+      {
+        "path": "native-setup.json",
+        "bytes": 1765,
+        "sha256": "14b9be1341fe1aa07eb6c6f7b00a696f78cb55f8f6146f7327916086ece4d713",
+        "modifiedAt": "2026-10-17T17:56:31.667Z"
+      },
+      {
+        "path": "native-observe.json",
+        "bytes": 7106,
+        "sha256": "dd6c9b270b45444ce7b634f8e4e911f05a4c854d310c6b6733f5a2f810a6a45a",
+        "modifiedAt": "2026-10-17T17:57:17.333Z"
+      },
+      {
+        "path": "native-retry-observe.json",
+        "bytes": 7117,
+        "sha256": "3cb1a5926d666d0313f8cce971df001b501e4351511879a284cd263d9246de27",
+        "modifiedAt": "2026-10-17T18:01:59.632Z"
+      },
+      {
+        "path": "native-retry2-observe.json",
+        "bytes": 8200,
+        "sha256": "04df8d8462b46a4f2e7ee18819b76fd8b522099514437ed572bbc312abaeb23f",
+        "modifiedAt": "2026-10-17T18:04:30.056Z"
+      },
+      {
+        "path": "native-final-observe.json",
+        "bytes": 10199,
+        "sha256": "d518cb16f1afc71ac33bdf892c04755fb210311cb07e0ae93c6c26738c399c38",
+        "modifiedAt": "2026-10-17T18:23:13.236Z"
+      },
+      {
+        "path": "native-durable-audit.json",
+        "bytes": 8026,
+        "sha256": "a5e1a541edfe0fa3e5f8c6baa3fc41e13f4e64b8e66b011182756feb65756341",
+        "modifiedAt": "2026-10-17T18:06:49.342Z"
+      },
+      {
+        "path": "native-durable-audit-after-cancellation.json",
+        "bytes": 12070,
+        "sha256": "c523c63927c9987b1183e40d131d78c1c7b822cf125c2485de6c67927d26e066",
+        "modifiedAt": "2026-10-17T18:25:29.765Z"
+      },
+      {
+        "path": "native-restart.result.json",
+        "bytes": 787,
+        "sha256": "a8508b0b2cf063952624e807fb5e40aaf1bb0ab3611666dfba20ac477747a2c1",
+        "modifiedAt": "2026-10-17T18:01:59.093Z"
+      },
+      {
+        "path": "native-final.result.json",
+        "bytes": 787,
+        "sha256": "198aceec2516457d709d4d4bb72bc73fbffcbf1c8f13888f308cb6a64d2ed0df",
+        "modifiedAt": "2026-10-17T18:20:38.749Z"
+      },
+      {
+        "path": "native-cancellation.result.json",
+        "bytes": 832,
+        "sha256": "e8026752e9c51dce81ce3a49b43224fb2e6ce3a169c2d10c3b4123d98b45178e",
+        "modifiedAt": "2026-10-17T18:25:11.309Z"
+      },
+      {
+        "path": "native-pg-stop.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "modifiedAt": "2026-10-17T18:31:42.499Z"
+      },
+      {
+        "path": "native-cleanup-verified.result.json",
+        "bytes": 769,
+        "sha256": "72fcc7bc497ab001240a6d3c15e969709546b2e452afde66504682dc6b8bef0e",
+        "modifiedAt": "2026-10-17T18:32:02.546Z"
+      },
+      {
+        "path": "vps-audit-evidence/install.result.json",
+        "bytes": 159,
+        "sha256": "ce51aaaf51accb58d6295fc414614b6d59a7c5ae357014f1a08fc56e1c3cf54b",
+        "modifiedAt": "2026-10-17T18:33:47.702Z"
+      },
+      {
+        "path": "vps-audit-evidence/build.result.json",
+        "bytes": 157,
+        "sha256": "31fbfc648de696e3c24df64d5a5941923b8280612d4a58ebf70e3b6da7d80a2d",
+        "modifiedAt": "2026-10-17T18:34:09.122Z"
+      },
+      {
+        "path": "vps-audit-evidence/build.log",
+        "bytes": 37517,
+        "sha256": "0cde5968bf754077f3f1a05855f9552b640a01d3c15d9947fa094e4e98fa25be",
+        "modifiedAt": "2026-10-17T18:34:00.895Z"
+      },
+      {
+        "path": "vps-audit-evidence/provider.result.json",
+        "bytes": 160,
+        "sha256": "a1ba4eba112e8abb1a399071aca507214d63ddba44d974acc8a43a75cb2bcaf5",
+        "modifiedAt": "2026-10-17T18:34:06.270Z"
+      },
+      {
+        "path": "vps-audit-evidence/provider.log",
+        "bytes": 648,
+        "sha256": "6accaea54b6ff98b202dd002dd63e75479aa094c7270633c8d838c2496a6adcf",
+        "modifiedAt": "2026-10-17T18:34:03.282Z"
+      },
+      {
+        "path": "vps-audit-evidence/typecheck.result.json",
+        "bytes": 161,
+        "sha256": "69c44206655ccc99054cfe63a1fb9add0dca4840d6d5d83d96cb9f3e3d32b82a",
+        "modifiedAt": "2026-10-17T18:33:48.901Z"
+      },
+      {
+        "path": "vps-audit-evidence/typecheck.log",
+        "bytes": 178,
+        "sha256": "3db3fbae6e23b3893f0102f361283f1c7a68b6dc3c89fff1a891f76d74a4a191",
+        "modifiedAt": "2026-10-17T18:33:47.105Z"
+      },
+      {
+        "path": "vps-audit-evidence/staging.result.json",
+        "bytes": 159,
+        "sha256": "590c578bac3ada757711e8b4bc1124b4ed04f1df699055144fdeecdfb744198e",
+        "modifiedAt": "2026-10-17T18:33:59.548Z"
+      },
+      {
+        "path": "vps-audit-evidence/staging.log",
+        "bytes": 7688,
+        "sha256": "6932228ad22aae1259142d3f5b4f9c974301219ec83318c89296a973ec615e80",
+        "modifiedAt": "2026-10-17T18:33:57.140Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final/result.json",
+        "bytes": 2484,
+        "sha256": "e38f70180219388d891e608899166991e0f55aeb76f63b666134de95e8a65c5c",
+        "modifiedAt": "2026-10-17T18:33:44.105Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final/stdout.txt",
+        "bytes": 196454,
+        "sha256": "16f7cb9bd041257c232b897ac17ed232b370f31ae944f1a64495bebb6d1de4eb",
+        "modifiedAt": "2026-10-17T18:33:45.908Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final/stderr.txt",
+        "bytes": 9735,
+        "sha256": "5f628c22000101fbf459248c0839ec5e75e53d495837378e38930d7b4d0d9902",
+        "modifiedAt": "2026-10-17T18:33:44.701Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final-build.result.json",
+        "bytes": 98,
+        "sha256": "c2d807dd5538b3574c5fef2496c73dd19f98809a50312cd03119362de694ef8d",
+        "modifiedAt": "2026-10-17T18:34:13.475Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final-build.log",
+        "bytes": 211,
+        "sha256": "e6010c18bdc89ca520b5754c07e8b09bcaa771abebb3f254069df64cc0fba85d",
+        "modifiedAt": "2026-10-17T18:34:05.671Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final-process.result.json",
+        "bytes": 100,
+        "sha256": "ba9c6f1e0306a0ca10fba9917592d4ead6327eed4f51d089b907dddde0dee670",
+        "modifiedAt": "2026-10-17T18:34:15.273Z"
+      },
+      {
+        "path": "vps-audit-evidence/audit-final-process.log",
+        "bytes": 741,
+        "sha256": "d4845feb69ed0905154881f88818db16999257525746669427c3edca7f57622c",
+        "modifiedAt": "2026-10-17T18:34:03.880Z"
+      },
+      {
+        "path": "vps-audit-evidence/deployment-audit-final.json",
+        "bytes": 786,
+        "sha256": "1134e0fe8c803e09e49dac88b5123b36fe922be1249d19a50f7ae5db6a820232",
+        "modifiedAt": "2026-10-17T18:33:53.249Z"
+      },
+      {
+        "path": "vps-audit-final-home.dom.txt",
+        "bytes": 3126,
+        "sha256": "9d2a933dc7dc1f24de66ed345acf489348a442e6c5c8e6be23febec8518dba23",
+        "modifiedAt": "2026-10-17T18:34:01.163Z"
+      },
+      {
+        "path": "vps-audit-final-home.png",
+        "bytes": 59758,
+        "sha256": "0c070d49ee9cc82459bbab1f96de838925fc715531e74cc1ae93d187748bd5f3",
+        "modifiedAt": "2026-10-17T18:34:02.770Z"
+      },
+      {
+        "path": "vps-audit-browser.json",
+        "bytes": 355,
+        "sha256": "6e66341f87377a5762b6d9e9ede4873a76f72b37742dfe0f12cca57a76a2d19a",
+        "modifiedAt": "2026-10-17T18:34:02.771Z"
+      },
+      {
+        "path": "vps-audit-browser-verified.json",
+        "bytes": 539,
+        "sha256": "c9b1e19877f793579146b5a0a03bb4510a1a646a65a855af76c4a19bc62e8f85",
+        "modifiedAt": "2026-10-17T18:34:16.711Z"
+      }
+    ]
+  }
+}
