@@ -1,12 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import {
   agents,
-  applyPendingMigrations,
   authUsers,
   companyMemberships,
   createDb,
@@ -18,26 +14,12 @@ import {
   type Db,
 } from "@armyofagents/db";
 import { insertTestCompany } from "./helpers/insert-test-company.js";
+import { startMigratedDatabase, type MigratedDatabase } from "./helpers/migrated-database.js";
 import { handleAskFounder, handleAskHuman } from "../mcp/tools/ask-founder-tool.js";
 import { workQuestionService } from "../services/work-questions.js";
 import type { ProtocolActor, ToolContext } from "../mcp/tools/types.js";
 
-type EmbeddedPostgresInstance = {
-  initialise(): Promise<void>;
-  start(): Promise<void>;
-  stop(): Promise<void>;
-};
-type EmbeddedPostgresCtor = new (opts: {
-  databaseDir: string;
-  user: string;
-  password: string;
-  port: number;
-  persistent: boolean;
-  initdbFlags?: string[];
-}) => EmbeddedPostgresInstance;
-
-let pg: EmbeddedPostgresInstance | null = null;
-let dataDir = "";
+let database: MigratedDatabase | undefined;
 let db: Db;
 let setupError: unknown = null;
 let setupFailed = false;
@@ -62,7 +44,6 @@ function assertSetupOk(): void {
     }`,
   );
 }
-const PORT = 59900 + Math.floor(Math.random() * 300);
 
 interface Scenario {
   companyId: string;
@@ -165,23 +146,8 @@ async function waitForQuestion(runId: string, timeoutMs = 10_000) {
 
 beforeAll(async () => {
   try {
-    dataDir = await mkdtemp(join(tmpdir(), "aoa-ask-human-dogfood-"));
-    const { default: EmbeddedPostgres } = (await import("embedded-postgres")) as {
-      default: EmbeddedPostgresCtor;
-    };
-    pg = new EmbeddedPostgres({
-      databaseDir: join(dataDir, "db"),
-      user: "test",
-      password: "test",
-      port: PORT,
-      persistent: false,
-      initdbFlags: ["--encoding=UTF8", "--locale=C"],
-    });
-    await pg.initialise();
-    await pg.start();
-    const connectionString = `postgres://test:test@localhost:${PORT}/postgres`;
-    await applyPendingMigrations(connectionString);
-    db = createDb(connectionString);
+    database = await startMigratedDatabase({ label: "aoa-ask-human-dogfood-" });
+    db = createDb(database.adminUrl);
   } catch (error) {
     setupError = error;
     setupFailed = true;
@@ -190,11 +156,14 @@ beforeAll(async () => {
 }, 180_000);
 
 afterAll(async () => {
-  try {
-    if (pg) await pg.stop();
-  } finally {
-    if (dataDir) await rm(dataDir, { recursive: true, force: true });
+  const errors: unknown[] = [];
+  for (const cleanup of [
+    () => db?.$client.end({ timeout: 5 }),
+    () => database?.teardown(),
+  ]) {
+    try { await cleanup(); } catch (error) { errors.push(error); }
   }
+  if (errors.length) throw new AggregateError(errors, "Ask Human dogfood fixture cleanup failed");
 }, 60_000);
 
 describe.skipIf(
