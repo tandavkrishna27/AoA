@@ -1,0 +1,3330 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-18",
+  "result": "PASS",
+  "integration": {
+    "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+    "tree": "8cf3597099653774d60866da53e0df02c47e9540",
+    "parents": [
+      "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+      "389fcd9789a38dec2204b76ffbc2526a074c010a"
+    ],
+    "commonBase": "eed114e7c25fef2f7a34fb57a1d6df3150b90c69",
+    "soleOverlap": [
+      "docs/aoa/plans/2026-10-18-program-integration-handoff.md"
+    ],
+    "preservedFiles": [
+      {
+        "path": "docs/aoa/evidence/2026-10-18-windows-postgres-fixture-summary.json",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "af2d05abf80ffc7f9d0d372059d3ddef433c767c"
+      },
+      {
+        "path": "docs/aoa/plans/2026-10-16-local-vps-validation-handoff.md",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "d7c4ac63c1b07adb312873c322aaf05a4d460133"
+      },
+      {
+        "path": "docs/aoa/plans/2026-10-16-replatform-completion.md",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "07b1b45fbfa85e366c78e83095ad4fbd1419e0c6"
+      },
+      {
+        "path": "docs/aoa/reports/2026-10-18-program-integration-report.md",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "f42f26f9a105e84694ad96252121c4d4ed581590"
+      },
+      {
+        "path": "docs/aoa/reports/2026-10-18-windows-postgres-fixture-report.md",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "c485c5a0f43548a8a8f68cde5dd557725778fa5f"
+      },
+      {
+        "path": "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "d7a6fbc0ff52bbd756ee1d4d29ff99dd07267a11"
+      },
+      {
+        "path": "server/src/__tests__/helpers/migrated-database.ts",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "94534b48da63656aae48ab6feceb7cdf77fed0e1"
+      },
+      {
+        "path": "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+        "originParent": "fdf1f5a5d99d8fe9a3e8338a4f053ce79b2f94c4",
+        "gitBlob": "d3ebe63cc09a9065077b0f9590ee76dd170aef81"
+      },
+      {
+        "path": "docs/aoa/evidence/2026-10-18-w12-live-summary.json",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "4c58a2bce3da7e7067fa453266518b7fab154bc6"
+      },
+      {
+        "path": "docs/aoa/evidence/2026-10-18-w12-restored-live-summary.json",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "c025346eac4bbf159448168fdadeb4384076f757"
+      },
+      {
+        "path": "docs/aoa/plans/2026-10-18-w12-handoff.md",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "ecfcca845c1053bcb3faa7cd19df2ff539c4c7fc"
+      },
+      {
+        "path": "docs/aoa/reports/2026-10-18-w12-live-rehearsal-report.md",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "c086c2f91446881ef50d71e9a96b6f7d6ac47f38"
+      },
+      {
+        "path": "docs/aoa/reports/2026-10-18-w12-restored-live-report.md",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "4aceedb264ffc3723fac726e61058925af2796b1"
+      },
+      {
+        "path": "docs/replatform/RUNBOOK-e7-1-keyed-run.md",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "0cb79653997968a40a07ace80865f485704e00be"
+      },
+      {
+        "path": "packages/db/src/__tests__/backup-native-contract.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "4d26f7e031cd17b5d9c65a524ec0e29bd7c32ff0"
+      },
+      {
+        "path": "packages/db/src/backup-lib.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "8abe6ea22da076b324181309cc12c64f5b2d3db7"
+      },
+      {
+        "path": "packages/db/src/migrations/0287_canary_successor_slug_update.sql",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "03d64a9468691a63f6e1d3c82d3391235cf62c78"
+      },
+      {
+        "path": "packages/db/src/migrations/meta/0287_snapshot.json",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "5145127a7541e5bf96a31ae74adc2d673346e522"
+      },
+      {
+        "path": "packages/db/src/migrations/meta/_journal.json",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "9e60db43b32176a2ad53364e81a3cad53bb10760"
+      },
+      {
+        "path": "packages/shared/src/index.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "2bdea25f6d22a52ddb22c598134003f83e5f6981"
+      },
+      {
+        "path": "packages/shared/src/validators/execution-target.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "8f490e130bf3d2e126de816e614929f41845870e"
+      },
+      {
+        "path": "packages/shared/src/validators/index.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "579e9cd3c7917f4cc6ebe020680661c116279781"
+      },
+      {
+        "path": "scripts/lib/__tests__/w7u1-agent-output-probe.test.mjs",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "e56c6910d39d3eabe8a74cae039d58e695c259e7"
+      },
+      {
+        "path": "scripts/w12-live-rehearsal/api.mjs",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "1e610da786237d4f44c26e8bfd7ab1c2c1a09e4f"
+      },
+      {
+        "path": "scripts/w12-live-rehearsal/api.test.mjs",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "99865abd7c39591b4248511360db14269b38af7e"
+      },
+      {
+        "path": "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "ccc00282abfc2a7f8f1ba308f0505e74f9b2fe41"
+      },
+      {
+        "path": "server/src/__tests__/execution-target-successor.integration.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "1ab8261b257054549a18aead79bee21b2b4b8deb"
+      },
+      {
+        "path": "server/src/__tests__/execution-target-successor.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "c0fc0a2c484a8e897871545732aed5d836874695"
+      },
+      {
+        "path": "server/src/__tests__/job-control-legacy-grants.contract.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "2a5f0c15e8353aa1e2d7fc4511269cd7e4322456"
+      },
+      {
+        "path": "server/src/__tests__/job-leasing-contract.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "1cad148615d4453899609f1661e48038ef5303ee"
+      },
+      {
+        "path": "server/src/__tests__/task-run-batch-workload.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "f7e31ff2056409101dfea6fdc4e2f6a9b7865c17"
+      },
+      {
+        "path": "server/src/__tests__/task-run-sandbox-invocation-auth.test.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "e5102d8bc18d8b491cacb39759caea54998f8ec4"
+      },
+      {
+        "path": "server/src/db/distributed-execution-databases.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "0d70e3561dd2aa053b764c0e9710876f236c14d6"
+      },
+      {
+        "path": "server/src/db/job-control-legacy-grants.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "1fd7413aed5c542d4fde571cd2e2a9e26fa0988b"
+      },
+      {
+        "path": "server/src/routes/execution-targets.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "29b119afc94a9dc46c84633db9c3194a6d902814"
+      },
+      {
+        "path": "server/src/services/execution-targets.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "d3f835872882ff6a924bc86b71bedb707bfb1a33"
+      },
+      {
+        "path": "server/src/services/task-run-sandbox-invocation.ts",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "c441dbf73ae246950ba783f6cdfc0b358a0909e6"
+      },
+      {
+        "path": "tests/d1/m4-native-fence-restore.test.mjs",
+        "originParent": "389fcd9789a38dec2204b76ffbc2526a074c010a",
+        "gitBlob": "77254642df783fffcc8180b757d56b507f832c92"
+      }
+    ],
+    "newApplicationEditsBeyondParents": false,
+    "conflictResolution": "Retained both completed increments and current pending qualifications"
+  },
+  "scope": {
+    "targeted": true,
+    "wholeSuite": false,
+    "rootBuild": false,
+    "paidLiveAcceptanceRepeated": false,
+    "providerCredentialsUsed": false,
+    "sharedReviewRedeployed": false,
+    "mainMerged": false
+  },
+  "coordination": {
+    "owner": "PROGRAM-ROOT-2",
+    "otherChat": "Find VPS testing requirements",
+    "otherChatId": "01a14485-5d55-7321-b4d0-daf03fcf33e9",
+    "otherChatConfirmedNoNewerOrUnpushedChanges": true
+  },
+  "sourceTransfer": {
+    "trackedFiles": 8378,
+    "archiveSha256": "07162417fe0d01d36197d11b19fcef25a29fff1b958655120c7f706973d41080",
+    "manifestSha256": "07f13c1c977e9a2ffff72526a8147ddf22100615b1b24b03dc131e6c4fae0a18",
+    "attribution": "Local clean Git checkout; VPS exact Git archive without .git, every tracked file hash checked after each stage and before teardown. VPS child captures correctly have null gitSha."
+  },
+  "hosts": {
+    "local": {
+      "platform": "win32",
+      "stages": [
+        {
+          "stage": "install",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 39680,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+              "install",
+              "--frozen-lockfile",
+              "--offline"
+            ]
+          },
+          "startedAt": "2026-10-18T06:21:24.409Z",
+          "durationMs": 20975.49,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\install\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\install\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "build",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 32128,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+              "-r",
+              "--filter",
+              "@armyofagents/adapter-utils...",
+              "--filter",
+              "@armyofagents/worker-daemon...",
+              "--filter",
+              "@armyofagents/sandbox-e2b-provider...",
+              "--filter",
+              "@armyofagents/adapter-manager...",
+              "--filter",
+              "@armyofagents/server...",
+              "--filter",
+              "@armyofagents/adapter-claude-local...",
+              "--filter",
+              "@armyofagents/adapter-gemini-local...",
+              "--filter",
+              "@armyofagents/adapter-opencode-local...",
+              "--filter",
+              "@armyofagents/adapter-codex-local...",
+              "--filter",
+              "@armyofagents/cli...",
+              "--filter",
+              "@armyofagents/shared...",
+              "--filter",
+              "@armyofagents/worker-protocol...",
+              "--filter",
+              "@armyofagents/db...",
+              "build"
+            ]
+          },
+          "startedAt": "2026-10-18T06:22:10.587Z",
+          "durationMs": 98479.95,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\build\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\build\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "typecheck",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 39992,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+              "-r",
+              "--filter",
+              "@armyofagents/adapter-utils",
+              "--filter",
+              "@armyofagents/worker-daemon",
+              "--filter",
+              "@armyofagents/sandbox-e2b-provider",
+              "--filter",
+              "@armyofagents/adapter-manager",
+              "--filter",
+              "@armyofagents/server",
+              "--filter",
+              "@armyofagents/adapter-claude-local",
+              "--filter",
+              "@armyofagents/adapter-gemini-local",
+              "--filter",
+              "@armyofagents/adapter-opencode-local",
+              "--filter",
+              "@armyofagents/adapter-codex-local",
+              "--filter",
+              "@armyofagents/cli",
+              "--filter",
+              "@armyofagents/shared",
+              "--filter",
+              "@armyofagents/worker-protocol",
+              "--filter",
+              "@armyofagents/db",
+              "typecheck"
+            ]
+          },
+          "startedAt": "2026-10-18T06:23:49.206Z",
+          "durationMs": 99815.75,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\typecheck\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\typecheck\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "ui",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 40152,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\pnpm\\node_modules\\pnpm\\bin\\pnpm.cjs",
+              "--filter",
+              "@armyofagents/ui",
+              "build"
+            ]
+          },
+          "startedAt": "2026-10-18T06:25:29.166Z",
+          "durationMs": 58872.97,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\ui\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\ui\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "core",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 32524,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\core\\vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/native-crew-tool-capture.test.ts",
+              "server/src/__tests__/codex-crew-tool-capture.test.ts",
+              "server/src/__tests__/aoa-runner.test.ts",
+              "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+              "server/src/__tests__/crew-tool-authority.test.ts",
+              "server/src/__tests__/crew-cancellation.test.ts",
+              "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+              "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+              "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+              "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+              "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+              "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+              "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+              "server/src/__tests__/task-outputs-routes.test.ts",
+              "server/src/__tests__/artifact-size-ceiling.test.ts",
+              "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+              "packages/adapters/claude-local/src/server/parse.test.ts",
+              "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+              "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+              "server/src/__tests__/claude-local-adapter.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+              "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+              "packages/adapters/opencode-local/src/server/parse.test.ts",
+              "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+              "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+              "server/src/__tests__/opencode-local-adapter.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+              "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+              "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+              "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+              "server/src/__tests__/auth-crew-run-boundary.test.ts",
+              "server/src/__tests__/agent-auth-jwt.test.ts",
+              "server/src/__tests__/auth-commander-jwt.test.ts",
+              "server/src/__tests__/mcp-agent-actor.test.ts",
+              "server/src/__tests__/mcp-run-currency-gate.test.ts",
+              "server/src/__tests__/broker-tool-context.unit.test.ts",
+              "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+              "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+              "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+              "server/src/__tests__/mcp-bridge-role-check.test.ts",
+              "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+              "server/src/__tests__/authorize-tool.test.ts",
+              "server/src/__tests__/hub-curation.test.ts",
+              "server/src/__tests__/hub-curation-tools.test.ts",
+              "server/src/__tests__/hub-curation.integration.test.ts",
+              "server/src/__tests__/sweep-steward.test.ts",
+              "server/src/__tests__/server-shutdown.test.ts",
+              "server/src/__tests__/costs-service.test.ts",
+              "server/src/__tests__/costs-idempotency.integration.test.ts",
+              "server/src/__tests__/mcp-server.test.ts",
+              "server/src/__tests__/crew-run-jwt.test.ts",
+              "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+              "cli/src/__tests__/run-entrypoint.test.ts",
+              "cli/src/__tests__/bundle-runtime.test.ts",
+              "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+              "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+              "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+              "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+              "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+              "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+              "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+              "server/src/__tests__/worker-enrollment.integration.test.ts",
+              "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+              "server/src/__tests__/worker-revocation.integration.test.ts",
+              "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+              "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+              "server/src/__tests__/task-run-sandbox-invocation-auth.test.ts",
+              "server/src/__tests__/task-run-sandbox-invocation.test.ts",
+              "server/src/__tests__/task-run-batch-workload.test.ts",
+              "packages/db/src/__tests__/backup-native-contract.test.ts",
+              "server/src/__tests__/execution-target-successor.test.ts",
+              "server/src/__tests__/execution-target-successor.integration.test.ts",
+              "server/src/__tests__/job-control-legacy-grants.contract.test.ts",
+              "server/src/__tests__/execution-target-resolver.test.ts",
+              "server/src/__tests__/cli-006-canary-credential-binding.test.ts",
+              "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+              "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\core\\vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:26:28.193Z",
+          "durationMs": 222696.49,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\core\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\core\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 87,
+            "passed": 978,
+            "failed": 0,
+            "pending": 3,
+            "success": true
+          }
+        },
+        {
+          "stage": "provider",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 32396,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\provider\\vitest-capture",
+              "--",
+              "run",
+              "src/__tests__/artifact-operation-cancellation.test.ts",
+              "src/__tests__/enumerate-and-bounded-read.test.ts",
+              "src/__tests__/artifact-export.test.ts",
+              "--config",
+              "vitest.config.ts",
+              "--root",
+              "packages/sandbox-e2b-provider",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\provider\\vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:30:11.035Z",
+          "durationMs": 4212.25,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\provider\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\provider\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 3,
+            "passed": 56,
+            "failed": 0,
+            "pending": 0,
+            "success": true
+          }
+        },
+        {
+          "stage": "artifactdb",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 35968,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\artifactdb\\vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "--testNamePattern",
+              "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\artifactdb\\vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:30:15.398Z",
+          "durationMs": 14038.77,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\artifactdb\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\artifactdb\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 1,
+            "passed": 16,
+            "failed": 0,
+            "pending": 23,
+            "success": true
+          }
+        },
+        {
+          "stage": "writer",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 41524,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\writer\\vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/job-leasing-contract.test.ts",
+              "-t",
+              "enforces an exhaustive authority-writer allowlist",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\writer\\vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:30:29.585Z",
+          "durationMs": 47295.79,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\writer\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\writer\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 1,
+            "passed": 1,
+            "failed": 0,
+            "pending": 19,
+            "success": true
+          }
+        },
+        {
+          "stage": "replay",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 39992,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\replay\\vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/job-placement.integration.test.ts",
+              "-t",
+              "\\[I-04\\]|\\[E11-F004\\]",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\replay\\vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:31:17.023Z",
+          "durationMs": 13513.94,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\replay\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\replay\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 1,
+            "passed": 2,
+            "failed": 0,
+            "pending": 38,
+            "success": true
+          }
+        },
+        {
+          "stage": "api",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 41868,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "--test",
+              "scripts/w12-live-rehearsal/api.test.mjs"
+            ]
+          },
+          "startedAt": "2026-10-18T06:31:30.673Z",
+          "durationMs": 1866.7,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\api\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\api\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "guard",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 39772,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "--test",
+              "scripts/lib/__tests__/w7u1-agent-output-probe.test.mjs"
+            ]
+          },
+          "startedAt": "2026-10-18T06:31:32.677Z",
+          "durationMs": 206.03,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\guard\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\guard\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "image",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 41568,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "docker",
+            "args": [
+              "build",
+              "-f",
+              "docker/worker/Dockerfile",
+              "-t",
+              "aoa-worker:program-combined-local",
+              "--label",
+              "aoa.work=program-combined-20261018",
+              "--build-arg",
+              "AOA_IMAGE_REVISION=5d7bad95831336d36dffef7e932ed1dc78f63324",
+              "."
+            ]
+          },
+          "startedAt": "2026-10-18T06:31:33.024Z",
+          "durationMs": 10661.82,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\image\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\image\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "native",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 38544,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "tests/d1/m4-slot-ownership.test.mjs",
+              "tests/d1/m4-slot-host.test.mjs",
+              "tests/d1/m4-native-fence-restore.test.mjs"
+            ]
+          },
+          "startedAt": "2026-10-18T06:31:43.837Z",
+          "durationMs": 111827.22,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\native\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\native\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "fixture-types",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "win32",
+            "architecture": "x64",
+            "cwd": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification",
+            "pid": 40144,
+            "gitSha": "5d7bad95831336d36dffef7e932ed1dc78f63324"
+          },
+          "command": {
+            "executable": "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+            "args": [
+              "node_modules/typescript/bin/tsc",
+              "-p",
+              "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\tsconfig.fixture.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:34:39.334Z",
+          "durationMs": 9862.68,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\fixture-types\\stdout.txt",
+          "stderrPath": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local\\fixture-types\\stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        }
+      ],
+      "selection": [
+        "server/src/__tests__/native-crew-tool-capture.test.ts",
+        "server/src/__tests__/codex-crew-tool-capture.test.ts",
+        "server/src/__tests__/aoa-runner.test.ts",
+        "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+        "server/src/__tests__/crew-tool-authority.test.ts",
+        "server/src/__tests__/crew-cancellation.test.ts",
+        "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+        "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+        "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+        "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+        "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+        "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+        "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+        "server/src/__tests__/task-outputs-routes.test.ts",
+        "server/src/__tests__/artifact-size-ceiling.test.ts",
+        "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+        "packages/adapters/claude-local/src/server/parse.test.ts",
+        "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+        "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+        "server/src/__tests__/claude-local-adapter.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+        "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+        "packages/adapters/opencode-local/src/server/parse.test.ts",
+        "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+        "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+        "server/src/__tests__/opencode-local-adapter.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+        "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+        "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+        "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+        "server/src/__tests__/auth-crew-run-boundary.test.ts",
+        "server/src/__tests__/agent-auth-jwt.test.ts",
+        "server/src/__tests__/auth-commander-jwt.test.ts",
+        "server/src/__tests__/mcp-agent-actor.test.ts",
+        "server/src/__tests__/mcp-run-currency-gate.test.ts",
+        "server/src/__tests__/broker-tool-context.unit.test.ts",
+        "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+        "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+        "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+        "server/src/__tests__/mcp-bridge-role-check.test.ts",
+        "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+        "server/src/__tests__/authorize-tool.test.ts",
+        "server/src/__tests__/hub-curation.test.ts",
+        "server/src/__tests__/hub-curation-tools.test.ts",
+        "server/src/__tests__/hub-curation.integration.test.ts",
+        "server/src/__tests__/sweep-steward.test.ts",
+        "server/src/__tests__/server-shutdown.test.ts",
+        "server/src/__tests__/costs-service.test.ts",
+        "server/src/__tests__/costs-idempotency.integration.test.ts",
+        "server/src/__tests__/mcp-server.test.ts",
+        "server/src/__tests__/crew-run-jwt.test.ts",
+        "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+        "cli/src/__tests__/run-entrypoint.test.ts",
+        "cli/src/__tests__/bundle-runtime.test.ts",
+        "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+        "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+        "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+        "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+        "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+        "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+        "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+        "server/src/__tests__/worker-enrollment.integration.test.ts",
+        "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+        "server/src/__tests__/worker-revocation.integration.test.ts",
+        "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+        "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+        "server/src/__tests__/task-run-sandbox-invocation-auth.test.ts",
+        "server/src/__tests__/task-run-sandbox-invocation.test.ts",
+        "server/src/__tests__/task-run-batch-workload.test.ts",
+        "packages/db/src/__tests__/backup-native-contract.test.ts",
+        "server/src/__tests__/execution-target-successor.test.ts",
+        "server/src/__tests__/execution-target-successor.integration.test.ts",
+        "server/src/__tests__/job-control-legacy-grants.contract.test.ts",
+        "server/src/__tests__/execution-target-resolver.test.ts",
+        "server/src/__tests__/cli-006-canary-credential-binding.test.ts",
+        "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+        "server/src/__tests__/migrated-database-teardown.integration.test.ts"
+      ],
+      "packages": [
+        "@armyofagents/adapter-utils",
+        "@armyofagents/worker-daemon",
+        "@armyofagents/sandbox-e2b-provider",
+        "@armyofagents/adapter-manager",
+        "@armyofagents/server",
+        "@armyofagents/adapter-claude-local",
+        "@armyofagents/adapter-gemini-local",
+        "@armyofagents/adapter-opencode-local",
+        "@armyofagents/adapter-codex-local",
+        "@armyofagents/cli",
+        "@armyofagents/shared",
+        "@armyofagents/worker-protocol",
+        "@armyofagents/db"
+      ],
+      "providerSelection": {
+        "root": "packages/sandbox-e2b-provider",
+        "config": "vitest.config.ts",
+        "files": [
+          "src/__tests__/artifact-operation-cancellation.test.ts",
+          "src/__tests__/enumerate-and-bounded-read.test.ts",
+          "src/__tests__/artifact-export.test.ts"
+        ]
+      },
+      "artifactDbSelection": {
+        "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+        "testNamePattern": "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+        "windowsOptIn": "AOA_RUN_WIN_INTEGRATION=1",
+        "selectedCases": 16,
+        "filterSkipsAreNotPasses": true,
+        "storage": "Stubbed grant/commit object storage; real embedded PostgreSQL and non-owner roles"
+      },
+      "lanes": {
+        "core": {
+          "files": 87,
+          "passed": 978,
+          "skipped": 3,
+          "failed": 0
+        },
+        "provider": {
+          "files": 3,
+          "passed": 56,
+          "skipped": 0,
+          "failed": 0
+        },
+        "artifactdb": {
+          "files": 1,
+          "passed": 16,
+          "skipped": 23,
+          "failed": 0
+        },
+        "writer": {
+          "files": 1,
+          "passed": 1,
+          "skipped": 19,
+          "failed": 0
+        },
+        "replay": {
+          "files": 1,
+          "passed": 2,
+          "skipped": 38,
+          "failed": 0
+        },
+        "api": {
+          "tests": 6,
+          "pass": 6,
+          "fail": 0,
+          "skipped": 0
+        },
+        "guard": {
+          "tests": 66,
+          "pass": 65,
+          "fail": 0,
+          "skipped": 1
+        },
+        "native": {
+          "tests": 4,
+          "pass": 4,
+          "fail": 0,
+          "skipped": 0,
+          "nestedEngineeringCases": {
+            "result": "PASS",
+            "passedNativeRestoreCases": 1,
+            "passedDatabaseAndObjectRecoveryCases": 2,
+            "postgresVersion": "18.6 (Debian 18.6-1.pgdg12+2)",
+            "postgresImageDigest": "sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11",
+            "scenarios": [
+              "post-snapshot lease",
+              "expired snapshot lease",
+              "generation cutoff in snapshot",
+              "post-backup revocation with pre-serving authority advance"
+            ],
+            "objectScenarios": [
+              "restored bytes corrupted",
+              "restored bytes missing",
+              "healthy sibling still accessible"
+            ],
+            "limits": "Disposable single-database + local-file engineering fixture; not live fleet, external object store or D5 timings"
+          },
+          "counting": "4 outer cases include the 1 restore and 2 recovery nested cases; do not add nested cases to the outer total."
+        }
+      },
+      "fixtureCycles": [
+        {
+          "cycle": 1,
+          "platform": "win32",
+          "pid": 40128,
+          "port": 63334,
+          "after": {
+            "processes": [],
+            "listeners": []
+          },
+          "shutdownRequested": true,
+          "shutdownCompleted": true,
+          "directoryAbsent": true
+        },
+        {
+          "cycle": 2,
+          "platform": "win32",
+          "pid": 30600,
+          "port": 56290,
+          "after": {
+            "processes": [],
+            "listeners": []
+          },
+          "shutdownRequested": true,
+          "shutdownCompleted": true,
+          "directoryAbsent": true
+        },
+        {
+          "cycle": 3,
+          "platform": "win32",
+          "pid": 33736,
+          "port": 62063,
+          "after": {
+            "processes": [],
+            "listeners": []
+          },
+          "shutdownRequested": true,
+          "shutdownCompleted": true,
+          "directoryAbsent": true
+        }
+      ],
+      "smoke": {
+        "schemaVersion": 1,
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "result": "pass",
+        "startedAt": "2026-10-18T06:26:44.6098297Z",
+        "finishedAt": "2026-10-18T06:27:06.2358176Z",
+        "nodeVersion": "v24.19.0",
+        "command": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\validation-2026-10-16\\runtime\\node-v24.19.0-win-x64\\node.exe",
+          "cli/dist/index.js",
+          "onboard",
+          "--yes",
+          "--data-dir",
+          "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\fresh-home"
+        ],
+        "health": {
+          "status": "ok",
+          "revision": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+          "deploymentMode": "local_trusted",
+          "deploymentExposure": "private",
+          "authReady": true,
+          "bootstrapStatus": "ready",
+          "features": {
+            "companyDeletionEnabled": true
+          }
+        },
+        "http": [
+          {
+            "html": [
+              "text/html; charset=utf-8"
+            ],
+            "route": "/",
+            "bytes": 3875,
+            "status": 200,
+            "rootElement": true
+          },
+          {
+            "html": [
+              "text/html; charset=utf-8"
+            ],
+            "route": "/onboarding",
+            "bytes": 3875,
+            "status": 200,
+            "rootElement": true
+          }
+        ],
+        "initialCompanyCount": 0,
+        "configCreated": true,
+        "keyCreated": true,
+        "sourceBefore": {
+          "sha": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+          "porcelainV1": ""
+        },
+        "sourceAfter": {
+          "sha": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+          "porcelainV1": ""
+        },
+        "httpOnly": true,
+        "interactiveOnboarding": false,
+        "browserProof": false,
+        "companyCreated": false,
+        "modelRun": false,
+        "operatorStoppedLongRunningServer": true,
+        "databaseStopExit": 0,
+        "processStopExit": 0,
+        "remainingListeners": [],
+        "remainingOwnedProcesses": [],
+        "preexistingListenerIdentityUnchanged": true,
+        "error": null,
+        "cleanupError": null,
+        "receipts": [
+          {
+            "sha256": "3589d2bd01f8295cc7c9ec3f5e07625fcd347ccb6f33f2d80edafe5f5217c1fb",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\database-stop.log",
+            "bytes": 58
+          },
+          {
+            "sha256": "a57710d59ed54bd979d78cc08dbe3bbd1056bc9ceac5be3c0a5241eeba32f767",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\fresh-home-acl.log",
+            "bytes": 164
+          },
+          {
+            "sha256": "526c4dfb9e2178e57298ebe2e7c592f6634fce9314eb9a817b615d91ea4662d7",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\health.json",
+            "bytes": 269
+          },
+          {
+            "sha256": "21fc545cf2f701e657f41d8e68e8da87068eba5b04b0095ce263b42a9f4e3414",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\onboard.result.json",
+            "bytes": 6572
+          },
+          {
+            "sha256": "2b4d822b2ffab391f371c31eb4d9a7f242b89ad8558949cde1146f27a298e8a2",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\onboard.stderr.log",
+            "bytes": 721
+          },
+          {
+            "sha256": "2442c707e92f9f11f828369dce7c82f57cf21bcfc1d85d960e127d86d1550437",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\onboard.stdout.log",
+            "bytes": 81735
+          },
+          {
+            "sha256": "98d8e3ccaff8b4ca67bfb750354c10a97abe796b04f757ca536a7e303eaa2928",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\onboarding.html",
+            "bytes": 3875
+          },
+          {
+            "sha256": "67f005ca593e8ce34a705e73fae1c92173037b81af6fde2357b239182e8de420",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\owned-processes-before-stop.json",
+            "bytes": 7439
+          },
+          {
+            "sha256": "3799d19856cfd59982e1ee3f90244bc91080a29d9eb594fee3c0b3cb9941f9bd",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\process-stop.log",
+            "bytes": 261
+          },
+          {
+            "sha256": "3023b2d034e439c9198f72ead272e8850c6413b15cf6ded961ff400736da0bb4",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\run.ps1",
+            "bytes": 13175
+          },
+          {
+            "sha256": "98d8e3ccaff8b4ca67bfb750354c10a97abe796b04f757ca536a7e303eaa2928",
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-smoke\\ui-root.html",
+            "bytes": 3875
+          }
+        ]
+      },
+      "before": {
+        "testListeners": [],
+        "newNodeModulesAbsent": true,
+        "containers": [],
+        "oldWorkerImageRemoved": true,
+        "at": "2026-10-18T06:21:24.1631360Z",
+        "freshWorktree": "C:/Users/Dell/Desktop/aoa/program-combined-verification",
+        "providerKeysUsed": false,
+        "protected": [
+          {
+            "pid": 6780,
+            "port": 3210,
+            "startTime": "2026-10-17T16:38:58.8721544Z"
+          },
+          {
+            "pid": 11492,
+            "port": 54329,
+            "startTime": "2026-10-17T16:39:10.3908687Z"
+          }
+        ],
+        "removedObsoleteBundles": [
+          {
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\combined.bundle",
+            "bytes": 64740
+          },
+          {
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-integration-2026-10-18\\combined-full.bundle",
+            "bytes": 53031739
+          },
+          {
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-windows-pg-fixture-2026-10-18\\fixture.bundle",
+            "bytes": 48112
+          }
+        ]
+      },
+      "after": {
+        "ownedProcessesRemaining": 0,
+        "ownedContainersRemaining": 0,
+        "testStateRemovalPending": true,
+        "ownedListenersRemaining": 0,
+        "protected": [
+          {
+            "startTime": "2026-10-17T16:38:58.8721544Z",
+            "pid": 6780,
+            "same": true,
+            "port": 3210
+          },
+          {
+            "startTime": "2026-10-17T16:39:10.3908687Z",
+            "pid": 11492,
+            "same": true,
+            "port": 54329
+          }
+        ],
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "workerImageRemoved": "sha256:77a21ec97f259dba2522846b014336187dba0a5a01a31ac793cb996b90e62e8b",
+        "sourceClean": true,
+        "at": "2026-10-18T06:39:41.8714209Z"
+      },
+      "teardown": {
+        "allTargetedStagesPassed": true,
+        "ownedContainersRemaining": 0,
+        "freshPrivateHomesRemoved": true,
+        "sharedReviewSame": true,
+        "retainedSharedNativeHardlinks": [
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 31898624,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\icudt77.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 3585024,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\icuin77.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 2552320,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\icuuc77.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 5694464,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libcrypto-3-x64.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 1436423,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libiconv-2.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 475769,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libintl-9.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 128000,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\liblz4.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 1312256,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libssl-3-x64.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 52736,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libwinpthread-1.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 1284096,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libxml2.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 728576,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\libzstd.dll"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 10223104,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@embedded-postgres+windows-x64@18.1.0-beta.16\\node_modules\\@embedded-postgres\\windows-x64\\native\\bin\\postgres.exe"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 11670528,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@esbuild+win32-x64@0.28.1\\node_modules\\@esbuild\\win32-x64\\esbuild.exe"
+          },
+          {
+            "sharedNativeHardlink": true,
+            "bytes": 27294720,
+            "path": "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules\\.pnpm\\@napi-rs+canvas-win32-x64-msvc@0.1.100\\node_modules\\@napi-rs\\canvas-win32-x64-msvc\\skia.win32-x64-msvc.node"
+          }
+        ],
+        "ownedProcessesRemaining": 0,
+        "ownedListenersRemaining": 0,
+        "archive": {
+          "archive": "local-evidence.tar.gz",
+          "sha256": "4ec03a707bb53838c9d60fcad414b33603b30ed9071948ead1c6512c9146b0b7",
+          "sizeBytes": 557917,
+          "files": 93,
+          "archiveMembersVerified": true,
+          "privateRuntimeHomesExcluded": true
+        },
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "removedPaths": [
+          "C:\\Users\\Dell\\Desktop\\aoa\\program-combined-verification\\node_modules"
+        ],
+        "newNodeModulesRemoved": false,
+        "sourceClean": true,
+        "retainedLinksReason": "These 14 hardlinks refer to the same native binaries loaded by protected shared review processes (PostgreSQL, esbuild and canvas). No running test setup remains; no shared process, ACL or file content was changed."
+      },
+      "rawManifest": {
+        "files": [
+          {
+            "path": "local/summary.json",
+            "sha256": "1419d81ac2edd98111ef69814903d5c4310266cc70402cddd41a19891dc76ba7"
+          },
+          {
+            "path": "local/tsconfig.fixture.json",
+            "sha256": "3873dfdbaa9005801749cea380d304dae3f8fa8c2c00e312c1d9301199502d55"
+          },
+          {
+            "path": "local/api/result.json",
+            "sha256": "5a3cf10a7e6ae53eadf7e7de0b074e2a7665e92ac14b60e2108520aad8c9393b"
+          },
+          {
+            "path": "local/api/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/api/stdout.txt",
+            "sha256": "96121ac7bbef20e0689a08641fde04b98ad658887f786fdbbd39db79ba7b37f1"
+          },
+          {
+            "path": "local/artifactdb/result.json",
+            "sha256": "e4a4ec18c2ec38013e74c68dc8f835e453315af56ceafe9283b70b291fac0e6f"
+          },
+          {
+            "path": "local/artifactdb/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/artifactdb/stdout.txt",
+            "sha256": "3c27f009e18f86bc3d4145de7ad554ffe984b7a69ef7cf68e0a6d2d2f6b618ba"
+          },
+          {
+            "path": "local/artifactdb/vitest.json",
+            "sha256": "d93aed4c5382420f6476adab8992943f8aaecffee8224e147b2c224c632f41b8"
+          },
+          {
+            "path": "local/build/result.json",
+            "sha256": "49b3cd729bfaf4221e3d8ff1089c3f1a444d5f064c35f981be66d99192657073"
+          },
+          {
+            "path": "local/build/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/build/stdout.txt",
+            "sha256": "79e4d7fcbd621c83ddfe6e97c21e2ceb9ea8d802eb2b342e6d7270177e928fff"
+          },
+          {
+            "path": "local/core/result.json",
+            "sha256": "83be76a8cf4a45a82df96422a2db3ab92acb1e1fa4cdaf86959d0c67bc807a20"
+          },
+          {
+            "path": "local/core/stderr.txt",
+            "sha256": "eddcaa3ad529588186ab8df5bb558aae4edd9950502dbd1dd09e5ef0b0474b9f"
+          },
+          {
+            "path": "local/core/stdout.txt",
+            "sha256": "aec1381c83f1074bb236592577798360d6586abf00aa89298283edefff33f789"
+          },
+          {
+            "path": "local/core/vitest.json",
+            "sha256": "16d62632be4818b29ef48a637a8f478dbe9c787453dd79512b5a54d98c434c58"
+          },
+          {
+            "path": "local/cycles/cycle-1.json",
+            "sha256": "4a8e71f75d72b06dbf5ad5bfe4b332f0d01c708574ad9397c2059327a7625176"
+          },
+          {
+            "path": "local/cycles/cycle-2.json",
+            "sha256": "fa35923bcb17d3f36d4ad329c9a348a6dd6659b9ef117669a472a9c5c137c38d"
+          },
+          {
+            "path": "local/cycles/cycle-3.json",
+            "sha256": "75733270218644ce7b289cae3a9ff0e62aee7a66eb74ef6122f8ff9ef7d70e59"
+          },
+          {
+            "path": "local/fixture-types/result.json",
+            "sha256": "4582fc93936dac550f31b566f5bb8c2c4e155f07e8e91441722cc7ae0033e1f9"
+          },
+          {
+            "path": "local/fixture-types/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/fixture-types/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/guard/result.json",
+            "sha256": "4a934ffc93191a18ff94c97986be85dd418fc0a1616794e061f9cd6495230ad3"
+          },
+          {
+            "path": "local/guard/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/guard/stdout.txt",
+            "sha256": "f8d41c10f2e234bb06f0537f62317cef94eeb7a1025d92d90ca01294a6abfff9"
+          },
+          {
+            "path": "local/image/result.json",
+            "sha256": "e08819779de41c8424bfe190e47623fbffc32766694647b7ef67d7f9bcfe6b5d"
+          },
+          {
+            "path": "local/image/stderr.txt",
+            "sha256": "a1593d041f1daa530b58469d0ebfbd090988e4fe2e27e361de41c49ba3535c10"
+          },
+          {
+            "path": "local/image/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/install/result.json",
+            "sha256": "86088a19c7017055298b6ac099262220cbf642839f98ce5372a66e4cf3bb48d7"
+          },
+          {
+            "path": "local/install/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/install/stdout.txt",
+            "sha256": "53f0aeb429a8efa40486e44b9a374c41f6d9cafea130998c7629a666c8ff6988"
+          },
+          {
+            "path": "local/native/result.json",
+            "sha256": "11ba99ef357e1563694be18f0baf81d7980b343fff2fd7cc1d3bb31a8a12e523"
+          },
+          {
+            "path": "local/native/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/native/stdout.txt",
+            "sha256": "1e6a2401cb150e346d42e69b648b5ca14c41522efd6285e2cabd55ada1203543"
+          },
+          {
+            "path": "local/provider/result.json",
+            "sha256": "2343b599c504c77f1d3667fc2dc3a814e271e11298a8f51835f29d7232094cc4"
+          },
+          {
+            "path": "local/provider/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/provider/stdout.txt",
+            "sha256": "14971c671cb15c173404272a7471255a245e3012c8406264085ae26362d221bd"
+          },
+          {
+            "path": "local/provider/vitest.json",
+            "sha256": "1e7724993430076ff45046f80d9431e732d488334147cc170b7a1ba47bb82ef6"
+          },
+          {
+            "path": "local/replay/result.json",
+            "sha256": "5316716f497e0fc723f0104067fcfc0916c38934fefd8c4f4e1856ddcf731a52"
+          },
+          {
+            "path": "local/replay/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/replay/stdout.txt",
+            "sha256": "330d9aff574baf4feb42752225b5370356de92f370e50c6fb3810654bf42bf74"
+          },
+          {
+            "path": "local/replay/vitest.json",
+            "sha256": "facf962d68644e019f919fbd6d235880b805d1bc7627c84ad161d5889cc9d628"
+          },
+          {
+            "path": "local/typecheck/result.json",
+            "sha256": "f4f30662b90c3c122da580a9f2ef5170c783934dd0728b0da1d431adea29a4d8"
+          },
+          {
+            "path": "local/typecheck/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/typecheck/stdout.txt",
+            "sha256": "4f0011025c40d289e61ec5b2d330901a3447471fd5893ac131ae223f7bf1d129"
+          },
+          {
+            "path": "local/ui/result.json",
+            "sha256": "bfdeb71a675d63cc0fa7b19e63c3a0c722ee7d1144cda1429847838e49d5a244"
+          },
+          {
+            "path": "local/ui/stderr.txt",
+            "sha256": "8e7318673e7d49ac29c81aefdc196a180c4505cdb88f615ba26b4a0686efb47a"
+          },
+          {
+            "path": "local/ui/stdout.txt",
+            "sha256": "8d6d87927a2ca4ab3028ab5dc6e757afdbab490de031039735eda0682c7a46f7"
+          },
+          {
+            "path": "local/writer/result.json",
+            "sha256": "cff6253311445ce91af1030b9790e69114db1542411a58d656c00ffa92beddf5"
+          },
+          {
+            "path": "local/writer/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/writer/stdout.txt",
+            "sha256": "b3b4d7ad7f87bf1a9e3f6bdce196c7dc51aba73103c2ad21dee43abef25dc1df"
+          },
+          {
+            "path": "local/writer/vitest.json",
+            "sha256": "423168e221990df4337dd473dcf0b4b28e4092bcf5db93fe720bb5023b68c020"
+          },
+          {
+            "path": "local/writer/vitest-capture/result.json",
+            "sha256": "d19b314719c2650708592051e84c21abab6dccd8f0d3f101c09f63b77fa3a9cc"
+          },
+          {
+            "path": "local/writer/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/writer/vitest-capture/stdout.txt",
+            "sha256": "b3b4d7ad7f87bf1a9e3f6bdce196c7dc51aba73103c2ad21dee43abef25dc1df"
+          },
+          {
+            "path": "local/tmp/aoa-m4-native-fence-y0DEny/artifact-recovery-result.json",
+            "sha256": "36b077d72b34def23d9b2257f1644e3972242cf64ba87dbba0cdd205a6e6b205"
+          },
+          {
+            "path": "local/tmp/aoa-m4-native-fence-y0DEny/ownership.json",
+            "sha256": "44c0867d494d9bc2aafb6bc87565a43924dc5bb9800a169582b875f75c1b088c"
+          },
+          {
+            "path": "local/tmp/aoa-m4-native-fence-y0DEny/vitest-result.json",
+            "sha256": "d4f3775f1ce4836ec0c246b6d0fbbb66cc309f239ddc4c725d001f96fb287fe5"
+          },
+          {
+            "path": "local/replay/vitest-capture/result.json",
+            "sha256": "b1d4fd8c24521e97caed01e7ff3b3b6662de165aa4aa6e05729ad5427c490517"
+          },
+          {
+            "path": "local/replay/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/replay/vitest-capture/stdout.txt",
+            "sha256": "330d9aff574baf4feb42752225b5370356de92f370e50c6fb3810654bf42bf74"
+          },
+          {
+            "path": "local/provider/vitest-capture/result.json",
+            "sha256": "8ad2ef140fe7f8c906ec4c2539f33a352f5cb5f55e9ca2b8fad8aa7b6badcdaf"
+          },
+          {
+            "path": "local/provider/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/provider/vitest-capture/stdout.txt",
+            "sha256": "14971c671cb15c173404272a7471255a245e3012c8406264085ae26362d221bd"
+          },
+          {
+            "path": "local/core/vitest-capture/result.json",
+            "sha256": "27a94ddd8168682a640c9b48290dbb779de010791a61bac9ae2c3bdc21e2a8d7"
+          },
+          {
+            "path": "local/core/vitest-capture/stderr.txt",
+            "sha256": "eddcaa3ad529588186ab8df5bb558aae4edd9950502dbd1dd09e5ef0b0474b9f"
+          },
+          {
+            "path": "local/core/vitest-capture/stdout.txt",
+            "sha256": "aec1381c83f1074bb236592577798360d6586abf00aa89298283edefff33f789"
+          },
+          {
+            "path": "local/artifactdb/vitest-capture/result.json",
+            "sha256": "695e8e952dcdde9a6f84b2980cf930aefbbf940ef99a8ef0fa5279e42ba12684"
+          },
+          {
+            "path": "local/artifactdb/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "local/artifactdb/vitest-capture/stdout.txt",
+            "sha256": "3c27f009e18f86bc3d4145de7ad554ffe984b7a69ef7cf68e0a6d2d2f6b618ba"
+          },
+          {
+            "path": "local-smoke/database-stop.log",
+            "sha256": "3589d2bd01f8295cc7c9ec3f5e07625fcd347ccb6f33f2d80edafe5f5217c1fb"
+          },
+          {
+            "path": "local-smoke/fresh-home-acl.log",
+            "sha256": "a57710d59ed54bd979d78cc08dbe3bbd1056bc9ceac5be3c0a5241eeba32f767"
+          },
+          {
+            "path": "local-smoke/health.json",
+            "sha256": "526c4dfb9e2178e57298ebe2e7c592f6634fce9314eb9a817b615d91ea4662d7"
+          },
+          {
+            "path": "local-smoke/onboard.result.json",
+            "sha256": "21fc545cf2f701e657f41d8e68e8da87068eba5b04b0095ce263b42a9f4e3414"
+          },
+          {
+            "path": "local-smoke/onboard.stderr.log",
+            "sha256": "2b4d822b2ffab391f371c31eb4d9a7f242b89ad8558949cde1146f27a298e8a2"
+          },
+          {
+            "path": "local-smoke/onboard.stdout.log",
+            "sha256": "2442c707e92f9f11f828369dce7c82f57cf21bcfc1d85d960e127d86d1550437"
+          },
+          {
+            "path": "local-smoke/onboarding.html",
+            "sha256": "98d8e3ccaff8b4ca67bfb750354c10a97abe796b04f757ca536a7e303eaa2928"
+          },
+          {
+            "path": "local-smoke/owned-processes-before-stop.json",
+            "sha256": "67f005ca593e8ce34a705e73fae1c92173037b81af6fde2357b239182e8de420"
+          },
+          {
+            "path": "local-smoke/process-stop.log",
+            "sha256": "3799d19856cfd59982e1ee3f90244bc91080a29d9eb594fee3c0b3cb9941f9bd"
+          },
+          {
+            "path": "local-smoke/run.ps1",
+            "sha256": "3023b2d034e439c9198f72ead272e8850c6413b15cf6ded961ff400736da0bb4"
+          },
+          {
+            "path": "local-smoke/smoke-summary.json",
+            "sha256": "1ce4f2cce356dee23306f9824f75c9fa8596513a933d05e7ad2cefcb3a38d177"
+          },
+          {
+            "path": "local-smoke/ui-root.html",
+            "sha256": "98d8e3ccaff8b4ca67bfb750354c10a97abe796b04f757ca536a7e303eaa2928"
+          },
+          {
+            "path": "archive-local.py",
+            "sha256": "3bf08bcd5fa5898ad0ddece1789701de2bf7f9b197ad35f0d005fee406908e23"
+          },
+          {
+            "path": "cleanup-local.ps1",
+            "sha256": "65f39138f786e272e745fcbc14362d8c76293c835c08e752065155c4c94d3f5b"
+          },
+          {
+            "path": "export-candidate.py",
+            "sha256": "ddea0819cf426a37a468466cdf77b370ef0a6f414c25936a88aa7aefa9b61770"
+          },
+          {
+            "path": "finalize-vps.py",
+            "sha256": "c413cde6722bc201fbc10f224df6fed54b99bccd9afba88add6f4d2d8431b4e0"
+          },
+          {
+            "path": "local-after.json",
+            "sha256": "ae83a64abce93866846fe8403c751d5dadd4bad572b53e739c41761991cdd39e"
+          },
+          {
+            "path": "local-before.json",
+            "sha256": "911616762d54cb315abf2b11bacbff55001a822b5f260d03038cff25b8d8b6e3"
+          },
+          {
+            "path": "prepare-vps.py",
+            "sha256": "3fe2973bc2e48075e8e7996190c38993abd81be6f00120574a471e02bbf422d0"
+          },
+          {
+            "path": "progress.md",
+            "sha256": "abc7781ef48897973836745d84ca0545675f57c037e63994f93cf1d83371e215"
+          },
+          {
+            "path": "run-combined.mjs",
+            "sha256": "ce99e940b9072fd5b66e427d0051eb504451d84806deff5b158cb962b7c72971"
+          },
+          {
+            "path": "smoke-vps.py",
+            "sha256": "085b5afd7f0ec11d874cf9857f831e6dc7d7ba3ccd2a6700482dfd5710c6f32a"
+          },
+          {
+            "path": "source-manifest.json",
+            "sha256": "07f13c1c977e9a2ffff72526a8147ddf22100615b1b24b03dc131e6c4fae0a18"
+          }
+        ]
+      },
+      "archive": {
+        "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\local-evidence.tar.gz",
+        "sha256": "4ec03a707bb53838c9d60fcad414b33603b30ed9071948ead1c6512c9146b0b7",
+        "sizeBytes": 557917,
+        "membersVerified": 93
+      },
+      "finalCleanupArchive": {
+        "archive": "local-cleanup-final-evidence.tar.gz",
+        "sha256": "237f8627ea0391235efedb27d0c7a649e4a327466d076c4d95d98f9edea64170",
+        "sizeBytes": 5124,
+        "files": 5,
+        "verified": true,
+        "members": [
+          {
+            "path": "cleanup-local.ps1",
+            "sha256": "92a16e80e6a2ee35b0a9cffa75f306b8ddd6b2c507e6e74d242e996ea4a8d9bf"
+          },
+          {
+            "path": "local-teardown.json",
+            "sha256": "a4a9f7e3ac06a7d2ed14b3e46d3ab2e07f488255a3120d008c56326c57eb336b"
+          },
+          {
+            "path": "local-native-hardlink-proof.json",
+            "sha256": "f0b76e1aac23846959675f6740e720203c317ff2f65b1343ae78cae418523746"
+          },
+          {
+            "path": "local-cleanup-final.log",
+            "sha256": "8980f7ec82b1ce681a40716c982bf6d78e3d6af5b47c86c9fd36c681cbac5aaa"
+          },
+          {
+            "path": "local-cleanup-resume.log",
+            "sha256": "2d3aaa12f3caac964ff4a0d184e02b69b998e3428e28d2ad9b958a66d21cf595"
+          }
+        ]
+      },
+      "nativeHardlinkProofSha256": "f0b76e1aac23846959675f6740e720203c317ff2f65b1343ae78cae418523746"
+    },
+    "vps": {
+      "platform": "linux",
+      "stages": [
+        {
+          "stage": "install",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 374933,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+              "install",
+              "--frozen-lockfile",
+              "--offline",
+              "--store-dir",
+              "/opt/aoa-validation-2026-10-16/home/.local/share/pnpm/store/v3"
+            ]
+          },
+          "startedAt": "2026-10-18T06:23:51.408Z",
+          "durationMs": 10988.39,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/install/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/install/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "build",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 374958,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+              "-r",
+              "--filter",
+              "@armyofagents/adapter-utils...",
+              "--filter",
+              "@armyofagents/worker-daemon...",
+              "--filter",
+              "@armyofagents/sandbox-e2b-provider...",
+              "--filter",
+              "@armyofagents/adapter-manager...",
+              "--filter",
+              "@armyofagents/server...",
+              "--filter",
+              "@armyofagents/adapter-claude-local...",
+              "--filter",
+              "@armyofagents/adapter-gemini-local...",
+              "--filter",
+              "@armyofagents/adapter-opencode-local...",
+              "--filter",
+              "@armyofagents/adapter-codex-local...",
+              "--filter",
+              "@armyofagents/cli...",
+              "--filter",
+              "@armyofagents/shared...",
+              "--filter",
+              "@armyofagents/worker-protocol...",
+              "--filter",
+              "@armyofagents/db...",
+              "build"
+            ]
+          },
+          "startedAt": "2026-10-18T06:24:02.907Z",
+          "durationMs": 170959.78,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/build/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/build/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "typecheck",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 375728,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+              "-r",
+              "--filter",
+              "@armyofagents/adapter-utils",
+              "--filter",
+              "@armyofagents/worker-daemon",
+              "--filter",
+              "@armyofagents/sandbox-e2b-provider",
+              "--filter",
+              "@armyofagents/adapter-manager",
+              "--filter",
+              "@armyofagents/server",
+              "--filter",
+              "@armyofagents/adapter-claude-local",
+              "--filter",
+              "@armyofagents/adapter-gemini-local",
+              "--filter",
+              "@armyofagents/adapter-opencode-local",
+              "--filter",
+              "@armyofagents/adapter-codex-local",
+              "--filter",
+              "@armyofagents/cli",
+              "--filter",
+              "@armyofagents/shared",
+              "--filter",
+              "@armyofagents/worker-protocol",
+              "--filter",
+              "@armyofagents/db",
+              "typecheck"
+            ]
+          },
+          "startedAt": "2026-10-18T06:26:56.342Z",
+          "durationMs": 188523.9,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/typecheck/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/typecheck/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "ui",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 376142,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "/opt/aoa-validation-2026-10-16/runtime/pnpm/node_modules/pnpm/bin/pnpm.cjs",
+              "--filter",
+              "@armyofagents/ui",
+              "build"
+            ]
+          },
+          "startedAt": "2026-10-18T06:30:07.431Z",
+          "durationMs": 99708.41,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/ui/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/ui/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "core",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 376370,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "/opt/aoa-program-combined-20261018/evidence/core/vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/native-crew-tool-capture.test.ts",
+              "server/src/__tests__/codex-crew-tool-capture.test.ts",
+              "server/src/__tests__/aoa-runner.test.ts",
+              "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+              "server/src/__tests__/crew-tool-authority.test.ts",
+              "server/src/__tests__/crew-cancellation.test.ts",
+              "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+              "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+              "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+              "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+              "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+              "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+              "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+              "server/src/__tests__/task-outputs-routes.test.ts",
+              "server/src/__tests__/artifact-size-ceiling.test.ts",
+              "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+              "packages/adapters/claude-local/src/server/parse.test.ts",
+              "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+              "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+              "server/src/__tests__/claude-local-adapter.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+              "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+              "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+              "packages/adapters/opencode-local/src/server/parse.test.ts",
+              "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+              "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+              "server/src/__tests__/opencode-local-adapter.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+              "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+              "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+              "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+              "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+              "server/src/__tests__/auth-crew-run-boundary.test.ts",
+              "server/src/__tests__/agent-auth-jwt.test.ts",
+              "server/src/__tests__/auth-commander-jwt.test.ts",
+              "server/src/__tests__/mcp-agent-actor.test.ts",
+              "server/src/__tests__/mcp-run-currency-gate.test.ts",
+              "server/src/__tests__/broker-tool-context.unit.test.ts",
+              "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+              "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+              "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+              "server/src/__tests__/mcp-bridge-role-check.test.ts",
+              "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+              "server/src/__tests__/authorize-tool.test.ts",
+              "server/src/__tests__/hub-curation.test.ts",
+              "server/src/__tests__/hub-curation-tools.test.ts",
+              "server/src/__tests__/hub-curation.integration.test.ts",
+              "server/src/__tests__/sweep-steward.test.ts",
+              "server/src/__tests__/server-shutdown.test.ts",
+              "server/src/__tests__/costs-service.test.ts",
+              "server/src/__tests__/costs-idempotency.integration.test.ts",
+              "server/src/__tests__/mcp-server.test.ts",
+              "server/src/__tests__/crew-run-jwt.test.ts",
+              "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+              "cli/src/__tests__/run-entrypoint.test.ts",
+              "cli/src/__tests__/bundle-runtime.test.ts",
+              "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+              "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+              "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+              "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+              "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+              "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+              "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+              "server/src/__tests__/worker-enrollment.integration.test.ts",
+              "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+              "server/src/__tests__/worker-revocation.integration.test.ts",
+              "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+              "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+              "server/src/__tests__/task-run-sandbox-invocation-auth.test.ts",
+              "server/src/__tests__/task-run-sandbox-invocation.test.ts",
+              "server/src/__tests__/task-run-batch-workload.test.ts",
+              "packages/db/src/__tests__/backup-native-contract.test.ts",
+              "server/src/__tests__/execution-target-successor.test.ts",
+              "server/src/__tests__/execution-target-successor.integration.test.ts",
+              "server/src/__tests__/job-control-legacy-grants.contract.test.ts",
+              "server/src/__tests__/execution-target-resolver.test.ts",
+              "server/src/__tests__/cli-006-canary-credential-binding.test.ts",
+              "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+              "server/src/__tests__/migrated-database-teardown.integration.test.ts",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=/opt/aoa-program-combined-20261018/evidence/core/vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:31:49.761Z",
+          "durationMs": 241610.01,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/core/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/core/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 87,
+            "passed": 980,
+            "failed": 0,
+            "pending": 1,
+            "success": true
+          }
+        },
+        {
+          "stage": "provider",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381073,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "/opt/aoa-program-combined-20261018/evidence/provider/vitest-capture",
+              "--",
+              "run",
+              "src/__tests__/artifact-operation-cancellation.test.ts",
+              "src/__tests__/enumerate-and-bounded-read.test.ts",
+              "src/__tests__/artifact-export.test.ts",
+              "--config",
+              "vitest.config.ts",
+              "--root",
+              "packages/sandbox-e2b-provider",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=/opt/aoa-program-combined-20261018/evidence/provider/vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:35:51.861Z",
+          "durationMs": 4896.44,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/provider/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/provider/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 3,
+            "passed": 56,
+            "failed": 0,
+            "pending": 0,
+            "success": true
+          }
+        },
+        {
+          "stage": "artifactdb",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381248,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "/opt/aoa-program-combined-20261018/evidence/artifactdb/vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+              "--testNamePattern",
+              "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=/opt/aoa-program-combined-20261018/evidence/artifactdb/vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:35:57.276Z",
+          "durationMs": 16280.89,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/artifactdb/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/artifactdb/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 1,
+            "passed": 16,
+            "failed": 0,
+            "pending": 23,
+            "success": true
+          }
+        },
+        {
+          "stage": "writer",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381409,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "/opt/aoa-program-combined-20261018/evidence/writer/vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/job-leasing-contract.test.ts",
+              "-t",
+              "enforces an exhaustive authority-writer allowlist",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=/opt/aoa-program-combined-20261018/evidence/writer/vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:36:14.030Z",
+          "durationMs": 65436.65,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/writer/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/writer/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 1,
+            "passed": 1,
+            "failed": 0,
+            "pending": 19,
+            "success": true
+          }
+        },
+        {
+          "stage": "replay",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381560,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "scripts/run-vitest-captured.mjs",
+              "--capture-dir",
+              "/opt/aoa-program-combined-20261018/evidence/replay/vitest-capture",
+              "--",
+              "run",
+              "server/src/__tests__/job-placement.integration.test.ts",
+              "-t",
+              "\\[I-04\\]|\\[E11-F004\\]",
+              "--no-file-parallelism",
+              "--maxWorkers=1",
+              "--minWorkers=1",
+              "--reporter=json",
+              "--outputFile=/opt/aoa-program-combined-20261018/evidence/replay/vitest.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:37:19.960Z",
+          "durationMs": 14889.2,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/replay/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/replay/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown",
+          "counts": {
+            "files": 1,
+            "passed": 2,
+            "failed": 0,
+            "pending": 38,
+            "success": true
+          }
+        },
+        {
+          "stage": "api",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381717,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "--test",
+              "scripts/w12-live-rehearsal/api.test.mjs"
+            ]
+          },
+          "startedAt": "2026-10-18T06:37:35.321Z",
+          "durationMs": 2171.82,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/api/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/api/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "guard",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381856,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "--test",
+              "scripts/lib/__tests__/w7u1-agent-output-probe.test.mjs"
+            ]
+          },
+          "startedAt": "2026-10-18T06:37:37.980Z",
+          "durationMs": 239.29,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/guard/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/guard/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "image",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 381870,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "docker",
+            "args": [
+              "build",
+              "-f",
+              "docker/worker/Dockerfile",
+              "-t",
+              "aoa-worker:program-combined-vps",
+              "--label",
+              "aoa.work=program-combined-20261018",
+              "--build-arg",
+              "AOA_IMAGE_REVISION=5d7bad95831336d36dffef7e932ed1dc78f63324",
+              "."
+            ]
+          },
+          "startedAt": "2026-10-18T06:37:38.716Z",
+          "durationMs": 170087.58,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/image/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/image/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "native",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 384045,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "tests/d1/m4-slot-ownership.test.mjs",
+              "tests/d1/m4-slot-host.test.mjs",
+              "tests/d1/m4-native-fence-restore.test.mjs"
+            ]
+          },
+          "startedAt": "2026-10-18T06:40:29.276Z",
+          "durationMs": 72349.89,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/native/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/native/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        },
+        {
+          "stage": "fixture-types",
+          "exitCode": 0,
+          "schemaVersion": 1,
+          "identity": {
+            "node": "v24.19.0",
+            "platform": "linux",
+            "architecture": "arm64",
+            "cwd": "/opt/aoa-program-combined-20261018/source",
+            "pid": 385767,
+            "gitSha": null
+          },
+          "command": {
+            "executable": "/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node",
+            "args": [
+              "node_modules/typescript/bin/tsc",
+              "-p",
+              "/opt/aoa-program-combined-20261018/evidence/tsconfig.fixture.json"
+            ]
+          },
+          "startedAt": "2026-10-18T06:42:05.022Z",
+          "durationMs": 19268.01,
+          "signal": null,
+          "spawnError": null,
+          "captureError": null,
+          "stdoutPath": "/opt/aoa-program-combined-20261018/evidence/fixture-types/stdout.txt",
+          "stderrPath": "/opt/aoa-program-combined-20261018/evidence/fixture-types/stderr.txt",
+          "summary": {
+            "testFiles": "unknown",
+            "tests": "unknown",
+            "passed": "unknown",
+            "failed": "unknown",
+            "skipped": "unknown"
+          },
+          "unhandledErrors": "unknown"
+        }
+      ],
+      "selection": [
+        "server/src/__tests__/native-crew-tool-capture.test.ts",
+        "server/src/__tests__/codex-crew-tool-capture.test.ts",
+        "server/src/__tests__/aoa-runner.test.ts",
+        "server/src/__tests__/aoa-runner-provider-resolution.test.ts",
+        "server/src/__tests__/crew-tool-authority.test.ts",
+        "server/src/__tests__/crew-cancellation.test.ts",
+        "packages/adapter-manager/src/__tests__/server-artifact-export.test.ts",
+        "packages/adapter-manager/src/__tests__/owned-op-gate.test.ts",
+        "packages/adapter-manager/src/__tests__/keyed-mutex.test.ts",
+        "packages/adapter-manager/src/__tests__/capability-verify.test.ts",
+        "packages/worker-daemon/src/__tests__/artifact-export-sequencer.test.ts",
+        "packages/worker-daemon/src/__tests__/artifact-export-capability.test.ts",
+        "packages/worker-daemon/src/__tests__/supervisor-export-artifacts.test.ts",
+        "server/src/__tests__/task-outputs-routes.test.ts",
+        "server/src/__tests__/artifact-size-ceiling.test.ts",
+        "packages/adapters/claude-local/src/__tests__/execute-native-outcome.test.ts",
+        "packages/adapters/claude-local/src/server/parse.test.ts",
+        "packages/adapters/claude-local/src/__tests__/ambient-config-isolation.test.ts",
+        "packages/adapters/claude-local/src/__tests__/execute-env-scrub-fu23.test.ts",
+        "server/src/__tests__/claude-local-adapter.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/execute-native-outcome.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/parse.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/parse-v038.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/execute-env-scrub-fu23.test.ts",
+        "packages/adapters/gemini-local/src/server/__tests__/execute-provider-sandbox.test.ts",
+        "packages/adapters/opencode-local/src/server/execute-w02-regressions.test.ts",
+        "packages/adapters/opencode-local/src/server/parse.test.ts",
+        "packages/adapters/opencode-local/src/server/execute-env-scrub-fu23.test.ts",
+        "packages/adapters/opencode-local/src/server/execute-provider-sandbox.test.ts",
+        "server/src/__tests__/opencode-local-adapter.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-turn-teardown.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-driver.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-failure-modes.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-jsonrpc-client.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-parse-events.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/appserver-spawn-teardown.test.ts",
+        "packages/adapters/codex-local/src/__tests__/execute-routing.test.ts",
+        "packages/adapters/codex-local/src/server/__tests__/execute-appserver-env-scrub-fu23.test.ts",
+        "packages/adapter-utils/src/__tests__/server-utils-tracked-child.test.ts",
+        "packages/adapter-utils/src/__tests__/server-utils-shutdown.test.ts",
+        "server/src/__tests__/auth-crew-run-boundary.test.ts",
+        "server/src/__tests__/agent-auth-jwt.test.ts",
+        "server/src/__tests__/auth-commander-jwt.test.ts",
+        "server/src/__tests__/mcp-agent-actor.test.ts",
+        "server/src/__tests__/mcp-run-currency-gate.test.ts",
+        "server/src/__tests__/broker-tool-context.unit.test.ts",
+        "server/src/services/internal-agent/__tests__/mcp-bridge-crew-policy.test.ts",
+        "server/src/services/internal-agent/__tests__/mcp-bridge-approval-conversation-id.test.ts",
+        "server/src/services/internal-agent/__tests__/mcp-bridge-output-refs.test.ts",
+        "server/src/__tests__/mcp-bridge-role-check.test.ts",
+        "server/src/__tests__/mcp-bridge-tool-discovery-auth.test.ts",
+        "server/src/__tests__/authorize-tool.test.ts",
+        "server/src/__tests__/hub-curation.test.ts",
+        "server/src/__tests__/hub-curation-tools.test.ts",
+        "server/src/__tests__/hub-curation.integration.test.ts",
+        "server/src/__tests__/sweep-steward.test.ts",
+        "server/src/__tests__/server-shutdown.test.ts",
+        "server/src/__tests__/costs-service.test.ts",
+        "server/src/__tests__/costs-idempotency.integration.test.ts",
+        "server/src/__tests__/mcp-server.test.ts",
+        "server/src/__tests__/crew-run-jwt.test.ts",
+        "packages/adapter-utils/src/__tests__/server-utils-win32-taskkill.test.ts",
+        "cli/src/__tests__/run-entrypoint.test.ts",
+        "cli/src/__tests__/bundle-runtime.test.ts",
+        "packages/worker-daemon/src/__tests__/slot-binding.test.ts",
+        "packages/worker-daemon/src/__tests__/slot-ownership.test.ts",
+        "packages/worker-daemon/src/__tests__/slot-host.test.ts",
+        "packages/worker-daemon/src/__tests__/poll-drain.component.test.ts",
+        "packages/worker-daemon/src/__tests__/poll-drain-resumable.component.test.ts",
+        "packages/worker-daemon/src/__tests__/poll-revoked.component.test.ts",
+        "packages/worker-daemon/src/__tests__/enroll-once.test.ts",
+        "server/src/__tests__/worker-enrollment.integration.test.ts",
+        "server/src/__tests__/worker-session-lifecycle.integration.test.ts",
+        "server/src/__tests__/worker-revocation.integration.test.ts",
+        "server/src/__tests__/dr-reenroll-revoke.integration.test.ts",
+        "server/src/__tests__/dr-stale-fence-after-restore.integration.test.ts",
+        "server/src/__tests__/task-run-sandbox-invocation-auth.test.ts",
+        "server/src/__tests__/task-run-sandbox-invocation.test.ts",
+        "server/src/__tests__/task-run-batch-workload.test.ts",
+        "packages/db/src/__tests__/backup-native-contract.test.ts",
+        "server/src/__tests__/execution-target-successor.test.ts",
+        "server/src/__tests__/execution-target-successor.integration.test.ts",
+        "server/src/__tests__/job-control-legacy-grants.contract.test.ts",
+        "server/src/__tests__/execution-target-resolver.test.ts",
+        "server/src/__tests__/cli-006-canary-credential-binding.test.ts",
+        "server/src/__tests__/helpers/__tests__/migrated-database.test.ts",
+        "server/src/__tests__/migrated-database-teardown.integration.test.ts"
+      ],
+      "packages": [
+        "@armyofagents/adapter-utils",
+        "@armyofagents/worker-daemon",
+        "@armyofagents/sandbox-e2b-provider",
+        "@armyofagents/adapter-manager",
+        "@armyofagents/server",
+        "@armyofagents/adapter-claude-local",
+        "@armyofagents/adapter-gemini-local",
+        "@armyofagents/adapter-opencode-local",
+        "@armyofagents/adapter-codex-local",
+        "@armyofagents/cli",
+        "@armyofagents/shared",
+        "@armyofagents/worker-protocol",
+        "@armyofagents/db"
+      ],
+      "providerSelection": {
+        "root": "packages/sandbox-e2b-provider",
+        "config": "vitest.config.ts",
+        "files": [
+          "src/__tests__/artifact-operation-cancellation.test.ts",
+          "src/__tests__/enumerate-and-bounded-read.test.ts",
+          "src/__tests__/artifact-export.test.ts"
+        ]
+      },
+      "artifactDbSelection": {
+        "file": "server/src/__tests__/artifact-transfer-commit.integration.test.ts",
+        "testNamePattern": "issues an upload grant on a live fence|rejects an upload grant on a stale fence|issues a download grant for a committed artifact even after the fence is lost|rejects a download grant when no committed artifact exists|commits a verified manifest|is idempotent: replaying the same commit|decides fence staleness BEFORE hash|rejects a sha256 mismatch|rejects a size mismatch|rejects a wrong-prefix|rejects a foreign-company|rejects a commit when the object is missing/incomplete|rejects a commit against a terminal attempt|rejects an upload grant whose expectedObjectKey is a foreign-org key|rejects a re-upload grant for an already-committed artifact|does not probe object storage before the fence identity is resolved",
+        "windowsOptIn": "AOA_RUN_WIN_INTEGRATION=1",
+        "selectedCases": 16,
+        "filterSkipsAreNotPasses": true,
+        "storage": "Stubbed grant/commit object storage; real embedded PostgreSQL and non-owner roles"
+      },
+      "lanes": {
+        "core": {
+          "files": 87,
+          "passed": 980,
+          "skipped": 1,
+          "failed": 0
+        },
+        "provider": {
+          "files": 3,
+          "passed": 56,
+          "skipped": 0,
+          "failed": 0
+        },
+        "artifactdb": {
+          "files": 1,
+          "passed": 16,
+          "skipped": 23,
+          "failed": 0
+        },
+        "writer": {
+          "files": 1,
+          "passed": 1,
+          "skipped": 19,
+          "failed": 0
+        },
+        "replay": {
+          "files": 1,
+          "passed": 2,
+          "skipped": 38,
+          "failed": 0
+        },
+        "api": {
+          "tests": 6,
+          "pass": 6,
+          "fail": 0,
+          "skipped": 0
+        },
+        "guard": {
+          "tests": 66,
+          "pass": 65,
+          "fail": 0,
+          "skipped": 1
+        },
+        "native": {
+          "tests": 4,
+          "pass": 4,
+          "fail": 0,
+          "skipped": 0,
+          "nestedEngineeringCases": {
+            "result": "PASS",
+            "passedNativeRestoreCases": 1,
+            "passedDatabaseAndObjectRecoveryCases": 2,
+            "postgresVersion": "18.6 (Debian 18.6-1.pgdg12+2)",
+            "postgresImageDigest": "sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11",
+            "scenarios": [
+              "post-snapshot lease",
+              "expired snapshot lease",
+              "generation cutoff in snapshot",
+              "post-backup revocation with pre-serving authority advance"
+            ],
+            "objectScenarios": [
+              "restored bytes corrupted",
+              "restored bytes missing",
+              "healthy sibling still accessible"
+            ],
+            "limits": "Disposable single-database + local-file engineering fixture; not live fleet, external object store or D5 timings"
+          },
+          "counting": "4 outer cases include the 1 restore and 2 recovery nested cases; do not add nested cases to the outer total."
+        }
+      },
+      "fixtureCycles": [
+        {
+          "cycle": 1,
+          "platform": "linux",
+          "pid": 379951,
+          "port": 61457,
+          "after": null,
+          "shutdownRequested": true,
+          "shutdownCompleted": true,
+          "directoryAbsent": true
+        },
+        {
+          "cycle": 2,
+          "platform": "linux",
+          "pid": 379983,
+          "port": 63596,
+          "after": null,
+          "shutdownRequested": true,
+          "shutdownCompleted": true,
+          "directoryAbsent": true
+        },
+        {
+          "cycle": 3,
+          "platform": "linux",
+          "pid": 380067,
+          "port": 63486,
+          "after": null,
+          "shutdownRequested": true,
+          "shutdownCompleted": true,
+          "directoryAbsent": true
+        }
+      ],
+      "smoke": {
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "startedAt": "2026-10-18T06:32:21.272249+00:00",
+        "result": "pass",
+        "freshHome": true,
+        "httpOnly": true,
+        "browserProof": false,
+        "companyCreated": false,
+        "modelRun": false,
+        "providerCredentialsUsed": false,
+        "rootPid": 376749,
+        "health": {
+          "status": "ok",
+          "revision": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+          "deploymentMode": "local_trusted",
+          "deploymentExposure": "private",
+          "authReady": true,
+          "bootstrapStatus": "ready",
+          "features": {
+            "companyDeletionEnabled": true
+          }
+        },
+        "http": [
+          {
+            "route": "/",
+            "status": 200,
+            "html": true,
+            "rootElement": true,
+            "sizeBytes": 3813
+          },
+          {
+            "route": "/onboarding",
+            "status": 200,
+            "html": true,
+            "rootElement": true,
+            "sizeBytes": 3813
+          }
+        ],
+        "initialCompanyCount": 0,
+        "configCreated": true,
+        "keyCreated": true,
+        "databaseStopExit": 0,
+        "operatorStoppedLongRunningServer": true,
+        "remainingListeners": [],
+        "remainingOwnedProcesses": [],
+        "finishedAt": "2026-10-18T06:32:52.619386+00:00"
+      },
+      "before": {
+        "at": "2026-10-18T06:23:26.661517+00:00",
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "trackedFiles": 8378,
+        "mismatches": 0,
+        "sourceArchiveSha256": "07162417fe0d01d36197d11b19fcef25a29fff1b958655120c7f706973d41080",
+        "oldDisposableNamespacesAbsent": [
+          "/opt/aoa-w12-20261018",
+          "/opt/aoa-w12-live-20261018",
+          "/opt/aoa-w12-acceptance-20261018",
+          "/opt/aoa-windows-pg-fixture-20261018"
+        ],
+        "oldWorkerImageRemoved": true,
+        "containersBefore": [
+          "aoa-validation-cloud-db"
+        ],
+        "testListenersBefore": [],
+        "sharedUnit": "ActiveState=active\nFragmentPath=/etc/systemd/system/aoa-validation.service\nDropInPaths=/etc/systemd/system/aoa-validation.service.d/w02-w05.conf /etc/systemd/system/aoa-validation.service.d/z-w02-followup.conf /etc/systemd/system/aoa-validation.service.d/zz-w02-adapters.conf /etc/systemd/system/aoa-validation.service.d/zzz-w02-w05-audit-artifacts.conf /etc/systemd/system/aoa-validation.service.d/zzzz-program-integration.conf\nActiveEnterTimestamp=Sun 2026-10-18 01:24:50 UTC\nMainPID=301667\nExecStart={ path=/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node ; argv[]=/opt/aoa-validation-2026-10-16/runtime/node-v24.19.0-linux-arm64/bin/node /opt/aoa-program-integration-20261018/source/node_modules/tsx/dist/cli.mjs server/src/index.ts ; ignore_errors=no ; start_time=[Sun 2026-10-18 01:24:50 UTC] ; stop_time=[n/a] ; pid=301667 ; code=(null) ; status=0/0 }\n",
+        "sharedDatabase": "3d5f59c4c990e1515d8871dbd36be02f671f0eae315d2576cef86bc811d082b0 2026-10-16T11:54:44.161606343Z",
+        "sharedHealthStatus": 200,
+        "freshSource": true,
+        "freshNodeModules": true,
+        "compiledOutputsReused": false,
+        "providerCredentialsUsed": false
+      },
+      "after": {
+        "at": "2026-10-18T06:44:34.676705+00:00",
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "trackedFilesVerified": 8378,
+        "sourceMismatches": 0,
+        "ownedProcessesRemaining": [],
+        "ownedListenersRemaining": [],
+        "ownedContainersRemaining": 0,
+        "ownedVolumesRemaining": 0,
+        "workerImageRemoved": true,
+        "sharedUnitSame": true,
+        "sharedDatabaseSame": true,
+        "sharedHealthStatus": 200,
+        "credentialsUsed": false
+      },
+      "teardown": {
+        "at": "2026-10-18T06:44:34.676705+00:00",
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "trackedFilesVerified": 8378,
+        "sourceMismatches": 0,
+        "ownedProcessesRemaining": [],
+        "ownedListenersRemaining": [],
+        "ownedContainersRemaining": 0,
+        "ownedVolumesRemaining": 0,
+        "workerImageRemoved": true,
+        "sharedUnitSame": true,
+        "sharedDatabaseSame": true,
+        "sharedHealthStatus": 200,
+        "credentialsUsed": false,
+        "archive": "/opt/aoa-program-combined-evidence-20261018/evidence.tar.gz",
+        "archiveSha256": "8459370ff977cf3f4070b6a0d024c7eb5ff1cf00d790b88423024fb6d8188d49",
+        "archiveBytes": 564077,
+        "archiveFiles": 81,
+        "archiveMembersVerified": true,
+        "stagingRootRemoved": true,
+        "transferRootRemoved": true
+      },
+      "rawManifest": {
+        "candidate": "5d7bad95831336d36dffef7e932ed1dc78f63324",
+        "files": [
+          {
+            "path": "evidence/tsconfig.fixture.json",
+            "sha256": "319ed42acf1779a76c66be0fd11236470c520c9915c5f0c097c01ecee1e05334"
+          },
+          {
+            "path": "evidence/summary.json",
+            "sha256": "880aa05446713cb3ff9431fdc64d158a8d3c45dac7241790098d6f0297486425"
+          },
+          {
+            "path": "evidence/before.json",
+            "sha256": "a142424880da3ddeaebbd83420799a9d78cefce3fdbcd7a6903f42cfe46dee73"
+          },
+          {
+            "path": "evidence/after.json",
+            "sha256": "d3e89c729840fc535ad6fbdd6f51d4b0f3f3554e3f6bf464e6ee5e13ba221aeb"
+          },
+          {
+            "path": "evidence/core/vitest.json",
+            "sha256": "7b132416d2a7515ed2cf5d79af6d6ee386c54782dad1c2ff30f5460f07e3109e"
+          },
+          {
+            "path": "evidence/core/result.json",
+            "sha256": "1a65c2c0ac1e72de8bd0d5254175dd64729257297a6e01fce8c307468e02f19c"
+          },
+          {
+            "path": "evidence/core/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/core/stdout.txt",
+            "sha256": "0f6a6ce8865860b4b2d30165f40e07a213ced7ddc2b289fe925c338c9f7262ff"
+          },
+          {
+            "path": "evidence/cycles/cycle-3.json",
+            "sha256": "638d695bf1d95a98dea39253895c791f584723684941737b1d513cac84885e36"
+          },
+          {
+            "path": "evidence/cycles/cycle-1.json",
+            "sha256": "8fdef148ded44bb2fba5f0180122c61541cc1cafd685bb13c76fadb4cb448efb"
+          },
+          {
+            "path": "evidence/cycles/cycle-2.json",
+            "sha256": "79b4bcd171a86e5c1661c7913ba6730e138e4fee0549df62c03c6a6889c4b65c"
+          },
+          {
+            "path": "evidence/install/result.json",
+            "sha256": "5d57b77149f90852c16d0b4bc43551e68578f6bf74f8148bae53e3743724e35a"
+          },
+          {
+            "path": "evidence/install/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/install/stdout.txt",
+            "sha256": "511981bb4d8c49182bc0a59282bd238c4fc915261a4c0401194b5ae45e4a78bc"
+          },
+          {
+            "path": "evidence/native/result.json",
+            "sha256": "9218006095a65b137353f6845ea883900b7000f3983f209b5be2d4266b1ae6be"
+          },
+          {
+            "path": "evidence/native/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/native/stdout.txt",
+            "sha256": "ef354732294e2f963113cc9850f047ae7d567dce15413514dfb916d230b5ad92"
+          },
+          {
+            "path": "evidence/writer/vitest.json",
+            "sha256": "7dd7b11bf2138b1f9358fb05bb0d6b7cf41e12fdde9b0faad2c7e1bf109c77c3"
+          },
+          {
+            "path": "evidence/writer/result.json",
+            "sha256": "14e3f836b24c0e9e8d34542475e8d9ec5af6e94e1ba9239d1cf1a8eb5a1148b2"
+          },
+          {
+            "path": "evidence/writer/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/writer/stdout.txt",
+            "sha256": "f3b1fcf3311e69f42925bf6dea7953f502b77d6237fb52e216ee5383bd70eb78"
+          },
+          {
+            "path": "evidence/artifactdb/vitest.json",
+            "sha256": "28defe7d91851d72e1892dde6f80c2a715405735b135262c0dc0041ee981bf04"
+          },
+          {
+            "path": "evidence/artifactdb/result.json",
+            "sha256": "2cdfa1433e0582bd09d7be5985a490a761853d4ed998a265f6f2b6f35c4b763a"
+          },
+          {
+            "path": "evidence/artifactdb/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/artifactdb/stdout.txt",
+            "sha256": "a917130880340f9c08ec0683e0e0af029328fa2382266b4f1b8d17bf6e490f84"
+          },
+          {
+            "path": "evidence/smoke/stdout.log",
+            "sha256": "18fa0923835f1e7d79f675a11c0092bb1d8eb5c0b1d0b4ea89be43df5501bb71"
+          },
+          {
+            "path": "evidence/smoke/summary.json",
+            "sha256": "28781ede230a9f78b79ad298e85580030c7ef3d40a006ca73fad06fcd5774810"
+          },
+          {
+            "path": "evidence/smoke/pg-stop.log",
+            "sha256": "e7b24f63c690806243625ca8cb53f81f1a71a030c6c34a3820e76021c6810564"
+          },
+          {
+            "path": "evidence/smoke/stderr.log",
+            "sha256": "7e2cd7151e949583ca6dfdf93566b56128ec795a0cb24df5593c40f9d0d6780e"
+          },
+          {
+            "path": "evidence/api/result.json",
+            "sha256": "bed8f8f602b6b6ffcfae20bae248dbbe4f71b2af3c03ec802660f9cafe0e7092"
+          },
+          {
+            "path": "evidence/api/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/api/stdout.txt",
+            "sha256": "f3756a877a3489a4b2fdb0d3ac29300674d67b39978b30febf3b62dc0982bdf2"
+          },
+          {
+            "path": "evidence/guard/result.json",
+            "sha256": "1bce2dc9e9cce8128f2efc1c9a1207e74c635dc4d340c9069d67266213c10d36"
+          },
+          {
+            "path": "evidence/guard/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/guard/stdout.txt",
+            "sha256": "bef82b50264ee0d9b18f0b567f5a0bde20c56db0b2a59f1193f3524c17129f8d"
+          },
+          {
+            "path": "evidence/provider/vitest.json",
+            "sha256": "e1af4f8693012e48aa96c0c781175a5f8109a7545c7a701077fe0d82a5a70040"
+          },
+          {
+            "path": "evidence/provider/result.json",
+            "sha256": "06d08b1b78465db2ccd483b22ce47f943e4c818ebaee1eccf706b259c2f00952"
+          },
+          {
+            "path": "evidence/provider/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/provider/stdout.txt",
+            "sha256": "92c0801a6281900836c7566496aeab2be542f3871f5a7acca1fe109b933ef208"
+          },
+          {
+            "path": "evidence/fixture-types/result.json",
+            "sha256": "b63b56892a779907ea09aaee5a3d1763e79710d1b4c021a17a0fc4b31068b880"
+          },
+          {
+            "path": "evidence/fixture-types/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/fixture-types/stdout.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/image/result.json",
+            "sha256": "5e4a2504ae4f9376c2379f0e08a8e51b0cb8c261889a0453580a5ce716680d5f"
+          },
+          {
+            "path": "evidence/image/stderr.txt",
+            "sha256": "d86cb49dd44ce17a9da506b4e732433d5755f98bac9a709da0462523638defc5"
+          },
+          {
+            "path": "evidence/image/stdout.txt",
+            "sha256": "09dcd258def8b5b5bc48dd1e7c6b1d0ebd0d0c322da77cede9413b5f14ddaa01"
+          },
+          {
+            "path": "evidence/build/result.json",
+            "sha256": "85f4d8c918301a40fbd3c001bc9f3ff4e856f854ad9872f47ef05ce4bec0d837"
+          },
+          {
+            "path": "evidence/build/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/build/stdout.txt",
+            "sha256": "d284c28d6d2e0bf66ee8b149c40e4a1277f6786aae09d0291ec7d3325f966058"
+          },
+          {
+            "path": "evidence/ui/result.json",
+            "sha256": "9ecb90597dfa88dc600c5b8bd54e23d521c7d297f1620bae3b426ac057778fa2"
+          },
+          {
+            "path": "evidence/ui/stderr.txt",
+            "sha256": "e752eff3d27cd29caf395c8ca8783fc27c400f4916e665b4e29783f5b23e3f96"
+          },
+          {
+            "path": "evidence/ui/stdout.txt",
+            "sha256": "391bebf1b5ee38ed8ddd63d06f9d608a87003a0209e936d8d6448cf3918a2e54"
+          },
+          {
+            "path": "evidence/typecheck/result.json",
+            "sha256": "c9d175b37e75f6b1bc9d9d95dac829735ba3c7fcaf33e6ea067762883ca2686e"
+          },
+          {
+            "path": "evidence/typecheck/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/typecheck/stdout.txt",
+            "sha256": "60764185bf28bb184218f32ea287f171a7150fe69871c4ef780783e105ce4ec0"
+          },
+          {
+            "path": "evidence/replay/vitest.json",
+            "sha256": "b87d908963eb36e27cb0b59fceaf3611dad0ac307f7abb71b3265e9b02662255"
+          },
+          {
+            "path": "evidence/replay/result.json",
+            "sha256": "fa9bd9250a8541e6edb3633269c2eaefe92b32089198ab4c9bb5ab7f553ba0ab"
+          },
+          {
+            "path": "evidence/replay/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/replay/stdout.txt",
+            "sha256": "cd28f1ccfdfa8f217c03efdaa0b547334370224b8cac70bfa290e36b59bcdaf0"
+          },
+          {
+            "path": "evidence/replay/vitest-capture/result.json",
+            "sha256": "9e696dcddb2b54ebc29d1711bb15c368a0de3a1a3cf997fb4eba09e418999b16"
+          },
+          {
+            "path": "evidence/replay/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/replay/vitest-capture/stdout.txt",
+            "sha256": "cd28f1ccfdfa8f217c03efdaa0b547334370224b8cac70bfa290e36b59bcdaf0"
+          },
+          {
+            "path": "evidence/provider/vitest-capture/result.json",
+            "sha256": "ae24fbf89bcd5472d8fc40c320337a38262d0a563dce0c9f67f0898f0e622291"
+          },
+          {
+            "path": "evidence/provider/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/provider/vitest-capture/stdout.txt",
+            "sha256": "92c0801a6281900836c7566496aeab2be542f3871f5a7acca1fe109b933ef208"
+          },
+          {
+            "path": "evidence/tmp/aoa-m4-native-fence-6n5pKL/ownership.json",
+            "sha256": "58aebd1b55c5e23e22491f435fb413662b6bea60a88a2b927f6c99cd2a17df6b"
+          },
+          {
+            "path": "evidence/tmp/aoa-m4-native-fence-6n5pKL/vitest-result.json",
+            "sha256": "2089f010c057a5eb66aed74717cf753986f599eef1920c9524997c26564f44f8"
+          },
+          {
+            "path": "evidence/tmp/aoa-m4-native-fence-6n5pKL/artifact-recovery-result.json",
+            "sha256": "769df802c8a221150c971f006bf741daee457ef733c1d37736edb21c53449cae"
+          },
+          {
+            "path": "evidence/artifactdb/vitest-capture/result.json",
+            "sha256": "b57563e80757fb750c8a4014b74bfcd6c2c9aae633669af2c10d599cd9e2ad84"
+          },
+          {
+            "path": "evidence/artifactdb/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/artifactdb/vitest-capture/stdout.txt",
+            "sha256": "a917130880340f9c08ec0683e0e0af029328fa2382266b4f1b8d17bf6e490f84"
+          },
+          {
+            "path": "evidence/writer/vitest-capture/result.json",
+            "sha256": "cf633f3e502d3a6cdcd0044ace8e1e4fbcf693ea3be7e9c09f6618cc33ed5e04"
+          },
+          {
+            "path": "evidence/writer/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/writer/vitest-capture/stdout.txt",
+            "sha256": "f3b1fcf3311e69f42925bf6dea7953f502b77d6237fb52e216ee5383bd70eb78"
+          },
+          {
+            "path": "evidence/core/vitest-capture/result.json",
+            "sha256": "95d5eb464296d886fdae95ca0aeb1c13b9dd57666312d62ec3cd390f3a443fa3"
+          },
+          {
+            "path": "evidence/core/vitest-capture/stderr.txt",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "path": "evidence/core/vitest-capture/stdout.txt",
+            "sha256": "0f6a6ce8865860b4b2d30165f40e07a213ced7ddc2b289fe925c338c9f7262ff"
+          },
+          {
+            "path": "prepare-vps.py",
+            "sha256": "3fe2973bc2e48075e8e7996190c38993abd81be6f00120574a471e02bbf422d0"
+          },
+          {
+            "path": "run-combined.mjs",
+            "sha256": "ce99e940b9072fd5b66e427d0051eb504451d84806deff5b158cb962b7c72971"
+          },
+          {
+            "path": "smoke-vps.py",
+            "sha256": "085b5afd7f0ec11d874cf9857f831e6dc7d7ba3ccd2a6700482dfd5710c6f32a"
+          },
+          {
+            "path": "finalize-vps.py",
+            "sha256": "c413cde6722bc201fbc10f224df6fed54b99bccd9afba88add6f4d2d8431b4e0"
+          },
+          {
+            "path": "source-manifest.json",
+            "sha256": "07f13c1c977e9a2ffff72526a8147ddf22100615b1b24b03dc131e6c4fae0a18"
+          }
+        ]
+      },
+      "archive": {
+        "path": "C:\\Users\\Dell\\Desktop\\aoa\\validation-program-combined-2026-10-18\\vps\\evidence.tar.gz",
+        "sha256": "8459370ff977cf3f4070b6a0d024c7eb5ff1cf00d790b88423024fb6d8188d49",
+        "sizeBytes": 564077,
+        "membersVerified": 81
+      }
+    }
+  },
+  "skipQualification": {
+    "coreLocal": "Two POSIX-only shutdown cases skip on Windows; the native restore opt-in skips in core and runs separately in Docker.",
+    "coreVps": "Native restore opt-in skips in core and runs separately in Docker.",
+    "artifactDbWriterReplay": "23 + 19 + 38 name-filtered cases are not passes.",
+    "guard": "One explicitly retired probe case skips on each host.",
+    "linuxCycles": "VPS cycle receipts have null per-cycle process scans; final owned process/listener scans are clear. Windows cycles include per-cycle empty scans."
+  },
+  "remaining": [
+    "Applicable CI/PR/release approval and governed main integration",
+    "Broader baseline provenance/distribution/engine acceptance gaps",
+    "W02 real installed-vendor/model/transport/cancellation and durable abrupt-crash custody qualification",
+    "W05 selected provider PC-worker artifact/export/download and SDK abort/late-effect acceptance",
+    "Expanded fleet/external-store failure domains, D5 recovery timings and automatic staged-orphan recovery",
+    "14 local native hardlinks remain mapped by shared review processes; no running test setup remains"
+  ]
+}

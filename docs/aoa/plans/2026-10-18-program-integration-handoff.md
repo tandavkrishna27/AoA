@@ -1,10 +1,14 @@
 # Program integration — completed and pending
 
-**Latest fixture follow-up — 18 October:** [Windows PostgreSQL fixture report](../reports/2026-10-18-windows-postgres-fixture-report.md) and [portable evidence](../evidence/2026-10-18-windows-postgres-fixture-summary.json), code `41f2c2a68dd89e62f68e85246d38878488650b40`. The current shared fixture defect is repaired with targeted Windows/VPS verification; the combined-candidate evidence below is unchanged.
+**Current combined follow-up — 18 October:** application merge `5d7bad95831336d36dffef7e932ed1dc78f63324` includes both completed chat increments (program `fdf1f5a5d` + W12 `389fcd978`). [Combined report](../reports/2026-10-18-program-combined-followup-report.md) and [portable evidence](../evidence/2026-10-18-program-combined-followup-summary.json). Fresh local/VPS targeted builds, typechecks, tests, native Docker restore/worker lanes and built-CLI HTTP smokes pass. Shared review apps remain untouched. Disposable test setups were removed; 14 local native hardlinks remain mapped by shared review processes, with no running test setup.
 
-**Branch:** `docs/replatform-program`. **Application candidate:** `0896c43961d2e19e2c7fd163f32c51c6e69d0889`. See the [integration report](../reports/2026-10-18-program-integration-report.md) and [portable evidence](../evidence/2026-10-18-program-integration-summary.json). Checked items certify only the stated bounded work, not full W-package or release acceptance.
+**Earlier fixture follow-up — 18 October:** [Windows PostgreSQL fixture report](../reports/2026-10-18-windows-postgres-fixture-report.md) and [portable evidence](../evidence/2026-10-18-windows-postgres-fixture-summary.json), code `41f2c2a68dd89e62f68e85246d38878488650b40`. The current shared fixture defect is repaired with targeted Windows/VPS verification; the combined-candidate evidence below is unchanged.
+
+**Branch:** `docs/replatform-program`. **Historical application candidate:** `0896c43961d2e19e2c7fd163f32c51c6e69d0889`. See the [integration report](../reports/2026-10-18-program-integration-report.md) and [portable evidence](../evidence/2026-10-18-program-integration-summary.json). Checked items certify only the stated bounded work, not full W-package or release acceptance.
 
 ## Completed
+
+- [x] Integrate both completed chat follow-ups with exact parent/blob review; verify application `5d7bad958` from fresh local/VPS setups. Core 87 files: Windows 978 pass / 3 skip and VPS 980 pass / 1 skip; separate provider, DB, writer/replay, API/guard and 4 outer native cases pass. Selected builds/typechecks and HTTP startup smokes pass. Archive raw captures and clean owned runtimes without changing shared review resources; preserve the documented 14-hardlink local exception. Publish current combined evidence separately from historical acceptance.
 
 - [x] Fetch origin and merge baseline `e3a6afaac`, W02/W05 `74a786efc`, then W12 `ba0d39164` into the program branch using three explicit merge commits. No conflicts or manual resolutions; no main merge, source-branch deletion or new production edit.
 - [x] Independently review exact merge parents/tree and preserve both the final W02/W05 code/evidence and W12's test/documentation increment.
@@ -27,7 +31,7 @@
 - [ ] W05 owner: select/provision a supported admitted provider/backend/worker/storage cohort, then execute normal VPS-authority → PC-worker generated-file/export/commit/UI-download with exact bytes/digest/size, foreign/stale denial and cleanup. Measure actual SDK abort/late effects; do not substitute SQL/scripted placement or copy personal auth.
 - [ ] W12/W14/W15 owners: repeat applicable expanded-topology/external-store cases with real failure domains and measured recovery times. The finite W12 rehearsal passed; D5 timing and automatic staged-orphan daemon recovery remain unproved.
 - [ ] Platform owner: qualify protected least-privilege model/E2B/storage configuration for the selected deployment cohort. Supplied OpenAI/E2B keys, pinned template, worker enrollment/profile/placement, and HTTPS presigning were exercised in the isolated W12 cohort; that does not qualify the W05 PC-worker or expanded fleet. Do not transfer worker private keys or personal CLI auth.
-- [ ] Program owner: leave `main` integration for its governed checkpoint. The 18 preflight baseline/main conflicts remain unresolved; do not remove the weekly-main block or assume this program merge grants release approval.
+- [ ] Program owner: leave `main` integration for its governed checkpoint. The earlier preflight recorded 18 baseline/main conflicts (not re-counted for this candidate); do not remove the weekly-main block or assume this program merge grants release approval.
 
 ## Pickup rules
 
