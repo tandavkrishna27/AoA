@@ -2180,6 +2180,23 @@ function signedPoll() {
   };
 }
 
+// Every fixture is immutable during its audit. Build one syntax index instead
+// of re-walking the entire source for each critical helper name on every mutant.
+function indexDirectIdentifierCalls(file: ts.SourceFile): Map<string, ts.CallExpression[]> {
+  const calls = new Map<string, ts.CallExpression[]>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      const name = node.expression.text;
+      const found = calls.get(name) ?? [];
+      found.push(node);
+      calls.set(name, found);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return calls;
+}
+
 function leaseStaticContextPollViolations(source: string): string[] {
   const file = ts.createSourceFile("job-leasing-static-context.ts", source, ts.ScriptTarget.Latest, true);
   const violations = new Set<string>();
@@ -2244,17 +2261,8 @@ function leaseStaticContextPollViolations(source: string): string[] {
     violations.add("import:job-lease-eligibility-named-only");
   }
 
-  const directCalls = (name: string): ts.CallExpression[] => {
-    const found: ts.CallExpression[] = [];
-    const visit = (node: ts.Node): void => {
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) {
-        found.push(node);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(file);
-    return found;
-  };
+  const directCallIndex = indexDirectIdentifierCalls(file);
+  const directCalls = (name: string): ts.CallExpression[] => directCallIndex.get(name) ?? [];
   let builderCalls: ts.CallExpression[] = [];
   let hashCalls: ts.CallExpression[] = [];
   const auditImportedUse = (node: ts.Node): void => {
@@ -5032,6 +5040,33 @@ function leaseStaticContextPollViolations(source: string): string[] {
 }
 
 describe("JOB-003 frozen worker-operation HTTP contract", () => {
+  it("indexes exact direct-call syntax without dropping nested or shadowed calls or admitting indirect calls", () => {
+    const file = ts.createSourceFile("call-index.ts", `
+      import { candidate as renamed } from "./fixture.js";
+      candidate(); candidate?.(); (candidate)(); object.candidate(); object["candidate"]();
+      renamed(); other();
+      function nested(candidate: () => void) { candidate(); return () => candidate(); }
+    `, ts.ScriptTarget.Latest, true);
+    const indexed = indexDirectIdentifierCalls(file);
+    const names = ["candidate", "renamed", "other", "absent"];
+    for (const name of names) {
+      // Independent old lookup algorithm pins exact node identity and traversal
+      // order, including optional calls and lexical shadows audited separately.
+      const expected: ts.CallExpression[] = [];
+      const visit = (node: ts.Node): void => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name) expected.push(node);
+        ts.forEachChild(node, visit);
+      };
+      visit(file);
+      const actual = indexed.get(name) ?? [];
+      expect(actual).toHaveLength(expected.length);
+      actual.forEach((node, index) => expect(node).toBe(expected[index]));
+    }
+    expect(indexed.get("candidate")?.map(node => node.getText(file))).toEqual([
+      "candidate()", "candidate?.()", "candidate()", "candidate()",
+    ]);
+  });
+
   it("verifies the session and Ed25519 proof without opening a database transaction", () => {
     const signed = signedPoll();
     const verified = verifyWorkerOperationProof({
