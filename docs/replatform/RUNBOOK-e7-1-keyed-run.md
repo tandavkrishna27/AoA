@@ -384,6 +384,20 @@ existing one-time ticket flow, then submit a **new governed task** to test the
 successor. Previously decided attempts and automatic retries retain their
 original placement snapshot; this operation does not re-place them.
 
+After restore, an interrupted distributed heartbeat run can still hold its
+agent slot even after target fanout cancels the job. Verify that job is terminal
+`cancelled` and its old lease is `revoked`, then use the normal board-authorized
+`POST /api/heartbeat-runs/<OLD_RUN_ID>/cancel`. The shipped cancellation port
+recognizes that no worker terminal is expected, closes the run, releases its
+issue lock, and dispatches queued work. Do this before testing the same agent's
+replacement task; do not synthesize a worker terminal or edit run status in SQL.
+
+Fresh database restore destinations also need compatible **cluster-role**
+attributes before restore: `pg_dump` does not recreate them, and an already-applied
+migration journal will not replay role hardening. Provision both serving roles
+with the exact non-owner contract, including `NOINHERIT NOREPLICATION`, and verify
+the unchanged normal startup gate. This is separate from archive-preserved ACLs.
+
 ---
 
 ## 8. Set a Company E2B provider key; raise the agent concurrency cap

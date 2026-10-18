@@ -1,5 +1,9 @@
 # W12 isolated live rehearsal — report, 18 October 2026
 
+**Historical attempt:** the later [restored-live report](2026-10-18-w12-restored-live-report.md)
+records the three fixes and passing bounded continuous rehearsal. The failed
+attempt and its qualifications below are preserved.
+
 ## Current verdict
 
 The isolated rehearsal reached a **real distributed E2B job** with a networked
