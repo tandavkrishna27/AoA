@@ -678,6 +678,10 @@ jobs:
           node --test scripts/lib/__tests__/m1a-redaction-probe.test.mjs scripts/lib/__tests__/m1-provider-identity.test.mjs
           node --test scripts/lib/__tests__/dep-024-worker-driven-seed.test.mjs
 
+      - name: W11 and W13 measurement and rehearsal contracts
+        run: |
+          node --test --test-concurrency=2 scripts/lib/__tests__/m4-daemon-fetch-probe.test.mjs scripts/lib/__tests__/m4-daemon-load-driver.test.mjs scripts/lib/__tests__/m4-daemon-load-measurements.test.mjs scripts/lib/__tests__/availability-measurements.test.mjs scripts/lib/__tests__/d4-service-availability.test.mjs scripts/w12-live-rehearsal/api.test.mjs
+
       - name: M1a archive offline unit tests
         env:
           AWS_ACCESS_KEY_ID: ""
@@ -1218,6 +1222,13 @@ jobs:
       # needs the built `dist`; the dependency-free `policy` job cannot run it.
       - name: Worker protocol package import smoke
         run: node scripts/check-worker-protocol-package.mjs
+
+      - name: W13 authenticated cross-replica realtime smoke
+        if: matrix.shard == 1
+        env:
+          AOA_W13_REALTIME: "1"
+          AOA_W13_CANDIDATE: ${{ github.sha }}
+        run: node --import tsx --test --test-concurrency=1 tests/d1/w13-authenticated-realtime.test.mjs
 
       - name: M4 CLI recovery fallback
         if: matrix.shard == 1

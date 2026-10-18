@@ -14,11 +14,11 @@
     },
     "packages/adapter-utils": {
       "mode": "floor",
-      "count": 29
+      "count": 30
     },
     "packages/adapters": {
       "mode": "floor",
-      "count": 97
+      "count": 101
     },
     "packages/browser-runtime": {
       "mode": "floor",
@@ -42,7 +42,7 @@
     },
     "packages/sandbox-e2b-provider": {
       "mode": "pinned",
-      "count": 28
+      "count": 29
     },
     "packages/sandbox-fake-provider": {
       "mode": "pinned",
@@ -58,7 +58,7 @@
     },
     "packages/worker-daemon": {
       "mode": "pinned",
-      "count": 191
+      "count": 192
     },
     "packages/worker-keystore": {
       "mode": "pinned",
@@ -74,15 +74,15 @@
     },
     "scripts": {
       "mode": "pinned",
-      "count": 97
+      "count": 103
     },
     "server": {
       "mode": "floor",
-      "count": 1630
+      "count": 1641
     },
     "tests": {
       "mode": "pinned",
-      "count": 113
+      "count": 114
     },
     "ui": {
       "mode": "floor",

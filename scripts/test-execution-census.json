@@ -233,7 +233,7 @@
     "scripts/check-schema-migration-drift.test.mjs": {
       "status": "runs",
       "workflow": "pr.yml",
-      "step": "Schema↔migration drift gate self-test (E8-F005 decision logic + wiring)"
+      "step": "Schema\u2194migration drift gate self-test (E8-F005 decision logic + wiring)"
     },
     "scripts/check-secret-resolve-vectors.test.mjs": {
       "status": "runs",
@@ -627,6 +627,41 @@
       "status": "runs",
       "workflow": "pr.yml",
       "step": "M4 native restored-fence regression"
+    },
+    "scripts/lib/__tests__/m4-daemon-fetch-probe.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W11 and W13 measurement and rehearsal contracts"
+    },
+    "scripts/lib/__tests__/m4-daemon-load-driver.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W11 and W13 measurement and rehearsal contracts"
+    },
+    "scripts/lib/__tests__/m4-daemon-load-measurements.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W11 and W13 measurement and rehearsal contracts"
+    },
+    "scripts/lib/__tests__/availability-measurements.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W11 and W13 measurement and rehearsal contracts"
+    },
+    "scripts/lib/__tests__/d4-service-availability.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W11 and W13 measurement and rehearsal contracts"
+    },
+    "scripts/w12-live-rehearsal/api.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W11 and W13 measurement and rehearsal contracts"
+    },
+    "tests/d1/w13-authenticated-realtime.test.mjs": {
+      "status": "runs",
+      "workflow": "pr.yml",
+      "step": "W13 authenticated cross-replica realtime smoke"
     }
   }
 }
