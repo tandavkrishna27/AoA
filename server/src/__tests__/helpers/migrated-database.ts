@@ -12,9 +12,12 @@
 // Callers are responsible for skipping on Windows without AOA_RUN_WIN_INTEGRATION=1
 // (embedded-postgres cannot start on the `runneradmin` CI runner — Issue #114).
 
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { platform, tmpdir } from "node:os";
+import { promisify } from "node:util";
 import postgres, { type Sql } from "postgres";
 import {
   applyPendingMigrations,
@@ -64,27 +67,77 @@ export async function startMigratedDatabase(
     default: EmbeddedPostgresCtor;
   };
   const port = await allocateEmbeddedPgPort();
+  const databaseDir = join(dataDir, "db");
   const embedded = new EmbeddedPostgres({
-    databaseDir: join(dataDir, "db"),
+    databaseDir,
     user: "test",
     password: "test",
     port,
-    persistent: false,
+    persistent: true,
     initdbFlags: ["--encoding=UTF8", "--locale=C"],
   });
   let admin: Sql | null = null;
   let app: NonOwnerDbConnection | null = null;
   let operator: NonOwnerDbConnection | null = null;
-  const teardown = async () => {
-    await operator?.close({ timeoutSeconds: 5 }).catch(() => {});
-    await app?.close({ timeoutSeconds: 5 }).catch(() => {});
-    await admin?.end().catch(() => {});
-    await embedded.stop().catch(() => {});
-    await rm(dataDir, { recursive: true, force: true }).catch(() => {});
+  const windows = platform() === "win32";
+  const pidFile = join(databaseDir, "postmaster.pid");
+  let startAttempted = false;
+  let identity: string | undefined;
+  const readIdentity = async () => {
+    const lines = (await readFile(pidFile, "utf8")).split(/\r?\n/);
+    const pid = Number(lines[0]);
+    const started = Number(lines[2]);
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isSafeInteger(started) || started <= 0
+      || !lines[1] || resolve(lines[1]).toLowerCase() !== resolve(databaseDir).toLowerCase()
+      || Number(lines[3]) !== port) {
+      throw new Error(`Invalid migrated fixture ownership receipt: ${pidFile}`);
+    }
+    return JSON.stringify([pid, resolve(lines[1]).toLowerCase(), started, port]);
   };
+  if (windows) {
+    let stopping: Promise<void> | undefined;
+    embedded.stop = () => stopping ??= (async () => {
+      if (!startAttempted) return;
+      if (!identity || await readIdentity() !== identity) {
+        throw new Error(`Migrated fixture ownership changed; refusing shutdown: ${pidFile}`);
+      }
+      const fixtureRequire = createRequire(import.meta.url);
+      const nativeRequire = createRequire(fixtureRequire.resolve("embedded-postgres"));
+      const entry = nativeRequire.resolve("@embedded-postgres/windows-x64");
+      const controller = resolve(dirname(entry), "..", "native", "bin", "pg_ctl.exe");
+      await promisify(execFile)(controller, ["stop", "-D", databaseDir, "-m", "fast", "-w", "-t", "15"], {
+        windowsHide: true, timeout: 20_000, maxBuffer: 64 * 1024,
+      });
+      try {
+        await readFile(pidFile, "utf8");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+      throw new Error(`Migrated fixture PID file remains after shutdown: ${pidFile}`);
+    })();
+  }
+  let disposal: Promise<void> | undefined;
+  const teardown = () => disposal ??= (async () => {
+    const errors: unknown[] = [];
+    for (const cleanup of [
+      () => operator?.close({ timeoutSeconds: 5 }),
+      () => app?.close({ timeoutSeconds: 5 }),
+      () => admin?.end({ timeout: 5 }),
+      () => embedded.stop(),
+    ]) {
+      try { await cleanup(); } catch (error) { errors.push(error); }
+    }
+    if (errors.length === 0) {
+      try { await rm(dataDir, { recursive: true, force: true }); } catch (error) { errors.push(error); }
+    }
+    if (errors.length) throw new AggregateError(errors, `Migrated fixture cleanup failed; inspect retained directory: ${dataDir}`);
+  })();
   try {
     await embedded.initialise();
+    startAttempted = true;
     await embedded.start();
+    if (windows) identity = await readIdentity();
     const adminUrl = `postgres://test:test@127.0.0.1:${port}/postgres`;
     await applyPendingMigrations(adminUrl);
     admin = postgres(adminUrl, { max: 2 });
@@ -107,7 +160,11 @@ export async function startMigratedDatabase(
       teardown,
     };
   } catch (error) {
-    await teardown();
+    try {
+      await teardown();
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], `Migrated fixture setup and cleanup failed; inspect retained directory: ${dataDir}`);
+    }
     throw error;
   }
 }
