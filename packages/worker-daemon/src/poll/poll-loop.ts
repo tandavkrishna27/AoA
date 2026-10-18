@@ -484,6 +484,7 @@ export function createPollLoop(deps: PollLoopDeps): PollLoopController {
   let backoffState: BackoffState = INITIAL_BACKOFF_STATE;
   let stopLeasingRequested = false;
   let drainRequested = false;
+  let capacityWake: (() => void) | null = null;
   // Consecutive recover-then-poll cycles with NO intervening successful poll; a
   // bound on this prevents an unbounded recover→poll→recover spin (see
   // MAX_CONSECUTIVE_RECOVERIES). Reset by any poll returning no_work/offer.
@@ -510,14 +511,40 @@ export function createPollLoop(deps: PollLoopDeps): PollLoopController {
     deps.metrics?.inc(BACKOFF_SLEEP_METRIC, { bucket: backoffBucket(result.delayMs) });
     await sleep(result.delayMs);
   }
-  async function cadenceSleep(retryAfterMs: number): Promise<void> {
+  async function cadenceSleep(retryAfterMs: number, advertisedCapacity?: WorkerCapacity): Promise<void> {
     // Honor the server's no_work cadence but floor it identically to nextBackoff's
     // explicit branch: a retryAfterMs of 0 (the frozen schema permits it) can never
     // drive an immediate re-poll flood. Every honored delay stays in [floor, maxMs].
     const floor = Math.min(deps.backoff.baseMs, deps.backoff.maxMs);
     const delay = Math.max(Math.min(Math.max(retryAfterMs, 0), deps.backoff.maxMs), floor);
+    // A no_work reply to a saturated advertisement remains stale once one of
+    // our handoffs settles. Re-poll with the newly free capacity instead of
+    // leaving the slot idle for the entire no_work cadence. Idle polls and
+    // transient/drain backoff retain their normal delay.
+    const regainedCapacity = (): boolean => {
+      if (!advertisedCapacity) return false;
+      const current = deps.measure();
+      return (advertisedCapacity.batchSlots === 0 && current.batchSlots > 0)
+        || (advertisedCapacity.browserSessionSlots === 0 && current.browserSessionSlots > 0)
+        || (advertisedCapacity.serviceSlots === 0 && current.serviceSlots > 0);
+    };
+    if (regainedCapacity()) return;
     deps.metrics?.inc(BACKOFF_SLEEP_METRIC, { bucket: backoffBucket(delay) });
-    await sleep(delay);
+    if (!advertisedCapacity || activeHandoffs.size === 0) {
+      await sleep(delay);
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const released = new Promise<void>((resolve) => {
+      capacityWake = () => { if (regainedCapacity()) resolve(); };
+    });
+    try {
+      const cadence = deps.sleep ? deps.sleep(delay) : new Promise<void>((resolve) => { timer = setTimeout(resolve, delay); });
+      await Promise.race([cadence, released]);
+    } finally {
+      clearTimeout(timer);
+      capacityWake = null;
+    }
   }
 
   /** WRK-013 — write/prune a lease candidate. Never throws: a store fault is logged by name.
@@ -556,6 +583,7 @@ export function createPollLoop(deps: PollLoopDeps): PollLoopController {
       deps.limiter.release(workloadClass);
       activeHandoffs.delete(settle);
       publishActiveLeases();
+      capacityWake?.();
     });
   }
 
@@ -701,7 +729,7 @@ export function createPollLoop(deps: PollLoopDeps): PollLoopController {
         // A successful poll → reset the recovery spin counter.
         consecutiveRecoveries = 0;
         resetBackoff();
-        await cadenceSleep(attempt.retryAfterMs);
+        await cadenceSleep(attempt.retryAfterMs, capacity);
       } else if (attempt.kind === "drain") {
         if (attempt.retryAfterMs === null) {
           // No hint = a TERMINAL drain (an operator drain, a rolling shutdown). Stop leasing and

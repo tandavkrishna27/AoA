@@ -97,6 +97,46 @@ describe("poll-backpressure — a saturated class advertises zero free slots and
     }).batchSlots).toBe(1);
   });
 
+  it("wakes a saturated no_work cadence when its handoff releases capacity", async () => {
+    const { session, key, client } = await enrollFixtureWorker(fake, CODE);
+    const limiter = new ConcurrencyLimiter({ batch: 1, browser_session: 0, service: 0 });
+    let finishHandoff!: () => void;
+    const handoff = new Promise<void>((resolve) => { finishHandoff = resolve; });
+    let finishCadence!: () => void;
+    const cadence = new Promise<void>((resolve) => { finishCadence = resolve; });
+    let enteredCadence!: () => void;
+    const sleeping = new Promise<void>((resolve) => { enteredCadence = resolve; });
+    let drained!: () => void;
+    const drainReached = new Promise<boolean>((resolve) => { drained = () => resolve(true); });
+    fake.enqueuePoll({ kind: "offer", offer: compatibleOffer() });
+    fake.enqueuePoll({ kind: "no_work", retryAfterMs: 750 });
+    fake.enqueuePoll({ kind: "drain" });
+    const loop = createPollLoop({
+      client: { ...client, poll: async (request) => {
+        const response = await client.poll(request);
+        if (fake.pollCount() === 3) drained();
+        return response;
+      } },
+      self, key, session: { get: async () => session, recover: async () => session }, limiter,
+      measure: () => measureCapacity({ probes: fixtureProbes(), reserved: { cpuMillis: 0, memoryMiB: 0, diskMiB: 0 }, slots: limiter.snapshot() }),
+      supervisor: { accept: () => handoff }, backoff: BACKOFF,
+      sleep: async () => { enteredCadence(); await cadence; },
+    });
+    const running = loop.run();
+    await sleeping;
+    expect(limiter.freeSlots("batch")).toBe(0);
+    finishHandoff();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      expect(await Promise.race([drainReached, new Promise<boolean>((resolve) => { timeout = setTimeout(() => resolve(false), 5_000); })])).toBe(true);
+    } finally {
+      clearTimeout(timeout);
+      finishCadence();
+      await running;
+    }
+    expect(limiter.freeSlots("batch")).toBe(1);
+  }, 10_000);
+
   it("the COMPOSED loop advertises backpressure when a slot saturates between measure() and tryAcquire", async () => {
     const { session, key, client } = await enrollFixtureWorker(fake, CODE);
     // The real limiter is already saturated; but measure() reports a (stale/racy)
