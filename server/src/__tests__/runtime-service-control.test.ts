@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import * as windowsRuntimeJob from "../utils/windows-runtime-job.js";
 
 const mockEmitRuntimeServiceTaskOutput = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 
@@ -124,6 +128,7 @@ import {
   RuntimeServiceActivationFenceError,
   runWorkspaceJobForControl,
   startRuntimeServicesForWorkspaceControl,
+  startLocalRuntimeService,
   resolveWorkspaceRuntimeReadinessTimeoutSec,
   restartDesiredRuntimeServicesOnStartup,
   stopRuntimeServicesForExecutionWorkspace,
@@ -897,7 +902,139 @@ describe("startRuntimeServicesForWorkspaceControl", () => {
   });
 });
 
+describe.skipIf(process.platform !== "win32")("Windows runtime descendant completion", () => {
+  const workspace = () => ({ baseCwd: process.cwd(), cwd: process.cwd(), source: "project_primary" as const, projectId: "project-native-persist", workspaceId: "workspace-native-persist", repoUrl: null, repoRef: null, strategy: "project_primary" as const, branchName: null, worktreePath: null, warnings: [], created: false });
+
+  it("serializes native terminal persistence behind an already submitted running write", async () => {
+    let enter!: () => void;
+    const entered = new Promise<void>((resolve) => { enter = resolve; });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let activeWrites = 0;
+    let maximumWrites = 0;
+    const committed: Record<string, unknown>[] = [];
+    const db = { insert: () => ({ values: (value: Record<string, unknown>) => ({ onConflictDoUpdate: async () => {
+      activeWrites += 1; maximumWrites = Math.max(maximumWrites, activeWrites);
+      try { if (value.status === "running") { enter(); await held; } committed.push({ ...value }); }
+      finally { activeWrites -= 1; }
+    } }) }) } as never;
+    const capture = vi.spyOn(windowsRuntimeJob, "launchWindowsRuntimeJob");
+    const start = startLocalRuntimeService({ db, runId: "native-write-order", agent: { id: "agent-1", name: "Board", companyId: "company-native-persist" }, issue: null,
+      workspace: workspace(), executionWorkspaceId: "native-write-order", adapterEnv: {}, service: { name: "native-write-order", command: "node -e \"setInterval(()=>{},1000)\"" }, reuseKey: null, scopeType: "run", scopeId: "native-write-order",
+    }).then((record) => record, (error: unknown) => error);
+    try {
+      await entered;
+      const job = capture.mock.results[0]!.value as windowsRuntimeJob.WindowsRuntimeJob;
+      await expect(job.stop()).resolves.toBe(true);
+      expect(maximumWrites).toBe(1);
+      release();
+      expect(await start).toBeInstanceOf(Error);
+      expect(committed.at(-1)).toMatchObject({ providerRef: null, processOwnerId: null });
+      expect(["stopped", "failed"]).toContain(committed.at(-1)!.status);
+    } finally { release(); await start; await stopRuntimeServicesForExecutionWorkspace({ executionWorkspaceId: "native-write-order", workspaceCwd: process.cwd() }); capture.mockRestore(); }
+  });
+
+  it("retains a confirmed-empty startup tombstone until its terminal write is durable", async () => {
+    const writes: Record<string, unknown>[] = [];
+    let calls = 0;
+    const db = { insert: () => ({ values: (value: Record<string, unknown>) => ({ onConflictDoUpdate: async () => {
+      writes.push({ ...value }); calls += 1;
+      if (calls === 2) throw new Error("final activation write failed");
+      if (calls === 3) throw new Error("terminal rollback write failed");
+    } }) }) } as never;
+    const capture = vi.spyOn(windowsRuntimeJob, "launchWindowsRuntimeJob");
+    try {
+      await expect(startLocalRuntimeService({ db, runId: "native-persist", agent: { id: "agent-1", name: "Board", companyId: "company-native-persist" }, issue: null,
+        workspace: workspace(), executionWorkspaceId: "native-persist", adapterEnv: {}, service: { name: "native-persist", command: "node -e \"setInterval(()=>{},1000)\"" }, reuseKey: "native-persist", scopeType: "run", scopeId: "native-persist",
+      })).rejects.toThrow("terminal rollback write failed");
+      const id = String(writes[0]!.id);
+      const job = capture.mock.results[0]!.value as windowsRuntimeJob.WindowsRuntimeJob;
+      expect(job.state).toBe("empty");
+      expect(areRuntimeServicesTrackedLocally([id])).toBe(true);
+      expect(writes[2]).toMatchObject({ status: "failed", providerRef: null, processOwnerId: null });
+      await stopRuntimeServicesForExecutionWorkspace({ executionWorkspaceId: "native-persist", workspaceCwd: process.cwd() });
+      expect(calls).toBe(4);
+      expect(areRuntimeServicesTrackedLocally([id])).toBe(false);
+    } finally { capture.mockRestore(); }
+  });
+
+  it("retains unknown native ownership and refuses stop and shared reuse after host death", async () => {
+    const writes: Record<string, unknown>[] = [];
+    const db = { insert: () => ({ values: (value: Record<string, unknown>) => ({ onConflictDoUpdate: async () => { writes.push({ ...value }); } }) }) } as never;
+    const capture = vi.spyOn(windowsRuntimeJob, "launchWindowsRuntimeJob");
+    const input = { db, actor: { id: "agent-1", name: "Board", companyId: "company-native-persist" }, issue: null, workspace: workspace(), executionWorkspaceId: "native-unknown", adapterEnv: {},
+      config: { workspaceRuntime: { services: [{ name: "native-unknown", command: "node -e \"setInterval(()=>{},1000)\"", reuseScope: "execution_workspace" }] } } };
+    try {
+      const refs = await startRuntimeServicesForWorkspaceControl(input);
+      const job = capture.mock.results[0]!.value as windowsRuntimeJob.WindowsRuntimeJob;
+      job.host!.kill("SIGKILL");
+      await expect(job.completion).resolves.toBe("unknown");
+      await expect(stopRuntimeServicesForExecutionWorkspace({ executionWorkspaceId: "native-unknown", workspaceCwd: process.cwd() })).rejects.toThrow("could not be confirmed stopped");
+      expect(areRuntimeServicesTrackedLocally([refs[0]!.id])).toBe(true);
+      expect(writes.at(-1)).toMatchObject({ providerRef: job.providerRef, processOwnerId: "owner-a", stoppedAt: null, healthStatus: "unhealthy" });
+      await expect(startRuntimeServicesForWorkspaceControl(input)).rejects.toThrow("stop or reconcile");
+      expect(capture).toHaveBeenCalledTimes(1);
+      await expect(terminatePersistedLocalRuntimeProcess({ processOwnerId: "owner-a", providerRef: job.providerRef, startedAt: new Date() })).resolves.toBe(false);
+    } finally { capture.mockRestore(); }
+  });
+
+  it("confirms a short-lived wrapper's ordinary grandchild gone before forgetting ownership", async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "aoa-runtime-job-red-"));
+    const script = path.join(directory, "parent.cjs");
+    const originalShell = process.env.SHELL;
+    delete process.env.SHELL;
+    let grandchildPid = 0;
+    let text = "";
+    let announce!: () => void;
+    const announced = new Promise<void>((resolve) => { announce = resolve; });
+    // The parent waits for the grandchild's real self-report, then exits. No
+    // readiness barrier or delay is added to runtime-service activation/stop.
+    await fs.writeFile(script, `const {spawn}=require('node:child_process');const c=spawn(process.execPath,['-e','console.log(process.pid);setInterval(()=>{},1000)'],{detached:true,stdio:['ignore','pipe','inherit']});c.stdout.once('data',b=>{console.log('OWNED_GRANDCHILD='+String(b).trim());c.unref();process.exit(0)});`);
+    const isAlive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    let serviceId: string | undefined;
+    try {
+      const record = await startLocalRuntimeService({
+        runId: "run-grandchild", agent: { id: "agent-1", name: "Board", companyId: "company-grandchild" }, issue: null,
+        workspace: { baseCwd: directory, cwd: directory, source: "project_primary", projectId: "project-grandchild", workspaceId: "workspace-grandchild", repoUrl: null, repoRef: null, strategy: "project_primary", branchName: null, worktreePath: null, warnings: [], created: false },
+        executionWorkspaceId: "execution-grandchild", adapterEnv: {},
+        service: { name: "grandchild", command: `node "${script}"` }, reuseKey: null, scopeType: "run", scopeId: "run-grandchild",
+        onLog: async (_stream, chunk) => { text += chunk; const match = /OWNED_GRANDCHILD=(\d+)/.exec(text); if (match) { grandchildPid = Number(match[1]); announce(); } },
+      });
+      serviceId = record.id;
+      await Promise.race([announced, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("real grandchild did not announce")), 5_000).unref())]);
+      const deadline = Date.now() + 5_000;
+      while (areRuntimeServicesTrackedLocally([serviceId]) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(grandchildPid).toBeGreaterThan(0);
+      expect(areRuntimeServicesTrackedLocally([serviceId])).toBe(false);
+      expect(isAlive(grandchildPid), `owned grandchild ${grandchildPid} must exit before tracking is removed`).toBe(false);
+    } finally {
+      await stopRuntimeServicesForExecutionWorkspace({ executionWorkspaceId: "execution-grandchild", workspaceCwd: directory });
+      if (grandchildPid && isAlive(grandchildPid)) {
+        // Exact PID just self-reported by this test's child, never a global scan.
+        process.kill(grandchildPid, "SIGKILL");
+        console.error(`manual fallback cleared test-owned grandchild ${grandchildPid}`);
+      }
+      if (originalShell !== undefined) process.env.SHELL = originalShell;
+      await fs.rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("terminatePersistedLocalRuntimeProcess", () => {
+  it("keeps Windows numeric generations unresolved without inspecting or signalling even an absent leader", async () => {
+    for (const alive of [false, true]) {
+      const isAlive = vi.fn(async () => alive);
+      const inspectIdentity = vi.fn(() => "different" as const);
+      const terminate = vi.fn();
+      await expect(terminatePersistedLocalRuntimeProcess(
+        { processOwnerId: "owner-a", providerRef: "4242", startedAt: new Date() },
+        { platform: "win32", isAlive, inspectIdentity, terminate },
+      )).resolves.toBe(false);
+      expect(isAlive).not.toHaveBeenCalled();
+      expect(inspectIdentity).not.toHaveBeenCalled();
+      expect(terminate).not.toHaveBeenCalled();
+    }
+  });
   it("does not inspect or signal foreign and legacy persisted PIDs", async () => {
     const isAlive = vi.fn(async () => true);
     const inspectIdentity = vi.fn(() => "matching" as const);
@@ -983,11 +1120,12 @@ describe("terminatePersistedLocalRuntimeProcess", () => {
     expect(safe).toBe(false);
   });
 
-  it("accepts a confirmed reused PID without signalling the unrelated process", async () => {
+  it("accepts a confirmed reused POSIX PID without signalling the unrelated process", async () => {
     const terminate = vi.fn();
     const safe = await terminatePersistedLocalRuntimeProcess(
       { processOwnerId: "owner-a", providerRef: "4242", startedAt: new Date() },
       {
+        platform: "linux",
         isAlive: async () => true,
         inspectIdentity: () => "different",
         terminate,
@@ -1101,7 +1239,7 @@ describe("terminatePersistedLocalRuntimeProcess", () => {
     }));
   });
 
-  it("persists process ownership with the PID before readiness can wait", async () => {
+  it("persists activated process ownership before readiness can wait", async () => {
     const writes: Array<Record<string, unknown>> = [];
     const db = {
       insert: () => ({
@@ -1138,7 +1276,7 @@ describe("terminatePersistedLocalRuntimeProcess", () => {
       status: "starting",
       processOwnerId: "owner-a",
     });
-    expect(writes[0]?.providerRef).toMatch(/^\d+$/);
+    expect(writes[0]?.providerRef).toMatch(process.platform === "win32" ? /^aoa-winjob:v1:[0-9a-f-]{36}$/ : /^\d+$/);
     await stopRuntimeServicesForExecutionWorkspace({
       executionWorkspaceId: "workspace-owned",
       workspaceCwd: process.cwd(),

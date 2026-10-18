@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
+import { launchWindowsRuntimeJob, stopOwnedWindowsRuntimeJob, forgetWindowsRuntimeJob, type WindowsRuntimeJob } from "../utils/windows-runtime-job.js";
 import type { AdapterRuntimeServiceReport } from "@armyofagents/adapter-utils";
 import type { Db } from "@armyofagents/db";
 import { executionWorkspaces, projectWorkspaces, taskOutputs, workspaceRuntimeServices } from "@armyofagents/db";
@@ -102,6 +103,8 @@ interface RuntimeServiceRecord extends RuntimeServiceRef {
   processOwnerId: string | null;
   db?: Db;
   child: ChildProcess | null;
+  windowsJob?: WindowsRuntimeJob;
+  windowsPersistenceTail?: Promise<void>;
   leaseRunIds: Set<string>;
   acquisitionCommitted: boolean;
   idleTimer: ReturnType<typeof globalThis.setTimeout> | null;
@@ -127,6 +130,7 @@ function validateRuntimeServiceAcquisition(serviceIds: Iterable<string>): Runtim
       runtimeServiceStopsInProgress.has(serviceId) ||
       (record.status !== "starting" && record.status !== "running") ||
       !record.providerRef
+      || (record.windowsJob && record.windowsJob.state !== "active")
     ) {
       throw new RuntimeServiceActivationFenceError();
     }
@@ -285,20 +289,23 @@ export async function terminatePersistedLocalRuntimeProcess(
   if (!processOwnerId || row.processOwnerId !== processOwnerId) return false;
 
   const rawPid = row.providerRef?.trim() ?? "";
+  const platform = deps.platform ?? process.platform;
+  // Windows tree ownership requires the original private job generation. A
+  // legacy PID (even absent/reused) says nothing about surviving descendants.
+  if (platform === "win32") return stopOwnedWindowsRuntimeJob(rawPid, processOwnerId);
   if (!/^\d+$/.test(rawPid)) return false;
   const pid = Number(rawPid);
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
 
-  const platform = deps.platform ?? process.platform;
   const isAlive = deps.isAlive ?? isProcessTargetEffectivelyAlive;
   const leaderAlive = await isAlive(pid);
-  const terminationTarget = platform === "win32" ? pid : -pid;
+  const terminationTarget = -pid;
   if (!leaderAlive) {
     // A detached POSIX leader may exit while tenant-command descendants remain
     // in its process group. With the recorded leader gone there is no process
     // start identity left to verify safely, so preserve the row and make cloud
     // startup fail closed until an operator remediates the group.
-    if (platform !== "win32" && await isAlive(terminationTarget)) return false;
+    if (await isAlive(terminationTarget)) return false;
     return true;
   }
 
@@ -313,13 +320,13 @@ export async function terminatePersistedLocalRuntimeProcess(
 
   (deps.terminate ?? terminateByPid)(
     pid,
-    platform === "win32" ? null : pid,
+    pid,
   );
 
   const deadline = Date.now() + (deps.waitForExitMs ?? 2_000);
   while (Date.now() <= deadline) {
     // POSIX success means the entire detached process group is gone, not only
-    // its shell/leader. Windows taskkill targets the tree through the PID.
+    // its shell/leader.
     if (!await isAlive(terminationTarget)) return true;
     await delay(50);
   }
@@ -748,7 +755,7 @@ function trackedRuntimeServiceForReuseKey(reuseKey: string): RuntimeServiceRecor
 }
 
 function assertRuntimeServiceCanBeReused(existing: RuntimeServiceRecord) {
-  if (existing.status === "running") return;
+  if (existing.status === "running" && (!existing.windowsJob || existing.windowsJob.state === "active")) return;
   throw new Error(
     `Runtime service "${existing.serviceName}" is still ${existing.status}/${existing.healthStatus}; ` +
     "stop or reconcile the tracked process before starting another service with the same reuse scope",
@@ -1784,41 +1791,49 @@ function toPersistedWorkspaceRuntimeService(record: RuntimeServiceRecord): typeo
 
 async function persistRuntimeServiceRecord(db: Db | undefined, record: RuntimeServiceRecord) {
   if (!db) return;
+  // Capture before queuing: a later native completion may mutate the record
+  // while an earlier activation write is still in flight.
   const values = toPersistedWorkspaceRuntimeService(record);
-  await db
-    .insert(workspaceRuntimeServices)
-    .values(values)
-    .onConflictDoUpdate({
-      target: workspaceRuntimeServices.id,
-      set: {
-        projectId: values.projectId,
-        projectWorkspaceId: values.projectWorkspaceId,
-        executionWorkspaceId: values.executionWorkspaceId,
-        issueId: values.issueId,
-        scopeType: values.scopeType,
-        scopeId: values.scopeId,
-        serviceName: values.serviceName,
-        status: values.status,
-        lifecycle: values.lifecycle,
-        reuseKey: values.reuseKey,
-        command: values.command,
-        cwd: values.cwd,
-        port: values.port,
-        url: values.url,
-        provider: values.provider,
-        providerRef: values.providerRef,
-        processOwnerId: values.processOwnerId,
-        ownerAgentId: values.ownerAgentId,
-        startedByRunId: values.startedByRunId,
-        lastUsedAt: values.lastUsedAt,
-        startedAt: values.startedAt,
-        stoppedAt: values.stoppedAt,
-        stopPolicy: values.stopPolicy,
-        healthStatus: values.healthStatus,
-        updatedAt: values.updatedAt,
-      },
-    });
-  await emitRuntimeServiceTaskOutput(db, values);
+  const write = async () => {
+    await db
+      .insert(workspaceRuntimeServices)
+      .values(values)
+      .onConflictDoUpdate({
+        target: workspaceRuntimeServices.id,
+        set: {
+          projectId: values.projectId,
+          projectWorkspaceId: values.projectWorkspaceId,
+          executionWorkspaceId: values.executionWorkspaceId,
+          issueId: values.issueId,
+          scopeType: values.scopeType,
+          scopeId: values.scopeId,
+          serviceName: values.serviceName,
+          status: values.status,
+          lifecycle: values.lifecycle,
+          reuseKey: values.reuseKey,
+          command: values.command,
+          cwd: values.cwd,
+          port: values.port,
+          url: values.url,
+          provider: values.provider,
+          providerRef: values.providerRef,
+          processOwnerId: values.processOwnerId,
+          ownerAgentId: values.ownerAgentId,
+          startedByRunId: values.startedByRunId,
+          lastUsedAt: values.lastUsedAt,
+          startedAt: values.startedAt,
+          stoppedAt: values.stoppedAt,
+          stopPolicy: values.stopPolicy,
+          healthStatus: values.healthStatus,
+          updatedAt: values.updatedAt,
+        },
+      });
+    await emitRuntimeServiceTaskOutput(db, values);
+  };
+  if (!record.windowsJob) return write();
+  const next = (record.windowsPersistenceTail ?? Promise.resolve()).catch(() => {}).then(write);
+  record.windowsPersistenceTail = next;
+  return next;
 }
 
 function clearIdleTimer(record: RuntimeServiceRecord) {
@@ -2277,6 +2292,7 @@ export async function startLocalRuntimeService(input: {
   // Resolve/validate ownership before spawning. In cloud_auth the unsafe
   // execution override does not waive the cross-replica PID safety boundary.
   const processOwnerId = resolveRuntimeProcessOwnerId({ requireExplicitInCloud: true });
+  if (!processOwnerId) throw new Error("Runtime service process owner could not be resolved");
   const serviceCwdTemplate = asString(input.service.cwd, ".");
   const portConfig = parseObject(input.service.port);
   const port = asString(portConfig.type, "") === "auto" ? await allocatePort() : null;
@@ -2303,7 +2319,10 @@ export async function startLocalRuntimeService(input: {
     env[portEnvKey] = String(port);
   }
   const shell = shellInvocation(command);
-  const child = spawn(shell.command, shell.args, {
+  const windowsJob = process.platform === "win32"
+    ? launchWindowsRuntimeJob({ ownerId: processOwnerId, command: shell.command, args: shell.args, cwd: serviceCwd, env })
+    : undefined;
+  const child = windowsJob ? null : spawn(shell.command, shell.args, {
     cwd: serviceCwd,
     env,
     detached: process.platform !== "win32",
@@ -2311,7 +2330,7 @@ export async function startLocalRuntimeService(input: {
   });
   let stderrExcerpt = "";
   let stdoutExcerpt = "";
-  child.stdout?.on("data", (chunk) => {
+  (windowsJob?.stdout ?? child?.stdout)?.on("data", (chunk) => {
     const text = String(chunk);
     stdoutExcerpt = (stdoutExcerpt + text).slice(-4096);
     if (input.onLog) {
@@ -2320,7 +2339,7 @@ export async function startLocalRuntimeService(input: {
       });
     }
   });
-  child.stderr?.on("data", (chunk) => {
+  (windowsJob?.stderr ?? child?.stderr)?.on("data", (chunk) => {
     const text = String(chunk);
     stderrExcerpt = (stderrExcerpt + text).slice(-4096);
     if (input.onLog) {
@@ -2357,7 +2376,7 @@ export async function startLocalRuntimeService(input: {
     port,
     url,
     provider: "local_process",
-    providerRef: child.pid ? String(child.pid) : null,
+    providerRef: windowsJob?.providerRef ?? (child?.pid ? String(child.pid) : null),
     processOwnerId,
     ownerAgentId: input.agent.id,
     startedByRunId,
@@ -2369,6 +2388,7 @@ export async function startLocalRuntimeService(input: {
     reused: false,
     db: input.db,
     child,
+    windowsJob,
     leaseRunIds: leaseRunId ? new Set([leaseRunId]) : new Set(),
     acquisitionCommitted: false,
     idleTimer: null,
@@ -2380,9 +2400,13 @@ export async function startLocalRuntimeService(input: {
   registerRuntimeService(input.db, record);
 
   try {
+    if (windowsJob) {
+      await windowsJob.ready;
+      if (windowsJob.state !== "active") throw new Error("runtime job exited before activation completed");
+    }
     await persistRuntimeServiceRecord(input.db, record);
     await waitForReadiness({ service: input.service, url });
-    if (runtimeServicesById.get(record.id) !== record) {
+    if (runtimeServicesById.get(record.id) !== record || (windowsJob && windowsJob.state !== "active")) {
       throw new Error("process exited before readiness completed");
     }
     // Keep the final durable transition inside the startup cleanup boundary.
@@ -2391,9 +2415,12 @@ export async function startLocalRuntimeService(input: {
     record.status = "running";
     record.healthStatus = "healthy";
     await persistRuntimeServiceRecord(input.db, record);
+    if (windowsJob && (windowsJob.state !== "active" || runtimeServicesById.get(record.id) !== record)) {
+      throw new Error("runtime job exited while activation was being persisted");
+    }
   } catch (err) {
-    let terminated = runtimeServicesById.get(record.id) !== record;
-    if (!terminated && (child.exitCode !== null || child.signalCode !== null)) {
+    let terminated = windowsJob ? windowsJob.state === "empty" : runtimeServicesById.get(record.id) !== record;
+    if (!windowsJob && !terminated && child && (child.exitCode !== null || child.signalCode !== null)) {
       // The group leader exited while readiness was pending. On POSIX, only
       // signal the original group when a descendant still proves that PGID is
       // live; otherwise avoid using a stale numeric PID that may be reused.
@@ -2403,7 +2430,7 @@ export async function startLocalRuntimeService(input: {
     if (!terminated) {
       runtimeServiceStopsInProgress.add(record.id);
       try {
-        terminated = await terminateChildProcess(child, input.terminationDeps);
+        terminated = windowsJob ? await windowsJob.stop() : child ? await terminateChildProcess(child, input.terminationDeps) : false;
       } finally {
         runtimeServiceStopsInProgress.delete(record.id);
       }
@@ -2423,12 +2450,17 @@ export async function startLocalRuntimeService(input: {
       record.stoppedAt = new Date().toISOString();
       record.providerRef = null;
       record.processOwnerId = null;
-      runtimeServicesById.delete(record.id);
-      if (record.reuseKey && runtimeServicesByReuseKey.get(record.reuseKey) === record.id) {
+      if (!windowsJob) runtimeServicesById.delete(record.id);
+      if (!windowsJob && record.reuseKey && runtimeServicesByReuseKey.get(record.reuseKey) === record.id) {
         runtimeServicesByReuseKey.delete(record.reuseKey);
       }
     }
     await persistRuntimeServiceRecord(input.db, record);
+    if (terminated && windowsJob) {
+      runtimeServicesById.delete(record.id);
+      if (record.reuseKey && runtimeServicesByReuseKey.get(record.reuseKey) === record.id) runtimeServicesByReuseKey.delete(record.reuseKey);
+      forgetWindowsRuntimeJob(windowsJob);
+    }
     throw new Error(
       `Failed to start runtime service "${serviceName}": ${err instanceof Error ? err.message : String(err)}` +
       `${stderrExcerpt ? ` | stderr: ${stderrExcerpt.trim()}` : ""}` +
@@ -2465,8 +2497,8 @@ async function stopRuntimeService(serviceId: string) {
   clearIdleTimer(record);
   runtimeServiceStopsInProgress.add(serviceId);
   try {
-    if (record.providerRef && record.child && record.child.pid) {
-      const terminated = await terminateChildProcess(record.child);
+    if (record.providerRef && (record.windowsJob || (record.child && record.child.pid))) {
+      const terminated = record.windowsJob ? await record.windowsJob.stop() : await terminateChildProcess(record.child!);
       if (!terminated) {
         // The child exit event may have raced with the confirmation failure.
         // Restore both indexes and active state so a surviving process group
@@ -2490,6 +2522,7 @@ async function stopRuntimeService(serviceId: string) {
     // durable. If persistence fails, a later stop/control retry can finish the
     // transition without requiring a server restart.
     await persistRuntimeServiceRecord(record.db, record);
+    if (record.windowsJob) forgetWindowsRuntimeJob(record.windowsJob);
     runtimeServicesById.delete(serviceId);
     if (record.reuseKey && runtimeServicesByReuseKey.get(record.reuseKey) === record.id) {
       runtimeServicesByReuseKey.delete(record.reuseKey);
@@ -2535,46 +2568,61 @@ function registerRuntimeService(db: Db | undefined, record: RuntimeServiceRecord
     runtimeServicesByReuseKey.set(record.reuseKey, record.id);
   }
 
-  record.child?.on("exit", (code, signal) => {
-    void (async () => {
-      const current = runtimeServicesById.get(record.id);
-      if (!current) return;
-      // The explicit stop path owns state transition and deletion while it is
-      // confirming the entire process tree, not just the group leader.
-      if (runtimeServiceStopsInProgress.has(record.id)) return;
+  const reconcileExit = async (code: number | null, signal: NodeJS.Signals | null) => {
+    const current = runtimeServicesById.get(record.id);
+    if (!current) return;
+    // The explicit stop path owns state transition and deletion while it is
+    // confirming the entire process tree, not just the group leader.
+    if (runtimeServiceStopsInProgress.has(record.id)) return;
 
-      // On POSIX a detached shell can exit while a descendant in its process
-      // group survives. Keep that group tracked until health/stop logic reaps it.
-      if (
-        process.platform !== "win32" &&
-        current.child?.pid &&
-        !(await waitForProcessTargetExit(-current.child.pid, 0))
-      ) {
-        clearIdleTimer(current);
-        current.status = "running";
-        current.healthStatus = "unhealthy";
-        current.lastUsedAt = new Date().toISOString();
-        current.stoppedAt = null;
-        await persistRuntimeServiceRecord(db, current);
-        return;
-      }
-
+    if (current.windowsJob && current.windowsJob.state !== "empty") {
       clearIdleTimer(current);
-      current.status = code === 0 || signal === "SIGTERM" ? "stopped" : "failed";
-      current.healthStatus = current.status === "failed" ? "unhealthy" : "unknown";
-      current.lastUsedAt = new Date().toISOString();
-      current.stoppedAt = new Date().toISOString();
-      current.providerRef = null;
-      current.processOwnerId = null;
+      current.healthStatus = "unhealthy";
+      current.stoppedAt = null;
       await persistRuntimeServiceRecord(db, current);
-      runtimeServicesById.delete(current.id);
-      if (current.reuseKey && runtimeServicesByReuseKey.get(current.reuseKey) === current.id) {
-        runtimeServicesByReuseKey.delete(current.reuseKey);
-      }
-    })().catch((err) => {
+      return;
+    }
+
+    // On POSIX a detached shell can exit while a descendant in its process
+    // group survives. Keep that group tracked until health/stop logic reaps it.
+    if (
+      process.platform !== "win32" &&
+      current.child?.pid &&
+      !(await waitForProcessTargetExit(-current.child.pid, 0))
+    ) {
+      clearIdleTimer(current);
+      current.status = "running";
+      current.healthStatus = "unhealthy";
+      current.lastUsedAt = new Date().toISOString();
+      current.stoppedAt = null;
+      await persistRuntimeServiceRecord(db, current);
+      return;
+    }
+
+    clearIdleTimer(current);
+    current.status = code === 0 || signal === "SIGTERM" ? "stopped" : "failed";
+    current.healthStatus = current.status === "failed" ? "unhealthy" : "unknown";
+    current.lastUsedAt = new Date().toISOString();
+    current.stoppedAt = new Date().toISOString();
+    current.providerRef = null;
+    current.processOwnerId = null;
+    await persistRuntimeServiceRecord(db, current);
+    if (current.windowsJob) forgetWindowsRuntimeJob(current.windowsJob);
+    runtimeServicesById.delete(current.id);
+    if (current.reuseKey && runtimeServicesByReuseKey.get(current.reuseKey) === current.id) {
+      runtimeServicesByReuseKey.delete(current.reuseKey);
+    }
+  };
+  const reportExit = (code: number | null, signal: NodeJS.Signals | null) => {
+    void reconcileExit(code, signal).catch((err) => {
       logger.error({ err, runtimeServiceId: record.id }, "failed to reconcile runtime service child exit");
     });
-  });
+  };
+  if (record.windowsJob) {
+    // Completion is latched by the private client before record registration;
+    // an absent host exit event is never substituted for a zero-job receipt.
+    void record.windowsJob.completion.then(() => reportExit(record.windowsJob!.exitCode, null));
+  } else record.child?.on("exit", reportExit);
 }
 
 async function ensureRuntimeServicesForRunUnlocked(input: {
