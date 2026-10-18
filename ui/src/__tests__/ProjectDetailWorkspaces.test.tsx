@@ -7,7 +7,7 @@
 // the retry loop handles that gap. Each suite (Board, Discussions,
 // Workspaces) needs the same treatment as rows are added.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, cleanup, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // These tests render a multi-query page; give enough headroom for slow CI runs.
@@ -20,6 +20,7 @@ import {
   mockDialogContext,
 } from "./test-utils";
 import { ProjectDetail } from "../pages/ProjectDetail";
+import { queryKeys } from "../lib/queryKeys";
 
 // --- Mock data ---
 
@@ -449,6 +450,9 @@ describe("ProjectDetail — Workspaces tab", () => {
   });
 
   it("workspace row navigates to workspace view on click", async () => {
+    // Control canonical metadata arrival instead of relying on CPU scheduling
+    // to land UUID -> ENG navigation between finding a row and clicking it.
+    projectsApiMock.get.mockResolvedValueOnce({ ...mockProject, simpleId: null });
     function LocationDisplay() {
       const location = useLocation();
       return <div data-testid="location">{location.pathname}</div>;
@@ -475,14 +479,24 @@ describe("ProjectDetail — Workspaces tab", () => {
 
     await screen.findByText("ENG-99-fix-auth", {}, { timeout: 5000 });
 
-    // Use findByTestId instead of getByTestId — under parallel-suite load
-    // the row query can resolve after the project header but before the
-    // row's own DOM node has rendered. findBy retries until the node exists.
-    fireEvent.click(await screen.findByTestId("workspace-row-ws-1"));
+    const rowBeforeCanonicalization = await screen.findByTestId("workspace-row-ws-1");
+    expect(rowBeforeCanonicalization.isConnected).toBe(true);
+    await act(async () => {
+      queryClient.setQueryData([...queryKeys.projects.detail(mockProject.id), "comp-1"], mockProject);
+    });
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/projects/ENG/workspaces"));
+    await screen.findByTestId("workspace-row-ws-1");
+    expect(rowBeforeCanonicalization.isConnected, "canonical project lookup remounts the workspace row").toBe(false);
+    // A findBy result captured before canonicalization is detached. Re-query
+    // and click in one synchronous turn after the canonical view is ready.
+    const row = screen.getByTestId("workspace-row-ws-1");
+    expect(row.isConnected).toBe(true);
+    fireEvent.click(row);
 
     await waitFor(() => {
       expect(screen.getByTestId("location")).toHaveTextContent("/TC/workspaces/ws-1");
     });
+    expect(screen.getByTestId("workspace-page")).toBeInTheDocument();
   });
 
   it("shows Archive button on active workspace rows", async () => {
