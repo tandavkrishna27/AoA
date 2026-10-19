@@ -12,6 +12,8 @@
 
 **Optional multi-chat execution:** [Astra/Sol/Luna orchestration and launch prompt](2026-10-19-p1-orchestration.md). It applies only after explicit human activation; ticket scope, dependencies and acceptance remain defined here.
 
+**Available test infrastructure:** [Local PC/VPS access, resource bookings, isolation and mandatory cleanup](2026-10-19-p1-test-resources.md). Docker/dev tooling is user-reported available on both. Reserve physical-host resources before application setup; remove owned disposable runtimes/data/install/build copies after each batch and retain compact evidence.
+
 **Baseline:** `docs/replatform-program`, `920ea681d97934762d30f9eb39a6bb5857feb3d3`, 19 October 2026. Recheck HEAD and superseding results before pickup. All seven ticket IDs below are local planning identifiers, status `not_started`; no external issues or result/QA records have been created. Existing W packages keep their own status.
 
 ## Global Constraints
@@ -25,6 +27,7 @@
 - No new control-plane command executor, credential copying, silent legacy/E2B fallback, parallel database authority, general fleet service, or worker-protocol v1 operation/byte changes.
 - New database fields/indexes are generated through Drizzle; security-only grants/RLS follow Decisions 122/123 and startup certification. Never edit old migrations to fit this feature.
 - Use [19 October test policy](2026-10-19-implementation-test-policy.md): targeted functional tests and affected-package types/builds; whole suite in GitHub CI. Performance/load/fairness/latency/soak campaigns remain deferred. Correctness deadlines and fault/race tests stay active.
+- Apply the linked shared-host booking/cleanup protocol to every heavy functional batch. Default to one heavy batch per physical host; paired PC/VPS tests reserve both. Concurrent chats never share mutable app/DB/config/ports/state. Release resources and remove owned disposable disk data at batch completion; retain only required compact evidence and budgeted shared caches.
 - Keep existing release exposure and gates unchanged. Record necessary local-provider, credential-route and cross-target-retry decisions in their owning records before code changes; this plan does not certify a release or change the disabled desktop/mobility matrix.
 
 ## Review Focus

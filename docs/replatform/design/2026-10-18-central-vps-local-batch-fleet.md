@@ -6,6 +6,8 @@ Status: proposed design and delivery sequence, prepared at the user's request. T
 
 The implementation pickup list is [P1 local-worker fleet implementation plan](../../aoa/plans/2026-10-19-p1-local-worker-fleet.md). Its seven local ticket IDs are proposed work items, not filed GitHub issues. Continue the owning W work through these bounded slices; do not reopen completed components or create duplicate W tickets.
 
+Actual application tests use the user-supplied local PC and testing VPS under the [shared-host access, reservation and cleanup protocol](../../aoa/plans/2026-10-19-p1-test-resources.md). Disk/RAM/CPU are constrained; central books host capacity, isolates concurrent chats and requires removal of owned disposable test resources after each batch. The protocol records the SSH command; no host connection was made to prepare these documents.
+
 ## Outcome and scope
 
 One authenticated VPS installation coordinates a small fleet of trusted, explicitly enrolled PCs and Linux VPSs. Jobs actually execute on worker hardware. P1 supports company API keys and owner-bound Codex personal subscriptions. Codex is the first CLI; Claude subscription support is deferred.

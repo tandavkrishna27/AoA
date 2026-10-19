@@ -21,6 +21,11 @@ workflow only when the human explicitly requests it. The guide does not itself
 grant permission to create/message chats, select models, execute the plan or
 provision resources; the current human launch instruction supplies that scope.
 Existing architecture, security and implementation-test rules remain controlling.
+For every P1 application/Docker/database or other heavy functional test, follow
+the [shared test-host reservation and cleanup protocol](docs/aoa/plans/2026-10-19-p1-test-resources.md).
+Local and VPS resources are constrained: central assigns host bookings, each run
+uses isolated names/paths/ports/state, and owned disposable resources are removed
+after verification. Parallel chats must use the shared reservation protocol.
 
 ## 3. Repo Map
 

@@ -22,6 +22,8 @@ For the narrowed central-VPS plus PC/Linux-VPS batch-worker work, read the
 then the [seven-ticket implementation queue](../aoa/plans/2026-10-19-p1-local-worker-fleet.md).
 For an explicitly requested Astra/Sol/Luna multi-chat run, use the
 [orchestration guide and launch prompt](../aoa/plans/2026-10-19-p1-orchestration.md).
+All actual local/VPS testing uses the
+[shared-host access, reservation and cleanup protocol](../aoa/plans/2026-10-19-p1-test-resources.md).
 Start with **P1-01**, the Codex credential-boundary qualification. After that
 interface is fixed, provider, credential and scheduling work can proceed in
 parallel as specified in the queue. Both company API keys and owner-bound Codex

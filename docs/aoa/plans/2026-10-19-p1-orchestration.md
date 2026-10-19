@@ -10,8 +10,11 @@ Read repository `AGENTS.md` and its required architecture sources, then:
 2. [P1 design and W01-W17 reuse ledger](../../replatform/design/2026-10-18-central-vps-local-batch-fleet.md).
 3. [Seven-ticket implementation plan](2026-10-19-p1-local-worker-fleet.md).
 4. [Implementation-phase test policy](2026-10-19-implementation-test-policy.md).
+5. [Shared local/VPS test hosts, access, reservations and cleanup](2026-10-19-p1-test-resources.md).
 
 The seven-ticket plan owns implementation scope and acceptance. This guide owns delegation, communication, worktree boundaries and integration. Recheck current HEAD and newer handoffs at startup. Reuse landed W01-W17 work. Keep security, tenant scope, quotas, fences, cancellation, durable completion and cleanup checks active; performance/load/latency/soak qualification stays deferred and whole-suite verification stays in GitHub CI.
+
+The user provides the local Windows computer and testing VPS at `2.28.28.156`, both with Docker/dev tooling reported available. SSH access and protected key-path reference are in the shared-host protocol. Central schedules physical-host bookings separately from code tickets: one heavy functional test/build batch per host by default; paired journeys reserve both hosts. Lanes cannot start app/DB/Docker setup without a booking, and cannot release it before verified owned teardown. Use host-global locks plus isolated run IDs, paths, ports, databases, Compose projects and receipts. Keep resource-heavy tests serialized even while coding lanes run in parallel.
 
 ## Models and responsibilities
 
@@ -70,15 +73,15 @@ Use exact authorized branch names `codex/p1-provider`, `codex/p1-credentials` an
 
 Only central integrates reviewed lane commits into `docs/replatform-program`. Lanes may commit and push their own branches, but do not merge each other or directly update the program branch. Central chooses merge/cherry-pick once, records the mapping and avoids replaying both copies. Pass prerequisites as exact commits and interfaces; a message saying “done” does not release a dependency. A dependent lane incorporates the reviewed prerequisite commits before using their APIs.
 
-Retain the existing repository ticket/result review conventions. Do not mark entire W packages or release gates complete from narrower P1 acceptance. Do not merge `main`, release, promote images, change production infrastructure or perform destructive cleanup under this orchestration instruction.
+Retain the existing repository ticket/result review conventions. Do not mark entire W packages or release gates complete from narrower P1 acceptance. Do not merge `main`, release, promote images or change production infrastructure under this instruction. Teardown/deletion of verified newly owned disposable test resources is required under the shared-host protocol; unrelated/global/destructive cleanup remains outside scope.
 
 ## Coordination state and handoffs
 
-Central owns a local, uncommitted operational registry, for example `.context/p1-orchestration-state.json`, recording the verified coordinator/lane chat IDs, hosts, branches/worktrees, base/ready commits, current ticket, dependencies, authorization reference and last delivered wait cursor. Ensure this operational registry is not staged or published. Recreate it from app state after interruption; never assume a lane exists because a creation request was sent.
+Central owns the local, uncommitted operational registry at `C:\Users\Dell\Desktop\aoa\.p1-coordination\state.json`, recording verified coordinator/lane IDs, hosts, branches/worktrees, base/ready commits, ticket/dependencies, authorization reference, wait cursors and resource bookings/locks. All lanes use this same host-global location, not independent copies in their worktrees. The shared-host protocol specifies remote ownership records and run roots. Ensure operational state is not staged/published. After interruption reconcile app and actual host state before scheduling; never assume a lane/resource exists or is gone because a request/SSH command ended.
 
 Maintain durable ticket progress/results in the repository's existing plan and evidence locations. Only central updates the shared status summary; lanes supply reviewed ticket evidence on their branches. Commit milestone status when dependencies or acceptance materially change rather than having every chat edit one status file at once.
 
-Every dispatch states: ticket, scope/files, base/prerequisite commits, interface, expected output/tests, constraints and handoff target. Every handoff states:
+Every dispatch states: ticket, scope/files, base/prerequisite commits, interface, expected output/tests, constraints and handoff target. Runtime dispatch also includes its host booking, run roots/project, resource/port allocations and cleanup owner. Every handoff states:
 
 ```text
 Ticket and status: ready_for_review | waiting_dependency | needs_human
@@ -88,10 +91,12 @@ Files and interface changes:
 Functional commands, native exits and pass/fail/skip counts:
 Evidence paths and remaining limitations:
 Documentation check result:
+Test host booking/run IDs, actual owned resources and cleanup receipt:
+Retained evidence/hash, residuals and booking released/cleanup_pending:
 Requested next action / exact dependency:
 ```
 
-`ready_for_review` is not `complete`. Central checks the actual diff and candidate-scoped evidence, requests fixes as needed, and integrates only after the required independent review. A Luna document check is supporting evidence, not code approval.
+`ready_for_review` is not `complete`. Central checks the actual diff, candidate-scoped evidence and resource cleanup receipts, requests fixes as needed, and integrates only after the required independent review. A Luna document check is supporting evidence, not code approval. A lane with unresolved owned runtime/disk residue reports `cleanup_pending`; it cannot silently return its host to the free pool.
 
 ## Messaging authorization, waiting and resumption
 
@@ -114,6 +119,7 @@ I approve the documented P1 plan for execution within its stated scope.
 Read AGENTS.md and its required sources, docs/replatform/README.md,
 docs/aoa/plans/2026-10-19-p1-orchestration.md, and the linked P1 design,
 seven-ticket implementation plan and current test policy.
+Also read docs/aoa/plans/2026-10-19-p1-test-resources.md before test setup.
 
 Use Astra High (gpt-6-astra, high) for central orchestration/review.
 Use Sol High (gpt-6-sol, high) for lane chats and implementation subagents.
@@ -150,10 +156,27 @@ deferred. Bounded disposable functional probes are in scope using already
 authorized resources/credential custody; ask for missing access rather than
 copying personal auth or launching unrelated paid-provider campaigns.
 
+The available test hosts are this local Windows PC and the testing VPS.
+From Windows, use:
+ssh -i "C:\Users\Dell\.ssh\aoa-testing" root@2.28.28.156
+Docker and standard dev tooling are reported available on both; verify
+actual capacity/versions before setup. Never read/copy/publish the key.
+Disk/RAM/CPU are constrained: centrally reserve each physical host, default
+to one heavy test/build batch per host, and reserve both for paired tests.
+Use host-global locks and unique run directories, ports, Compose projects,
+DB/storage state and logs. Parallel code lanes do not imply parallel heavy
+test capacity. Reuse safe caches/builds and avoid duplicate installations.
+I authorize and require cleanup/deletion of newly owned disposable test
+resources on success, failure, cancellation or timeout, per that protocol.
+Retain compact verified evidence; preserve permanent auth, shared tooling,
+unrelated resources and source work. No global prune or blanket kill/delete.
+Verify teardown and release the booking before another batch starts.
+
 Keep a coordinator-owned status registry, verify handoff commits/tests,
 and perform code/security review separately from Luna documentation checks.
 Proceed through the ready tickets without asking for approval at each ticket.
-No production rollout, release publication or destructive cleanup is authorized.
+No production rollout, release publication or unrelated destructive cleanup
+is authorized. Owned disposable test cleanup is required as described above.
 ```
 
 The launch prompt is the current human instruction when the user submits it. The historical “planning only” notes in the design/plan describe their preparation; they do not require repeated permission after a later explicit implementation launch. Feasibility, required credential access and architecture/security decisions still follow their actual documented gates.
