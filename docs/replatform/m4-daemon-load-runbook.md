@@ -1,5 +1,10 @@
 # Bounded W11 real-daemon diagnostic
 
+> **DEFERRED — optimization phase (19 October 2026):** Do not prepare fixtures,
+> provision applications, run profiles or pursue these performance verdicts during
+> implementation. See the [current test policy](../aoa/plans/2026-10-19-implementation-test-policy.md).
+> The commands below are retained for a later explicitly resumed phase.
+
 This disposable engineering fixture uses authenticated HTTP job submission, the
 production placement service, two separately enrolled networked worker daemons,
 and the shipped deterministic D1 provider through its gated wire. It requires no

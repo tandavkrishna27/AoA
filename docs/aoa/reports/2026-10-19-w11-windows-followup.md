@@ -1,5 +1,7 @@
 # W11 and Windows integration follow-up — 19 October 2026
 
+**Later scope decision, 19 October:** The founder deferred performance optimization. The historical load/fairness FAIL results below are retained and are now non-blocking, deferred optimization findings for implementation. Do not rerun performance campaigns or continue profiling in this phase. Functional regressions remain required. See the [current test policy](../plans/2026-10-19-implementation-test-policy.md); no historical verdict or threshold is changed.
+
 Scope: repair the observed capacity/polling delay and Windows fixture timing/teardown failures, use targeted checks, leave full-suite verification to GitHub CI, and stop disposable applications. This follow-up does not close expanded D5 or the remaining W13/W17 campaigns.
 
 ## Changes

@@ -175,7 +175,23 @@ The `verify` job uses `--frozen-lockfile`, so the regenerated lockfile must be i
 
 ## 8. Verification Before Hand-off
 
-Run this full check before claiming done:
+### Current implementation phase (founder direction, 19 October 2026)
+
+Use targeted functional tests for changed behavior; leave the whole suite to
+GitHub CI. Performance optimization and quantitative load/latency/soak campaigns
+are **DEFERRED**, unnecessary for current implementation acceptance. Do not run
+them, provision local/VPS applications for them, or pursue their failures unless
+the user explicitly resumes that work. Keep historical failures as deferred
+findings, never as passes. See the [test policy and deferred inventory](docs/aoa/plans/2026-10-19-implementation-test-policy.md).
+
+Keep correctness, security, tenant isolation, quota/budget accounting, fencing,
+durable completion, cancellation, recovery and teardown checks active. A timeout
+that detects a hang or enforces a product deadline is still a correctness check.
+Do not skip files merely because their names contain `performance` or `load`.
+Leave performance opt-in flags unset in routine CI and implementation sessions.
+
+The general full verification recipe below remains for CI/release work; it is
+not an instruction to restart full-suite or performance campaigns locally:
 
 ```sh
 pnpm -r typecheck

@@ -3,7 +3,12 @@ import { describe, it, expect } from "vitest";
 /**
  * Performance QA Tests
  *
- * Validates performance contracts and targets:
+ * DEFERRED during implementation: opt in with AOA_RUN_PERFORMANCE_QA=1.
+ * These local pattern/formula assertions do not exercise product code and
+ * cannot certify functional behavior or real performance. See
+ * docs/aoa/plans/2026-10-19-implementation-test-policy.md.
+ *
+ * Historical performance contracts and targets:
  * - Memory search: <100ms for 10K items (contract test)
  * - Suggestion engine: <2s full detection run (contract test)
  * - Context assembly: <200ms per task (contract test)
@@ -16,7 +21,7 @@ import { describe, it, expect } from "vitest";
  * a live database with 10K+ items.
  */
 
-describe("Performance QA", () => {
+describe.skipIf(process.env.AOA_RUN_PERFORMANCE_QA !== "1")("Performance QA (deferred optimization)", () => {
   // ── Memory search performance contract ──────────────────────────────────────
 
   describe("Memory search performance", () => {

@@ -1,5 +1,10 @@
 # W13 bounded service and authenticated realtime validation
 
+> **Implementation scope (19 October 2026):** Keep the bounded functional tests
+> below. FULL quantitative realtime repetitions and long-form D4 collection are
+> deferred; do not run those campaign sections or provision resources for them.
+> See the [current test policy](../aoa/plans/2026-10-19-implementation-test-policy.md).
+
 These engineering checks do not close W13, D4, COV-01, or D5. Run them against
 one recorded candidate in a fresh checkout. Use Node 24.19.0 and pnpm 9.15.4;
 install the checked-in lockfile with `pnpm install --frozen-lockfile`. Build the
@@ -73,7 +78,10 @@ queries to complete, then drains their remaining Promise continuations. The raw
 ledger retains those completed query receipts. This test-only observer delegates
 all database queries and values unchanged; it uses no timed sleep as a barrier.
 
-The full quantitative realtime lane preserves the normative counts and duration:
+### Full quantitative realtime — DEFERRED
+
+Do not run this lane during implementation. The retained commands preserve the
+normative counts and duration for later qualification:
 
 ```sh
 env -i PATH="$PATH" HOME="$EVIDENCE/home" TMPDIR="$EVIDENCE/tmp" \
@@ -98,7 +106,10 @@ buffer depths. Reports record candidate, wall-clock timestamps and scope limits.
 `AOA_W13_REALTIME_EVIDENCE` is an alias for the report **filename** and takes
 precedence over `AOA_W13_REPORT`; its parent directory must already exist.
 
-## Frozen service availability schedule and collection
+## Frozen service availability schedule — live collection DEFERRED
+
+Do not run live collection during implementation. Offline schedule/verdict
+checks remain active; the campaign commands below are for later qualification.
 
 `scripts/d4-service-availability.mjs` implements the shared SLI schedule,
 collection and independently recomputable verdict. It does not orchestrate the
