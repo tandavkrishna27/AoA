@@ -14,6 +14,14 @@ Before making changes, read in this order:
 2. `docs/architecture/decisions.md` — 90+ locked product and architectural decisions. **Do not relitigate.**
 3. `docs/roadmap.md` — planned features (NOT current behavior); `CLAUDE.md` is the source of truth for what shipped
 
+For central-VPS/local-worker **P1** work, also read the
+[P1 orchestration guide](docs/aoa/plans/2026-10-19-p1-orchestration.md), which links
+the design, seven-ticket queue and copyable launch prompt. Activate its multi-chat
+workflow only when the human explicitly requests it. The guide does not itself
+grant permission to create/message chats, select models, execute the plan or
+provision resources; the current human launch instruction supplies that scope.
+Existing architecture, security and implementation-test rules remain controlling.
+
 ## 3. Repo Map
 
 ```

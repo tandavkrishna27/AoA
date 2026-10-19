@@ -10,6 +10,8 @@
 
 **Spec:** [Updated P1 design and W01-W17 reuse ledger](../../replatform/design/2026-10-18-central-vps-local-batch-fleet.md).
 
+**Optional multi-chat execution:** [Astra/Sol/Luna orchestration and launch prompt](2026-10-19-p1-orchestration.md). It applies only after explicit human activation; ticket scope, dependencies and acceptance remain defined here.
+
 **Baseline:** `docs/replatform-program`, `920ea681d97934762d30f9eb39a6bb5857feb3d3`, 19 October 2026. Recheck HEAD and superseding results before pickup. All seven ticket IDs below are local planning identifiers, status `not_started`; no external issues or result/QA records have been created. Existing W packages keep their own status.
 
 ## Global Constraints
