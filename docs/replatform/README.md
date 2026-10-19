@@ -15,6 +15,21 @@ The program is a selective re-platform, not a blank-slate product rewrite. The e
 7. [`epics/README.md`](epics/README.md) — live epic status and navigation.
 8. [`templates/`](templates/) — mandatory formats for execution records.
 
+## P1 local-worker fleet pickup
+
+For the narrowed central-VPS plus PC/Linux-VPS batch-worker work, read the
+[P1 design and W01-W17 reuse ledger](design/2026-10-18-central-vps-local-batch-fleet.md),
+then the [seven-ticket implementation queue](../aoa/plans/2026-10-19-p1-local-worker-fleet.md).
+Start with **P1-01**, the Codex credential-boundary qualification. After that
+interface is fixed, provider, credential and scheduling work can proceed in
+parallel as specified in the queue. Both company API keys and owner-bound Codex
+subscriptions remain required. Reuse the completed W work; retain the current
+targeted-functional-test policy and deferred performance campaigns.
+
+These are planning documents; no P1 implementation or release acceptance has
+been completed by publishing them. Existing architecture and gate authority
+remain as listed below.
+
 ## Source-of-truth hierarchy
 
 1. Locked product-wide decisions: `docs/architecture/decisions.md`.
